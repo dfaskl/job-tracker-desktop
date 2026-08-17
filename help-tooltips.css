@@ -1,0 +1,44 @@
+.title-with-help { display: flex; align-items: center; gap: 9px; }
+.panel h2.title-with-help { padding-left: 12px; }
+.help-icon {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  min-height: 19px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--green) 42%, #aab4ad);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--green) 7%, white);
+  color: var(--green);
+  font: 800 12px/1 Arial, sans-serif;
+  cursor: help;
+  vertical-align: middle;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
+}
+.help-icon:hover, .help-icon:focus-visible {
+  color: #fff;
+  background: var(--green);
+  transform: translateY(-1px);
+  outline: none;
+}
+.stat-card .help-icon { position: absolute; right: 14px; top: 14px; z-index: 2; }
+.floating-help {
+  position: fixed;
+  z-index: 100;
+  width: min(340px, calc(100vw - 28px));
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--green) 18%, #d8dfda);
+  border-radius: 11px;
+  background: rgba(24, 35, 29, .96);
+  color: #f6faf7;
+  box-shadow: 0 14px 36px rgba(5, 18, 10, .24);
+  font-size: 13px;
+  line-height: 1.7;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.floating-help.visible { opacity: 1; transform: translateY(0); }

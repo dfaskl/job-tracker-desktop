@@ -1,0 +1,54 @@
+.ai-normalize-button {
+  min-height: 38px;
+  margin-right: auto;
+  padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, #7355b5 30%, white);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #f4effc, #ebe3f8);
+  color: #6847a0;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.ai-normalize-button:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(91, 63, 139, .14); }
+.ai-normalize-button:disabled { opacity: .58; cursor: wait; transform: none; box-shadow: none; }
+
+.ai-review-panel {
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, #7355b5 24%, #e3e6e4);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #fcfaff, #f7f4fb);
+}
+.ai-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.ai-review-head b { display: block; color: #583b89; font-size: 16px; }
+.ai-review-head span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.ai-review-columns, .ai-review-row {
+  display: grid;
+  grid-template-columns: 24px 82px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.ai-review-columns { padding: 0 10px 7px; color: var(--muted); font-size: 12px; }
+.ai-review-list { display: grid; gap: 7px; }
+.ai-review-row { padding: 10px; border: 1px solid #e7e1ee; border-radius: 9px; background: rgba(255,255,255,.8); cursor: pointer; }
+.ai-review-row:hover { border-color: #cdbde0; }
+.ai-review-row input { width: 16px; height: 16px; accent-color: #7251a8; }
+.ai-review-row > b { font-size: 13px; }
+.ai-old-value, .ai-new-value { min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.ai-old-value { color: #7d8881; text-decoration-color: #d6a7a2; }
+.ai-new-value { color: #513779; font-weight: 600; }
+.ai-review-summary, .ai-review-warnings { display: grid; gap: 4px; margin-top: 12px; padding: 10px 12px; border-radius: 9px; font-size: 12px; line-height: 1.55; }
+.ai-review-summary { background: #eee8f7; color: #5d4385; }
+.ai-review-warnings { background: #fff3dc; color: #8b5b16; }
+.ai-review-summary b, .ai-review-warnings b { margin-bottom: 2px; }
+.ai-no-change { padding: 16px; text-align: center; color: var(--muted); background: #fff; border-radius: 9px; }
+.ai-review-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
+@media(max-width: 700px) {
+  .ai-review-columns { display: none; }
+  .ai-review-row { grid-template-columns: 24px 1fr; }
+  .ai-review-row > b { grid-column: 2; }
+  .ai-old-value, .ai-new-value { grid-column: 2; }
+  .ai-old-value::before { content: "原："; }
+  .ai-new-value::before { content: "建议："; }
+}

@@ -1,0 +1,101 @@
+:root[data-theme="blue"] {
+  --green: #355fae;
+  --green2: #e9effb;
+  --line: #dce3ee;
+  --shadow: 0 10px 28px rgba(39, 61, 101, .08);
+}
+:root[data-theme="purple"] {
+  --green: #7251a8;
+  --green2: #f0ebf8;
+  --line: #e4deec;
+  --shadow: 0 10px 28px rgba(78, 54, 105, .08);
+}
+:root[data-theme="orange"] {
+  --green: #a8602d;
+  --green2: #fbefe5;
+  --line: #eadfd6;
+  --shadow: 0 10px 28px rgba(105, 69, 39, .08);
+}
+
+:root[data-theme="blue"] body {
+  background: radial-gradient(circle at 88% 4%, rgba(211, 223, 247, .8), transparent 27%), linear-gradient(135deg, #f7f8fb, #eef2f8);
+}
+:root[data-theme="purple"] body {
+  background: radial-gradient(circle at 88% 4%, rgba(229, 217, 244, .78), transparent 27%), linear-gradient(135deg, #faf8fb, #f2eef6);
+}
+:root[data-theme="orange"] body {
+  background: radial-gradient(circle at 88% 4%, rgba(245, 222, 201, .78), transparent 27%), linear-gradient(135deg, #faf8f5, #f5efe9);
+}
+
+:root[data-theme="blue"] .sidebar { background: linear-gradient(180deg, #17233e, #111b31 62%, #18243c); border-right-color: rgba(127, 157, 211, .16); }
+:root[data-theme="purple"] .sidebar { background: linear-gradient(180deg, #2c203c, #21182e 62%, #2d213a); border-right-color: rgba(178, 146, 211, .16); }
+:root[data-theme="orange"] .sidebar { background: linear-gradient(180deg, #3a271c, #2d1e16 62%, #3a281d); border-right-color: rgba(210, 157, 113, .16); }
+
+:root[data-theme="blue"] .brand-mark { background: linear-gradient(145deg, #7297df, #466fc0); box-shadow: 0 8px 20px rgba(54, 91, 164, .28); }
+:root[data-theme="purple"] .brand-mark { background: linear-gradient(145deg, #a47bd2, #7650ae); box-shadow: 0 8px 20px rgba(106, 70, 154, .28); }
+:root[data-theme="orange"] .brand-mark { background: linear-gradient(145deg, #d99760, #b86b34); box-shadow: 0 8px 20px rgba(161, 87, 35, .28); }
+
+:root[data-theme="blue"] nav button.active { background: linear-gradient(90deg, rgba(70, 104, 169, .45), rgba(52, 78, 132, .25)); box-shadow: inset 3px 0 0 #7da4eb; }
+:root[data-theme="purple"] nav button.active { background: linear-gradient(90deg, rgba(119, 77, 157, .45), rgba(88, 58, 119, .25)); box-shadow: inset 3px 0 0 #b58add; }
+:root[data-theme="orange"] nav button.active { background: linear-gradient(90deg, rgba(159, 91, 45, .45), rgba(119, 66, 34, .25)); box-shadow: inset 3px 0 0 #dda06c; }
+:root[data-theme="blue"] nav button.active span { color: #8eb0ed; }
+:root[data-theme="purple"] nav button.active span { color: #c09be3; }
+:root[data-theme="orange"] nav button.active span { color: #e3aa79; }
+
+:root[data-theme="blue"] .primary { background: linear-gradient(135deg, #4a75ca, #315aa8); box-shadow: 0 7px 16px rgba(45, 83, 158, .2); }
+:root[data-theme="purple"] .primary { background: linear-gradient(135deg, #8962bd, #67449d); box-shadow: 0 7px 16px rgba(91, 58, 137, .2); }
+:root[data-theme="orange"] .primary { background: linear-gradient(135deg, #bd7541, #985322); box-shadow: 0 7px 16px rgba(142, 76, 30, .2); }
+
+:root[data-theme] .secondary {
+  background: color-mix(in srgb, var(--green) 10%, white);
+  color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 24%, white);
+}
+:root[data-theme] .secondary:hover,
+:root[data-theme] .link-btn:hover { background: color-mix(in srgb, var(--green) 15%, white); }
+:root[data-theme] .link-btn { color: var(--green); }
+:root[data-theme] .field input:focus,
+:root[data-theme] .field select:focus,
+:root[data-theme] .field textarea:focus,
+:root[data-theme] .search:focus {
+  border-color: color-mix(in srgb, var(--green) 65%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 12%, transparent);
+}
+:root[data-theme] .application-card:hover { border-color: color-mix(in srgb, var(--green) 35%, white); }
+
+:root[data-theme="blue"] .panel h2::before, :root[data-theme="blue"] .application-card:hover::before, :root[data-theme="blue"] .column-track i { background: linear-gradient(#668bd2, #365faa); }
+:root[data-theme="purple"] .panel h2::before, :root[data-theme="purple"] .application-card:hover::before, :root[data-theme="purple"] .column-track i { background: linear-gradient(#9a73c7, #68479d); }
+:root[data-theme="orange"] .panel h2::before, :root[data-theme="orange"] .application-card:hover::before, :root[data-theme="orange"] .column-track i { background: linear-gradient(#cf8a56, #9b5727); }
+:root[data-theme="blue"] .event-card { border-left-color: #668bd2; }
+:root[data-theme="purple"] .event-card { border-left-color: #9671bf; }
+:root[data-theme="orange"] .event-card { border-left-color: #c7804c; }
+
+.theme-panel { margin-bottom: 20px; }
+.theme-panel > p { color: var(--muted); margin: 7px 0 18px; }
+.theme-options { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 12px; }
+.theme-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 11px;
+  padding: 13px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.theme-option:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.theme-option.active { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 12%, transparent); }
+.theme-option.active::after { content: "✓"; position: absolute; right: 9px; top: 7px; color: var(--green); font-weight: 800; }
+.theme-swatch { width: 36px; height: 36px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+.theme-swatch.blue { background: linear-gradient(135deg, #17233e 50%, #567fce 50%); }
+.theme-swatch.purple { background: linear-gradient(135deg, #2c203c 50%, #8962bd 50%); }
+.theme-swatch.orange { background: linear-gradient(135deg, #3a271c 50%, #bd7541 50%); }
+.theme-swatch.green { background: linear-gradient(135deg, #102c20 50%, #3b9b6c 50%); }
+.theme-option b { display: block; }
+.theme-option small { display: block; color: var(--muted); margin-top: 3px; }
+@media(max-width: 900px) { .theme-options { grid-template-columns: 1fr 1fr; } }

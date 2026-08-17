@@ -1,0 +1,27 @@
+.schedule-calendar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.schedule-calendar-actions .calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.schedule-calendar-actions .calendar-controls .ghost {
+  width: 34px;
+  min-height: 34px;
+  padding: 5px;
+  font-size: 20px;
+  line-height: 1;
+}
+.schedule-calendar-actions .calendar-controls .secondary,
+.schedule-calendar-actions > .primary {
+  min-height: 34px;
+  padding: 7px 12px;
+}
+@media(max-width: 720px) {
+  .schedule-calendar-panel .panel-head { align-items: flex-start; }
+  .schedule-calendar-actions { flex-wrap: wrap; gap: 7px; }
+}

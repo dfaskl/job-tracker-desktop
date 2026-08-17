@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>求职进度本</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="home-layout.css">
+  <link rel="stylesheet" href="theme-refresh.css">
+  <link rel="stylesheet" href="theme-options.css">
+  <link rel="stylesheet" href="help-tooltips.css">
+  <link rel="stylesheet" href="ai-normalize.css">
+  <link rel="stylesheet" href="official-search.css">
+  <link rel="stylesheet" href="stats-calendar.css">
+  <link rel="stylesheet" href="schedule-calendar.css">
+  <link rel="stylesheet" href="schedule-toolbar.css">
+  <link rel="stylesheet" href="notes-display.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">✓</span><div><b>求职进度本</b><small>本地求职管理工具</small></div></div>
+    <nav id="nav">
+      <button data-page="home" class="active"><span>⌂</span>首页</button>
+      <button data-page="applications"><span>▣</span>投递记录</button>
+      <button data-page="calendar"><span>□</span>日程</button>
+      <button data-page="mail"><span>✦</span>邮件识别</button>
+      <button data-page="stats"><span>◫</span>统计</button>
+      <button data-page="settings"><span>⚙</span>设置</button>
+    </nav>
+  </aside>
+  <main>
+    <header><div><h1 id="pageTitle">首页</h1><p id="pageSubtitle">掌握每一次机会的进展</p></div><button class="primary" id="quickAdd">＋ 新建投递</button></header>
+    <section id="content"></section>
+  </main>
+
+  <div class="modal-mask hidden" id="modalMask"><div class="modal"><div class="modal-head"><h2 id="modalTitle"></h2><button class="icon-btn" id="modalClose">×</button></div><div id="modalBody"></div></div></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+  <script src="stats-v2.js"></script>
+  <script src="home-confirm.js"></script>
+  <script src="theme-selector.js"></script>
+  <script src="help-tooltips.js"></script>
+  <script src="ai-normalize.js"></script>
+  <script src="official-search.js"></script>
+  <script src="stats-calendar.js"></script>
+  <script src="schedule-calendar.js"></script>
+  <script src="application-dedupe.js"></script>
+  <script src="notes-display.js"></script>
+</body>
+</html>

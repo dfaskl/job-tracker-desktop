@@ -1,0 +1,16 @@
+.application-info-line { display: flex; flex-wrap: wrap; gap: 22px; }
+.application-info-line span { display: flex; gap: 8px; }
+.application-info-line b { color: var(--ink); }
+.application-note-block { margin-top: 13px; padding: 11px 13px; border-left: 3px solid var(--green); border-radius: 7px; background: color-mix(in srgb, var(--green) 7%, white); }
+.application-note-block > b { color: var(--green); font-size: 12px; }
+.application-note-block p { margin: 5px 0 0; color: var(--ink); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.application-note-empty { margin-top: 11px; color: var(--muted); font-size: 12px; }
+.schedule-note { padding: 6px 8px; border-radius: 6px; background: #f5f2f8; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.schedule-note b { margin-right: 7px; color: #674b87; }
+.event-note { margin-top: 7px; padding: 6px 8px; border-radius: 6px; background: #f5f2f8; color: #655872; }
+.event-note b { color: #674b87; }
+.event-note.empty-note { background: #f5f6f5; color: #929b95; }
+.event-note.empty-note b { color: #78827c; }
+.event-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.event-card-actions button { min-height: 32px; padding: 6px 10px; font-size: 12px; }
+.event-done-mark { padding: 0 8px; color: #718078; font-size: 19px; }
