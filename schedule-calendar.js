@@ -39,5 +39,21 @@
   window.scheduleMiss=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=true;event.missed=true;save();render();showScheduleDayModal(selectedDate);toast('已标记错过');};
   window.restoreSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=false;event.missed=false;save();render();showScheduleDayModal(selectedDate);toast('日程已恢复为待完成');};
   window.editSchedule=function(eventId){const item=state.events.find(event=>event.id===eventId);if(!item)return;openModal('编辑日程',`<form id="scheduleEditForm" class="form-grid"><div class="field"><label>类型</label><select name="type">${options(TYPES,item.type)}</select></div><div class="field"><label>安排名称</label><input name="title" required value="${esc(item.title||'')}"></div><div class="field"><label>开始时间</label><input type="datetime-local" name="startsAt" required value="${esc(String(item.startsAt||'').replace(' ','T'))}"></div><div class="field"><label>地点 / 会议方式</label><input name="location" value="${esc(item.location||'')}"></div><div class="field full"><label>备注</label><textarea name="notes" placeholder="邮件摘要、时长或其他补充信息">${esc(item.notes||'')}</textarea></div><div class="form-actions"><button type="button" class="ghost" onclick="closeModal()">取消</button><button class="primary">保存修改</button></div></form>`);document.querySelector('#scheduleEditForm').onsubmit=event=>{event.preventDefault();const values=Object.fromEntries(new FormData(event.target));Object.assign(item,values,{startsAt:values.startsAt.replace('T',' ')});save();closeModal();render();toast('日程已更新');};};
-  window.deleteSchedule=function(eventId){if(!confirm('确定删除这条日程吗？此操作不可恢复。'))return;state.events=state.events.filter(item=>item.id!==eventId);save();render();showScheduleDayModal(selectedDate);toast('日程已删除');};
+  function removeEventHistory(event) {
+    const application=appById(event.applicationId);
+    if(!application)return;
+    const expectedTitles=[`新增${event.type}安排：${event.title||event.type}`,`邮件识别追加${event.type}安排：${event.title||event.type}`];
+    application.timeline=(application.timeline||[]).filter(item=>{
+      if(item.eventId)return item.eventId!==event.id;
+      return !(item.at===event.createdAt&&expectedTitles.includes(item.title));
+    });
+    const terminal=['Offer','已结束'].includes(application.stage)||['已通过','未通过','已放弃','已结束'].includes(application.status);
+    if(!terminal&&application.stage===event.type){
+      const remaining=state.events.filter(item=>item.applicationId===application.id&&item.id!==event.id&&['测评','笔试','面试','Offer'].includes(item.type)).sort((a,b)=>String(b.startsAt).localeCompare(String(a.startsAt)));
+      application.stage=remaining[0]?.type||'已投递';
+      application.status=application.stage==='Offer'?'已通过':'进行中';
+    }
+    application.updatedAt=nowText();
+  }
+  window.deleteSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;if(!confirm('确定删除这条日程吗？对应的状态历史也会一并删除，此操作不可恢复。'))return;removeEventHistory(event);state.events=state.events.filter(item=>item.id!==eventId);save();closeModal();render();if(selectedId===event.applicationId)openDetail(event.applicationId);toast('日程及对应状态历史已删除');};
 })();

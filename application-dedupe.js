@@ -11,6 +11,12 @@
     if (!normalizedCompany || !normalizedPosition) return null;
     return state.applications.find(item => normalizeCompany(item.company) === normalizedCompany && normalizeText(item.position) === normalizedPosition) || null;
   }
+  function statusForSchedule(type, startsAt, suggestedStatus) {
+    if (type === 'Offer') return '已通过';
+    const time = new Date(String(startsAt || '').replace(' ', 'T')).getTime();
+    if (Number.isFinite(time) && time > Date.now()) return '进行中';
+    return suggestedStatus && STATUSES.includes(suggestedStatus) ? suggestedStatus : '等待安排';
+  }
   function appendMailEvent(application, schedule) {
     const startsAt = String(schedule.startsAt || '').trim();
     const type = TYPES.includes(schedule.type) ? schedule.type : '其他';
@@ -20,17 +26,18 @@
       toast('该岗位已有相同时间和类型的日程，未重复添加');
       return true;
     }
+    const eventId = id('evt');
+    const createdAt = nowText();
     state.events.push({
-      id: id('evt'), applicationId: application.id, company: application.company, position: application.position,
+      id: eventId, applicationId: application.id, company: application.company, position: application.position,
       type, title: schedule.title || type, startsAt, location: schedule.location || '', notes: schedule.summary || '',
-      completed: false, missed: false, createdAt: nowText()
+      completed: false, missed: false, createdAt
     });
     if (['测评','笔试','面试','Offer'].includes(type)) application.stage = type;
-    if (schedule.status && STATUSES.includes(schedule.status)) application.status = schedule.status;
-    else application.status = type === 'Offer' ? '已通过' : '进行中';
-    application.updatedAt = nowText();
+    application.status = statusForSchedule(type, startsAt, schedule.status);
+    application.updatedAt = createdAt;
     application.timeline = Array.isArray(application.timeline) ? application.timeline : [];
-    application.timeline.unshift({ id: id('tl'), at: nowText(), title: `邮件识别追加${type}安排：${schedule.title || type}` });
+    application.timeline.unshift({ id: id('tl'), eventId, at: createdAt, title: `邮件识别追加${type}安排：${schedule.title || type}` });
     save();
     return true;
   }

@@ -1,0 +1,159 @@
+.application-card-flow {
+  display: block;
+  padding: 17px 21px 16px;
+}
+
+.card-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+}
+
+.card-summary-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.card-summary-line strong {
+  flex: 0 1 180px;
+  min-width: 45px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  text-overflow: ellipsis;
+}
+
+.card-summary-line .card-position {
+  flex: 0 1 320px;
+  min-width: 70px;
+  overflow: hidden;
+  color: #526159;
+  text-overflow: ellipsis;
+}
+
+.card-summary-line > span:not(.card-position) {
+  flex: 0 0 auto;
+}
+
+.card-summary-line i {
+  flex: 0 0 auto;
+  margin: 0 9px;
+  color: #a0aaa4;
+  font-style: normal;
+}
+
+.card-health {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 28px;
+}
+
+.application-flow {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  margin-top: 17px;
+  padding: 2px 3px 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--green) 25%, transparent) transparent;
+}
+
+.flow-node {
+  flex: 0 0 auto;
+  min-width: 76px;
+  max-width: 132px;
+  display: grid;
+  justify-items: center;
+  position: relative;
+  text-align: center;
+}
+
+.flow-node i {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #cbd5cf;
+  border-radius: 50%;
+  background: var(--panel);
+  color: transparent;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 0 0 4px var(--panel);
+  z-index: 1;
+}
+
+.flow-node b {
+  max-width: 124px;
+  margin-top: 7px;
+  overflow: hidden;
+  color: #55625b;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-node small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.flow-line {
+  flex: 1 0 28px;
+  min-width: 28px;
+  height: 2px;
+  margin: 11px -9px 0;
+  background: #dce3df;
+}
+
+.flow-node.done i {
+  border-color: color-mix(in srgb, var(--green) 72%, white);
+  background: color-mix(in srgb, var(--green) 88%, white);
+  color: white;
+}
+
+.flow-node.done b { color: color-mix(in srgb, var(--green) 82%, #17241d); }
+.flow-node.done + .flow-line { background: color-mix(in srgb, var(--green) 42%, #dce3df); }
+
+.flow-node.current i,
+.flow-node.upcoming i {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, white);
+  box-shadow: 0 0 0 4px var(--panel), 0 0 0 6px color-mix(in srgb, var(--green) 10%, transparent);
+}
+
+.flow-node.current b,
+.flow-node.upcoming b { color: var(--green); }
+.flow-node.upcoming i::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+.flow-node.failed i {
+  border-color: #d35e58;
+  background: #d35e58;
+  color: white;
+}
+.flow-node.failed b { color: #b54742; }
+
+.flow-node.success i {
+  border-color: #42a46d;
+  background: #42a46d;
+  color: white;
+}
+.flow-node.success b { color: #237448; }
+
+@media (max-width: 900px) {
+  .application-card-flow { padding: 16px; }
+  .flow-node { min-width: 70px; }
+  .flow-line { min-width: 22px; }
+}

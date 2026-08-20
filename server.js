@@ -130,7 +130,7 @@ const server=http.createServer(async(req,res)=>{
   let file=req.url==='/'?'index.html':decodeURIComponent(req.url.split('?')[0].slice(1));
   const target=path.resolve(root,file);
   if(!target.startsWith(root)){res.writeHead(403);return res.end();}
-  fs.readFile(target,(err,data)=>{if(err){res.writeHead(404);res.end('Not found');return}res.writeHead(200,{'Content-Type':mime[path.extname(target)]||'application/octet-stream'});res.end(data)});
+  fs.readFile(target,(err,data)=>{if(err){res.writeHead(404);res.end('Not found');return}res.writeHead(200,{'Content-Type':mime[path.extname(target)]||'application/octet-stream','Cache-Control':'no-store'});res.end(data)});
 });
 server.on('error',error=>{
   if(error.code==='EADDRINUSE'){
