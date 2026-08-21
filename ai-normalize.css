@@ -52,3 +52,10 @@
   .ai-old-value::before { content: "原："; }
   .ai-new-value::before { content: "建议："; }
 }
+.mail-match-hint {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}

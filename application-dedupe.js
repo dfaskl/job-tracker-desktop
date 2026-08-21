@@ -11,6 +11,25 @@
     if (!normalizedCompany || !normalizedPosition) return null;
     return state.applications.find(item => normalizeCompany(item.company) === normalizedCompany && normalizeText(item.position) === normalizedPosition) || null;
   }
+  function matchScore(application, company, position) {
+    const appCompany=normalizeCompany(application.company),appPosition=normalizeText(application.position);
+    const targetCompany=normalizeCompany(company),targetPosition=normalizeText(position);
+    let score=0;
+    if(appCompany&&targetCompany){
+      if(appCompany===targetCompany)score+=70;
+      else if(appCompany.includes(targetCompany)||targetCompany.includes(appCompany))score+=35;
+    }
+    if(appPosition&&targetPosition){
+      if(appPosition===targetPosition)score+=50;
+      else if(appPosition.includes(targetPosition)||targetPosition.includes(appPosition))score+=24;
+    }
+    return score;
+  }
+  function existingApplicationOptions(company, position) {
+    const exact=findExisting(company,position);
+    const items=state.applications.slice().sort((a,b)=>matchScore(b,company,position)-matchScore(a,company,position)||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+    return `<option value="__new__" ${exact?'':'selected'}>未关联现有岗位（新建投递）</option>${items.map(application=>{const score=matchScore(application,company,position),recommended=score>0?'〔可能匹配〕 ':'';return `<option value="${application.id}" ${exact?.id===application.id?'selected':''}>${recommended}${esc(application.company)} · ${esc(application.position)}</option>`;}).join('')}`;
+  }
   function statusForSchedule(type, startsAt, suggestedStatus) {
     if (type === 'Offer') return '已通过';
     const time = new Date(String(startsAt || '').replace(' ', 'T')).getTime();
@@ -75,6 +94,11 @@
   };
   window.openApplicationForm = openApplicationForm;
 
+  mailResultHtml = function () {
+    const result=mailResult;
+    return `<div class="field"><label>公司</label><input id="mrCompany" value="${esc(result.company)}"></div><div class="field"><label>岗位</label><input id="mrPosition" value="${esc(result.position)}"></div><div class="field full"><label>关联现有投递</label><select id="mrExistingApp">${existingApplicationOptions(result.company,result.position)}</select><small class="mail-match-hint">已按公司和岗位自动检索。没有准确匹配时，可在这里手动选择已有岗位，或保留“新建投递”。</small></div><div class="field"><label>通知类型</label><select id="mrType">${options(TYPES,result.noticeType)}</select></div><div class="field"><label>时间</label><input id="mrStarts" value="${esc(result.startsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field"><label>面试地点 / 视频链接</label><input id="mrLocation" value="${esc(result.location)}" placeholder="视频会议链接或线下面试地址"></div><div class="field"><label>备注 / 摘要</label><textarea id="mrSummary" placeholder="部门、会议密码、联系人及注意事项">${esc(result.summary)}</textarea></div><div class="form-actions"><button class="primary" onclick="useMailResult()">使用识别结果</button></div>`;
+  };
+
   useMailResult = function () {
     const company = document.querySelector('#mrCompany')?.value.trim() || '';
     const position = document.querySelector('#mrPosition')?.value.trim() || '';
@@ -84,7 +108,8 @@
     const summary = document.querySelector('#mrSummary')?.value.trim() || '';
     if (!company || !position) { toast('请先补充公司名称和岗位名称'); return; }
     const schedule = { type, title: type, startsAt, location, summary, status: mailResult?.suggestedStatus || '进行中' };
-    const existing = findExisting(company, position);
+    const selectedApplicationId=document.querySelector('#mrExistingApp')?.value||'';
+    const existing = selectedApplicationId&&selectedApplicationId!=='__new__'?appById(selectedApplicationId):findExisting(company, position);
     if (existing) {
       if (startsAt) {
         appendMailEvent(existing, schedule);
