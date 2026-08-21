@@ -3,6 +3,40 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const root = __dirname;
+if (typeof fetch === 'undefined') {
+  const httpMod = require('http');
+  const httpsMod = require('https');
+  global.fetch = (url, options = {}) => new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const useHttps = u.protocol === 'https:';
+    const body = options.body != null ? Buffer.from(options.body) : null;
+    const req = (useHttps ? httpsMod : httpMod).request({
+      hostname: u.hostname,
+      port: u.port || (useHttps ? 443 : 80),
+      path: u.pathname + u.search,
+      method: options.method || 'GET',
+      headers: {
+        ...(options.headers || {}),
+        ...(body ? { 'Content-Length': body.length } : {})
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          json: async () => { try { return JSON.parse(text); } catch (e) { return {}; } },
+          text: async () => text
+        });
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
 const dataDir = path.join(root, 'data');
 const dataFile = path.join(dataDir, 'job-tracker.json');
 const tempDataFile = path.join(dataDir, 'job-tracker.tmp.json');
