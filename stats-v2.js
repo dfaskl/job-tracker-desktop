@@ -4,7 +4,7 @@
     const health = progressHealth(application);
     if (health && health.days >= 7) return '无消息';
     if (['测评', '笔试', '面试', 'Offer'].includes(application.stage)) return application.stage;
-    return '已投递';
+    return '仅投递';
   }
 
   function verticalChart(items, emptyText) {
@@ -19,7 +19,7 @@
   }
 
   renderStats = function () {
-    const stageLabels = ['已投递', '测评', '笔试', '面试', 'Offer', '已结束', '无消息'];
+    const stageLabels = ['仅投递', '测评', '笔试', '面试', 'Offer', '已结束', '无消息'];
     const stageItems = stageLabels.map(label => [label, state.applications.filter(item => stageCategory(item) === label).length]);
     const channelMap = state.applications.reduce((result, item) => {
       const channel = item.channel || '未填写';
@@ -28,11 +28,15 @@
     }, {});
     const channelItems = Object.entries(channelMap).sort((a, b) => b[1] - a[1]);
     const noMessage = stageItems.find(item => item[0] === '无消息')[1];
+    const activeApplications=state.applications.filter(item=>item.stage!=='Offer'&&!['已通过','未通过','已放弃','已结束'].includes(item.status));
+    const activeWithProgress=activeApplications.filter(item=>item.stage!=='已投递'&&item.stage!=='准备投递'||state.events.some(event=>event.applicationId===item.id)).length;
+    const activeOnlyApplied=activeApplications.length-activeWithProgress;
 
     content.innerHTML = `
-      <div class="grid stats-grid">
+      <div class="grid stats-grid stats-grid-five">
         <div class="stat-card"><small>投递总数</small><strong>${state.applications.length}</strong></div>
-        <div class="stat-card"><small>面试阶段</small><strong>${stageItems.find(item => item[0] === '面试')[1]}</strong></div>
+        <div class="stat-card"><small>进行中 · 有进展</small><strong>${activeWithProgress}</strong></div>
+        <div class="stat-card"><small>进行中 · 仅投递</small><strong>${activeOnlyApplied}</strong></div>
         <div class="stat-card"><small>Offer</small><strong>${stageItems.find(item => item[0] === 'Offer')[1]}</strong></div>
         <div class="stat-card"><small>长期无消息</small><strong>${noMessage}</strong></div>
       </div>
