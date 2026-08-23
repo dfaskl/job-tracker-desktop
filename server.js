@@ -40,11 +40,25 @@ if (typeof fetch === 'undefined') {
 const dataDir = path.join(root, 'data');
 const dataFile = path.join(dataDir, 'job-tracker.json');
 const tempDataFile = path.join(dataDir, 'job-tracker.tmp.json');
+const configFile = path.join(dataDir, 'local-config.json');
+const backupsDir = path.join(dataDir, 'backups');
 const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
 let clientSeen = false;
 let lastHeartbeat = Date.now();
 const pageSessions = new Set();
 let shutdownTimer = null;
+
+function readJson(file,fallback={}){try{return JSON.parse(fs.readFileSync(file,'utf8'))}catch{return fallback}}
+function safeBusinessData(data){const clean=JSON.parse(JSON.stringify(data||{}));if(clean.settings)delete clean.settings.apiKey;return clean}
+function backupCurrent(reason='auto'){
+  if(!fs.existsSync(dataFile))return null;
+  fs.mkdirSync(backupsDir,{recursive:true});
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  const name=`${stamp}_${reason}.json`;
+  fs.copyFileSync(dataFile,path.join(backupsDir,name));
+  fs.readdirSync(backupsDir).filter(name=>name.endsWith('.json')).sort().reverse().slice(30).forEach(name=>fs.unlinkSync(path.join(backupsDir,name)));
+  return name;
+}
 
 function normalizeUrl(value){
   const url=String(value||'').trim().replace(/\/+$/,'');
@@ -54,12 +68,26 @@ function normalizeUrl(value){
   return `${url}/v1/chat/completions`;
 }
 const server=http.createServer(async(req,res)=>{
+  if(req.method==='GET'&&req.url==='/api/config'){
+    res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify(readJson(configFile,{apiKey:''})));return;
+  }
+  if(req.method==='POST'&&req.url==='/api/config'){
+    let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{try{const input=JSON.parse(raw||'{}');fs.mkdirSync(dataDir,{recursive:true});fs.writeFileSync(configFile,JSON.stringify({apiKey:String(input.apiKey||'')},null,2),'utf8');res.writeHead(204);res.end();}catch(error){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:error.message}));}});return;
+  }
+  if(req.method==='GET'&&req.url==='/api/backups'){
+    const items=fs.existsSync(backupsDir)?fs.readdirSync(backupsDir).filter(name=>name.endsWith('.json')).sort().reverse().map(name=>{const stat=fs.statSync(path.join(backupsDir,name));return{name,size:stat.size,createdAt:stat.mtime.toISOString()}}):[];
+    res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({items}));return;
+  }
+  if(req.method==='POST'&&req.url==='/api/backups/restore'){
+    let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',()=>{try{const {name}=JSON.parse(raw||'{}'),safeName=path.basename(String(name||'')),source=path.join(backupsDir,safeName);if(!safeName.endsWith('.json')||!fs.existsSync(source))throw new Error('备份文件不存在');const restored=readJson(source,null);if(!restored||!Array.isArray(restored.applications)||!Array.isArray(restored.events))throw new Error('备份格式不正确');backupCurrent('before-restore');fs.copyFileSync(source,dataFile);res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({data:restored}));}catch(error){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:error.message}));}});return;
+  }
   if(req.method==='GET'&&req.url==='/api/data'){
     try{
       if(!fs.existsSync(dataFile)){
         res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({exists:false,data:null}));return;
       }
       const data=JSON.parse(fs.readFileSync(dataFile,'utf8'));
+      if(data.settings&&data.settings.apiKey){fs.mkdirSync(dataDir,{recursive:true});fs.writeFileSync(configFile,JSON.stringify({apiKey:data.settings.apiKey},null,2),'utf8');delete data.settings.apiKey;fs.writeFileSync(dataFile,JSON.stringify(data,null,2),'utf8');}
       res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({exists:true,data}));
     }catch(error){
       res.writeHead(500,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:`读取本地数据失败：${error.message}`}));
@@ -74,9 +102,10 @@ const server=http.createServer(async(req,res)=>{
     });
     req.on('end',()=>{
       try{
-        const data=JSON.parse(raw||'{}');
+        const data=safeBusinessData(JSON.parse(raw||'{}'));
         if(!Array.isArray(data.applications)||!Array.isArray(data.events))throw new Error('数据格式不正确');
         fs.mkdirSync(dataDir,{recursive:true});
+        backupCurrent('auto');
         fs.writeFileSync(tempDataFile,JSON.stringify(data,null,2),'utf8');
         fs.renameSync(tempDataFile,dataFile);
         res.writeHead(204);res.end();

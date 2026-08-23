@@ -53,7 +53,7 @@
       return;
     }
     if (!state.settings.apiUrl || !state.settings.model) {
-      alert('请先前往“设置 → 大模型 API”配置接口地址和模型名称。');
+      toast('请先前往“设置 → 大模型 API”配置接口地址和模型名称',{type:'warning',duration:5000});
       return;
     }
     button.disabled = true;
@@ -70,7 +70,7 @@
       renderReview(form, application, result);
       toast('AI 校正完成，可逐项选择修改');
     } catch (error) {
-      alert(`AI 校正失败：${error.message}`);
+      toast(`AI 校正失败：${error.message}`,{type:'error',duration:5000});
     } finally {
       button.disabled = false;
       button.textContent = originalText;

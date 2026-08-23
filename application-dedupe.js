@@ -75,10 +75,10 @@
       const existing = findExisting(values.company, values.position);
       if (existing) {
         pendingMailSchedule = null;
-        if (confirm(`检测到已有“${existing.company} · ${existing.position}”。\n\n不会新建重复投递，是否直接为该岗位追加日程？`)) {
+        confirmAction('检测到重复投递',`已经存在“${existing.company} · ${existing.position}”，不会创建重复记录。是否直接为该岗位追加日程？`,()=>{
           closeModal();
           openEventForm(existing.id);
-        }
+        });
         return;
       }
       const beforeIds = new Set(state.applications.map(item => item.id));

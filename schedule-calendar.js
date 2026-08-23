@@ -55,5 +55,5 @@
     }
     application.updatedAt=nowText();
   }
-  window.deleteSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;if(!confirm('确定删除这条日程吗？对应的状态历史也会一并删除，此操作不可恢复。'))return;removeEventHistory(event);state.events=state.events.filter(item=>item.id!==eventId);save();closeModal();render();if(selectedId===event.applicationId)openDetail(event.applicationId);toast('日程及对应状态历史已删除');};
+  window.deleteSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;confirmAction('删除日程',`将删除“${event.company} · ${event.title||event.type}”及对应状态历史。删除后仍可撤销。`,()=>{createUndoSnapshot('日程');removeEventHistory(event);state.events=state.events.filter(item=>item.id!==eventId);save();closeModal();render();if(selectedId===event.applicationId)openDetail(event.applicationId);toast('日程及状态历史已删除',{type:'warning',action:'撤销',onAction:undoLastChange,duration:8000})},{danger:true});};
 })();
