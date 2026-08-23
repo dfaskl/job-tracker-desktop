@@ -71,6 +71,11 @@ function hasSelectionProgress(a){
   if(progressedStages.includes(a.stage))return true;
   return state.events.some(e=>e.applicationId===a.id&&['测评','笔试','面试','Offer'].includes(e.type));
 }
+function nextUpcomingTime(a){
+  const now=Date.now();
+  const times=state.events.filter(e=>e.applicationId===a.id&&!e.completed&&!e.missed).map(e=>new Date(String(e.startsAt||'').replace(' ','T')).getTime()).filter(time=>Number.isFinite(time)&&time>=now);
+  return times.length?Math.min(...times):Infinity;
+}
 function compareApplications(a,b){
   const aRejected=a.status==='未通过',bRejected=b.status==='未通过';
   if(aRejected!==bRejected)return aRejected?1:-1;
@@ -78,6 +83,10 @@ function compareApplications(a,b){
     const updated=value=>new Date(String(value.updatedAt||value.createdAt||'').replace(' ','T')).getTime()||0;
     return updated(b)-updated(a);
   }
+  const aUpcoming=nextUpcomingTime(a),bUpcoming=nextUpcomingTime(b);
+  const aHasUpcoming=Number.isFinite(aUpcoming),bHasUpcoming=Number.isFinite(bUpcoming);
+  if(aHasUpcoming!==bHasUpcoming)return aHasUpcoming?-1:1;
+  if(aHasUpcoming&&bHasUpcoming&&aUpcoming!==bUpcoming)return aUpcoming-bUpcoming;
   const aProgressed=hasSelectionProgress(a),bProgressed=hasSelectionProgress(b);
   if(aProgressed!==bProgressed)return aProgressed?-1:1;
   return latestProgressTime(b)-latestProgressTime(a);
@@ -119,7 +128,7 @@ function openEventForm(appId=''){if(!state.applications.length){toast('请先新
 function completeEvent(idValue){const e=state.events.find(x=>x.id===idValue);if(e){e.completed=true;e.missed=false;save();closeModal();render();toast('已标记完成')}}
 function missEvent(idValue){const e=state.events.find(x=>x.id===idValue);if(e){e.completed=true;e.missed=true;save();render();toast('已标记错过')}}
 function renderMail(){content.innerHTML=`<div class="grid mail-layout"><div class="panel mail-box"><div class="panel-head"><h2>邮件正文</h2><button class="link-btn" onclick="document.querySelector('#mailBody').value=''">清空</button></div><textarea id="mailBody" class="search" placeholder="将完整的笔试、面试或 Offer 通知正文粘贴到这里……"></textarea><div class="form-actions"><button class="primary" id="recognizeBtn">✦ 使用大模型识别</button></div></div><div class="panel"><div class="panel-head"><h2>识别结果</h2></div><div id="recognition" class="recognition">${mailResult?mailResultHtml():`<div class="empty">识别出的公司、岗位、时间等信息会显示在这里，未识别内容可手动补充。</div>`}</div></div></div>`;document.querySelector('#recognizeBtn').onclick=recognizeMail}
-function mailResultHtml(){const r=mailResult;return `<div class="field"><label>公司</label><input id="mrCompany" value="${esc(r.company)}"></div><div class="field"><label>岗位</label><input id="mrPosition" value="${esc(r.position)}"></div><div class="field"><label>通知类型</label><select id="mrType">${options(TYPES,r.noticeType)}</select></div><div class="field"><label>时间</label><input id="mrStarts" value="${esc(r.startsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field"><label>面试地点 / 视频链接</label><input id="mrLocation" value="${esc(r.location)}" placeholder="视频会议链接或线下面试地址"></div><div class="field"><label>备注 / 摘要</label><textarea id="mrSummary" placeholder="部门、会议密码、联系人及注意事项">${esc(r.summary)}</textarea></div><div class="form-actions"><button class="primary" onclick="useMailResult()">使用识别结果</button></div>`}
+function mailResultHtml(){const r=mailResult;return `<div class="field"><label>公司</label><input id="mrCompany" value="${esc(r.company)}"></div><div class="field"><label>岗位</label><input id="mrPosition" value="${esc(r.position)}"></div><div class="field"><label>通知类型</label><select id="mrType">${options(TYPES,r.noticeType)}</select></div><div class="field"><label>时间</label><input id="mrStarts" value="${esc(r.startsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field"><label>面试地点 / 视频链接</label><input id="mrLocation" value="${esc(r.location)}" placeholder="视频会议链接或线下面试地址"></div><div class="field"><label>备注</label><textarea id="mrSummary" placeholder="如有需要，可在这里手动填写"></textarea></div><div class="form-actions"><button class="primary" onclick="useMailResult()">使用识别结果</button></div>`}
 async function recognizeMail(){const body=document.querySelector('#mailBody').value.trim(),btn=document.querySelector('#recognizeBtn');if(!body)return toast('请先粘贴邮件正文');btn.disabled=true;btn.textContent='正在识别…';try{const res=await fetch('/api/recognize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...state.settings,body})}),data=await res.json();if(!res.ok)throw new Error(data.error||'识别失败');mailResult=data;document.querySelector('#recognition').innerHTML=mailResultHtml();toast('识别完成')}catch(e){alert('识别失败：'+e.message)}finally{btn.disabled=false;btn.textContent='✦ 使用大模型识别'}}
 function useMailResult(){const r={company:document.querySelector('#mrCompany').value,position:document.querySelector('#mrPosition').value,stage:mailResult.suggestedStage||'已投递',status:mailResult.suggestedStatus||'进行中',notes:document.querySelector('#mrSummary').value};closeModal();openApplicationForm('',r)}
 function renderStats(){const byStage=STAGES.map(s=>[s,state.applications.filter(a=>a.stage===s).length]),max=Math.max(1,...byStage.map(x=>x[1]));content.innerHTML=`<div class="grid stats-grid"><div class="stat-card"><small>投递总数</small><strong>${state.applications.length}</strong></div><div class="stat-card"><small>面试阶段</small><strong>${state.applications.filter(a=>a.stage==='面试').length}</strong></div><div class="stat-card"><small>Offer</small><strong>${state.applications.filter(a=>a.stage==='Offer').length}</strong></div><div class="stat-card"><small>结束 / 未通过</small><strong>${state.applications.filter(a=>['已结束','未通过'].includes(a.status)).length}</strong></div></div><div class="grid two-col"><div class="panel"><h2>阶段分布</h2>${byStage.map(([s,n])=>`<div class="chart-row"><span>${s}</span><div class="bar"><i style="width:${n/max*100}%"></i></div><b>${n}</b></div>`).join('')}</div><div class="panel"><h2>渠道分布</h2>${Object.entries(state.applications.reduce((m,a)=>(m[a.channel||'未填写']=(m[a.channel||'未填写']||0)+1,m),{})).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`<div class="chart-row"><span>${esc(s)}</span><div class="bar"><i style="width:${n/Math.max(1,state.applications.length)*100}%"></i></div><b>${n}</b></div>`).join('')||'<div class="empty">暂无数据</div>'}</div></div>`}

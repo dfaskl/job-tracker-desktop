@@ -147,9 +147,8 @@ const server=http.createServer(async(req,res)=>{
 2. startsAt 格式为 YYYY-MM-DD HH:mm；没有明确年份或时间时不要猜测，返回空字符串。
 3. 对面试、笔试或测评通知，location 优先填写可直接进入活动的视频会议、在线面试或考试完整链接，例如腾讯会议、牛客面试、企业视频面试链接；不要把邮箱阅读页面、招聘职位详情页或普通公司首页当成活动链接。
 4. 如果没有活动链接但有明确线下面试地址，location 填写线下地址；只有会议平台名称而没有链接时，可填写平台名称。
-5. summary 使用简洁的中文结构化短句，保留邮件中明确出现的部门或团队、会议密码/入会码、联系人及联系方式、需要准备的材料、签到或设备要求、时长和其他重要注意事项。例如“部门：搜索事业部；会议密码：123456；联系人：张老师”。
-6. 视频链接只写入 location，不要在 summary 中重复；与链接配套的密码、入会码或口令必须写入 summary。
-7. 不得编造部门、密码、链接、时间或岗位；不确定时留空。`;
+5. summary 必须始终返回空字符串。不要提取、概括或改写邮件正文中的部门、密码、联系人、要求、时长及其他内容，备注由用户自行填写。
+6. 不得编造链接、时间、公司或岗位；不确定时留空。`;
         const response=await fetch(normalizeUrl(apiUrl),{method:'POST',headers:{'Content-Type':'application/json',...(apiKey?{Authorization:`Bearer ${apiKey}`}:{})},body:JSON.stringify({model,temperature:0,messages:[{role:'system',content:prompt},{role:'user',content:`提取以下邮件正文：\n<email>\n${body}\n</email>`}]})});
         const data=await response.json();
         if(!response.ok) throw new Error(data?.error?.message||`API 请求失败（${response.status}）`);
@@ -157,7 +156,9 @@ const server=http.createServer(async(req,res)=>{
         const cleaned=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'');
         const start=cleaned.indexOf('{'),end=cleaned.lastIndexOf('}');
         if(start<0) throw new Error('模型没有返回有效 JSON');
-        res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify(JSON.parse(cleaned.slice(start,end+1))));
+        const result=JSON.parse(cleaned.slice(start,end+1));
+        result.summary='';
+        res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify(result));
       }catch(e){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:e.message}));}
     });return;
   }
