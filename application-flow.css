@@ -57,7 +57,8 @@
 }
 
 .application-flow {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(var(--flow-slots, 1), minmax(76px, 1fr));
   align-items: flex-start;
   min-width: 0;
   margin-top: 17px;
@@ -68,28 +69,41 @@
 }
 
 .flow-node {
-  flex: 0 0 auto;
+  --node-color: #718078;
+  --node-soft: #eef2ef;
+  width: 100%;
   min-width: 76px;
-  max-width: 132px;
   display: grid;
   justify-items: center;
   position: relative;
   text-align: center;
 }
 
+.flow-node:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(-50% + 15px);
+  top: 14px;
+  width: calc(100% - 30px);
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--green) 32%, #dce3df), #dce3df);
+}
+
 .flow-node i {
-  width: 23px;
-  height: 23px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border: 2px solid #cbd5cf;
-  border-radius: 50%;
-  background: var(--panel);
-  color: transparent;
+  border: 2px solid color-mix(in srgb, var(--node-color) 72%, white);
+  border-radius: 10px;
+  background: var(--node-soft);
+  color: var(--node-color);
   font-style: normal;
-  font-size: 13px;
+  font-family: "Segoe UI Symbol", "Microsoft YaHei UI", sans-serif;
+  font-size: 16px;
   font-weight: 800;
-  box-shadow: 0 0 0 4px var(--panel);
+  box-shadow: 0 0 0 4px var(--panel), 0 3px 8px color-mix(in srgb, var(--node-color) 16%, transparent);
   z-index: 1;
 }
 
@@ -97,7 +111,7 @@
   max-width: 124px;
   margin-top: 7px;
   overflow: hidden;
-  color: #55625b;
+  color: var(--node-color);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -110,50 +124,64 @@
   white-space: nowrap;
 }
 
-.flow-line {
-  flex: 1 0 28px;
-  min-width: 28px;
-  height: 2px;
-  margin: 11px -9px 0;
-  background: #dce3df;
-}
+.flow-applied { --node-color: #4775be; --node-soft: #eaf1fc; }
+.flow-assessment { --node-color: #7a57ad; --node-soft: #f1ebfa; }
+.flow-test { --node-color: #b77718; --node-soft: #fff2d9; }
+.flow-interview { --node-color: #24828b; --node-soft: #e3f5f5; }
+.flow-phone { --node-color: #596bc2; --node-soft: #ebedfb; }
+.flow-offer { --node-color: #258254; --node-soft: #e3f5e9; }
+.flow-waiting { --node-color: #b06424; --node-soft: #fff0e1; }
+.flow-failed { --node-color: #bc4c48; --node-soft: #fde9e8; }
+.flow-other { --node-color: #69766f; --node-soft: #edf1ef; }
 
-.flow-node.done i {
-  border-color: color-mix(in srgb, var(--green) 72%, white);
-  background: color-mix(in srgb, var(--green) 88%, white);
+.flow-node.done i::after {
+  content: "✓";
+  position: absolute;
+  right: -4px;
+  top: -5px;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  background: var(--node-color);
   color: white;
+  font-size: 9px;
 }
-
-.flow-node.done b { color: color-mix(in srgb, var(--green) 82%, #17241d); }
-.flow-node.done + .flow-line { background: color-mix(in srgb, var(--green) 42%, #dce3df); }
+.flow-node.done i { position: relative; opacity: .82; }
+.flow-node.done::before { background: linear-gradient(90deg, color-mix(in srgb, var(--green) 58%, #dce3df), color-mix(in srgb, var(--node-color) 45%, #dce3df)); }
 
 .flow-node.current i,
 .flow-node.upcoming i {
-  border-color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, white);
-  box-shadow: 0 0 0 4px var(--panel), 0 0 0 6px color-mix(in srgb, var(--green) 10%, transparent);
+  border-color: var(--node-color);
+  background: var(--node-soft);
+  box-shadow: 0 0 0 4px var(--panel), 0 0 0 6px color-mix(in srgb, var(--node-color) 13%, transparent), 0 5px 12px color-mix(in srgb, var(--node-color) 20%, transparent);
 }
 
 .flow-node.current b,
-.flow-node.upcoming b { color: var(--green); }
-.flow-node.upcoming i::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.flow-node.upcoming b { color: var(--node-color); }
+.flow-node.upcoming i { border-style: dashed; }
 
 .flow-node.failed i {
-  border-color: #d35e58;
-  background: #d35e58;
+  --node-color: #bc4c48;
+  --node-soft: #fde9e8;
+  border-color: var(--node-color);
+  background: var(--node-color);
   color: white;
 }
-.flow-node.failed b { color: #b54742; }
+.flow-node.failed b { color: var(--node-color); }
 
 .flow-node.success i {
-  border-color: #42a46d;
-  background: #42a46d;
+  --node-color: #258254;
+  --node-soft: #e3f5e9;
+  border-color: var(--node-color);
+  background: var(--node-color);
   color: white;
 }
-.flow-node.success b { color: #237448; }
+.flow-node.success b { color: var(--node-color); }
 
 @media (max-width: 900px) {
   .application-card-flow { padding: 16px; }
   .flow-node { min-width: 70px; }
-  .flow-line { min-width: 22px; }
 }
