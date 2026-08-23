@@ -1,0 +1,14 @@
+:root{
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;
+  --radius-xs:6px;--radius-sm:8px;--radius-md:12px;--radius-lg:16px;
+  --surface:#fff;--surface-subtle:#f7f9fa;--surface-muted:#f1f4f5;
+  --text-primary:#17221c;--text-secondary:#56635c;--text-tertiary:#7d8882;
+  --shadow-float:0 18px 50px rgba(21,34,27,.16);--shadow-hover:0 8px 22px rgba(24,43,32,.08);
+  --control-height:38px;--motion-fast:140ms;--motion-normal:180ms;
+  --danger:#b5433e;--warning:#a76b16;--success:#26784e;
+  --font-ui:"Inter","Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif;
+}
+body{font-family:var(--font-ui);color:var(--text-primary);font-size:14px;font-feature-settings:"tnum" 1,"cv02" 1;background:var(--bg)!important}
+button,input,select,textarea{font-family:inherit}button,input,select,textarea,.application-card,.event-card{transition-duration:var(--motion-fast)!important}
+h1{font-size:26px;line-height:1.25;letter-spacing:-.025em}h2{font-size:17px!important;letter-spacing:-.012em}.muted,.settings-note,.event-sub,.card-summary-line{color:var(--text-secondary)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}

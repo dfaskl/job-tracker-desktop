@@ -63,7 +63,19 @@
     if(!form||form.dataset.commercialValidation)return;form.dataset.commercialValidation='true';
     form.querySelectorAll('[required]').forEach(field=>{field.addEventListener('invalid',()=>{field.closest('.field')?.classList.add('field-invalid');toast(`请检查“${field.closest('.field')?.querySelector('label')?.textContent.replace('*','').trim()||'必填项'}”`,{type:'error'});});field.addEventListener('input',()=>field.closest('.field')?.classList.remove('field-invalid'));});
   }
+  const iconPaths={add:'<path d="M12 5v14M5 12h14"/>',spark:'<path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5Z"/><path d="m18 16 .7 2.3L21 19l-2.3.7L18 22l-.7-2.3L15 19l2.3-.7Z"/>',download:'<path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 19h14"/>',upload:'<path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M5 20h14"/>',edit:'<path d="m4 16-.8 4 4-.8L18 8.4 14.6 5Z"/><path d="m13.5 6.1 3.4 3.4"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6"/>',external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/>',check:'<path d="m5 12 4 4L19 6"/>',applied:'<path d="M5 19 19 5M9 5h10v10"/>',assessment:'<path d="m12 3 8 9-8 9-8-9Z"/>',test:'<path d="M5 20h14M8 16 16 8M14 6l4 4M7 17l-1 3 3-1"/>',interview:'<circle cx="12" cy="9" r="4"/><path d="M5 21c.6-4 3-6 7-6s6.4 2 7 6"/>',phone:'<path d="M7 3h3l1.5 4-2 1.5a15 15 0 0 0 6 6l1.5-2L21 14v3c0 2-1 4-4 4C9 20 4 15 3 7c0-3 2-4 4-4Z"/>',offer:'<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/>',waiting:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',failed:'<path d="m7 7 10 10M17 7 7 17"/>',other:'<path d="M12 5v14M5 12h14"/>'};
+  function svgIcon(name){return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">${iconPaths[name]||iconPaths.other}</svg>`;}
+  function upgradeVisualIcons(){
+    const flowMap={applied:'applied',assessment:'assessment',test:'test',interview:'interview',phone:'phone',offer:'offer',waiting:'waiting',failed:'failed',other:'other'};
+    document.querySelectorAll('.flow-node i').forEach(holder=>{if(holder.querySelector('svg'))return;const type=Object.keys(flowMap).find(key=>holder.closest('.flow-node')?.classList.contains(`flow-${key}`))||'other';holder.innerHTML=svgIcon(flowMap[type]);});
+    const buttonRules=[['新建投递','add'],['新增日程','add'],['追加安排','calendar'],['使用大模型识别','spark'],['AI 校正','spark'],['编辑','edit'],['删除','trash'],['导出数据','download'],['导入数据','upload'],['打开链接','external']];
+    document.querySelectorAll('button,label.ghost').forEach(button=>{if(button.querySelector('.ui-icon'))return;const text=button.textContent.replace(/[＋✦]/g,'').trim(),rule=buttonRules.find(([label])=>text.includes(label));if(rule){Array.from(button.childNodes).filter(node=>node.nodeType===Node.TEXT_NODE).forEach(node=>node.textContent=node.textContent.replace(/[＋✦]/g,'').trim());button.insertAdjacentHTML('afterbegin',svgIcon(rule[1]));}});
+    const statIcons={'投递总数':'applied','进行中 · 有进展':'assessment','进行中 · 仅投递':'waiting','Offer':'offer','长期无消息':'failed'};
+    document.querySelectorAll('.stat-card').forEach(card=>{if(card.querySelector('.stat-svg'))return;const name=statIcons[card.querySelector('small')?.textContent.trim()];if(name){card.dataset.icon='';card.insertAdjacentHTML('afterbegin',`<span class="stat-svg">${svgIcon(name)}</span>`);}});
+  }
   const baseOpenModal=openModal;
-  openModal=function(...args){baseOpenModal(...args);requestAnimationFrame(()=>enhanceForm(document.querySelector('#modalBody form')));};window.openModal=openModal;
+  openModal=function(...args){baseOpenModal(...args);requestAnimationFrame(()=>{enhanceForm(document.querySelector('#modalBody form'));upgradeVisualIcons();});};window.openModal=openModal;
+  const baseRender=render;render=function(){baseRender();requestAnimationFrame(upgradeVisualIcons);};
+  requestAnimationFrame(upgradeVisualIcons);
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.querySelector('#modalMask')?.classList.contains('hidden'))closeModal();});
 })();
