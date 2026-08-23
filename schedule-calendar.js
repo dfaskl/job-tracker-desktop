@@ -51,7 +51,7 @@
     if(!terminal&&application.stage===event.type){
       const remaining=state.events.filter(item=>item.applicationId===application.id&&item.id!==event.id&&['测评','笔试','面试','Offer'].includes(item.type)).sort((a,b)=>String(b.startsAt).localeCompare(String(a.startsAt)));
       application.stage=remaining[0]?.type||'已投递';
-      application.status=application.stage==='Offer'?'已通过':'进行中';
+      application.status=application.stage==='Offer'?'已通过':'等待结果';
     }
     application.updatedAt=nowText();
   }

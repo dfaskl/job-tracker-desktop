@@ -12,6 +12,7 @@
     form.querySelector('.ai-review-panel')?.remove();
     const labels = { company:'公司名称', position:'岗位名称', city:'工作地点', channel:'投递渠道', stage:'当前阶段', status:'当前状态', notes:'备注' };
     const fields = Object.keys(labels).filter(name => String(original[name] ?? '') !== String(result[name] ?? ''));
+    fields.forEach(name => form.elements.namedItem(name)?.closest('.field')?.classList.add('ai-suggestion'));
     const panel = document.createElement('div');
     panel.className = 'ai-review-panel full';
     panel.innerHTML = `
@@ -35,7 +36,7 @@
         ${fields.length ? '<button type="button" class="primary ai-review-apply">应用所选修改</button>' : ''}
       </div>`;
     form.querySelector('.form-actions').before(panel);
-    const close = () => panel.remove();
+    const close = () => { panel.remove(); fields.forEach(name => form.elements.namedItem(name)?.closest('.field')?.classList.remove('ai-suggestion')); };
     panel.querySelector('.ai-review-close').onclick = close;
     panel.querySelector('.ai-review-cancel').onclick = close;
     panel.querySelector('.ai-review-apply')?.addEventListener('click', () => {
@@ -57,6 +58,7 @@
       return;
     }
     button.disabled = true;
+    button.style.width = `${Math.ceil(button.getBoundingClientRect().width)}px`;
     const originalText = button.textContent;
     button.textContent = '正在校正…';
     try {
@@ -74,6 +76,7 @@
     } finally {
       button.disabled = false;
       button.textContent = originalText;
+      button.style.width = '';
     }
   }
 

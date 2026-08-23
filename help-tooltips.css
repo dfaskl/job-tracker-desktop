@@ -27,15 +27,15 @@
 .floating-help {
   position: fixed;
   z-index: 100;
-  width: min(340px, calc(100vw - 28px));
-  padding: 13px 15px;
+  width: min(300px, calc(100vw - 28px));
+  padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--green) 18%, #d8dfda);
   border-radius: 11px;
   background: rgba(24, 35, 29, .96);
   color: #f6faf7;
   box-shadow: 0 14px 36px rgba(5, 18, 10, .24);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.55;
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);

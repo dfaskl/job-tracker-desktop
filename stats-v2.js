@@ -2,7 +2,7 @@
   function stageCategory(application) {
     if (application.stage === '已结束' || ['未通过', '已放弃', '已结束'].includes(application.status)) return '已结束';
     const health = progressHealth(application);
-    if (health && health.days >= 7) return '无消息';
+    if (health && health.days >= PROGRESS_STALE_DAYS) return '无消息';
     if (['测评', '笔试', '面试', 'Offer'].includes(application.stage)) return application.stage;
     return '仅投递';
   }
@@ -29,7 +29,7 @@
     const channelItems = Object.entries(channelMap).sort((a, b) => b[1] - a[1]);
     const noMessage = stageItems.find(item => item[0] === '无消息')[1];
     const activeApplications=state.applications.filter(item=>item.stage!=='Offer'&&!['已通过','未通过','已放弃','已结束'].includes(item.status));
-    const activeWithProgress=activeApplications.filter(item=>item.stage!=='已投递'&&item.stage!=='准备投递'||state.events.some(event=>event.applicationId===item.id)).length;
+    const activeWithProgress=activeApplications.filter(item=>item.stage!=='已投递'||state.events.some(event=>event.applicationId===item.id)).length;
     const activeOnlyApplied=activeApplications.length-activeWithProgress;
 
     content.innerHTML = `

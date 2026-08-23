@@ -32,9 +32,7 @@
   }
   function statusForSchedule(type, startsAt, suggestedStatus) {
     if (type === 'Offer') return '已通过';
-    const time = new Date(String(startsAt || '').replace(' ', 'T')).getTime();
-    if (Number.isFinite(time) && time > Date.now()) return '进行中';
-    return suggestedStatus && STATUSES.includes(suggestedStatus) ? suggestedStatus : '等待安排';
+    return suggestedStatus && STATUSES.includes(suggestedStatus) ? suggestedStatus : '等待结果';
   }
   function appendMailEvent(application, schedule) {
     const startsAt = String(schedule.startsAt || '').trim();
@@ -107,7 +105,7 @@
     const location = document.querySelector('#mrLocation')?.value.trim() || '';
     const summary = document.querySelector('#mrSummary')?.value.trim() || '';
     if (!company || !position) { toast('请先补充公司名称和岗位名称'); return; }
-    const schedule = { type, title: type, startsAt, location, summary, status: mailResult?.suggestedStatus || '进行中' };
+    const schedule = { type, title: type, startsAt, location, summary, status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果' };
     const selectedApplicationId=document.querySelector('#mrExistingApp')?.value||'';
     const existing = selectedApplicationId&&selectedApplicationId!=='__new__'?appById(selectedApplicationId):findExisting(company, position);
     if (existing) {
@@ -124,7 +122,7 @@
     pendingMailSchedule = startsAt ? schedule : null;
     openApplicationForm('', {
       company, position, stage: mailResult?.suggestedStage || '已投递',
-      status: mailResult?.suggestedStatus || '进行中', notes: summary
+      status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果', notes: summary
     });
   };
   window.useMailResult = useMailResult;

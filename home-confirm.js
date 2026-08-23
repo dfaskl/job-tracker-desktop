@@ -5,7 +5,7 @@
     originalRenderHome();
     const candidates = state.applications
       .map(application => ({ application, health: progressHealth(application) }))
-      .filter(item => item.health && item.health.days >= 10)
+      .filter(item => item.health && item.health.days >= PROGRESS_STALE_DAYS)
       .sort((a, b) => b.health.days - a.health.days);
 
     const section = document.createElement('div');
@@ -14,7 +14,7 @@
       <div class="panel-head">
         <div>
           <h2>人工确认</h2>
-          <p>达到10天没有实际进展的岗位，请确认是否标记为未通过。</p>
+          <p>达到${PROGRESS_STALE_DAYS}天没有实际进展的岗位，请确认是否标记为未通过。</p>
         </div>
         <span class="badge ${candidates.length ? 'health-risk' : 'health-good'}">${candidates.length} 个待确认</span>
       </div>
