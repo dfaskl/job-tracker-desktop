@@ -165,6 +165,24 @@ const server=http.createServer(async(req,res)=>{
       }catch(error){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:error.message}));}
     });return;
   }
+  if(req.method==='POST'&&req.url==='/api/daily-quote'){
+    let raw='';req.on('data',chunk=>raw+=chunk);req.on('end',async()=>{
+      try{
+        const {apiUrl,apiKey,model,date}=JSON.parse(raw||'{}');
+        if(!apiUrl||!model)throw new Error('请先在设置中配置 API 地址和模型名称');
+        const prompt='你是一位温柔、细腻且富有共情力的中文文字创作者。请为正在求职、等待机会或经历反复尝试的人写一句每日鼓励，20到55个汉字。文字要像真正关心他的朋友所说：理解他的疲惫、珍惜他的坚持，让人感到被看见、被接住，并重新获得一点希望。可以有柔和的画面感和余韵，但不要说教、喊口号、制造焦虑、承诺一定成功，也不要使用空泛的成功学套话；不必每句都直接出现“求职”“工作”等字眼。优先原创，此时 author 必须为空；只有百分之百确定原文和作者时才可引用名人名言。只返回 JSON 对象，格式为 {"quote":"内容","author":""}，不要输出 Markdown。';
+        const response=await fetch(normalizeUrl(apiUrl),{method:'POST',headers:{'Content-Type':'application/json',...(apiKey?{Authorization:`Bearer ${apiKey}`}:{})},body:JSON.stringify({model,temperature:.8,messages:[{role:'system',content:prompt},{role:'user',content:`为 ${/^\d{4}-\d{2}-\d{2}$/.test(String(date||''))?date:new Date().toISOString().slice(0,10)} 生成今日一句。`}]})});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data?.error?.message||`API 请求失败（${response.status}）`);
+        const text=String(data?.choices?.[0]?.message?.content||'').replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'');
+        const start=text.indexOf('{'),end=text.lastIndexOf('}');
+        if(start<0||end<start)throw new Error('模型没有返回有效 JSON');
+        const result=JSON.parse(text.slice(start,end+1)),quote=String(result.quote||'').replace(/[\r\n]+/g,' ').trim().slice(0,80),author=String(result.author||'').replace(/[\r\n]+/g,' ').trim().slice(0,30);
+        if(!quote)throw new Error('模型没有返回每日一句');
+        res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({quote,author}));
+      }catch(error){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:error.message}));}
+    });return;
+  }
   if(req.method==='POST'&&req.url==='/api/recognize'){
     let raw=''; req.on('data',c=>raw+=c); req.on('end',async()=>{
       try{

@@ -1,10 +1,12 @@
 const KEY='job_tracker_desktop_v1';
+const DAILY_QUOTE_KEY='job_tracker_daily_quote_v1';
 const STAGES=['已投递','测评','笔试','面试','Offer','已结束'];
 const STATUSES=['等待结果','已通过','未通过','已放弃','已结束'];
 const TYPES=['测评','笔试','面试','Offer','其他'];
 const CHANNELS=['官网','Boss直聘','实习僧','牛客','猎聘','智联招聘','前程无忧','校园招聘平台','内推','其他'];
 const tones={'等待结果':'amber','已通过':'cyan','未通过':'red','已放弃':'gray','已结束':'gray','已投递':'blue','测评':'purple','笔试':'amber','面试':'cyan','Offer':'green'};
 let state=load(), page='home', selectedId=null, mailResult=null, applicationHeatmapMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let localDataReady=false,dailyQuoteRequest=null;
 function initial(){return{applications:[],events:[],settings:{apiUrl:'https://api.deepseek.com',model:'deepseek-chat',apiKey:''}}}
 function normalizeApplicationRecords(data){let changed=false;(data.applications||[]).forEach(application=>{if(application.stage==='准备投递'){application.stage='已投递';changed=true}if(!application.status||['进行中','等待安排'].includes(application.status)){application.status='等待结果';changed=true}});return changed}
 function load(){try{const cached=JSON.parse(localStorage.getItem(KEY)||'{}');if(cached.settings)delete cached.settings.apiKey;normalizeApplicationRecords(cached);localStorage.setItem(KEY,JSON.stringify(cached));return Object.assign(initial(),cached)}catch{return initial()}}
@@ -61,10 +63,10 @@ function progressHealth(a){
 function healthBadge(a){const health=progressHealth(a);return health?`<span class="badge badge-health ${health.className}" title="已经 ${health.days} 天没有新进展">${health.label}<b>${health.days}天</b></span>`:''}
 function latestProgressTime(a){
   const timelineTimes=(a.timeline||[])
-    .filter(item=>item.title!=='创建投递记录')
+    .filter(item=>!item.eventId&&item.title!=='创建投递记录')
     .map(item=>item.at);
   const completedEventTimes=state.events
-    .filter(e=>e.applicationId===a.id&&e.completed)
+    .filter(e=>e.applicationId===a.id&&e.completed&&!e.missed)
     .map(e=>e.startsAt);
   const times=[a.appliedDate]
     .concat(timelineTimes,completedEventTimes)
@@ -98,6 +100,13 @@ function compareApplications(a,b){
   return latestProgressTime(b)-latestProgressTime(a);
 }
 function toast(msg){const t=document.querySelector('#toast');t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2200)}
+function fallbackDailyQuote(){const quotes=['今天多走一步，明天就多一个选择。','把注意力放在能推进的下一步上。','每一次认真准备，都在靠近更合适的机会。','慢一点没有关系，只要方向仍在向前。','机会会迟到，但你的积累不会白费。','先完成今天能完成的，再把答案交给时间。','保持行动，好的结果往往在坚持之后出现。'];return quotes[new Date().getDay()]}
+function dailyQuoteCache(){try{return JSON.parse(localStorage.getItem(DAILY_QUOTE_KEY)||'null')}catch{return null}}
+function showDailyQuote(text,author=''){const holder=document.querySelector('#dailyQuote');if(!holder)return;holder.innerHTML=`<button type="button" class="daily-quote-refresh" onclick="event.stopPropagation();refreshDailyQuote()" title="换一句" aria-label="重新生成每日一句">✦</button><div><small class="daily-quote-label">今日一句</small><p>${esc(text)}${author?`<em>— ${esc(author)}</em>`:''}</p></div><span class="daily-quote-sparks" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b><b></b></span>`;holder.classList.toggle('hidden',page!=='home')}
+function celebrateDailyQuote(){const holder=document.querySelector('#dailyQuote');if(!holder||page!=='home')return;holder.classList.remove('refresh-complete');void holder.offsetWidth;holder.classList.add('refresh-complete');setTimeout(()=>holder.classList.remove('refresh-complete'),900)}
+async function generateDailyQuote(force=false){const holder=document.querySelector('#dailyQuote');if(!holder||dailyQuoteRequest)return;const previous=dailyQuoteCache();if(!state.settings.apiUrl||!state.settings.model||!state.settings.apiKey){if(previous?.date===today()&&previous.quote)showDailyQuote(previous.quote,previous.author);else showDailyQuote(fallbackDailyQuote());if(force)toast('请先在设置中完成大模型 API 配置');return}if(previous?.date===today()&&previous.quote)showDailyQuote(previous.quote,previous.author);else holder.innerHTML='<button type="button" class="daily-quote-refresh" disabled aria-label="正在生成每日一句">✦</button><div><small class="daily-quote-label">今日一句</small><p class="daily-quote-loading">正在准备今天的内容…</p></div>';holder.classList.add('is-refreshing');holder.querySelector('.daily-quote-refresh')?.setAttribute('disabled','');dailyQuoteRequest=fetch('/api/daily-quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...state.settings,date:today()})}).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||'生成失败');const value={date:today(),quote:result.quote,author:result.author||''};localStorage.setItem(DAILY_QUOTE_KEY,JSON.stringify(value));showDailyQuote(value.quote,value.author);celebrateDailyQuote()}).catch(error=>{if(previous?.date===today()&&previous.quote)showDailyQuote(previous.quote,previous.author);else showDailyQuote(fallbackDailyQuote());if(force)toast(`换一句失败：${error.message}`,{type:'error',duration:4000})}).finally(()=>{dailyQuoteRequest=null;holder.classList.remove('is-refreshing')});await dailyQuoteRequest}
+function refreshDailyQuote(){generateDailyQuote(true)}
+async function renderDailyQuote(){const holder=document.querySelector('#dailyQuote');if(!holder)return;holder.classList.toggle('hidden',page!=='home');if(page!=='home')return;const cached=dailyQuoteCache();if(cached?.date===today()&&cached.quote){showDailyQuote(cached.quote,cached.author);return}if(localDataReady)generateDailyQuote()}
 const content=document.querySelector('#content');
 // 持久连接用于识别页面是否真正关闭；普通刷新会自动重新连接。
 const pageSession=new EventSource('/api/session');
@@ -105,7 +114,7 @@ const pageMeta={home:['首页','掌握每一次机会的进展'],applications:['
 document.querySelector('#nav').onclick=e=>{const b=e.target.closest('button[data-page]');if(b)navigate(b.dataset.page)};
 document.querySelector('#quickAdd').onclick=()=>openApplicationForm();
 document.querySelector('#modalClose').onclick=closeModal;document.querySelector('#modalMask').onclick=e=>{if(e.target.id==='modalMask')closeModal()};
-function navigate(p){page=p;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));document.querySelector('#pageTitle').textContent=pageMeta[p][0];document.querySelector('#pageSubtitle').textContent=pageMeta[p][1];document.querySelector('#quickAdd').classList.toggle('hidden',!['home','applications'].includes(p));render()}
+function navigate(p){page=p;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));document.querySelector('#pageTitle').textContent=pageMeta[p][0];document.querySelector('#pageSubtitle').textContent=pageMeta[p][1];document.querySelector('#quickAdd').classList.toggle('hidden',!['home','applications'].includes(p));renderDailyQuote();render()}
 function render(){({home:renderHome,applications:renderApplications,calendar:renderCalendar,mail:renderMail,stats:renderStats,settings:renderSettings}[page]||renderHome)()}
 function eventLocation(e){if(!e.location)return '';if(/^https?:\/\//i.test(e.location))return ` · <a href="${esc(e.location)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">打开链接</a>`;return ` · ${esc(e.location)}`}
 function eventTypeTone(value){return({'测评':'assessment','笔试':'test','面试':'interview','Offer':'offer','其他':'other'})[value]||'other'}
@@ -157,4 +166,4 @@ function importData(input){const f=input.files[0];if(!f)return;const reader=new 
 function clearData(){confirmAction('清空全部数据','将清空所有投递和日程，建议操作前确认自动备份可用。',()=>{state.applications=[];state.events=[];save();render();toast('数据已清空')},{danger:true})}
 Object.assign(window,{navigate,openApplicationForm,openDetail,openEventForm,closeModal,quickStatus,removeApplication,completeEvent,missEvent,useMailResult,exportData,importData,clearData});
 render();
-loadFromLocalFile();
+loadFromLocalFile().finally(()=>{localDataReady=true;renderDailyQuote()});
