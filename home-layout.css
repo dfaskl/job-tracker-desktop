@@ -165,7 +165,7 @@ body:has(#nav button[data-page="home"].active) #content > .two-col > .panel:firs
 }
 .manual-confirm-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(150px, .8fr) minmax(260px, 1.4fr) auto auto;
   align-items: center;
   gap: 16px;
   padding: 14px 16px;
@@ -183,9 +183,67 @@ body:has(#nav button[data-page="home"].active) #content > .two-col > .panel:firs
   white-space: nowrap;
 }
 .manual-confirm-info span { color: var(--muted); margin-top: 5px; }
+.manual-confirm-flow {
+  display: flex;
+  min-width: 0;
+  padding: 4px 2px 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.manual-confirm-step {
+  --node-color: #718078;
+  --node-soft: #eef2ef;
+  position: relative;
+  flex: 1 0 58px;
+  min-width: 58px;
+  display: grid;
+  justify-items: center;
+  color: var(--node-color);
+  text-align: center;
+}
+.manual-confirm-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(-50% + 7px);
+  top: 6px;
+  width: calc(100% - 14px);
+  height: 2px;
+  background: color-mix(in srgb, var(--node-color) 38%, #dce3df);
+}
+.manual-confirm-step i {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--node-color);
+  border-radius: 50%;
+  background: var(--node-soft);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+.manual-confirm-step.done i { opacity: .72; }
+.manual-confirm-step.current i,
+.manual-confirm-step.upcoming i,
+.manual-confirm-step.failed i,
+.manual-confirm-step.success i { background: var(--node-color); }
+.manual-confirm-step span {
+  max-width: 68px;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .compact-empty { padding: 22px 15px; }
+
+@media(max-width: 1050px) {
+  .manual-confirm-item { grid-template-columns: minmax(0, 1fr) minmax(220px, 1.2fr) auto; }
+  .manual-confirm-item .danger { grid-column: 1 / -1; justify-self: end; }
+}
 
 @media(max-width: 760px) {
   .manual-confirm-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .manual-confirm-flow { grid-column: 1 / -1; grid-row: 2; }
   .manual-confirm-item .danger { grid-column: 1 / -1; }
 }

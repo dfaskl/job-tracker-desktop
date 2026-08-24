@@ -1,6 +1,13 @@
 (function () {
   const originalRenderHome = renderHome;
 
+  function manualConfirmFlow(application) {
+    const nodes = applicationFlowNodes(application);
+    return `<div class="manual-confirm-flow" aria-label="当前进展：${nodes.map(node => esc(node.label)).join('，')}">
+      ${nodes.map(node => `<div class="manual-confirm-step ${node.kind} flow-${node.style}" title="${esc(node.label)}${node.date ? ` · ${esc(node.date)}` : ''}"><i></i><span>${esc(node.label)}</span></div>`).join('')}
+    </div>`;
+  }
+
   renderHome = function () {
     originalRenderHome();
     const candidates = state.applications
@@ -25,6 +32,7 @@
               <b title="${esc(application.company)}">${esc(application.company)}</b>
               <span>${esc(application.position)}</span>
             </div>
+            ${manualConfirmFlow(application)}
             <span class="badge health-risk">${health.days}天无进展</span>
             <button class="danger" onclick="event.stopPropagation();quickStatus('${application.id}','reject')">标记未通过</button>
           </div>`).join('') || '<div class="empty compact-empty">目前没有需要人工确认的岗位</div>'}
