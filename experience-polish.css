@@ -11,7 +11,7 @@
 .application-card-flow.application-card-stopped:hover{border-color:color-mix(in srgb,#c96a61 28%,var(--line))!important}
 .application-card-flow.application-card-offer:hover{border-color:color-mix(in srgb,#27ad5d 46%,var(--line))!important;box-shadow:0 8px 24px color-mix(in srgb,#45c878 13%,transparent)!important}
 /* Home hierarchy */
-.home-workbench{gap:14px!important}.home-workbench .smart-insight{margin-bottom:0!important;border-left:3px solid var(--green)!important}.home-priority-section{position:relative}.home-priority-section::before{content:"优先处理";position:absolute;right:18px;top:17px;color:var(--green);font-size:10px;font-weight:750;letter-spacing:.08em}.home-review-section{background:color-mix(in srgb,#c96a61 2%,white)!important}
+.home-workbench{gap:14px!important}.home-workbench .smart-insight{margin-bottom:0!important;border-left:3px solid var(--green)!important}.home-priority-section{position:relative}.home-review-section{background:color-mix(in srgb,#c96a61 2%,white)!important}
 /* Three modal sizes */
 .modal.modal-small{width:min(440px,94vw)}.modal.modal-medium{width:min(700px,94vw)}.modal.modal-large{width:min(940px,95vw)}.modal-small .modal-head{margin-bottom:12px}.modal-small .modal-head h2{font-size:16px!important}
 /* Complete field states */
