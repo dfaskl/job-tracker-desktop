@@ -7,9 +7,12 @@
 
   function availableSize() {
     const viewport = window.visualViewport;
+    const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+    const cssWidth = Math.min(screen.availWidth || window.innerWidth, viewport?.width || window.innerWidth);
+    const cssHeight = Math.min(screen.availHeight || window.innerHeight, viewport?.height || window.innerHeight);
     return {
-      width: Math.min(screen.availWidth || window.innerWidth, viewport?.width || window.innerWidth),
-      height: Math.min(screen.availHeight || window.innerHeight, viewport?.height || window.innerHeight)
+      width: cssWidth * pixelRatio,
+      height: cssHeight * pixelRatio
     };
   }
 
