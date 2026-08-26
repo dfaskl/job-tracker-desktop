@@ -36,9 +36,69 @@
   transition: color .16s ease;
 }
 .official-company-link:hover { color: var(--green); }
-.official-company-link span {
+.official-company-link > .external-icon {
   color: var(--green);
   font-size: 16px;
   transition: transform .16s ease;
 }
-.official-company-link:hover span { transform: translate(2px, -2px); }
+.official-company-link:hover > .external-icon { transform: translate(2px, -2px); }
+.official-company-title {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.official-destination-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 8px;
+}
+.official-destination-indicator svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.official-destination-indicator.is-website {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, white);
+}
+.official-destination-indicator.is-search {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, white);
+}
+.official-url-edit {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: color-mix(in srgb, var(--green) 9%, transparent);
+  color: var(--green);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background .16s ease, transform .16s ease;
+}
+.official-url-edit:hover {
+  background: color-mix(in srgb, var(--green) 17%, transparent);
+  transform: translateY(-1px);
+}
+.official-url-edit:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--green) 45%, white);
+  outline-offset: 2px;
+}
+.official-url-help {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  line-height: 1.6;
+}

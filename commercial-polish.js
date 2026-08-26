@@ -34,8 +34,12 @@
     const channelStats={};apps.forEach(item=>{const key=item.channel||'未填写',entry=channelStats[key]||(channelStats[key]={total:0,interviews:0});entry.total++;if(applicationReached(item,'面试'))entry.interviews++;});
     const best=Object.entries(channelStats).filter(([,value])=>value.total).sort((a,b)=>b[1].interviews/b[1].total-a[1].interviews/a[1].total)[0];
     const upcomingCount=state.events.filter(event=>!event.completed&&!event.missed&&new Date(String(event.startsAt).replace(' ','T')).getTime()>=Date.now()).length;
-    const sentence=apps.length?`目前记录 ${apps.length} 个岗位，${active.length} 个仍在推进，${upcomingCount} 项日程待参加${stale.length?`，另有 ${stale.length} 个岗位达到 ${PROGRESS_STALE_DAYS} 天没有进展`:''}${best&&best[1].interviews?`。${best[0]}的面试转化表现最好`:'。'}`:'创建第一条投递后，这里会自动总结当前求职进展。';
-    return `<div class="panel smart-insight"><div class="insight-icon">✦</div><div><span>今日求职简报</span><strong>${esc(sentence)}</strong></div><button class="secondary" onclick="navigate('stats')">查看统计</button></div>`;
+    const attentionThreshold=Math.max(3,Math.ceil(active.length*.2));
+    const hasResult=apps.some(item=>item.stage==='Offer'||item.status==='已通过');
+    const status=active.length?(stale.length>=attentionThreshold?{label:'需要关注',tone:'attention'}:{label:'稳步推进',tone:'steady'}):hasResult?{label:'阶段收获',tone:'success'}:apps.length?{label:'暂时休整',tone:'idle'}:{label:'等待开始',tone:'idle'};
+    const summary=best&&best[1].interviews?`${best[0]}的面试转化表现最好`:upcomingCount?`近期有 ${upcomingCount} 项日程，按计划准备即可`:apps.length?'当前机会池保持稳定，继续记录新的进展':'创建第一条投递后，这里会自动汇总求职进展';
+    const attentionAction=stale.length?"document.querySelector('.manual-confirm-panel')?.scrollIntoView({behavior:'smooth',block:'start'})":"navigate('applications')";
+    return `<div class="panel smart-insight"><div class="insight-head"><div class="insight-heading"><div class="insight-icon">✦</div><div><span>今日求职简报</span><small>数据更新至今天</small></div></div><span class="insight-status insight-status-${status.tone}"><i></i>${status.label}</span></div><div class="insight-metrics"><button onclick="navigate('applications')"><b>${apps.length}</b><small>总岗位</small></button><button onclick="navigate('applications')"><b>${active.length}</b><small>推进中</small></button><button onclick="navigate('calendar')"><b>${upcomingCount}</b><small>待参加</small></button><button class="${stale.length?'has-attention':''}" onclick="${attentionAction}"><b>${stale.length}</b><small>需关注</small></button></div><div class="insight-summary"><span><i></i><b>渠道亮点</b>${esc(summary)}</span><button class="link-btn" onclick="navigate('stats')">查看统计 →</button></div></div>`;
   }
 
   const baseHome=renderHome;

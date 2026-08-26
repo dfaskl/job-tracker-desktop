@@ -14,28 +14,30 @@
 .card-summary-line {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--muted);
   font-size: 13px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .card-summary-line strong {
-  flex: 0 1 180px;
-  min-width: 45px;
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
   color: var(--ink);
   font-size: 16px;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .card-summary-line .card-position {
-  flex: 0 1 320px;
-  min-width: 70px;
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
   color: #526159;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .card-summary-line > span:not(.card-position) {

@@ -15,8 +15,9 @@
   }
   function dateKey(value){return String(value||'').slice(0,10);}
   function polishHome(){
-    if(page!=='home')return;
-    content.classList.add('home-workbench');
+    const isHome=page==='home';
+    content.classList.toggle('home-workbench',isHome);
+    if(!isHome)return;
     const todayKey=typeof today==='function'?today():dateKey(new Date().toISOString()),nextDate=new Date();nextDate.setDate(nextDate.getDate()+1);const tomorrow=`${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')}`;
     content.querySelectorAll('.event-card').forEach((card,index)=>{const key=dateKey(card.dataset.startsAt);card.classList.toggle('is-next',index===0);card.classList.toggle('is-today',key===todayKey);card.classList.toggle('is-tomorrow',key===tomorrow);});
     content.querySelectorAll('.empty').forEach(empty=>{empty.classList.add('polished-empty');const panel=empty.closest('.panel'),title=titleText(panel?.querySelector('h2'));if(title==='近期日程'&&!empty.querySelector('button'))empty.insertAdjacentHTML('beforeend','<button class="secondary" onclick="openEventForm()">＋ 新增日程</button>');});
