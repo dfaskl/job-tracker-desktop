@@ -47,14 +47,16 @@ const PROGRESS_STALE_DAYS=10;
 function appById(id){return state.applications.find(x=>x.id===id)}
 function upcoming(){return state.events.filter(e=>!e.completed).sort((a,b)=>a.startsAt.localeCompare(b.startsAt))}
 function pendingFollowups(){const now=Date.now();return upcoming().filter(e=>{const t=new Date(e.startsAt.replace(' ','T')).getTime();return t<now-2*3600e3&&!e.missed})}
+function isInterviewEvent(event){return event.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(String(event.type||'')+' '+String(event.title||''))}
 function progressHealth(a){
   if(['Offer','已结束'].includes(a.stage)||['已通过','未通过','已放弃','已结束'].includes(a.status))return null;
-  const related=state.events.filter(e=>e.applicationId===a.id&&['笔试','面试'].includes(e.type));
+  const related=state.events.filter(e=>e.applicationId===a.id&&isInterviewEvent(e));
   const hasUpcoming=related.some(e=>!e.completed&&!e.missed&&new Date(e.startsAt.replace(' ','T')).getTime()>=Date.now());
   if(hasUpcoming)return null;
   const completed=related.filter(e=>e.completed&&!e.missed);
   if(!completed.length)return null;
-  const reference=latestProgressTime(a);
+  const reference=Math.max(...completed.map(e=>new Date(String(e.startsAt||'').replace(' ','T')).getTime()).filter(Number.isFinite));
+  if(!Number.isFinite(reference))return null;
   const days=Math.max(0,Math.floor((Date.now()-reference)/86400000));
   if(days<=3)return{label:'进展正常',className:'health-good',days};
   if(days<PROGRESS_STALE_DAYS)return{label:'等待较久',className:'health-watch',days};
@@ -74,11 +76,9 @@ function latestProgressTime(a){
     .filter(Number.isFinite);
   return times.length?Math.max(...times):0;
 }
-function hasSelectionProgress(a){
-  const progressedStages=['测评','笔试','面试','Offer'];
-  if(progressedStages.includes(a.stage))return true;
-  return state.events.some(e=>e.applicationId===a.id&&['测评','笔试','面试','Offer'].includes(e.type));
-}
+function hasInterviewProgress(a){return ['面试','Offer'].includes(a.stage)||a.status==='已通过'||state.events.some(e=>e.applicationId===a.id&&!e.missed&&(isInterviewEvent(e)||e.type==='Offer'))}
+function hasAssessmentOrTestProgress(a){return ['测评','笔试'].includes(a.stage)||state.events.some(e=>e.applicationId===a.id&&!e.missed&&['测评','笔试'].includes(e.type))}
+function applicationProgressTier(a){return hasInterviewProgress(a)?0:hasAssessmentOrTestProgress(a)?1:2}
 function nextUpcomingTime(a){
   const now=Date.now();
   const times=state.events.filter(e=>e.applicationId===a.id&&!e.completed&&!e.missed).map(e=>new Date(String(e.startsAt||'').replace(' ','T')).getTime()).filter(time=>Number.isFinite(time)&&time>=now);
@@ -95,8 +95,8 @@ function compareApplications(a,b){
   const aHasUpcoming=Number.isFinite(aUpcoming),bHasUpcoming=Number.isFinite(bUpcoming);
   if(aHasUpcoming!==bHasUpcoming)return aHasUpcoming?-1:1;
   if(aHasUpcoming&&bHasUpcoming&&aUpcoming!==bUpcoming)return aUpcoming-bUpcoming;
-  const aProgressed=hasSelectionProgress(a),bProgressed=hasSelectionProgress(b);
-  if(aProgressed!==bProgressed)return aProgressed?-1:1;
+  const aTier=applicationProgressTier(a),bTier=applicationProgressTier(b);
+  if(aTier!==bTier)return aTier-bTier;
   return latestProgressTime(b)-latestProgressTime(a);
 }
 function toast(msg){const t=document.querySelector('#toast');t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),2200)}
@@ -126,8 +126,9 @@ function applicationFlowNodes(a){
   const [appliedStyle,appliedIcon]=visual('已投递');
   const nodes=[{label:'已投递',date:a.appliedDate||'',kind:events.length||a.stage!=='已投递'?'done':'current',style:appliedStyle,icon:appliedIcon}];
   events.forEach(e=>{const eventTime=new Date(String(e.startsAt||'').replace(' ','T')).getTime(),kind=e.missed?'failed':e.completed?'done':eventTime>Date.now()?'upcoming':'current',[style,icon]=visual(e.title||e.type,e.type);nodes.push({label:e.title||e.type,date:String(e.startsAt||'').slice(0,10),kind,style,icon});});
-  const last=nodes[nodes.length-1],latestEvent=events[events.length-1],latestEventPending=latestEvent&&!latestEvent.completed&&!latestEvent.missed,terminal=a.status==='未通过'||a.status==='已放弃'||a.status==='已结束',offer=a.stage==='Offer'||a.status==='已通过';
+  const last=nodes[nodes.length-1],latestEvent=events[events.length-1],latestEventPending=latestEvent&&!latestEvent.completed&&!latestEvent.missed,terminal=a.status==='未通过'||a.status==='已放弃'||a.status==='已结束',offer=a.stage==='Offer'||a.status==='已通过',enteredInterview=a.stage==='面试'||events.some(isInterviewEvent);
   let statusLabel=offer?'Offer':terminal?a.status:a.status;
+  if(statusLabel==='等待结果'&&!enteredInterview)statusLabel='';
   if(statusLabel&&statusLabel!==last.label&&!(statusLabel==='等待结果'&&latestEventPending)){const [style,icon]=visual(statusLabel);nodes.push({label:statusLabel,date:offer?'':'当前状态',kind:offer?'success':terminal?'failed':'current',style,icon});}
   else if(!events.length&&a.stage!=='已投递'){const [style,icon]=visual(a.stage,a.stage);nodes.push({label:a.stage,date:'当前阶段',kind:'current',style,icon});}
   return nodes;
@@ -136,14 +137,16 @@ function applicationFlow(a,slots=0){const nodes=applicationFlowNodes(a),columnCo
 function applicationCardCategory(a){
   if(a.stage==='Offer'||a.status==='已通过')return'offer';
   if(a.stage==='已结束'||['未通过','已放弃','已结束'].includes(a.status))return'stopped';
-  const latestEvent=state.events.filter(event=>event.applicationId===a.id).sort((x,y)=>String(y.startsAt||'').localeCompare(String(x.startsAt||'')))[0];
-  return latestEvent&&!latestEvent.completed&&!latestEvent.missed?'pending':'waiting';
+  if(Number.isFinite(nextUpcomingTime(a)))return'pending';
+  if(hasInterviewProgress(a))return'interview';
+  if(hasAssessmentOrTestProgress(a))return'assessment';
+  return'applied';
 }
 function appCard(a,flowSlots=0){const category=applicationCardCategory(a);return `<div class="application-card application-card-flow application-card-${category}" onclick="openDetail('${a.id}')"><div class="card-overview"><div class="card-summary-line"><strong title="${esc(a.company)}">${esc(a.company)}</strong><i>·</i><span class="card-position" title="${esc(a.position)}">${esc(a.position)}</span><i>·</i><span>${esc(a.city||'地点未填')}</span><i>·</i><span>${esc(a.channel||'渠道未填')}</span></div><div class="card-health">${healthBadge(a)}</div></div>${applicationFlow(a,flowSlots)}</div>`}
-function applicationHeatmapBounds(){const current=new Date(new Date().getFullYear(),new Date().getMonth(),1),dates=state.applications.map(a=>String(a.appliedDate||'')).filter(value=>/^\d{4}-\d{2}-\d{2}$/.test(value)).sort(),earliest=dates.length?new Date(Number(dates[0].slice(0,4)),Number(dates[0].slice(5,7))-1,1):current;return {earliest,current}}
-function changeApplicationHeatmapMonth(offset){const {earliest,current}=applicationHeatmapBounds(),candidate=new Date(applicationHeatmapMonth.getFullYear(),applicationHeatmapMonth.getMonth()+offset,1);applicationHeatmapMonth=candidate<earliest?earliest:candidate>current?current:candidate;renderApplications()}
-function applicationMonthHeatmap(){const {earliest,current}=applicationHeatmapBounds();if(applicationHeatmapMonth<earliest)applicationHeatmapMonth=earliest;if(applicationHeatmapMonth>current)applicationHeatmapMonth=current;const year=applicationHeatmapMonth.getFullYear(),month=applicationHeatmapMonth.getMonth(),prefix=`${year}-${String(month+1).padStart(2,'0')}`,counts={};state.applications.forEach(a=>{if(String(a.appliedDate||'').startsWith(prefix))counts[a.appliedDate]=(counts[a.appliedDate]||0)+1});const max=Math.max(1,...Object.values(counts)),offset=(new Date(year,month,1).getDay()+6)%7,days=new Date(year,month+1,0).getDate(),cells=[];for(let index=0;index<42;index++){const day=index-offset+1;if(day<1||day>days){cells.push('<i class="outside"></i>');continue}const key=`${prefix}-${String(day).padStart(2,'0')}`,count=counts[key]||0,level=count?Math.max(1,Math.ceil(count/max*4)):0;cells.push(`<i class="heat-${level}" title="${key}：投递 ${count} 个岗位"></i>`)}const total=Object.values(counts).reduce((sum,value)=>sum+value,0),atEarliest=applicationHeatmapMonth.getTime()===earliest.getTime(),atCurrent=applicationHeatmapMonth.getTime()===current.getTime();return `<div class="application-heatmap"><div class="heatmap-summary"><b>${year}年${month+1}月</b><span>共 ${total} 个岗位</span><div class="heatmap-scale"><i></i><i></i><i></i><i></i><i></i></div></div><div class="heatmap-grid" aria-label="${year}年${month+1}月每日投递分布">${cells.join('')}</div><div class="heatmap-month-switch" aria-label="切换投递分布月份"><button type="button" onclick="event.stopPropagation();changeApplicationHeatmapMonth(-1)" title="${atEarliest?'已经是最早投递月份':'上个月'}" ${atEarliest?'disabled':''}>‹</button><b>${month+1}月</b><button type="button" onclick="event.stopPropagation();changeApplicationHeatmapMonth(1)" title="${atCurrent?'已经是当前月份':'下个月'}" ${atCurrent?'disabled':''}>›</button></div></div>`}
-function renderApplications(){content.innerHTML=`<div class="application-tools">${applicationMonthHeatmap()}<div class="application-filters"><input class="search" id="search" placeholder="搜索公司或岗位"><select class="search" id="statusFilter"><option value="">全部状态</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select></div></div><div class="cards" id="applicationList"></div>`;const refresh=()=>{const q=document.querySelector('#search').value.trim().toLowerCase(),s=document.querySelector('#statusFilter').value;const items=state.applications.filter(a=>(!q||(a.company+a.position).toLowerCase().includes(q))&&(!s||a.status===s)).sort(compareApplications),flowSlots=Math.max(1,...items.map(a=>applicationFlowNodes(a).length));document.querySelector('#applicationList').innerHTML=items.map(a=>appCard(a,flowSlots)).join('')||'<div class="panel empty">没有符合条件的投递记录</div>'};document.querySelector('#search').oninput=refresh;document.querySelector('#statusFilter').onchange=refresh;refresh()}
+function applicationHeatmapBounds(){const current=new Date(new Date().getFullYear(),new Date().getMonth(),1),dates=state.applications.map(a=>String(a.appliedDate||'')).filter(value=>/^\d{4}-\d{2}-\d{2}$/.test(value)).sort(),earliest=dates.length?new Date(Number(dates[0].slice(0,4)),Number(dates[0].slice(5,7))-1,1):current,latest=dates.length?new Date(Number(dates[dates.length-1].slice(0,4)),Number(dates[dates.length-1].slice(5,7))-1,1):current;return {earliest,latest}}
+function changeApplicationHeatmapMonth(offset){const {earliest,latest}=applicationHeatmapBounds(),candidate=new Date(applicationHeatmapMonth.getFullYear(),applicationHeatmapMonth.getMonth()+offset,1);applicationHeatmapMonth=candidate<earliest?earliest:candidate>latest?latest:candidate;renderApplications()}
+function applicationMonthHeatmap(){const {earliest,latest}=applicationHeatmapBounds();if(applicationHeatmapMonth<earliest)applicationHeatmapMonth=earliest;if(applicationHeatmapMonth>latest)applicationHeatmapMonth=latest;const year=applicationHeatmapMonth.getFullYear(),month=applicationHeatmapMonth.getMonth(),prefix=`${year}-${String(month+1).padStart(2,'0')}`,counts={};state.applications.forEach(a=>{if(String(a.appliedDate||'').startsWith(prefix))counts[a.appliedDate]=(counts[a.appliedDate]||0)+1});const max=Math.max(1,...Object.values(counts)),offset=(new Date(year,month,1).getDay()+6)%7,days=new Date(year,month+1,0).getDate(),cells=[];for(let index=0;index<42;index++){const day=index-offset+1;if(day<1||day>days){cells.push('<i class="outside"></i>');continue}const key=`${prefix}-${String(day).padStart(2,'0')}`,count=counts[key]||0,level=count?Math.max(1,Math.ceil(count/max*4)):0;cells.push(`<i class="heat-${level}" title="${key}：投递 ${count} 个岗位"></i>`)}const total=Object.values(counts).reduce((sum,value)=>sum+value,0),atEarliest=applicationHeatmapMonth.getTime()===earliest.getTime(),atLatest=applicationHeatmapMonth.getTime()===latest.getTime();return `<div class="application-heatmap"><div class="heatmap-summary"><b>${year}年${month+1}月</b><span>共 ${total} 个岗位</span><div class="heatmap-scale"><i></i><i></i><i></i><i></i><i></i></div></div><div class="heatmap-grid" aria-label="${year}年${month+1}月每日投递分布">${cells.join('')}</div><div class="heatmap-month-switch" aria-label="切换投递分布月份"><button type="button" onclick="event.stopPropagation();changeApplicationHeatmapMonth(-1)" title="${atEarliest?'已经是最早投递月份':'上个月'}" ${atEarliest?'disabled':''}>‹</button><b>${month+1}月</b><button type="button" onclick="event.stopPropagation();changeApplicationHeatmapMonth(1)" title="${atLatest?'已经是最晚投递月份':'下个月'}" ${atLatest?'disabled':''}>›</button></div></div>`}
+function renderApplications(){content.innerHTML=`<div class="application-tools"><input class="search application-search-input" id="search" placeholder="搜索公司或岗位"><select class="search application-status-filter" id="statusFilter"><option value="">全部状态</option>${STATUSES.map(x=>`<option>${x}</option>`).join('')}</select>${applicationMonthHeatmap()}</div><div class="application-color-legend" aria-label="投递卡片颜色说明"><span class="legend-title">卡片颜色</span><span class="legend-item legend-pending"><i></i>待参加日程</span><span class="legend-item legend-interview"><i></i>有面试进展</span><span class="legend-item legend-assessment"><i></i>测评 / 笔试</span><span class="legend-item legend-applied"><i></i>仅投递</span><span class="legend-item legend-stopped"><i></i>未通过 / 已结束</span><span class="legend-item legend-offer"><i></i>Offer / 已通过</span></div><div class="cards" id="applicationList"></div>`;const refresh=()=>{const q=document.querySelector('#search').value.trim().toLowerCase(),s=document.querySelector('#statusFilter').value;const items=state.applications.filter(a=>(!q||(a.company+a.position).toLowerCase().includes(q))&&(!s||a.status===s)).sort(compareApplications),flowSlots=Math.max(1,...items.map(a=>applicationFlowNodes(a).length));document.querySelector('#applicationList').innerHTML=items.map(a=>appCard(a,flowSlots)).join('')||'<div class="panel empty">没有符合条件的投递记录</div>'};document.querySelector('#search').oninput=refresh;document.querySelector('#statusFilter').onchange=refresh;refresh()}
 function renderCalendar(){const events=state.events.slice().sort((a,b)=>a.startsAt.localeCompare(b.startsAt)),todo=events.filter(e=>!e.completed),done=events.filter(e=>e.completed);content.innerHTML=`<div class="panel-head"><div></div><button class="primary" onclick="openEventForm()">＋ 新增日程</button></div><div class="panel"><div class="panel-head"><h2>待完成 · ${todo.length}</h2></div><div class="cards">${todo.map(e=>eventCard(e)+(pendingFollowups().some(x=>x.id===e.id)?`<div class="form-actions"><button class="success" onclick="completeEvent('${e.id}')">已经完成</button><button class="danger" onclick="missEvent('${e.id}')">已经错过</button></div>`:'')).join('')||'<div class="empty">暂无待完成日程</div>'}</div></div><div class="panel" style="margin-top:18px"><div class="panel-head"><h2>已完成 / 已错过</h2></div><div class="cards">${done.map(eventCard).join('')||'<div class="empty">暂无历史日程</div>'}</div></div>`}
 function openModal(title,html){document.querySelector('#modalTitle').textContent=title;document.querySelector('#modalBody').innerHTML=html;document.querySelector('#modalMask').classList.remove('hidden')}
 function closeModal(){document.querySelector('#modalMask').classList.add('hidden')}

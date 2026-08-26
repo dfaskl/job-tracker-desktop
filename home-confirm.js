@@ -21,7 +21,7 @@
       <div class="panel-head">
         <div>
           <h2>人工确认</h2>
-          <p>达到${PROGRESS_STALE_DAYS}天没有实际进展的岗位，请确认是否标记为未通过。</p>
+          <p>面试结束达到${PROGRESS_STALE_DAYS}天仍无进展的岗位，请确认是否标记为未通过。</p>
         </div>
         <span class="badge ${candidates.length ? 'health-risk' : 'health-good'}">${candidates.length} 个待确认</span>
       </div>

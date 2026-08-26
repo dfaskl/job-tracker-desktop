@@ -41,6 +41,8 @@ const dataDir = path.join(root, 'data');
 const dataFile = path.join(dataDir, 'job-tracker.json');
 const tempDataFile = path.join(dataDir, 'job-tracker.tmp.json');
 const configFile = path.join(dataDir, 'local-config.json');
+const companyLinksFile = path.join(dataDir, 'company-links.json');
+const tempCompanyLinksFile = path.join(dataDir, 'company-links.tmp.json');
 const backupsDir = path.join(dataDir, 'backups');
 const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
 let clientSeen = false;
@@ -68,6 +70,16 @@ function normalizeUrl(value){
   return `${url}/v1/chat/completions`;
 }
 const server=http.createServer(async(req,res)=>{
+  if(req.method==='GET'&&req.url==='/api/company-links'){
+    const data=readJson(companyLinksFile,{version:1,updatedAt:'',items:[]});
+    res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({...data,items:Array.isArray(data.items)?data.items:[]}));return;
+  }
+  if(req.method==='POST'&&req.url==='/api/company-links'){
+    let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>1024*1024)req.destroy();});req.on('end',()=>{try{
+      const input=JSON.parse(raw||'{}'),seen=new Set(),items=(Array.isArray(input.items)?input.items:[]).map(item=>({company:String(item.company||'').trim().slice(0,120),url:String(item.url||'').trim().slice(0,2048)})).filter(item=>item.company&&(!item.url||/^https?:\/\//i.test(item.url))).filter(item=>{const key=item.company.replace(/\s+/g,' ').toLocaleLowerCase('zh-CN');if(seen.has(key))return false;seen.add(key);return true;});
+      fs.mkdirSync(dataDir,{recursive:true});fs.writeFileSync(tempCompanyLinksFile,JSON.stringify({version:1,updatedAt:new Date().toISOString(),items},null,2),'utf8');fs.renameSync(tempCompanyLinksFile,companyLinksFile);res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify({items}));
+    }catch(error){res.writeHead(400,{'Content-Type':mime['.json']});res.end(JSON.stringify({error:`保存公司官网库失败：${error.message}`}));}});return;
+  }
   if(req.method==='GET'&&req.url==='/api/config'){
     res.writeHead(200,{'Content-Type':mime['.json']});res.end(JSON.stringify(readJson(configFile,{apiKey:''})));return;
   }

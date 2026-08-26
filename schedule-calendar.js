@@ -4,6 +4,20 @@
   let selectedDate = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
 
   function key(year, month, day) { return `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
+  function monthValue(date) { return date.getFullYear()*12+date.getMonth(); }
+  function scheduleBounds() {
+    const months=state.events.map(event=>String(event.startsAt||'').slice(0,7)).filter(value=>/^\d{4}-\d{2}$/.test(value)).sort();
+    const now=new Date(),fallback=new Date(now.getFullYear(),now.getMonth(),1);
+    if(!months.length)return {first:fallback,last:fallback};
+    const toDate=value=>new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1);
+    return {first:toDate(months[0]),last:toDate(months[months.length-1])};
+  }
+  function clampScheduleMonth(candidate) {
+    const {first,last}=scheduleBounds(),value=monthValue(candidate);
+    if(value<monthValue(first))return first;
+    if(value>monthValue(last))return last;
+    return candidate;
+  }
   function eventsOn(date) { return state.events.filter(event => String(event.startsAt||'').slice(0,10)===date).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)); }
   function statusText(event) { return event.missed?'已错过':event.completed?'已完成':'待完成'; }
   function detailRow(event) {
@@ -17,7 +31,9 @@
     </div>`;
   }
   function renderScheduleCalendar(){
+    scheduleMonth=clampScheduleMonth(scheduleMonth);
     const year=scheduleMonth.getFullYear(),month=scheduleMonth.getMonth();
+    const {first,last}=scheduleBounds(),currentValue=monthValue(scheduleMonth),now=new Date(),thisMonth=new Date(now.getFullYear(),now.getMonth(),1),thisMonthInRange=monthValue(thisMonth)>=monthValue(first)&&monthValue(thisMonth)<=monthValue(last);
     const offset=(new Date(year,month,1).getDay()+6)%7,days=new Date(year,month+1,0).getDate();
     const today=key(new Date().getFullYear(),new Date().getMonth(),new Date().getDate());
     const cells=[];
@@ -27,14 +43,14 @@
       const date=key(year,month,day),items=eventsOn(date),pending=items.filter(item=>!item.completed).length,weekend=new Date(year,month,day).getDay()%6===0,past=date<today;
       cells.push(`<button class="schedule-day ${items.length?'has-events':''} ${date===today?'today':''} ${date===selectedDate?'selected':''} ${weekend?'weekend':''} ${past?'past':''}" onclick="selectScheduleDay('${date}',this)"><span class="schedule-day-number">${day}</span><div class="schedule-day-events">${items.slice(0,3).map(item=>`<i class="event-chip chip-${eventTypeTone(item.type)} ${item.completed?'done':''} ${item.missed?'missed':''}"><em>${String(item.startsAt).slice(11,16)}</em>${esc(item.company)} · ${esc(item.title||item.type)}</i>`).join('')}${items.length>3?'<small class="more-ellipsis">•••</small>':''}</div>${pending?`<b class="pending-count">${pending}</b>`:''}</button>`);
     }
-    content.innerHTML=`<div class="panel schedule-calendar-panel"><div class="panel-head"><div><h2>日程月历</h2><p>${year}年${month+1}月 · 共 ${state.events.filter(event=>String(event.startsAt||'').startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length} 项安排</p></div><div class="schedule-calendar-actions"><div class="calendar-controls"><button class="ghost" onclick="changeScheduleMonth(-1)">‹</button><button class="secondary" onclick="resetScheduleMonth()">本月</button><button class="ghost" onclick="changeScheduleMonth(1)">›</button></div><button class="primary" onclick="openEventForm()">＋ 新增日程</button></div></div><div class="delivery-weekdays">${['周一','周二','周三','周四','周五','周六','周日'].map(day=>`<b>${day}</b>`).join('')}</div><div class="schedule-calendar-grid">${cells.join('')}</div></div>`;
+    content.innerHTML=`<div class="panel schedule-calendar-panel"><div class="panel-head"><div><h2>日程月历</h2><p>${year}年${month+1}月 · 共 ${state.events.filter(event=>String(event.startsAt||'').startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length} 项安排</p></div><div class="schedule-calendar-actions"><div class="calendar-controls"><button class="ghost" onclick="changeScheduleMonth(-1)" title="${currentValue<=monthValue(first)?'已经是最早日程月份':'上个月'}" ${currentValue<=monthValue(first)?'disabled':''}>‹</button><button class="secondary" onclick="resetScheduleMonth()" title="${thisMonthInRange?'回到本月':'本月不在日程范围内'}" ${thisMonthInRange?'':'disabled'}>本月</button><button class="ghost" onclick="changeScheduleMonth(1)" title="${currentValue>=monthValue(last)?'已经是最晚日程月份':'下个月'}" ${currentValue>=monthValue(last)?'disabled':''}>›</button></div><button class="primary" onclick="openEventForm()">＋ 新增日程</button></div></div><div class="delivery-weekdays">${['周一','周二','周三','周四','周五','周六','周日'].map(day=>`<b>${day}</b>`).join('')}</div><div class="schedule-calendar-grid">${cells.join('')}</div></div>`;
   }
 
   renderCalendar=renderScheduleCalendar;
   window.showScheduleDayModal=function(date){selectedDate=date;const items=eventsOn(date),parts=date.split('-').map(Number);openModal(`${parts[1]}月${parts[2]}日安排`, `<div class="schedule-modal-summary">共 ${items.length} 项日程</div><div class="schedule-detail-list">${items.map(detailRow).join('')||'<div class="empty compact-empty">当天没有安排</div>'}</div><div class="schedule-modal-actions"><button class="primary" onclick="closeModal();openEventForm()">＋ 新增日程</button></div>`);};
   window.selectScheduleDay=function(date,button){document.querySelectorAll('.schedule-day.selected').forEach(item=>item.classList.remove('selected'));button?.classList.add('selected');showScheduleDayModal(date);};
-  window.changeScheduleMonth=function(offset){scheduleMonth=new Date(scheduleMonth.getFullYear(),scheduleMonth.getMonth()+offset,1);selectedDate=key(scheduleMonth.getFullYear(),scheduleMonth.getMonth(),1);render();};
-  window.resetScheduleMonth=function(){const now=new Date();scheduleMonth=new Date(now.getFullYear(),now.getMonth(),1);selectedDate=key(now.getFullYear(),now.getMonth(),now.getDate());render();};
+  window.changeScheduleMonth=function(offset){const candidate=new Date(scheduleMonth.getFullYear(),scheduleMonth.getMonth()+offset,1),bounded=clampScheduleMonth(candidate);if(monthValue(bounded)===monthValue(scheduleMonth))return;scheduleMonth=bounded;selectedDate=key(scheduleMonth.getFullYear(),scheduleMonth.getMonth(),1);render();};
+  window.resetScheduleMonth=function(){const now=new Date(),candidate=new Date(now.getFullYear(),now.getMonth(),1),bounded=clampScheduleMonth(candidate);if(monthValue(bounded)!==monthValue(candidate))return;scheduleMonth=bounded;selectedDate=key(now.getFullYear(),now.getMonth(),now.getDate());render();};
   window.scheduleComplete=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=true;event.missed=false;save();render();showScheduleDayModal(selectedDate);toast('已标记完成');};
   window.scheduleMiss=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=true;event.missed=true;save();render();showScheduleDayModal(selectedDate);toast('已标记错过');};
   window.restoreSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=false;event.missed=false;save();render();showScheduleDayModal(selectedDate);toast('日程已恢复为待完成');};
