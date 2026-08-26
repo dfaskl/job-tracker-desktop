@@ -172,6 +172,87 @@ window.openCompanyWebsite = function (button) {
   }
 
   window.openOfficialUrlEditor = openOfficialUrlEditor;
+  function matchingCompanyLinks(company) {
+    const key = normalizeCompanyName(company);
+    if (!key) return [];
+    return companyLinks
+      .filter(item => String(item.url || '').trim())
+      .map(item => {
+        const itemKey = normalizeCompanyName(item.company);
+        const exact = itemKey === key;
+        const related = exact || itemKey.includes(key) || key.includes(itemKey);
+        return { ...item, exact, related };
+      })
+      .filter(item => item.related)
+      .sort((a, b) => Number(b.exact) - Number(a.exact) || a.company.localeCompare(b.company, 'zh-CN'))
+      .slice(0, 8);
+  }
+
+  function enhanceApplicationOfficialLink(form) {
+    const companyInput = form.elements.namedItem('company');
+    const notesField = form.elements.namedItem('notes')?.closest('.field');
+    if (!companyInput || !notesField || form.querySelector('.application-official-field')) return;
+    notesField.insertAdjacentHTML('beforebegin', `<div class="field full application-official-field">
+      <div class="application-official-heading"><label for="applicationOfficialChoice">公司官网链接</label><small id="applicationOfficialStatus">输入公司名称后自动检索官网库</small></div>
+      <select id="applicationOfficialChoice" aria-describedby="applicationOfficialStatus"><option value="__manual__">手动填写官网链接</option></select>
+      <input id="applicationOfficialManual" class="hidden" type="url" placeholder="https://careers.example.com" autocomplete="url">
+      <small class="official-url-help">链接按公司统一保存，同一公司的其他投递会自动复用。</small>
+    </div>`);
+    const select = form.querySelector('#applicationOfficialChoice');
+    const manual = form.querySelector('#applicationOfficialManual');
+    const status = form.querySelector('#applicationOfficialStatus');
+
+    const syncManualState = (shouldFocus = false) => {
+      const isManual = select.value === '__manual__';
+      manual.classList.toggle('hidden', !isManual);
+      if (isManual && shouldFocus) manual.focus({ preventScroll: true });
+    };
+    const refreshMatches = () => {
+      const company = companyInput.value.trim();
+      const matches = matchingCompanyLinks(company);
+      const exact = matches.find(item => item.exact);
+      select.innerHTML = `<option value="__manual__">${matches.length ? '手动填写其他链接' : '手动填写官网链接'}</option>${matches.map(item => `<option value="${esc(item.url)}" ${item === exact ? 'selected' : ''}>${item.exact ? '〔已匹配〕 ' : '〔相近公司〕 '}${esc(item.company)} · ${esc(item.url)}</option>`).join('')}`;
+      status.textContent = exact ? '已找到该公司的官网链接' : matches.length ? `找到 ${matches.length} 个相近公司链接，可选择或手动填写` : company ? '官网库暂无该公司链接，请手动填写' : '输入公司名称后自动检索官网库';
+      syncManualState();
+    };
+
+    companyInput.addEventListener('input', refreshMatches);
+    select.addEventListener('change', () => syncManualState(true));
+    refreshMatches();
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const company = companyInput.value.trim();
+      const selected = select.value;
+      const url = (selected === '__manual__' ? manual.value : selected).trim();
+      if (url && !/^https?:\/\//i.test(url)) return toast('官网链接需以 http:// 或 https:// 开头', { type: 'error' });
+      const submitHandler = form.onsubmit;
+      const submitButton = form.querySelector('button[type="submit"],.form-actions .primary');
+      if (submitButton) submitButton.disabled = true;
+      try {
+        await companyLinksReady;
+        if (company) await persistCompanyLinks(replaceCompanyLink(company, url));
+        submitHandler?.call(form, { preventDefault() {}, target: form });
+      } catch (error) {
+        if (submitButton) submitButton.disabled = false;
+        toast(error.message, { type: 'error', duration: 5000 });
+      }
+    }, true);
+  }
+
+  const originalOpenApplicationForm = openApplicationForm;
+  openApplicationForm = function (...args) {
+    const editingId = args[0] || '';
+    originalOpenApplicationForm(...args);
+    if (editingId) return;
+    const form = document.querySelector('#appForm');
+    if (!form) return;
+    companyLinksReady.then(() => {
+      if (form.isConnected) enhanceApplicationOfficialLink(form);
+    });
+  };
+  window.openApplicationForm = openApplicationForm;
   const originalOpenDetail = openDetail;
   openDetail = function (applicationId) {
     originalOpenDetail(applicationId);
