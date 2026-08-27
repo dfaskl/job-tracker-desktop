@@ -11,6 +11,7 @@ const dedupeClient = fs.readFileSync(path.join(root, 'application-dedupe.js'), '
 const migrationClient = fs.readFileSync(path.join(root, 'online-migration.js'), 'utf8');
 const appClient = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8');
+const statsClient = fs.readFileSync(path.join(root, 'stats-v2.js'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
 assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
@@ -35,6 +36,9 @@ assert.match(migrationClient, /companyLinks:\[\]/);
 assert.match(appClient, /apiUrl:localConfig\.apiUrl/);
 assert.match(appClient, /model:localConfig\.model/);
 assert.match(onlineServer, /VALUES\(\$1,\$2::jsonb\).*JSON\.stringify\(items\)/);
+assert.doesNotMatch(statsClient, /stageLabels = \[[^\]]*'无消息'/);
+assert.doesNotMatch(statsClient, /return '无消息'/);
+assert.match(statsClient, /const noMessage=activeApplications\.filter/);
 
 const child = spawn(process.execPath, ['-r', './tests/mock-pg.js', 'server-online.js'], {
   cwd:root,
