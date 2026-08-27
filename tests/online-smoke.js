@@ -106,6 +106,11 @@ async function waitForServer() {
     const userCookie = userRegister.headers.get('set-cookie').split(';')[0];
     const forbidden = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers:{ Cookie:userCookie } });
     assert.equal(forbidden.status, 403);
+    const forbiddenToggle = await fetch(`http://127.0.0.1:${port}/api/admin/settings/registration`, {
+      method:'PATCH', headers:{ 'Content-Type':'application/json', Cookie:userCookie },
+      body:JSON.stringify({ enabled:false })
+    });
+    assert.equal(forbiddenToggle.status, 403);
 
     const disableUser = await fetch(`http://127.0.0.1:${port}/api/admin/users/${userBody.user.id}`, {
       method:'PATCH', headers:{ 'Content-Type':'application/json', Cookie:adminCookie },
@@ -138,6 +143,30 @@ async function waitForServer() {
     assert.equal(deleteUser.status, 200);
     const finalOverview = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers:{ Cookie:adminCookie } });
     assert.equal((await finalOverview.json()).summary.totalUsers, 1);
+
+    const closeRegistration = await fetch(`http://127.0.0.1:${port}/api/admin/settings/registration`, {
+      method:'PATCH', headers:{ 'Content-Type':'application/json', Cookie:adminCookie },
+      body:JSON.stringify({ enabled:false })
+    });
+    assert.equal(closeRegistration.status, 200);
+    const closedRegister = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ email:'closed@example.com', password:'registration-is-closed' })
+    });
+    assert.equal(closedRegister.status, 403);
+    const closedOverview = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers:{ Cookie:adminCookie } });
+    assert.equal((await closedOverview.json()).summary.registrationOpen, false);
+
+    const openRegistration = await fetch(`http://127.0.0.1:${port}/api/admin/settings/registration`, {
+      method:'PATCH', headers:{ 'Content-Type':'application/json', Cookie:adminCookie },
+      body:JSON.stringify({ enabled:true })
+    });
+    assert.equal(openRegistration.status, 200);
+    const reopenedRegister = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ email:'reopened@example.com', password:'registration-is-open' })
+    });
+    assert.equal(reopenedRegister.status, 201);
 
     const privateSource = await fetch(`http://127.0.0.1:${port}/server-online.js`);
     assert.equal(privateSource.status, 404);

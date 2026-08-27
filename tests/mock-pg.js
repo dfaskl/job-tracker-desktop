@@ -1,7 +1,7 @@
 const pg = require('pg');
 const crypto = require('crypto');
 
-const state = { users:[], sessions:[], audit:[] };
+const state = { users:[], sessions:[], audit:[], registrationOpen:undefined };
 let nextUserId = 1;
 let nextAuditId = 1;
 
@@ -59,6 +59,11 @@ class MockPool {
       })));
     }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM sessions')) return rows([{ count:String(state.sessions.length) }]);
+    if (sql.startsWith("SELECT value FROM system_settings WHERE key='registration_open'")) return rows(state.registrationOpen === undefined ? [] : [{ value:state.registrationOpen }]);
+    if (sql.startsWith('INSERT INTO system_settings(')) {
+      state.registrationOpen = Boolean(params[0]);
+      return rows();
+    }
     if (sql.startsWith('SELECT id,action,target_email,created_at FROM admin_audit_logs')) return rows([...state.audit].reverse());
     if (sql.startsWith('SELECT id,email,is_admin,disabled_at FROM users WHERE id=')) return rows(state.users.filter(item => item.id === Number(params[0])));
     if (sql.startsWith('SELECT id,email,is_admin FROM users WHERE id=')) return rows(state.users.filter(item => item.id === Number(params[0])));

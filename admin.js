@@ -3,7 +3,7 @@
   const dashboard = document.querySelector('#dashboard');
   const userRows = document.querySelector('#userRows');
   const deleteDialog = document.querySelector('#deleteDialog');
-  const actionLabels = { 'disable-user':'停用了账号', 'enable-user':'启用了账号', 'delete-user':'永久删除了账号' };
+  const actionLabels = { 'disable-user':'停用了账号', 'enable-user':'启用了账号', 'delete-user':'永久删除了账号', 'open-registration':'开放了用户注册', 'close-registration':'关闭了用户注册' };
   let currentUser = null;
   let users = [];
   let deleteTarget = null;
@@ -61,6 +61,10 @@
     document.querySelector('[data-summary-note="enabledUsers"]').textContent = `${result.summary.enabledUsers} 个可用账号`;
     ['totalApplications','activeSessions','configuredApiKeys'].forEach(key => { document.querySelector(`[data-summary="${key}"]`).textContent = result.summary[key]; });
     document.querySelector('#registrationStatus').textContent = result.summary.registrationOpen ? '开放' : '已关闭';
+    const registrationToggle = document.querySelector('#registrationToggle');
+    registrationToggle.dataset.open = String(result.summary.registrationOpen);
+    registrationToggle.textContent = result.summary.registrationOpen ? '关闭注册' : '开启注册';
+    registrationToggle.disabled = false;
     document.querySelector('#registrationCodeStatus').textContent = result.summary.registrationCodeEnabled ? '已启用' : '未启用';
     document.querySelector('#adminEmailStatus').textContent = result.summary.adminEmailConfigured ? '已配置' : '未配置';
     renderUsers(); renderAudit(result.audit);
@@ -111,6 +115,20 @@
 
   document.querySelector('#cancelDelete').onclick = () => { deleteDialog.close(); deleteTarget = null; };
   document.querySelector('#refreshButton').onclick = () => loadOverview(true);
+  document.querySelector('#registrationToggle').onclick = async event => {
+    const button = event.currentTarget;
+    const nextEnabled = button.dataset.open !== 'true';
+    if (!confirm(nextEnabled ? '确认重新开放新用户注册？' : '确认关闭新用户注册？现有用户仍可正常登录。')) return;
+    button.disabled = true;
+    try {
+      await api('/api/admin/settings/registration', { method:'PATCH', body:JSON.stringify({ enabled:nextEnabled }) });
+      notify(nextEnabled ? '新用户注册已开放' : '新用户注册已关闭');
+      await loadOverview();
+    } catch (error) {
+      notify(error.message);
+      button.disabled = false;
+    }
+  };
   document.querySelector('#logoutButton').onclick = async () => { await fetch('/api/auth/logout', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {}); location.replace('/'); };
   loadOverview();
 })();

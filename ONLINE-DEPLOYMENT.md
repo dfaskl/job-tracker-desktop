@@ -50,7 +50,7 @@
 7. 首次创建 Blueprint 时，`ADMIN_EMAIL` 可以暂时留空；等待健康检查通过后，先打开 Render 提供的 `onrender.com` 地址注册你的普通账号。
 8. 确认账号注册成功后，在 Render 的 Environment 中把 `ADMIN_EMAIL` 设置为该账号的登录邮箱并保存。它不是密码，不要填写邀请码。
 9. Render 重启服务时，已存在且与 `ADMIN_EMAIL` 匹配的账号会自动提升为管理员；重新登录后，侧栏会出现“管理后台”。
-10. 所有目标用户注册完成后，将 Render 环境变量 `ALLOW_REGISTRATION` 改为 `false`。
+10. 所有目标用户注册完成后，在管理员后台概览中点击“关闭注册”，无需重启 Render。
 
 此后推送到 GitHub 默认分支会先触发 GitHub Actions；语法检查和线上冒烟测试全部通过后，Render 才自动部署。Neon 数据库独立于代码部署，因此更新线上代码不会覆盖用户数据。
 
@@ -68,7 +68,7 @@
 建议同时配置：
 
 - `REGISTRATION_CODE`：小规模用户的邀请码。
-- `ALLOW_REGISTRATION`：注册结束后设为 `false`。
+- `ALLOW_REGISTRATION`：尚未在管理员后台切换过注册状态时使用的初始默认值，默认为 `true`。
 - `AI_ALLOWED_HOSTS`：允许使用的 AI API 域名白名单，例如 `api.deepseek.com,api.openai.com`。
 - `SESSION_DAYS`：登录会话有效天数，默认 7 天。
 
@@ -76,6 +76,7 @@
 
 管理员登录普通页面后，可通过侧栏底部的“管理后台”进入 `/admin.html`。后台只显示各账号的记录数量和 API Key 是否已配置，不读取投递内容或 API Key 明文。
 
+- 概览中的“关闭注册 / 开启注册”会把状态保存到 PostgreSQL 并立即生效；首次切换后，数据库状态优先于 `ALLOW_REGISTRATION` 环境变量。
 - 停用用户会立即删除该用户的现有会话，但不会删除数据；重新启用后可再次登录。
 - 永久删除会级联删除该用户的投递、日程、公司官网库、API 配置、会话和数据库内备份，且无法撤销。
 - 普通用户直接访问后台地址只能看到无权限提示，服务端管理接口返回 403。

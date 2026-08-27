@@ -114,6 +114,12 @@ async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS admin_audit_logs_created_idx ON admin_audit_logs(created_at DESC);
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
   await pool.query('DELETE FROM sessions WHERE expires_at <= NOW()');
   const adminEmail = normalizedEmail(process.env.ADMIN_EMAIL);
@@ -169,6 +175,12 @@ function normalizedEmail(value) { return String(value || '').trim().toLowerCase(
 
 function publicUser(user) {
   return { id:String(user.id), email:user.email, isAdmin:Boolean(user.is_admin) };
+}
+
+async function registrationIsOpen() {
+  const result = await pool.query("SELECT value FROM system_settings WHERE key='registration_open'");
+  if (!result.rows[0]) return process.env.ALLOW_REGISTRATION !== 'false';
+  return result.rows[0].value === true;
 }
 
 async function passwordRecord(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -281,7 +293,7 @@ async function authRoute(req, res, pathname) {
     return user ? json(res, 200, { user:publicUser(user), mode:'online' }) : json(res, 401, { error:'请先登录' });
   }
   if (pathname === '/api/auth/register' && req.method === 'POST') {
-    if (process.env.ALLOW_REGISTRATION === 'false') return json(res, 403, { error:'当前未开放注册' });
+    if (!(await registrationIsOpen())) return json(res, 403, { error:'当前未开放注册' });
     if (!allowLoginAttempt(req)) return json(res, 429, { error:'尝试次数过多，请稍后再试' });
     const body = await readBody(req), email = normalizedEmail(body.email), password = String(body.password || '');
     if (process.env.REGISTRATION_CODE && body.registrationCode !== process.env.REGISTRATION_CODE) return json(res, 403, { error:'邀请码不正确' });
@@ -332,6 +344,7 @@ async function adminRoute(req, res, pathname, user) {
     `);
     const auditResult = await pool.query('SELECT id,action,target_email,created_at FROM admin_audit_logs ORDER BY created_at DESC LIMIT 30');
     const sessionResult = await pool.query('SELECT COUNT(*) AS count FROM sessions WHERE expires_at>NOW()');
+    const registrationOpen = await registrationIsOpen();
     const users = userResult.rows.map(row => ({
       id:String(row.id),
       email:row.email,
@@ -352,7 +365,7 @@ async function adminRoute(req, res, pathname, user) {
         totalApplications:users.reduce((sum, item) => sum + item.applicationCount, 0),
         activeSessions:Number(sessionResult.rows[0]?.count || 0),
         configuredApiKeys:users.filter(item => item.hasApiKey).length,
-        registrationOpen:process.env.ALLOW_REGISTRATION !== 'false',
+        registrationOpen,
         registrationCodeEnabled:Boolean(process.env.REGISTRATION_CODE),
         adminEmailConfigured:Boolean(normalizedEmail(process.env.ADMIN_EMAIL))
       },
@@ -364,6 +377,18 @@ async function adminRoute(req, res, pathname, user) {
         createdAt:row.created_at
       }))
     });
+  }
+
+  if (pathname === '/api/admin/settings/registration' && req.method === 'PATCH') {
+    const body = await readBody(req);
+    if (typeof body.enabled !== 'boolean') return json(res, 400, { error:'注册开关状态不正确' });
+    await pool.query(`
+      INSERT INTO system_settings(key,value,updated_by)
+      VALUES('registration_open',to_jsonb($1::boolean),$2)
+      ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()
+    `, [body.enabled, user.id]);
+    await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id, null, '系统注册入口', body.enabled ? 'open-registration' : 'close-registration']);
+    return json(res, 200, { ok:true, registrationOpen:body.enabled });
   }
 
   const userMatch = pathname.match(/^\/api\/admin\/users\/(\d+)$/);
