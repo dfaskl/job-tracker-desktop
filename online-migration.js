@@ -45,26 +45,33 @@
     }
   }
 
-  window.importLegacyCompanyLinks = async function (input) {
-    try {
-      const imported = normalizedLinks(await readJsonFile(input));
-      if (!confirm(`将导入 ${imported.length} 条公司官网链接；同名公司将使用导入文件中的链接。是否继续？`)) return;
-      const currentResponse = await fetch('/api/company-links', { cache:'no-store' });
-      const current = currentResponse.ok ? (await currentResponse.json()).items || [] : [];
-      const merged = new Map(current.map(item => [normalizeCompany(item.company), item]));
-      imported.forEach(item => merged.set(normalizeCompany(item.company), item));
-      await saveCompanyLinks([...merged.values()]);
-      toast(`已导入 ${imported.length} 条官网链接`);
-      setTimeout(() => location.reload(), 700);
-    } catch (error) {
-      toast(error.message, { type:'error', duration:5000 });
-    } finally { input.value = ''; }
-  };
+  async function mergeCompanyLinks(imported) {
+    const currentResponse = await fetch('/api/company-links', { cache:'no-store' });
+    const current = currentResponse.ok ? (await currentResponse.json()).items || [] : [];
+    const merged = new Map(current.map(item => [normalizeCompany(item.company), item]));
+    imported.forEach(item => merged.set(normalizeCompany(item.company), item));
+    await saveCompanyLinks([...merged.values()]);
+  }
 
   async function importOnlineData(input) {
     try {
       const data = await readJsonFile(input);
-      if (!Array.isArray(data?.applications) || !Array.isArray(data?.events)) throw new Error('投递备份格式不正确，请选择 job-tracker.json 或线上完整备份');
+      const isBusinessBackup = Array.isArray(data?.applications) && Array.isArray(data?.events);
+      if (!isBusinessBackup) {
+        if (data && typeof data === 'object' && ('applications' in data || 'events' in data)) throw new Error('投递备份格式不完整，必须同时包含 applications 和 events 数组');
+        const importedLinks = normalizedLinks(data);
+        confirmAction('导入官网库', `将合并导入 ${importedLinks.length} 条公司官网链接；同名公司使用导入文件中的链接。`, async () => {
+          try {
+            await mergeCompanyLinks(importedLinks);
+            toast(`已导入 ${importedLinks.length} 条官网链接`);
+            setTimeout(() => location.reload(), 700);
+          } catch (error) {
+            toast(error.message, { type:'error', duration:5000 });
+          }
+        });
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'companyLinks') && !Array.isArray(data.companyLinks)) throw new Error('完整备份中的 companyLinks 必须是数组');
       const companyLinks = Array.isArray(data.companyLinks) ? normalizedLinks({ items:data.companyLinks }) : null;
       const message = '将用备份中的 ' + data.applications.length + ' 条投递和 ' + data.events.length + ' 项日程替换当前数据' + (companyLinks ? '，并恢复 ' + companyLinks.length + ' 条官网链接' : '') + '。';
       confirmAction('导入备份', message, async () => {
@@ -112,23 +119,15 @@
   exportData = exportOnlineBackup;
   window.exportData = exportOnlineBackup;
 
-  function enhanceMigrationPanel() {
-    const form = document.querySelector('#settingsForm');
-    if (!form || document.querySelector('.legacy-migration-panel')) return;
-    const host = document.querySelector('.settings-right-column') || form.closest('.grid') || document.querySelector('#content');
-    if (!host) return;
-    host.insertAdjacentHTML('beforeend', `<div class="panel settings-section legacy-migration-panel">
-      <h2>旧版数据迁移</h2>
-      <p>旧版的两类业务数据可分别导入。以后使用上方“导出数据”，会把它们合并保存到一个完整备份文件中。</p>
-      <div class="legacy-migration-list">
-        <label><span><b>投递与日程</b><small>job-tracker.json</small></span><em>选择文件</em><input type="file" accept=".json,application/json" hidden onchange="importData(this)"></label>
-        <label><span><b>公司官网库</b><small>company-links.json · 合并导入</small></span><em>选择文件</em><input type="file" accept=".json,application/json" hidden onchange="importLegacyCompanyLinks(this)"></label>
-      </div>
-      <small class="legacy-security-note">API 地址、模型和 API Key 只能在设置表单中手动填写，不会进入任何导入或导出文件。</small>
-    </div>`);
+  function enhanceImportDescription() {
+    const input = document.querySelector('input[onchange="importData(this)"]');
+    const note = input?.closest('.panel')?.querySelector('.settings-note');
+    if (!note) return;
+    const text = '支持线上完整备份、旧版 job-tracker.json 和 company-links.json。投递与日程会替换当前数据，单独导入官网库时会合并。';
+    if (note.textContent !== text) note.textContent = text;
   }
 
-  const observer = new MutationObserver(enhanceMigrationPanel);
+  const observer = new MutationObserver(enhanceImportDescription);
   observer.observe(document.querySelector('#content'), { childList:true, subtree:true });
-  enhanceMigrationPanel();
+  enhanceImportDescription();
 })();
