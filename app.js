@@ -24,7 +24,7 @@ async function loadFromLocalFile(){
     const result=await response.json();
     if(result.exists&&result.data){
       const configResponse=await fetch('/api/config',{cache:'no-store'}),localConfig=configResponse.ok?await configResponse.json():{};
-      state={...initial(),...result.data,settings:{...initial().settings,...(result.data.settings||{}),apiKey:localConfig.apiKey||''}};
+      state={...initial(),...result.data,settings:{...initial().settings,...(result.data.settings||{}),apiUrl:localConfig.apiUrl||result.data.settings?.apiUrl||initial().settings.apiUrl,model:localConfig.model||result.data.settings?.model||initial().settings.model,apiKey:localConfig.apiKey||''}};
       const migrated=normalizeApplicationRecords(state);
       const cached=JSON.parse(JSON.stringify(state));delete cached.settings.apiKey;localStorage.setItem(KEY,JSON.stringify(cached));
       document.documentElement.dataset.theme=state.settings.theme||'blue';
