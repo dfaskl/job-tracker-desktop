@@ -1,0 +1,18 @@
+{
+  "name": "job-tracker-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "多用户在线求职进度管理工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server-online.js",
+    "check": "node --check server.js && node --check server-online.js && node --check auth.js && node --check app.js",
+    "test": "node tests/online-smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

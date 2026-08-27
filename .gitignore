@@ -6,3 +6,4 @@ data/*
 *.log
 *backup*.json
 *before-*.json
+node_modules/
