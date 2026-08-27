@@ -1,9 +1,15 @@
 const assert = require('assert/strict');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 const root = path.resolve(__dirname, '..');
 const port = 31973;
+const blueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
+assert.match(blueprint, /plan:\s+free/);
+assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
+assert.doesNotMatch(blueprint, /^databases:/m);
+
 const child = spawn(process.execPath, ['-r', './tests/mock-pg.js', 'server-online.js'], {
   cwd:root,
   env:{
