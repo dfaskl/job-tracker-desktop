@@ -21,6 +21,9 @@
 
 ## Render 部署
 
+### 费用提醒
+
+`render.yaml` 默认使用付费的 Starter Web Service 和 Basic-256MB PostgreSQL，目的是保持服务常驻，并避免免费 PostgreSQL 在 30 天后到期。Render 2026 年 7 月给出的参考组合约为每月 13 美元，数据库存储和超额流量另计；创建 Blueprint 时请以控制台显示的实时价格为准。当前价格说明：<https://render.com/pricing>。
 1. 将本次代码推送到 GitHub。
 2. 在 Render 控制台选择 **New → Blueprint**，连接当前仓库。
 3. Render 会读取根目录 `render.yaml`，创建 Web Service 和 PostgreSQL。
