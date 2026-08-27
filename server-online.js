@@ -15,7 +15,7 @@ const scrypt = promisify(crypto.scrypt);
 const loginAttempts = new Map();
 const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8' };
 const publicFiles = new Set([
-  'admin.html', 'admin.js', 'admin.css',
+  'admin.html', 'admin.js', 'admin.css', 'online-migration.js', 'online-migration.css',
   'index.html', 'auth.js', 'auth.css', 'app.js', 'stats-v2.js', 'home-confirm.js', 'theme-selector.js',
   'help-tooltips.js', 'ai-normalize.js', 'official-search.js', 'schedule-calendar.js', 'application-dedupe.js',
   'notes-display.js', 'ui-polish.js', 'commercial-polish.js', 'experience-polish.js', 'styles.css',
@@ -550,8 +550,9 @@ function serveStatic(req, res, pathname) {
     if (error) { res.writeHead(404); return res.end('Not found'); }
     if (requested === 'index.html') {
       let html = data.toString('utf8');
-      html = html.replace('</head>', '  <link rel="stylesheet" href="auth.css">\n</head>');
+      html = html.replace('</head>', '  <link rel="stylesheet" href="auth.css">\n  <link rel="stylesheet" href="online-migration.css">\n</head>');
       html = html.replace('<script src="app.js"></script>', '<script src="auth.js"></script>\n  <script src="app.js"></script>');
+      html = html.replace('</body>', '  <script src="online-migration.js"></script>\n</body>');
       data = Buffer.from(html);
     }
     res.writeHead(200, { 'Content-Type':mime[path.extname(requested)], 'Cache-Control':requested === 'index.html' ? 'no-store' : 'public, max-age=300', 'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'", 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'no-referrer' });
