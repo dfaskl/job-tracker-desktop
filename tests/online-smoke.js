@@ -17,6 +17,8 @@ assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
 assert.doesNotMatch(blueprint, /^databases:/m);
 assert.match(authClient, /if \(nextHtml !== note\.innerHTML\) note\.innerHTML = nextHtml/);
 assert.doesNotMatch(authClient, /about-brand p'\)\.forEach\(item => \{ item\.textContent =/);
+assert.match(authClient, /class="password-toggle" aria-label="显示密码"/);
+assert.match(authClient, /passwordInput\.type = visible \? 'text' : 'password'/);
 assert.match(dedupeClient, /if \(!existing && \(!company \|\| !position\)\)/);
 assert.match(migrationClient, /company-links\.json/);
 assert.doesNotMatch(migrationClient, /local-config\.json/);

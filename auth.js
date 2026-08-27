@@ -59,7 +59,7 @@
       <div class="auth-tabs"><button class="${registering ? '' : 'active'}" data-mode="login">登录</button><button class="${registering ? 'active' : ''}" data-mode="register">注册</button></div>
       <form id="authForm">
         <label>邮箱<input type="email" name="email" autocomplete="email" required maxlength="254" placeholder="name@example.com"></label>
-        <label>密码<input type="password" name="password" autocomplete="${registering ? 'new-password' : 'current-password'}" required minlength="10" maxlength="128" placeholder="至少 10 位"></label>
+        <label>密码<div class="password-field"><input type="password" name="password" autocomplete="${registering ? 'new-password' : 'current-password'}" required minlength="10" maxlength="128" placeholder="至少 10 位"><button type="button" class="password-toggle" aria-label="显示密码" aria-pressed="false"><svg class="eye-show" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg><svg class="eye-hide" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a15.8 15.8 0 0 1-2.2 2.9M6.2 6.2C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a10.6 10.6 0 0 0 3.4-.5M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg></button></div></label>
         ${registering ? '<label>邀请码（如管理员已设置）<input type="text" name="registrationCode" autocomplete="off" maxlength="100" placeholder="未设置时可留空"></label>' : ''}
         <p class="auth-message ${message ? 'visible' : ''}" role="alert">${escapeHtml(message)}</p>
         <button class="primary auth-submit">${registering ? '创建账号' : '登录'}</button>
@@ -67,6 +67,15 @@
       <small class="auth-security">数据按账号隔离；API Key 仅以加密形式保存在服务器。</small>
     </div>`;
     gate.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => renderGate(button.dataset.mode));
+    const passwordInput = gate.querySelector('input[name="password"]');
+    const passwordToggle = gate.querySelector('.password-toggle');
+    passwordToggle.onclick = () => {
+      const visible = passwordInput.type === 'password';
+      passwordInput.type = visible ? 'text' : 'password';
+      passwordToggle.setAttribute('aria-pressed', String(visible));
+      passwordToggle.setAttribute('aria-label', visible ? '隐藏密码' : '显示密码');
+      passwordInput.focus({ preventScroll:true });
+    };
     gate.querySelector('#authForm').onsubmit = async event => {
       event.preventDefault();
       const button = gate.querySelector('.auth-submit');
