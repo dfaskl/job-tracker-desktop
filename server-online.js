@@ -15,6 +15,7 @@ const scrypt = promisify(crypto.scrypt);
 const loginAttempts = new Map();
 const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8' };
 const publicFiles = new Set([
+  'admin.html', 'admin.js', 'admin.css',
   'index.html', 'auth.js', 'auth.css', 'app.js', 'stats-v2.js', 'home-confirm.js', 'theme-selector.js',
   'help-tooltips.js', 'ai-normalize.js', 'official-search.js', 'schedule-calendar.js', 'application-dedupe.js',
   'notes-display.js', 'ui-polish.js', 'commercial-polish.js', 'experience-polish.js', 'styles.css',
@@ -66,6 +67,8 @@ async function initDatabase() {
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -102,8 +105,19 @@ async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS data_backups_user_idx ON data_backups(user_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS admin_audit_logs (
+      id BIGSERIAL PRIMARY KEY,
+      admin_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      target_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      target_email TEXT NOT NULL,
+      action TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS admin_audit_logs_created_idx ON admin_audit_logs(created_at DESC);
   `);
   await pool.query('DELETE FROM sessions WHERE expires_at <= NOW()');
+  const adminEmail = normalizedEmail(process.env.ADMIN_EMAIL);
+  if (adminEmail) await pool.query('UPDATE users SET is_admin=TRUE WHERE email=$1', [adminEmail]);
 }
 
 function json(res, status, value, extraHeaders = {}) {
@@ -128,9 +142,9 @@ async function currentUser(req) {
   const token = parseCookies(req).jt_session;
   if (!token) return null;
   const result = await pool.query(`
-    SELECT users.id, users.email
+    SELECT users.id, users.email, users.is_admin
     FROM sessions JOIN users ON users.id = sessions.user_id
-    WHERE sessions.token_hash = $1 AND sessions.expires_at > NOW()
+    WHERE sessions.token_hash = $1 AND sessions.expires_at > NOW() AND users.disabled_at IS NULL
   `, [tokenHash(token)]);
   return result.rows[0] || null;
 }
@@ -152,6 +166,10 @@ async function readBody(req, limit = 1024 * 1024) {
 }
 
 function normalizedEmail(value) { return String(value || '').trim().toLowerCase().slice(0, 254); }
+
+function publicUser(user) {
+  return { id:String(user.id), email:user.email, isAdmin:Boolean(user.is_admin) };
+}
 
 async function passwordRecord(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = await scrypt(String(password), salt, 64);
@@ -260,7 +278,7 @@ function parseModelJson(text) {
 async function authRoute(req, res, pathname) {
   if (pathname === '/api/auth/session' && req.method === 'GET') {
     const user = await currentUser(req);
-    return user ? json(res, 200, { user:{ id:String(user.id), email:user.email }, mode:'online' }) : json(res, 401, { error:'请先登录' });
+    return user ? json(res, 200, { user:publicUser(user), mode:'online' }) : json(res, 401, { error:'请先登录' });
   }
   if (pathname === '/api/auth/register' && req.method === 'POST') {
     if (process.env.ALLOW_REGISTRATION === 'false') return json(res, 403, { error:'当前未开放注册' });
@@ -271,9 +289,9 @@ async function authRoute(req, res, pathname) {
     if (password.length < 10 || password.length > 128) return json(res, 400, { error:'密码长度需为 10–128 位' });
     const record = await passwordRecord(password);
     try {
-      const result = await pool.query('INSERT INTO users(email,password_salt,password_hash) VALUES($1,$2,$3) RETURNING id,email', [email, record.salt, record.hash]);
+      const result = await pool.query('INSERT INTO users(email,password_salt,password_hash) VALUES($1,$2,$3) RETURNING id,email,is_admin', [email, record.salt, record.hash]);
       await createSession(result.rows[0].id, res);
-      return json(res, 201, { user:{ id:String(result.rows[0].id), email } });
+      return json(res, 201, { user:publicUser(result.rows[0]) });
     } catch (error) {
       if (error.code === '23505') return json(res, 409, { error:'该邮箱已注册' });
       throw error;
@@ -285,8 +303,9 @@ async function authRoute(req, res, pathname) {
     const result = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
     const user = result.rows[0];
     if (!user || !(await verifyPassword(password, user.password_salt, user.password_hash))) return json(res, 401, { error:'邮箱或密码不正确' });
+    if (user.disabled_at) return json(res, 403, { error:'该账号已被停用，请联系管理员' });
     await createSession(user.id, res);
-    return json(res, 200, { user:{ id:String(user.id), email:user.email } });
+    return json(res, 200, { user:publicUser(user) });
   }
   if (pathname === '/api/auth/logout' && req.method === 'POST') {
     const token = parseCookies(req).jt_session;
@@ -296,8 +315,103 @@ async function authRoute(req, res, pathname) {
   return false;
 }
 
+async function adminRoute(req, res, pathname, user) {
+  if (!user.is_admin) return json(res, 403, { error:'需要管理员权限' });
+
+  if (pathname === '/api/admin/overview' && req.method === 'GET') {
+    const userResult = await pool.query(`
+      SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,
+        CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,
+        CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,
+        (c.encrypted_api_key IS NOT NULL) AS has_api_key,
+        (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id=u.id) AS last_login_at
+      FROM users u
+      LEFT JOIN user_data d ON d.user_id=u.id
+      LEFT JOIN api_configs c ON c.user_id=u.id
+      ORDER BY u.is_admin DESC,u.created_at ASC
+    `);
+    const auditResult = await pool.query('SELECT id,action,target_email,created_at FROM admin_audit_logs ORDER BY created_at DESC LIMIT 30');
+    const sessionResult = await pool.query('SELECT COUNT(*) AS count FROM sessions WHERE expires_at>NOW()');
+    const users = userResult.rows.map(row => ({
+      id:String(row.id),
+      email:row.email,
+      isAdmin:Boolean(row.is_admin),
+      disabled:Boolean(row.disabled_at),
+      disabledAt:row.disabled_at || '',
+      createdAt:row.created_at,
+      lastLoginAt:row.last_login_at || '',
+      applicationCount:Number(row.application_count || 0),
+      eventCount:Number(row.event_count || 0),
+      hasApiKey:Boolean(row.has_api_key)
+    }));
+    return json(res, 200, {
+      currentUser:publicUser(user),
+      summary:{
+        totalUsers:users.length,
+        enabledUsers:users.filter(item => !item.disabled).length,
+        totalApplications:users.reduce((sum, item) => sum + item.applicationCount, 0),
+        activeSessions:Number(sessionResult.rows[0]?.count || 0),
+        configuredApiKeys:users.filter(item => item.hasApiKey).length,
+        registrationOpen:process.env.ALLOW_REGISTRATION !== 'false',
+        registrationCodeEnabled:Boolean(process.env.REGISTRATION_CODE),
+        adminEmailConfigured:Boolean(normalizedEmail(process.env.ADMIN_EMAIL))
+      },
+      users,
+      audit:auditResult.rows.map(row => ({
+        id:String(row.id),
+        action:row.action,
+        targetEmail:row.target_email,
+        createdAt:row.created_at
+      }))
+    });
+  }
+
+  const userMatch = pathname.match(/^\/api\/admin\/users\/(\d+)$/);
+  if (userMatch && req.method === 'PATCH') {
+    const targetId = userMatch[1];
+    if (targetId === String(user.id)) return json(res, 400, { error:'不能停用自己的管理员账号' });
+    const body = await readBody(req);
+    if (typeof body.disabled !== 'boolean') return json(res, 400, { error:'停用状态不正确' });
+    const targetResult = await pool.query('SELECT id,email,is_admin,disabled_at FROM users WHERE id=$1', [targetId]);
+    const target = targetResult.rows[0];
+    if (!target) return json(res, 404, { error:'用户不存在' });
+    if (target.is_admin) return json(res, 400, { error:'不能通过后台停用管理员账号' });
+    await pool.query('UPDATE users SET disabled_at=CASE WHEN $2::boolean THEN NOW() ELSE NULL END WHERE id=$1', [targetId, body.disabled]);
+    if (body.disabled) await pool.query('DELETE FROM sessions WHERE user_id=$1', [targetId]);
+    await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id, targetId, target.email, body.disabled ? 'disable-user' : 'enable-user']);
+    return json(res, 200, { ok:true, disabled:body.disabled });
+  }
+
+  if (userMatch && req.method === 'DELETE') {
+    const targetId = userMatch[1];
+    if (targetId === String(user.id)) return json(res, 400, { error:'不能删除自己的管理员账号' });
+    const body = await readBody(req);
+    const targetResult = await pool.query('SELECT id,email,is_admin FROM users WHERE id=$1', [targetId]);
+    const target = targetResult.rows[0];
+    if (!target) return json(res, 404, { error:'用户不存在' });
+    if (target.is_admin) return json(res, 400, { error:'不能通过后台删除管理员账号' });
+    if (normalizedEmail(body.confirmEmail) !== target.email) return json(res, 400, { error:'确认邮箱不匹配' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id, targetId, target.email, 'delete-user']);
+      await client.query('DELETE FROM users WHERE id=$1', [targetId]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    return json(res, 200, { ok:true });
+  }
+
+  return false;
+}
+
 async function apiRoute(req, res, pathname, user) {
   const userId = user.id;
+  if (pathname.startsWith('/api/admin/')) return adminRoute(req, res, pathname, user);
   if (pathname === '/api/data' && req.method === 'GET') {
     const result = await pool.query('SELECT data FROM user_data WHERE user_id=$1', [userId]);
     return json(res, 200, result.rows[0] ? { exists:true, data:result.rows[0].data } : { exists:false, data:null });

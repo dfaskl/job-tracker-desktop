@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server-online.js",
-    "check": "node --check server.js && node --check server-online.js && node --check auth.js && node --check app.js",
+    "check": "node --check server.js && node --check server-online.js && node --check auth.js && node --check admin.js && node --check app.js",
     "test": "node tests/online-smoke.js"
   },
   "engines": {

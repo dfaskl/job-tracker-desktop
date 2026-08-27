@@ -86,7 +86,7 @@
     if (!sidebar || sidebar.querySelector('.account-panel')) return;
     const panel = document.createElement('div');
     panel.className = 'account-panel';
-    panel.innerHTML = `<div><span>${escapeHtml(user.email.slice(0, 1).toUpperCase())}</span><p><b>${escapeHtml(user.email)}</b><small>云端数据已同步</small></p></div><button type="button" title="退出当前账号">退出</button>`;
+    panel.innerHTML = `<div><span>${escapeHtml(user.email.slice(0, 1).toUpperCase())}</span><p><b>${escapeHtml(user.email)}</b><small>${user.isAdmin ? '管理员 · 云端数据已同步' : '云端数据已同步'}</small></p></div><section>${user.isAdmin ? '<a href="/admin.html">管理后台</a>' : ''}<button type="button" title="退出当前账号">退出</button></section>`;
     panel.querySelector('button').onclick = async () => {
       panel.querySelector('button').disabled = true;
       await nativeFetch('/api/auth/logout', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {});

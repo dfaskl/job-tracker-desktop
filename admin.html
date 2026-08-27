@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>管理后台 · 求职进度本</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <aside class="admin-sidebar">
+    <a class="admin-brand" href="/"><span>✓</span><div><b>求职进度本</b><small>管理员控制台</small></div></a>
+    <nav><a class="active" href="#overview">概览</a><a href="#users">用户管理</a><a href="#audit">操作记录</a></nav>
+    <a class="back-link" href="/">← 返回普通页面</a>
+  </aside>
+
+  <main>
+    <header><div><p>ADMIN CONSOLE</p><h1>管理员后台</h1></div><div class="admin-account"><span id="adminEmail">正在验证身份…</span><button id="logoutButton" type="button">退出登录</button></div></header>
+
+    <section class="access-state" id="accessState">
+      <div class="spinner"></div><h2>正在验证管理员权限</h2><p>请稍候。</p>
+    </section>
+
+    <div id="dashboard" hidden>
+      <section id="overview">
+        <div class="section-heading"><div><small>OVERVIEW</small><h2>运行概览</h2></div><button class="refresh-button" id="refreshButton" type="button">刷新数据</button></div>
+        <div class="summary-grid">
+          <article><span>用户总数</span><strong data-summary="totalUsers">0</strong><small data-summary-note="enabledUsers">0 个可用账号</small></article>
+          <article><span>投递记录</span><strong data-summary="totalApplications">0</strong><small>所有账号合计</small></article>
+          <article><span>有效会话</span><strong data-summary="activeSessions">0</strong><small>尚未过期的登录</small></article>
+          <article><span>API 已配置</span><strong data-summary="configuredApiKeys">0</strong><small>仅统计，不读取密钥</small></article>
+        </div>
+        <div class="system-status"><div><i></i><span>注册状态</span><b id="registrationStatus">—</b></div><div><i></i><span>邀请码</span><b id="registrationCodeStatus">—</b></div><div><i></i><span>管理员邮箱</span><b id="adminEmailStatus">—</b></div></div>
+      </section>
+
+      <section id="users" class="panel-section">
+        <div class="section-heading"><div><small>USERS</small><h2>用户管理</h2><p>停用会立即撤销该用户的全部登录会话；删除会永久清除其云端数据。</p></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>账号</th><th>角色 / 状态</th><th>数据</th><th>API</th><th>注册 / 最近登录</th><th>操作</th></tr></thead>
+            <tbody id="userRows"></tbody>
+          </table>
+        </div>
+        <p class="empty-row" id="usersEmpty" hidden>暂无用户。</p>
+      </section>
+
+      <section id="audit" class="panel-section">
+        <div class="section-heading"><div><small>AUDIT LOG</small><h2>最近管理操作</h2><p>记录停用、启用和删除用户操作。</p></div></div>
+        <div class="audit-list" id="auditList"></div>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="deleteDialog">
+    <form method="dialog" id="deleteForm">
+      <div class="danger-mark">!</div><h2>永久删除用户</h2>
+      <p>将删除 <b id="deleteTargetEmail"></b> 的账号、投递、日程、API 配置及备份。此操作无法撤销。</p>
+      <label>请输入该用户邮箱进行确认<input id="deleteConfirmEmail" type="email" autocomplete="off" required></label>
+      <p class="dialog-error" id="deleteError"></p>
+      <div class="dialog-actions"><button value="cancel" type="button" id="cancelDelete">取消</button><button class="danger" value="confirm" type="submit">确认永久删除</button></div>
+    </form>
+  </dialog>
+
+  <div class="notice" id="notice" hidden></div>
+  <script src="admin.js"></script>
+</body>
+</html>

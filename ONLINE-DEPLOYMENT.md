@@ -11,6 +11,8 @@
 - 邮箱和密码登录；密码使用 Node.js `scrypt` 加随机盐哈希。
 - 会话令牌只通过 `HttpOnly`、`SameSite=Lax` Cookie 保存，数据库只存令牌哈希。
 - 业务数据、公司官网库、自动备份和 API 配置均通过 `user_id` 隔离。
+- 管理员身份由服务端 `ADMIN_EMAIL` 提升并在每个管理接口重新校验；普通用户无法读取用户列表。
+- 管理后台支持用户概览、停用、启用和永久删除，并记录最近管理操作。管理员不能停用或删除自己，也不能从后台删除其他管理员。
 - 用户 API Key 使用 AES-256-GCM 加密；主密钥只存在 `ENCRYPTION_KEY` 环境变量。
 - 设置接口只返回“已配置”和密钥末四位所需的掩码，不返回明文。
 - AI 调用时仅在服务端内存中临时解密，前端请求中的 API 配置会被忽略。
@@ -45,8 +47,10 @@
 4. `DATABASE_URL` 填写刚从 Neon 复制的完整 Pooled connection string。
 5. 在本机运行 `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`，将结果同时保存到密码管理器并填写为 `ENCRYPTION_KEY`。
 6. 在本机运行 `node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"`，将结果保存并填写为 `REGISTRATION_CODE`。
-7. 创建 Blueprint，等待健康检查通过，然后打开 Render 提供的 `onrender.com` 地址注册管理员账号。
-8. 所有目标用户注册完成后，将 Render 环境变量 `ALLOW_REGISTRATION` 改为 `false`。
+7. 首次创建 Blueprint 时，`ADMIN_EMAIL` 可以暂时留空；等待健康检查通过后，先打开 Render 提供的 `onrender.com` 地址注册你的普通账号。
+8. 确认账号注册成功后，在 Render 的 Environment 中把 `ADMIN_EMAIL` 设置为该账号的登录邮箱并保存。它不是密码，不要填写邀请码。
+9. Render 重启服务时，已存在且与 `ADMIN_EMAIL` 匹配的账号会自动提升为管理员；重新登录后，侧栏会出现“管理后台”。
+10. 所有目标用户注册完成后，将 Render 环境变量 `ALLOW_REGISTRATION` 改为 `false`。
 
 此后推送到 GitHub 默认分支会先触发 GitHub Actions；语法检查和线上冒烟测试全部通过后，Render 才自动部署。Neon 数据库独立于代码部署，因此更新线上代码不会覆盖用户数据。
 
@@ -59,6 +63,7 @@
 | `DATABASE_URL` | PostgreSQL 连接地址 |
 | `ENCRYPTION_KEY` | API Key 的服务端主加密密钥，至少 32 个随机字符 |
 | `NODE_ENV=production` | 启用安全 Cookie 等生产配置 |
+| `ADMIN_EMAIL` | 管理员登录邮箱；匹配的现有账号会在服务启动时被提升为管理员 |
 
 建议同时配置：
 
@@ -66,6 +71,15 @@
 - `ALLOW_REGISTRATION`：注册结束后设为 `false`。
 - `AI_ALLOWED_HOSTS`：允许使用的 AI API 域名白名单，例如 `api.deepseek.com,api.openai.com`。
 - `SESSION_DAYS`：登录会话有效天数，默认 7 天。
+
+## 管理员后台
+
+管理员登录普通页面后，可通过侧栏底部的“管理后台”进入 `/admin.html`。后台只显示各账号的记录数量和 API Key 是否已配置，不读取投递内容或 API Key 明文。
+
+- 停用用户会立即删除该用户的现有会话，但不会删除数据；重新启用后可再次登录。
+- 永久删除会级联删除该用户的投递、日程、公司官网库、API 配置、会话和数据库内备份，且无法撤销。
+- 普通用户直接访问后台地址只能看到无权限提示，服务端管理接口返回 403。
+- 修改 `ADMIN_EMAIL` 后需要保存 Render 环境变量并等待服务重启；已有账号随后重新登录即可看到管理员入口。
 
 ## 主密钥管理
 

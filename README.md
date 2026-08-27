@@ -27,6 +27,6 @@
 
 ## 在线多用户版
 
-项目同时提供基于 PostgreSQL 的小规模多用户在线模式。线上模式包含邮箱密码登录、账号数据隔离、数据库自动备份，以及用户 API Key 的 AES-256-GCM 加密存储；云端启动入口为 `npm start`，不会改变上述 Windows 本地版启动方式。
+项目同时提供基于 PostgreSQL 的小规模多用户在线模式。线上模式包含邮箱密码登录、账号数据隔离、数据库自动备份、用户 API Key 的 AES-256-GCM 加密存储，以及受服务端权限保护的管理员后台；云端启动入口为 `npm start`，不会改变上述 Windows 本地版启动方式。
 
 部署所需环境变量、Render Blueprint 和安全注意事项见 [`ONLINE-DEPLOYMENT.md`](ONLINE-DEPLOYMENT.md)。推送到 GitHub 默认分支后，Render 可自动构建并更新线上版本，数据库不会随代码部署被覆盖。
