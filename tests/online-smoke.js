@@ -10,6 +10,7 @@ const authClient = fs.readFileSync(path.join(root, 'auth.js'), 'utf8');
 const dedupeClient = fs.readFileSync(path.join(root, 'application-dedupe.js'), 'utf8');
 const migrationClient = fs.readFileSync(path.join(root, 'online-migration.js'), 'utf8');
 const appClient = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
 assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
@@ -31,6 +32,7 @@ assert.match(migrationClient, /applications:JSON\.parse\(JSON\.stringify\(state\
 assert.match(migrationClient, /companyLinks:\[\]/);
 assert.match(appClient, /apiUrl:localConfig\.apiUrl/);
 assert.match(appClient, /model:localConfig\.model/);
+assert.match(onlineServer, /VALUES\(\$1,\$2::jsonb\).*JSON\.stringify\(items\)/);
 
 const child = spawn(process.execPath, ['-r', './tests/mock-pg.js', 'server-online.js'], {
   cwd:root,

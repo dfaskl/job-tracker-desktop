@@ -464,7 +464,7 @@ async function apiRoute(req, res, pathname, user) {
   }
   if (pathname === '/api/company-links' && req.method === 'POST') {
     const body = await readBody(req), items = normalizedCompanyLinks(body.items);
-    await pool.query('INSERT INTO company_links(user_id,items) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW()', [userId, items]);
+    await pool.query('INSERT INTO company_links(user_id,items) VALUES($1,$2::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW()', [userId, JSON.stringify(items)]);
     return json(res, 200, { items });
   }
   if (pathname === '/api/config' && req.method === 'GET') {
