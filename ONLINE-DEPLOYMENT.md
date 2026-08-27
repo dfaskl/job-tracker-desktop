@@ -28,9 +28,9 @@
 1. 将本次代码推送到 GitHub。
 2. 在 Render 控制台选择 **New → Blueprint**，连接当前仓库。
 3. Render 会读取根目录 `render.yaml`，创建 Web Service 和 PostgreSQL。
-4. 为 `REGISTRATION_CODE` 填写一个只分享给目标用户的强邀请码。
-5. 完成首次部署后打开站点，注册管理员账号。
-6. 用户注册完成后，可将 `ALLOW_REGISTRATION` 改为 `false`，阻止继续注册。
+4. 在本机运行 `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`，将结果同时保存到密码管理器并填写为 `ENCRYPTION_KEY`。`n5. 为 `REGISTRATION_CODE` 填写一个只分享给目标用户的强邀请码。
+6. 完成首次部署后打开站点，注册管理员账号。
+7. 用户注册完成后，可将 `ALLOW_REGISTRATION` 改为 `false`，阻止继续注册。
 
 此后推送到 GitHub 默认分支会先触发 GitHub Actions；语法检查和线上冒烟测试全部通过后，Render 才自动部署。数据库独立于代码部署，因此更新线上代码不会覆盖用户数据。
 
