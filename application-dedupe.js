@@ -104,10 +104,11 @@
     const startsAt = document.querySelector('#mrStarts')?.value.trim() || '';
     const location = document.querySelector('#mrLocation')?.value.trim() || '';
     const summary = document.querySelector('#mrSummary')?.value.trim() || '';
-    if (!company || !position) { toast('请先补充公司名称和岗位名称'); return; }
-    const schedule = { type, title: type, startsAt, location, summary, status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果' };
     const selectedApplicationId=document.querySelector('#mrExistingApp')?.value||'';
     const existing = selectedApplicationId&&selectedApplicationId!=='__new__'?appById(selectedApplicationId):findExisting(company, position);
+    if (selectedApplicationId&&selectedApplicationId!=='__new__'&&!existing) { toast('所选投递记录不存在，请重新选择'); return; }
+    if (!existing && (!company || !position)) { toast('请先补充公司名称和岗位名称'); return; }
+    const schedule = { type, title: type, startsAt, location, summary, status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果' };
     if (existing) {
       if (startsAt) {
         appendMailEvent(existing, schedule);

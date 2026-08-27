@@ -7,12 +7,14 @@ const root = path.resolve(__dirname, '..');
 const port = 31973;
 const blueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
 const authClient = fs.readFileSync(path.join(root, 'auth.js'), 'utf8');
+const dedupeClient = fs.readFileSync(path.join(root, 'application-dedupe.js'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
 assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
 assert.doesNotMatch(blueprint, /^databases:/m);
 assert.match(authClient, /if \(nextHtml !== note\.innerHTML\) note\.innerHTML = nextHtml/);
 assert.doesNotMatch(authClient, /about-brand p'\)\.forEach\(item => \{ item\.textContent =/);
+assert.match(dedupeClient, /if \(!existing && \(!company \|\| !position\)\)/);
 
 const child = spawn(process.execPath, ['-r', './tests/mock-pg.js', 'server-online.js'], {
   cwd:root,
