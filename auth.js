@@ -101,17 +101,22 @@
     return String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' })[char]);
   }
 
-  const observer = new MutationObserver(() => {
+  function setTextIfChanged(element, text) {
+    if (element.textContent !== text) element.textContent = text;
+  }
+
+  function enhanceOnlineUi() {
     document.querySelectorAll('.settings-note').forEach(note => {
-      note.innerHTML = note.innerHTML
+      const nextHtml = note.innerHTML
         .replace(/API Key[^。]*。/, 'API Key 使用 AES-256-GCM 加密后保存，页面不会再次显示完整密钥。')
         .replace('本地数据', '账号数据');
+      if (nextHtml !== note.innerHTML) note.innerHTML = nextHtml;
     });
     document.querySelectorAll('.about-settings-section dd').forEach(item => {
-      if (item.textContent.includes('data/job-tracker.json')) item.textContent = '云端 PostgreSQL（按账号隔离）';
-      if (item.textContent.includes('data/local-config.json')) item.textContent = '服务端加密存储';
+      if (item.textContent.includes('data/job-tracker.json')) setTextIfChanged(item, '云端 PostgreSQL（按账号隔离）');
+      if (item.textContent.includes('data/local-config.json')) setTextIfChanged(item, '服务端加密存储');
     });
-    document.querySelectorAll('.about-brand p').forEach(item => { item.textContent = '私密、专注、可同步的求职管理工具'; });
+    document.querySelectorAll('.about-brand p').forEach(item => setTextIfChanged(item, '私密、专注、可同步的求职管理工具'));
     const apiKey = document.querySelector('#settingsForm input[name="apiKey"]');
     if (apiKey && !apiKey.dataset.onlineHint) {
       apiKey.dataset.onlineHint = 'true';
@@ -120,8 +125,11 @@
         apiKey.placeholder = '已加密保存；输入新值可替换';
       } else apiKey.placeholder = '输入后将加密保存';
     }
-  });
+  }
+
+  const observer = new MutationObserver(enhanceOnlineUi);
   observer.observe(document.documentElement, { childList:true, subtree:true });
+  enhanceOnlineUi();
 
   nativeFetch('/api/auth/session', { cache:'no-store' }).then(async response => {
     if (!response.ok) throw new Error('not-authenticated');
