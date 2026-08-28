@@ -338,6 +338,7 @@ tbody tr:last-child td {
 .detail-heading span{color:var(--muted);font-size:10px}
 .application-detail-list{display:grid;gap:7px;max-height:360px;overflow:auto}
 .application-detail-list article{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #edf1f6;border-radius:8px}
+.application-detail-card{flex-direction:column}.application-detail-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.admin-flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:12px 2px 4px}.admin-flow-step{position:relative;display:flex;align-items:center;min-width:150px;gap:8px;padding-right:24px}.admin-flow-step:not(:last-child)::after{content:"";position:absolute;top:14px;right:4px;width:16px;height:1px;background:#cbd7e8}.admin-flow-step>i{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:50%;background:#edf3ff;color:var(--blue);font-size:10px;font-style:normal;font-weight:800}.admin-flow-step b,.admin-flow-step small{display:block}.admin-flow-step b{font-size:11px}.admin-flow-step small{margin-top:3px;color:var(--muted);font-size:9px}
 .application-detail-list span{color:var(--muted);font-size:10px}
 .empty-detail{color:var(--muted);text-align:center}
 .empty-row {

@@ -178,8 +178,8 @@ async function waitForServer() {
     const adminDetails = await fetch(`http://127.0.0.1:${port}/api/admin/users/${overviewBody.currentUser.id}/details`, { headers:{ Cookie:adminCookie } });
     assert.equal(adminDetails.status, 200);
     const adminDetailsBody = await adminDetails.json();
-    assert.equal(adminDetailsBody.password.viewable, false);
-    assert.equal(adminDetailsBody.api.maskedKey, '');
+    assert.equal('password' in adminDetailsBody, false);
+    assert.equal('api' in adminDetailsBody, false);
     assert.deepEqual(adminDetailsBody.applications, []);
     assert.equal(overviewBody.summary.totalUsers, 1);
 

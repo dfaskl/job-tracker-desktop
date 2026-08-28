@@ -395,13 +395,19 @@ async function adminRoute(req, res, pathname, user) {
   const userDetailsMatch = pathname.match(/^\/api\/admin\/users\/(\d+)\/details$/);
   if (userDetailsMatch && req.method === 'GET') {
     const targetId = userDetailsMatch[1];
-    const result = await pool.query(`SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,d.data,c.api_url,c.model,c.encrypted_api_key,c.key_last_four FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id WHERE u.id=$1`, [targetId]);
+    const result = await pool.query(`SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,d.data FROM users u LEFT JOIN user_data d ON d.user_id=u.id WHERE u.id=$1`, [targetId]);
     const target = result.rows[0];
     if (!target) return json(res, 404, { error:'用户不存在' });
     const rawApplications = Array.isArray(target.data?.applications) ? target.data.applications : [];
-    const applications = rawApplications.slice(0, 500).map(item => ({ id:String(item?.id || ''), company:String(item?.company || '').slice(0,300), position:String(item?.position || '').slice(0,300), stage:String(item?.stage || '').slice(0,100), status:String(item?.status || '').slice(0,100), appliedDate:String(item?.appliedDate || '').slice(0,40), city:String(item?.city || '').slice(0,200), channel:String(item?.channel || '').slice(0,100) }));
+    const rawEvents = Array.isArray(target.data?.events) ? target.data.events : [];
+    const applications = rawApplications.slice(0,500).map(item => {
+      const timeline = Array.isArray(item?.timeline) ? item.timeline.map(step => ({ at:String(step?.at||'').slice(0,40), title:String(step?.title||'').slice(0,500) })) : [];
+      const events = rawEvents.filter(event => String(event?.applicationId||'')===String(item?.id||'')).map(event => ({ at:String(event?.completedAt||event?.endsAt||event?.startsAt||event?.createdAt||'').slice(0,40), title:String(event?.title||event?.type||'日程').slice(0,300), type:String(event?.type||'').slice(0,100), result:String(event?.missed?'已错过':event?.completed?(event?.result||'已完成'):'待完成').slice(0,100) }));
+      const flow = [{at:String(item?.appliedDate||item?.createdAt||'').slice(0,40),title:'已投递'},...timeline,...events.map(event=>({at:event.at,title:`${event.type?`${event.type} · `:''}${event.title} · ${event.result}`}))].filter(step=>step.at||step.title).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+      return { id:String(item?.id||''),company:String(item?.company||'').slice(0,300),position:String(item?.position||'').slice(0,300),stage:String(item?.stage||'').slice(0,100),status:String(item?.status||'').slice(0,100),appliedDate:String(item?.appliedDate||'').slice(0,40),city:String(item?.city||'').slice(0,200),channel:String(item?.channel||'').slice(0,100),flow };
+    });
     await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id,targetId,target.email,'view-user-details']);
-    return json(res,200,{ user:{id:String(target.id),email:target.email}, password:{viewable:false,description:'密码采用不可逆哈希保存，任何人（包括管理员）都无法查看原密码。'}, api:{configured:Boolean(target.encrypted_api_key),apiUrl:target.api_url||'',model:target.model||'',maskedKey:target.encrypted_api_key?`••••••••${String(target.key_last_four||'')}`:''}, applications,totalApplications:rawApplications.length,truncated:rawApplications.length>applications.length });
+    return json(res,200,{ user:{id:String(target.id),email:target.email},applications,totalApplications:rawApplications.length,truncated:rawApplications.length>applications.length });
   }
   if (userMatch && req.method === 'PATCH') {
     const targetId = userMatch[1];
