@@ -392,6 +392,17 @@ async function adminRoute(req, res, pathname, user) {
   }
 
   const userMatch = pathname.match(/^\/api\/admin\/users\/(\d+)$/);
+  const userDetailsMatch = pathname.match(/^\/api\/admin\/users\/(\d+)\/details$/);
+  if (userDetailsMatch && req.method === 'GET') {
+    const targetId = userDetailsMatch[1];
+    const result = await pool.query(`SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,d.data,c.api_url,c.model,c.encrypted_api_key,c.key_last_four FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id WHERE u.id=$1`, [targetId]);
+    const target = result.rows[0];
+    if (!target) return json(res, 404, { error:'用户不存在' });
+    const rawApplications = Array.isArray(target.data?.applications) ? target.data.applications : [];
+    const applications = rawApplications.slice(0, 500).map(item => ({ id:String(item?.id || ''), company:String(item?.company || '').slice(0,300), position:String(item?.position || '').slice(0,300), stage:String(item?.stage || '').slice(0,100), status:String(item?.status || '').slice(0,100), appliedDate:String(item?.appliedDate || '').slice(0,40), city:String(item?.city || '').slice(0,200), channel:String(item?.channel || '').slice(0,100) }));
+    await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id,targetId,target.email,'view-user-details']);
+    return json(res,200,{ user:{id:String(target.id),email:target.email}, password:{viewable:false,description:'密码采用不可逆哈希保存，任何人（包括管理员）都无法查看原密码。'}, api:{configured:Boolean(target.encrypted_api_key),apiUrl:target.api_url||'',model:target.model||'',maskedKey:target.encrypted_api_key?`••••••••${String(target.key_last_four||'')}`:''}, applications,totalApplications:rawApplications.length,truncated:rawApplications.length>applications.length });
+  }
   if (userMatch && req.method === 'PATCH') {
     const targetId = userMatch[1];
     if (targetId === String(user.id)) return json(res, 400, { error:'不能停用自己的管理员账号' });

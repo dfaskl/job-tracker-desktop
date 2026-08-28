@@ -50,6 +50,10 @@ class MockPool {
     }
     if (sql === 'SELECT * FROM users WHERE email=$1') return rows(state.users.filter(item => item.email === params[0]));
     if (sql.startsWith('SELECT u.id,u.email,u.is_admin')) {
+      if (sql.includes('WHERE u.id=$1')) {
+        const user = state.users.find(item => item.id === Number(params[0]));
+        return rows(user ? [{ ...user, data:{ applications:[] }, api_url:null, model:null, encrypted_api_key:null, key_last_four:null }] : []);
+      }
       return rows(state.users.map(user => ({
         ...user,
         application_count:0,

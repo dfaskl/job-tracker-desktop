@@ -175,6 +175,12 @@ async function waitForServer() {
     assert.equal(overview.status, 200);
     const overviewBody = await overview.json();
     assert.equal(overviewBody.currentUser.isAdmin, true);
+    const adminDetails = await fetch(`http://127.0.0.1:${port}/api/admin/users/${overviewBody.currentUser.id}/details`, { headers:{ Cookie:adminCookie } });
+    assert.equal(adminDetails.status, 200);
+    const adminDetailsBody = await adminDetails.json();
+    assert.equal(adminDetailsBody.password.viewable, false);
+    assert.equal(adminDetailsBody.api.maskedKey, '');
+    assert.deepEqual(adminDetailsBody.applications, []);
     assert.equal(overviewBody.summary.totalUsers, 1);
 
     const disableSelf = await fetch(`http://127.0.0.1:${port}/api/admin/users/${overviewBody.currentUser.id}`, {

@@ -3,10 +3,12 @@
   const dashboard = document.querySelector('#dashboard');
   const userRows = document.querySelector('#userRows');
   const deleteDialog = document.querySelector('#deleteDialog');
-  const actionLabels = { 'disable-user':'停用了账号', 'enable-user':'启用了账号', 'delete-user':'永久删除了账号', 'open-registration':'开放了用户注册', 'close-registration':'关闭了用户注册' };
+  const actionLabels = { 'disable-user':'停用了账号', 'enable-user':'启用了账号', 'delete-user':'永久删除了账号', 'open-registration':'开放了用户注册', 'close-registration':'关闭了用户注册', 'view-user-details':'查看了用户数据' };
   let currentUser = null;
   let users = [];
   let deleteTarget = null;
+  const userDetails = new Map();
+  const expandedUsers = new Set();
   let noticeTimer = null;
 
   function escapeHtml(value = '') {
@@ -37,15 +39,21 @@
     document.querySelector('#usersEmpty').hidden = users.length > 0;
     userRows.innerHTML = users.map(user => {
       const protectedAccount = user.isAdmin || user.id === currentUser.id;
+      const details=userDetails.get(user.id),expanded=expandedUsers.has(user.id);
       return `<tr>
         <td class="user-cell"><b>${escapeHtml(user.email)}</b><small>ID ${escapeHtml(user.id)}</small></td>
         <td><span class="badge ${user.isAdmin ? 'admin' : ''}">${user.isAdmin ? '管理员' : '普通用户'}</span><span class="badge ${user.disabled ? 'disabled' : 'enabled'}">${user.disabled ? '已停用' : '正常'}</span></td>
         <td class="data-count"><b>${user.applicationCount}</b> 条投递<br><small>${user.eventCount} 项日程</small></td>
         <td><span class="badge ${user.hasApiKey ? 'enabled' : ''}">${user.hasApiKey ? '已配置' : '未配置'}</span></td>
         <td class="date-cell"><small>注册 ${formatDate(user.createdAt)}</small><span>登录 ${formatDate(user.lastLoginAt)}</span></td>
-        <td>${protectedAccount ? '<span class="protected">受保护账号</span>' : `<div class="row-actions"><button data-action="toggle" data-id="${user.id}">${user.disabled ? '启用' : '停用'}</button><button class="danger" data-action="delete" data-id="${user.id}">删除</button></div>`}</td>
-      </tr>`;
+        <td><div class="user-row-controls">${protectedAccount ? '<span class="protected">受保护账号</span>' : `<div class="row-actions"><button data-action="toggle" data-id="${user.id}">${user.disabled ? '启用' : '停用'}</button><button class="danger" data-action="delete" data-id="${user.id}">删除</button></div>`}<button class="detail-toggle" data-action="details" data-id="${user.id}" aria-expanded="${expanded}">⌄</button></div></td>
+      </tr><tr class="user-detail-row" ${expanded?'':'hidden'}><td colspan="6">${renderUserDetails(details)}</td></tr>`;
     }).join('');
+  }
+  function renderUserDetails(details) {
+    if(!details)return '<div class="detail-loading">正在安全加载用户详情…</div>';
+    const apps=details.applications||[];
+    return `<section class="user-detail-panel"><div class="detail-security"><article><small>密码</small><b>不可查看</b><p>${escapeHtml(details.password.description)}</p></article><article><small>API 配置</small><b>${details.api.configured?escapeHtml(details.api.maskedKey):'未配置'}</b><p>${details.api.configured?`${escapeHtml(details.api.apiUrl)} · ${escapeHtml(details.api.model)}`:'用户尚未保存 API Key'}</p></article></div><div class="detail-heading"><b>投递信息（${details.totalApplications}）</b>${details.truncated?'<span>仅显示前 500 条</span>':''}</div>${apps.length?`<div class="application-detail-list">${apps.map(item=>`<article><b>${escapeHtml(item.company||'未填写公司')} · ${escapeHtml(item.position||'未填写岗位')}</b><span>${escapeHtml(item.stage||'—')} · ${escapeHtml(item.status||'—')} · ${escapeHtml(item.appliedDate||'日期未知')}${item.city?` · ${escapeHtml(item.city)}`:''}</span></article>`).join('')}</div>`:'<p class="empty-detail">该用户暂无投递记录。</p>'}</section>`;
   }
 
   function renderAudit(items) {
@@ -87,7 +95,11 @@
     if (!button) return;
     const user = users.find(item => item.id === button.dataset.id);
     if (!user) return;
-    if (button.dataset.action === 'toggle') {
+    if(button.dataset.action==='details'){
+      if(expandedUsers.has(user.id)){expandedUsers.delete(user.id);renderUsers();return}
+      expandedUsers.add(user.id);renderUsers();
+      if(!userDetails.has(user.id)){try{userDetails.set(user.id,await api(`/api/admin/users/${user.id}/details`));renderUsers()}catch(error){expandedUsers.delete(user.id);renderUsers();notify(error.message)}}
+    } else if (button.dataset.action === 'toggle') {
       const nextDisabled = !user.disabled;
       if (!confirm(`${nextDisabled ? '停用' : '启用'}账号 ${user.email}？`)) return;
       button.disabled = true;
