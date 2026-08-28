@@ -5,8 +5,16 @@
 
   function key(year, month, day) { return `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
   function monthValue(date) { return date.getFullYear()*12+date.getMonth(); }
+  function eventOccursOn(event,date) {
+    if(eventHasRange(event)&&!event.completed)return String(event.startsAt||'').slice(0,10)<=date&&date<=String(event.endsAt||'').slice(0,10);
+    return String(eventRecordAt(event)||'').slice(0,10)===date;
+  }
+  function calendarTime(event,date) {
+    if(eventHasRange(event)&&!event.completed){const startDate=String(event.startsAt||'').slice(0,10),endDate=String(event.endsAt||'').slice(0,10),startTime=String(event.startsAt||'').slice(11,16),endTime=String(event.endsAt||'').slice(11,16);if(startDate===endDate)return `${startTime}–${endTime}`;if(date===startDate)return `开始 ${startTime}`;if(date===endDate)return `截止 ${endTime}`;return '进行中';}
+    return String(eventRecordAt(event)||'').slice(11,16)||'时间未填';
+  }
   function scheduleBounds() {
-    const months=state.events.map(event=>String(event.startsAt||'').slice(0,7)).filter(value=>/^\d{4}-\d{2}$/.test(value)).sort();
+    const months=state.events.flatMap(event=>eventHasRange(event)&&!event.completed?[event.startsAt,event.endsAt]:[eventRecordAt(event)]).map(value=>String(value||'').slice(0,7)).filter(value=>/^\d{4}-\d{2}$/.test(value)).sort();
     const now=new Date(),fallback=new Date(now.getFullYear(),now.getMonth(),1);
     if(!months.length)return {first:fallback,last:fallback};
     const toDate=value=>new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1);
@@ -18,13 +26,13 @@
     if(value>monthValue(last))return last;
     return candidate;
   }
-  function eventsOn(date) { return state.events.filter(event => String(event.startsAt||'').slice(0,10)===date).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)); }
+  function eventsOn(date) { return state.events.filter(event=>eventOccursOn(event,date)).sort((a,b)=>String(eventRecordAt(a)).localeCompare(String(eventRecordAt(b)))); }
   function statusText(event) { return event.missed?'已错过':event.completed?'已完成':'待完成'; }
   function detailRow(event) {
-    const time=String(event.startsAt||'').slice(11,16)||'时间未填';
+    const ranged=eventHasRange(event)&&!event.completed,time=ranged?eventTimeLabel(event):(String(eventRecordAt(event)||'').slice(11,16)||'时间未填');
     const link=/^https?:\/\//i.test(event.location||'')?`<a href="${esc(event.location)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">打开链接 ↗</a>`:esc(event.location||'地点未填');
-    return `<div class="schedule-detail-row ${event.completed?'completed':''} ${event.missed?'missed':''}">
-      <div class="schedule-detail-time">${time}</div>
+    return `<div class="schedule-detail-row ${ranged?'range-pending':''} ${event.completed?'completed':''} ${event.missed?'missed':''}">
+      <div class="schedule-detail-time">${esc(time)}</div>
       <div class="schedule-detail-main"><div><b>${esc(event.company)} · ${esc(event.title||event.type)}</b>${badge(event.type)}</div><span>${esc(event.position)} · ${link}</span>${event.notes?`<small class="schedule-note"><b>备注</b>${esc(event.notes)}</small>`:''}</div>
       <span class="schedule-result ${event.missed?'is-missed':event.completed?'is-completed':''}">${statusText(event)}</span>
       <div class="schedule-row-actions"><button class="secondary" onclick="editSchedule('${event.id}')">编辑</button>${event.completed?`<button class="ghost" onclick="restoreSchedule('${event.id}')">恢复</button>`:`<button class="success" onclick="scheduleComplete('${event.id}')">完成</button><button class="danger" onclick="scheduleMiss('${event.id}')">错过</button>`}<button class="ghost delete-schedule" onclick="deleteSchedule('${event.id}')">删除</button></div>
@@ -41,9 +49,10 @@
       const day=index-offset+1;
       if(day<1||day>days){cells.push('<div class="schedule-day outside"></div>');continue;}
       const date=key(year,month,day),items=eventsOn(date),pending=items.filter(item=>!item.completed).length,weekend=new Date(year,month,day).getDay()%6===0,past=date<today;
-      cells.push(`<button class="schedule-day ${items.length?'has-events':''} ${date===today?'today':''} ${date===selectedDate?'selected':''} ${weekend?'weekend':''} ${past?'past':''}" onclick="selectScheduleDay('${date}',this)"><span class="schedule-day-number">${day}</span><div class="schedule-day-events">${items.slice(0,3).map(item=>`<i class="event-chip chip-${eventTypeTone(item.type)} ${item.completed?'done':''} ${item.missed?'missed':''}"><em>${String(item.startsAt).slice(11,16)}</em>${esc(item.company)} · ${esc(item.title||item.type)}</i>`).join('')}${items.length>3?'<small class="more-ellipsis">•••</small>':''}</div>${pending?`<b class="pending-count">${pending}</b>`:''}</button>`);
+      cells.push(`<button class="schedule-day ${items.length?'has-events':''} ${date===today?'today':''} ${date===selectedDate?'selected':''} ${weekend?'weekend':''} ${past?'past':''}" onclick="selectScheduleDay('${date}',this)"><span class="schedule-day-number">${day}</span><div class="schedule-day-events">${items.slice(0,3).map(item=>`<i class="event-chip chip-${eventTypeTone(item.type)} ${item.completed?'done':''} ${item.missed?'missed':''}"><em>${esc(calendarTime(item,date))}</em>${esc(item.company)} · ${esc(item.title||item.type)}</i>`).join('')}${items.length>3?'<small class="more-ellipsis">•••</small>':''}</div>${pending?`<b class="pending-count">${pending}</b>`:''}</button>`);
     }
-    content.innerHTML=`<div class="panel schedule-calendar-panel"><div class="panel-head"><div><h2>日程月历</h2><p>${year}年${month+1}月 · 共 ${state.events.filter(event=>String(event.startsAt||'').startsWith(`${year}-${String(month+1).padStart(2,'0')}`)).length} 项安排</p></div><div class="schedule-calendar-actions"><div class="calendar-controls"><button class="ghost" onclick="changeScheduleMonth(-1)" title="${currentValue<=monthValue(first)?'已经是最早日程月份':'上个月'}" ${currentValue<=monthValue(first)?'disabled':''}>‹</button><button class="secondary" onclick="resetScheduleMonth()" title="${thisMonthInRange?'回到本月':'本月不在日程范围内'}" ${thisMonthInRange?'':'disabled'}>本月</button><button class="ghost" onclick="changeScheduleMonth(1)" title="${currentValue>=monthValue(last)?'已经是最晚日程月份':'下个月'}" ${currentValue>=monthValue(last)?'disabled':''}>›</button></div><button class="primary" onclick="openEventForm()">＋ 新增日程</button></div></div><div class="delivery-weekdays">${['周一','周二','周三','周四','周五','周六','周日'].map(day=>`<b>${day}</b>`).join('')}</div><div class="schedule-calendar-grid">${cells.join('')}</div></div>`;
+    const monthPrefix=`${year}-${String(month+1).padStart(2,'0')}`,monthCount=state.events.filter(event=>eventHasRange(event)&&!event.completed?String(event.startsAt||'').slice(0,7)<=monthPrefix&&monthPrefix<=String(event.endsAt||'').slice(0,7):String(eventRecordAt(event)||'').startsWith(monthPrefix)).length;
+    content.innerHTML=`<div class="panel schedule-calendar-panel"><div class="panel-head"><div><h2>日程月历</h2><p>${year}年${month+1}月 · 共 ${monthCount} 项安排</p></div><div class="schedule-calendar-actions"><div class="calendar-controls"><button class="ghost" onclick="changeScheduleMonth(-1)" title="${currentValue<=monthValue(first)?'已经是最早日程月份':'上个月'}" ${currentValue<=monthValue(first)?'disabled':''}>‹</button><button class="secondary" onclick="resetScheduleMonth()" title="${thisMonthInRange?'回到本月':'本月不在日程范围内'}" ${thisMonthInRange?'':'disabled'}>本月</button><button class="ghost" onclick="changeScheduleMonth(1)" title="${currentValue>=monthValue(last)?'已经是最晚日程月份':'下个月'}" ${currentValue>=monthValue(last)?'disabled':''}>›</button></div><button class="primary" onclick="openEventForm()">＋ 新增日程</button></div></div><div class="delivery-weekdays">${['周一','周二','周三','周四','周五','周六','周日'].map(day=>`<b>${day}</b>`).join('')}</div><div class="schedule-calendar-grid">${cells.join('')}</div></div>`;
   }
 
   renderCalendar=renderScheduleCalendar;
@@ -51,10 +60,10 @@
   window.selectScheduleDay=function(date,button){document.querySelectorAll('.schedule-day.selected').forEach(item=>item.classList.remove('selected'));button?.classList.add('selected');showScheduleDayModal(date);};
   window.changeScheduleMonth=function(offset){const candidate=new Date(scheduleMonth.getFullYear(),scheduleMonth.getMonth()+offset,1),bounded=clampScheduleMonth(candidate);if(monthValue(bounded)===monthValue(scheduleMonth))return;scheduleMonth=bounded;selectedDate=key(scheduleMonth.getFullYear(),scheduleMonth.getMonth(),1);render();};
   window.resetScheduleMonth=function(){const now=new Date(),candidate=new Date(now.getFullYear(),now.getMonth(),1),bounded=clampScheduleMonth(candidate);if(monthValue(bounded)!==monthValue(candidate))return;scheduleMonth=bounded;selectedDate=key(now.getFullYear(),now.getMonth(),now.getDate());render();};
-  window.scheduleComplete=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=true;event.missed=false;save();render();showScheduleDayModal(selectedDate);toast('已标记完成');};
-  window.scheduleMiss=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=true;event.missed=true;save();render();showScheduleDayModal(selectedDate);toast('已标记错过');};
-  window.restoreSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;event.completed=false;event.missed=false;save();render();showScheduleDayModal(selectedDate);toast('日程已恢复为待完成');};
-  window.editSchedule=function(eventId){const item=state.events.find(event=>event.id===eventId);if(!item)return;openModal('编辑日程',`<form id="scheduleEditForm" class="form-grid"><div class="field"><label>类型</label><select name="type">${options(TYPES,item.type)}</select></div><div class="field"><label>安排名称</label><input name="title" required value="${esc(item.title||'')}"></div><div class="field"><label>开始时间</label><input type="datetime-local" name="startsAt" required value="${esc(String(item.startsAt||'').replace(' ','T'))}"></div><div class="field"><label>地点 / 会议方式</label><input name="location" value="${esc(item.location||'')}"></div><div class="field full"><label>备注</label><textarea name="notes" placeholder="邮件摘要、时长或其他补充信息">${esc(item.notes||'')}</textarea></div><div class="form-actions"><button type="button" class="ghost" onclick="closeModal()">取消</button><button class="primary">保存修改</button></div></form>`);document.querySelector('#scheduleEditForm').onsubmit=event=>{event.preventDefault();const values=Object.fromEntries(new FormData(event.target));Object.assign(item,values,{startsAt:values.startsAt.replace('T',' ')});save();closeModal();render();toast('日程已更新');};};
+  window.scheduleComplete=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;resolveEvent(event);selectedDate=String(eventRecordAt(event)||selectedDate).slice(0,10);save();render();showScheduleDayModal(selectedDate);toast('已标记完成');};
+  window.scheduleMiss=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;resolveEvent(event,true);selectedDate=String(eventRecordAt(event)||selectedDate).slice(0,10);save();render();showScheduleDayModal(selectedDate);toast('已标记错过');};
+  window.restoreSchedule=function(eventId){const event=state.events.find(item=>item.id===eventId);if(!event)return;restoreEvent(event);save();render();showScheduleDayModal(selectedDate);toast('日程已恢复为待完成');};
+  window.editSchedule=function(eventId){const item=state.events.find(event=>event.id===eventId);if(!item)return;const ranged=eventHasRange(item);openModal('编辑日程',`<form id="scheduleEditForm" class="form-grid"><div class="field"><label>类型</label><select name="type">${options(TYPES,item.type)}</select></div><div class="field"><label>安排名称</label><input name="title" required value="${esc(item.title||'')}"></div><div class="field"><label>时间类型</label><select name="timeMode"><option value="point" ${ranged?'':'selected'}>时间点</option><option value="range" ${ranged?'selected':''}>时间段</option></select></div><div class="field"><label>开始时间</label><input type="datetime-local" name="startsAt" required value="${esc(String(item.startsAt||'').replace(' ','T'))}"></div><div class="field" data-end-field ${ranged?'':'hidden'}><label>结束时间</label><input type="datetime-local" name="endsAt" value="${esc(String(item.endsAt||'').replace(' ','T'))}"></div><div class="field"><label>地点 / 会议方式</label><input name="location" value="${esc(item.location||'')}"></div><div class="field full"><label>备注</label><textarea name="notes" placeholder="邮件摘要、时长或其他补充信息">${esc(item.notes||'')}</textarea></div><div class="form-actions"><button type="button" class="ghost" onclick="closeModal()">取消</button><button class="primary">保存修改</button></div></form>`);const form=document.querySelector('#scheduleEditForm');bindEventTimeMode(form);form.onsubmit=event=>{event.preventDefault();try{const values=eventFormData(event.target);if(!values.endsAt){delete item.endsAt;delete item.completedAt}Object.assign(item,values);save();closeModal();render();toast('日程已更新')}catch(error){toast(error.message,{type:'error'})}};};
   function removeEventHistory(event) {
     const application=appById(event.applicationId);
     if(!application)return;
@@ -65,7 +74,7 @@
     });
     const terminal=['Offer','已结束'].includes(application.stage)||['已通过','未通过','已放弃','已结束'].includes(application.status);
     if(!terminal&&application.stage===event.type){
-      const remaining=state.events.filter(item=>item.applicationId===application.id&&item.id!==event.id&&['测评','笔试','面试','Offer'].includes(item.type)).sort((a,b)=>String(b.startsAt).localeCompare(String(a.startsAt)));
+      const remaining=state.events.filter(item=>item.applicationId===application.id&&item.id!==event.id&&['测评','笔试','面试','Offer'].includes(item.type)).sort((a,b)=>String(eventRecordAt(b)).localeCompare(String(eventRecordAt(a))));
       application.stage=remaining[0]?.type||'已投递';
       application.status=application.stage==='Offer'?'已通过':'等待结果';
     }

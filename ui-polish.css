@@ -101,5 +101,9 @@
 .application-detail-modal .timeline-event-card::before { content:""; position:absolute; left:-23px; top:50%; width:11px; height:11px; transform:translateY(-50%); border:3px solid white; border-radius:50%; background:var(--green); box-shadow:0 0 0 1px color-mix(in srgb,var(--green) 30%,white); }
 .application-detail-modal .timeline-event-card:not(:last-child)::after { content:""; position:absolute; left:-18px; top:calc(50% + 7px); width:2px; height:calc(50% + 14px); background:color-mix(in srgb,var(--green) 23%,#dfe6e1); }
 
+.event-card.event-card-range { grid-template-columns:160px minmax(0,1fr) auto; }
+.schedule-detail-row.range-pending { grid-template-columns:minmax(150px,190px) minmax(0,1fr) auto; }
+.schedule-detail-row.range-pending .schedule-detail-time { font-size:12px; line-height:1.5; text-align:center; }
+
 @media(max-width:1000px){.stats-grid-five .stat-card{padding-left:58px}.stats-grid-five .stat-card::before{left:16px}.activity-legend{width:100%;padding:7px 0 0}.calendar-panel-head{flex-wrap:wrap}}
-@media(max-width:760px){.mail-stepper{grid-template-columns:auto 16px auto 16px auto;padding:10px}.mail-stepper span{font-size:0}.mail-stepper span b{font-size:12px}.schedule-detail-row{grid-template-columns:60px minmax(0,1fr)}.application-detail-modal .detail-delete-action{margin-left:0}}
+@media(max-width:760px){.mail-stepper{grid-template-columns:auto 16px auto 16px auto;padding:10px}.mail-stepper span{font-size:0}.mail-stepper span b{font-size:12px}.schedule-detail-row{grid-template-columns:60px minmax(0,1fr)}.schedule-detail-row.range-pending{grid-template-columns:1fr}.schedule-detail-row.range-pending .schedule-detail-time{grid-column:1/-1}.event-card.event-card-range{grid-template-columns:1fr}.application-detail-modal .detail-delete-action{margin-left:0}}

@@ -16,7 +16,7 @@
       if (/^\d{4}-\d{2}-\d{2}$/.test(application.appliedDate || '')) bucket(application.appliedDate).applications += 1;
     });
     state.events.forEach(event => {
-      const key = String(event.startsAt || '').slice(0, 10);
+      const key = String(eventRecordAt(event) || '').slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
       if (event.type === '笔试') bucket(key).tests += 1;
       if (event.type === '面试') bucket(key).interviews += 1;

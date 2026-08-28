@@ -1,5 +1,6 @@
 const assert = require('assert/strict');
 const { spawn } = require('child_process');
+const vm = require('node:vm');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,6 +13,7 @@ const migrationClient = fs.readFileSync(path.join(root, 'online-migration.js'), 
 const appClient = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8');
 const statsClient = fs.readFileSync(path.join(root, 'stats-v2.js'), 'utf8');
+const scheduleClient = fs.readFileSync(path.join(root, 'schedule-calendar.js'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
 assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
@@ -39,6 +41,34 @@ assert.match(onlineServer, /VALUES\(\$1,\$2::jsonb\).*JSON\.stringify\(items\)/)
 assert.doesNotMatch(statsClient, /stageLabels = \[[^\]]*'无消息'/);
 assert.doesNotMatch(statsClient, /return '无消息'/);
 assert.match(statsClient, /const noMessage=activeApplications\.filter/);
+assert.match(appClient, /function eventRecordAt\(event\).*event\.completedAt\|\|event\.endsAt/);
+assert.match(appClient, /function resolveEvent\(event,missed=false\).*event\.completedAt=nowText\(\)/);
+assert.match(appClient, /else delete event\.completedAt/);
+assert.match(appClient, /name="timeMode"/);
+assert.match(appClient, /结束时间必须晚于开始时间/);
+assert.match(scheduleClient, /eventHasRange\(event\)&&!event\.completed/);
+assert.match(scheduleClient, /resolveEvent\(event\)/);
+assert.match(scheduleClient, /restoreEvent\(event\)/);
+
+const timeContext = { nowText:() => '2026-08-28 14:35' };
+const timeFunctions = ['eventHasRange','eventRecordAt','resolveEvent','restoreEvent'].map(name => {
+  const match = appClient.match(new RegExp(`^function ${name}.*$`, 'm'));
+  assert.ok(match, `missing ${name}`);
+  return match[0];
+}).join('\n');
+vm.runInNewContext(timeFunctions, timeContext);
+const pointEvent = { startsAt:'2026-09-01 10:00', completed:false, missed:false };
+timeContext.resolveEvent(pointEvent);
+assert.equal(pointEvent.completedAt, undefined);
+assert.equal(timeContext.eventRecordAt(pointEvent), '2026-09-01 10:00');
+const rangeEvent = { startsAt:'2026-09-01 00:00', endsAt:'2026-09-03 18:00', completed:false, missed:false };
+assert.equal(timeContext.eventRecordAt(rangeEvent), '2026-09-01 00:00');
+timeContext.resolveEvent(rangeEvent);
+assert.equal(rangeEvent.completedAt, '2026-08-28 14:35');
+assert.equal(timeContext.eventRecordAt(rangeEvent), '2026-08-28 14:35');
+timeContext.restoreEvent(rangeEvent);
+assert.equal(rangeEvent.completedAt, undefined);
+assert.equal(timeContext.eventRecordAt(rangeEvent), '2026-09-01 00:00');
 
 const child = spawn(process.execPath, ['-r', './tests/mock-pg.js', 'server-online.js'], {
   cwd:root,

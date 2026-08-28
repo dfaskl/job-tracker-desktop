@@ -33,7 +33,7 @@
     const apps=state.applications,active=apps.filter(item=>!['未通过','已放弃','已结束','已通过'].includes(item.status)&&item.stage!=='Offer'),stale=active.filter(item=>{const health=progressHealth(item);return health&&health.days>=PROGRESS_STALE_DAYS;});
     const channelStats={};apps.forEach(item=>{const key=item.channel||'未填写',entry=channelStats[key]||(channelStats[key]={total:0,interviews:0});entry.total++;if(applicationReached(item,'面试'))entry.interviews++;});
     const best=Object.entries(channelStats).filter(([,value])=>value.total).sort((a,b)=>b[1].interviews/b[1].total-a[1].interviews/a[1].total)[0];
-    const upcomingCount=state.events.filter(event=>!event.completed&&!event.missed&&new Date(String(event.startsAt).replace(' ','T')).getTime()>=Date.now()).length;
+    const upcomingCount=state.events.filter(event=>!event.completed&&!event.missed&&new Date(String(eventDeadlineAt(event)).replace(' ','T')).getTime()>=Date.now()).length;
     const attentionThreshold=Math.max(3,Math.ceil(active.length*.2));
     const hasResult=apps.some(item=>item.stage==='Offer'||item.status==='已通过');
     const status=active.length?(stale.length>=attentionThreshold?{label:'需要关注',tone:'attention'}:{label:'稳步推进',tone:'steady'}):hasResult?{label:'阶段收获',tone:'success'}:apps.length?{label:'暂时休整',tone:'idle'}:{label:'等待开始',tone:'idle'};
