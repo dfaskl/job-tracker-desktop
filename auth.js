@@ -96,6 +96,24 @@
     const panel = document.createElement('div');
     panel.className = 'account-panel';
     panel.innerHTML = `<div><span>${escapeHtml(user.email.slice(0, 1).toUpperCase())}</span><p><b>${escapeHtml(user.email)}</b><small>${user.isAdmin ? '管理员 · 云端数据已同步' : '云端数据已同步'}</small></p></div><section>${user.isAdmin ? '<a href="/admin.html">管理后台</a>' : ''}<button type="button" title="退出当前账号">退出</button></section>`;
+    const mobileButton = document.createElement('button');
+    mobileButton.type = 'button';
+    mobileButton.className = 'mobile-account-button';
+    mobileButton.textContent = user.email.slice(0, 1).toUpperCase();
+    mobileButton.setAttribute('aria-label', '打开账号菜单');
+    mobileButton.setAttribute('aria-expanded', 'false');
+    mobileButton.onclick = event => {
+      event.stopPropagation();
+      const open = panel.classList.toggle('mobile-open');
+      mobileButton.setAttribute('aria-expanded', String(open));
+    };
+    document.querySelector('main > header')?.appendChild(mobileButton);
+    document.addEventListener('click', event => {
+      if (!panel.contains(event.target) && event.target !== mobileButton) {
+        panel.classList.remove('mobile-open');
+        mobileButton.setAttribute('aria-expanded', 'false');
+      }
+    });
     panel.querySelector('button').onclick = async () => {
       panel.querySelector('button').disabled = true;
       await nativeFetch('/api/auth/logout', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {});

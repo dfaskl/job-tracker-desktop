@@ -23,7 +23,7 @@ const publicFiles = new Set([
   'official-search.css', 'schedule-calendar.css', 'schedule-toolbar.css', 'notes-display.css',
   'application-flow.css', 'application-heatmap.css', 'ui-polish.css', 'commercial-polish.css',
   'design-tokens.css', 'components-v2.css', 'layouts-v2.css', 'pages-v2.css', 'experience-polish.css',
-  'adaptive-layout.css'
+  'adaptive-layout.css', 'mobile.css'
 ]);
 
 if (!process.env.DATABASE_URL) throw new Error('线上模式缺少 DATABASE_URL');
