@@ -15,6 +15,7 @@ const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8'
 const localServer = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const statsClient = fs.readFileSync(path.join(root, 'stats-v2.js'), 'utf8');
 const scheduleClient = fs.readFileSync(path.join(root, 'schedule-calendar.js'), 'utf8');
+const experienceCss = fs.readFileSync(path.join(root, 'experience-polish.css'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(blueprint, /key:\s+DATABASE_URL\s+sync:\s+false/);
 assert.match(blueprint, /key:\s+ADMIN_EMAIL\s+sync:\s+false/);
@@ -58,6 +59,7 @@ assert.match(appClient, /结束时间必须晚于开始时间/);
 assert.match(scheduleClient, /eventHasRange\(event\)&&!event\.completed/);
 assert.match(scheduleClient, /resolveEvent\(event\)/);
 assert.match(scheduleClient, /restoreEvent\(event\)/);
+assert.match(experienceCss, /\.home-workbench>\.two-col>\.panel:nth-child\(2\)>\.cards\{grid-auto-rows:max-content\}/);
 
 const timeContext = { nowText:() => '2026-08-28 14:35' };
 const timeFunctions = ['eventHasRange','eventRecordAt','resolveEvent','restoreEvent'].map(name => {
