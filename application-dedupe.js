@@ -36,9 +36,16 @@
   }
   function appendMailEvent(application, schedule) {
     const startsAt = String(schedule.startsAt || '').trim();
+    const endsAt = String(schedule.endsAt || '').trim();
     const type = TYPES.includes(schedule.type) ? schedule.type : '其他';
     if (!startsAt) return false;
-    const duplicate = state.events.some(event => event.applicationId === application.id && event.startsAt === startsAt && event.type === type);
+    const startTime = new Date(startsAt.replace(' ', 'T')).getTime();
+    const endTime = new Date(endsAt.replace(' ', 'T')).getTime();
+    if (endsAt && (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime)) {
+      toast('结束时间必须晚于开始时间');
+      return false;
+    }
+    const duplicate = state.events.some(event => event.applicationId === application.id && event.startsAt === startsAt && String(event.endsAt || '') === endsAt && event.type === type);
     if (duplicate) {
       toast('该岗位已有相同时间和类型的日程，未重复添加');
       return true;
@@ -47,7 +54,7 @@
     const createdAt = nowText();
     state.events.push({
       id: eventId, applicationId: application.id, company: application.company, position: application.position,
-      type, title: schedule.title || type, startsAt, location: schedule.location || '', notes: schedule.summary || '',
+      type, title: schedule.title || type, startsAt, ...(endsAt ? { endsAt } : {}), location: schedule.location || '', notes: schedule.summary || '',
       completed: false, missed: false, createdAt
     });
     if (['测评','笔试','面试','Offer'].includes(type)) application.stage = type;
@@ -94,21 +101,41 @@
 
   mailResultHtml = function () {
     const result=mailResult;
-    return `<div class="mail-result-form"><div class="mail-result-intro"><span>✓</span><div><b>关键信息已提取</b><small>请确认识别结果，未识别或不准确的内容可以直接修改。</small></div></div><div class="mail-result-section-title"><span>岗位信息</span></div><div class="field"><label>公司</label><input id="mrCompany" value="${esc(result.company)}"></div><div class="field"><label>岗位</label><input id="mrPosition" value="${esc(result.position)}"></div><div class="field full mail-match-field"><div class="mail-match-heading"><div><label>关联现有投递</label><small>避免为同一岗位创建重复记录</small></div></div><select id="mrExistingApp">${existingApplicationOptions(result.company,result.position)}</select><small class="mail-match-hint">已按公司和岗位自动检索；没有准确匹配时，可手动选择已有岗位或新建投递。</small></div><div class="mail-result-section-title"><span>安排信息</span></div><div class="field"><label>通知类型</label><select id="mrType">${options(TYPES,result.noticeType)}</select></div><div class="field"><label>时间</label><input id="mrStarts" value="${esc(result.startsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field full"><label>面试地点 / 视频链接</label><input id="mrLocation" value="${esc(result.location)}" placeholder="视频会议链接或线下面试地址"></div><div class="field full"><label>备注</label><textarea id="mrSummary" placeholder="如有需要，可在这里手动填写"></textarea></div><div class="form-actions"><button class="primary" onclick="useMailResult()">使用识别结果</button></div></div>`;
+    const isRange=Boolean(String(result.endsAt||'').trim());
+    return `<div class="mail-result-form"><div class="mail-result-intro"><span>✓</span><div><b>关键信息已提取</b><small>请确认识别结果，未识别或不准确的内容可以直接修改。</small></div></div><div class="mail-result-section-title"><span>岗位信息</span></div><div class="field"><label>公司</label><input id="mrCompany" value="${esc(result.company)}"></div><div class="field"><label>岗位</label><input id="mrPosition" value="${esc(result.position)}"></div><div class="field full mail-match-field"><div class="mail-match-heading"><div><label>关联现有投递</label><small>避免为同一岗位创建重复记录</small></div></div><select id="mrExistingApp">${existingApplicationOptions(result.company,result.position)}</select><small class="mail-match-hint">已按公司和岗位自动检索；没有准确匹配时，可手动选择已有岗位或新建投递。</small></div><div class="mail-result-section-title"><span>安排信息</span></div><div class="field"><label>通知类型</label><select id="mrType">${options(TYPES,result.noticeType)}</select></div><div class="field"><label>时间类型</label><select id="mrTimeMode" onchange="toggleMailTimeMode(this)"><option value="point" ${isRange?'':'selected'}>时间点</option><option value="range" ${isRange?'selected':''}>时间段</option></select></div><div class="field"><label>${isRange?'开始时间':'时间'}</label><input id="mrStarts" value="${esc(result.startsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field" id="mrEndField" ${isRange?'':'hidden'}><label>结束时间</label><input id="mrEnds" value="${esc(result.endsAt)}" placeholder="YYYY-MM-DD HH:mm"></div><div class="field full"><label>面试地点 / 视频链接</label><input id="mrLocation" value="${esc(result.location)}" placeholder="视频会议链接或线下面试地址"></div><div class="field full"><label>备注</label><textarea id="mrSummary" placeholder="如有需要，可在这里手动填写"></textarea></div><div class="form-actions"><button class="primary" onclick="useMailResult()">使用识别结果</button></div></div>`;
+  };
+
+  window.toggleMailTimeMode = function (select) {
+    const isRange = select?.value === 'range';
+    const startLabel = document.querySelector('#mrStarts')?.closest('.field')?.querySelector('label');
+    const endField = document.querySelector('#mrEndField');
+    if (startLabel) startLabel.textContent = isRange ? '开始时间' : '时间';
+    if (endField) endField.hidden = !isRange;
+    if (!isRange) {
+      const endInput = document.querySelector('#mrEnds');
+      if (endInput) endInput.value = '';
+    }
   };
 
   useMailResult = function () {
     const company = document.querySelector('#mrCompany')?.value.trim() || '';
     const position = document.querySelector('#mrPosition')?.value.trim() || '';
     const type = document.querySelector('#mrType')?.value || mailResult?.noticeType || '其他';
+    const isRange = document.querySelector('#mrTimeMode')?.value === 'range';
     const startsAt = document.querySelector('#mrStarts')?.value.trim() || '';
+    const endsAt = isRange ? document.querySelector('#mrEnds')?.value.trim() || '' : '';
     const location = document.querySelector('#mrLocation')?.value.trim() || '';
     const summary = document.querySelector('#mrSummary')?.value.trim() || '';
     const selectedApplicationId=document.querySelector('#mrExistingApp')?.value||'';
     const existing = selectedApplicationId&&selectedApplicationId!=='__new__'?appById(selectedApplicationId):findExisting(company, position);
     if (selectedApplicationId&&selectedApplicationId!=='__new__'&&!existing) { toast('所选投递记录不存在，请重新选择'); return; }
     if (!existing && (!company || !position)) { toast('请先补充公司名称和岗位名称'); return; }
-    const schedule = { type, title: type, startsAt, location, summary, status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果' };
+    if (isRange && !startsAt) { toast('请填写开始时间'); return; }
+    if (isRange && !endsAt) { toast('请填写结束时间'); return; }
+    const startTime = new Date(startsAt.replace(' ', 'T')).getTime();
+    const endTime = new Date(endsAt.replace(' ', 'T')).getTime();
+    if (endsAt && (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime)) { toast('结束时间必须晚于开始时间'); return; }
+    const schedule = { type, title: type, startsAt, ...(endsAt ? { endsAt } : {}), location, summary, status: STATUSES.includes(mailResult?.suggestedStatus) ? mailResult.suggestedStatus : '等待结果' };
     if (existing) {
       if (startsAt) {
         appendMailEvent(existing, schedule);
