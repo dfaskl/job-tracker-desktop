@@ -20,6 +20,7 @@ const mobileCss = fs.readFileSync(path.join(root, 'mobile.css'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
 assert.match(mobileCss, /@media\(max-width:820px\)/);
 assert.match(mobileCss, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+assert.match(mobileCss, /\.insight-metrics button\{grid-column:auto!important;justify-self:stretch!important/);
 assert.match(mobileCss, /\.event-card\.event-card-range[^}]*grid-template-columns:minmax\(0,1fr\)!important/);
 assert.match(mobileCss, /\.schedule-calendar-panel \.delivery-weekdays,\.schedule-calendar-grid\{min-width:0!important/);
 assert.match(mobileCss, /\.mail-result-form\{grid-template-columns:minmax\(0,1fr\)!important\}/);
