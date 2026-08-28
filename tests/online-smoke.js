@@ -63,6 +63,8 @@ assert.match(experienceCss, /\.home-workbench>\.two-col>\.panel:nth-child\(2\)>\
 assert.match(experienceCss, /body:has\(#nav button\[data-page="home"\]\.active\)\{height:auto;overflow-y:auto\}/);
 assert.match(experienceCss, /body:has\(#nav button\[data-page="home"\]\.active\) \.home-workbench\{height:auto;display:grid!important;overflow:visible\}/);
 assert.match(experienceCss, /\.manual-confirm-panel>\.cards\{flex:none;overflow:visible;padding-right:0\}/);
+assert.match(experienceCss, /\.home-workbench \.event-card\.event-card-range\{grid-template-columns:clamp\(220px,16vw,280px\) minmax\(0,1fr\) auto\}/);
+assert.match(experienceCss, /\.event-card\.event-card-range:is\(\.is-today,\.is-tomorrow\) \.event-time\{white-space:normal\}/);
 
 const timeContext = { nowText:() => '2026-08-28 14:35' };
 const timeFunctions = ['eventHasRange','eventRecordAt','resolveEvent','restoreEvent'].map(name => {
