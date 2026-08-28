@@ -52,6 +52,8 @@ assert.doesNotMatch(statsClient, /stageLabels = \[[^\]]*'无消息'/);
 assert.doesNotMatch(statsClient, /return '无消息'/);
 assert.match(statsClient, /const noMessage=activeApplications\.filter/);
 assert.match(appClient, /function eventRecordAt\(event\).*event\.completedAt\|\|event\.endsAt/);
+assert.match(appClient, /isRange=eventHasRange\(e\)&&!e\.completed/);
+assert.match(appClient, /rest=isRange\?timeLabel:timeLabel\.slice\(first\.length\)\.trim\(\)/);
 assert.match(appClient, /function resolveEvent\(event,missed=false\).*event\.completedAt=nowText\(\)/);
 assert.match(appClient, /else delete event\.completedAt/);
 assert.match(appClient, /name="timeMode"/);
