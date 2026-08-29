@@ -15,6 +15,7 @@ const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8'
 const localServer = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const statsClient = fs.readFileSync(path.join(root, 'stats-v2.js'), 'utf8');
 const scheduleClient = fs.readFileSync(path.join(root, 'schedule-calendar.js'), 'utf8');
+const commercialClient = fs.readFileSync(path.join(root, 'commercial-polish.js'), 'utf8');
 const experienceCss = fs.readFileSync(path.join(root, 'experience-polish.css'), 'utf8');
 const mobileCss = fs.readFileSync(path.join(root, 'mobile.css'), 'utf8');
 assert.match(blueprint, /plan:\s+free/);
@@ -24,6 +25,9 @@ assert.match(mobileCss, /\.insight-metrics button\{grid-column:auto!important;ju
 assert.match(mobileCss, /--mobile-content-clearance:calc\(88px \+ env\(safe-area-inset-bottom\)\)/);
 assert.match(mobileCss, /main\{[^}]*padding:0 12px var\(--mobile-content-clearance\)!important/);
 assert.match(mobileCss, /\.modal-mask\{align-items:end;z-index:200/);
+assert.match(commercialClient, /id="backupList"/);
+assert.match(commercialClient, /loadBackups\(\)/);
+assert.match(commercialClient, /applicationCount/);
 assert.match(mobileCss, /\.event-card\.event-card-range[^}]*grid-template-columns:minmax\(0,1fr\)!important/);
 assert.match(mobileCss, /\.schedule-calendar-panel \.delivery-weekdays,\.schedule-calendar-grid\{min-width:0!important/);
 assert.match(mobileCss, /\.mail-result-form\{grid-template-columns:minmax\(0,1fr\)!important\}/);

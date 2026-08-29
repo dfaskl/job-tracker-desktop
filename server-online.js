@@ -506,8 +506,11 @@ async function apiRoute(req, res, pathname, user) {
     return json(res, 200, { apiUrl, model, apiKey:encrypted ? '••••••••' : '', hasApiKey:Boolean(encrypted), lastFour });
   }
   if (pathname === '/api/backups' && req.method === 'GET') {
-    const result = await pool.query('SELECT id,created_at,octet_length(data::text) AS size FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30', [userId]);
-    return json(res, 200, { items:result.rows.map(row => ({ name:String(row.id), size:Number(row.size), createdAt:row.created_at })) });
+    const result = await pool.query(`SELECT id,created_at,octet_length(data::text) AS size,
+      CASE WHEN jsonb_typeof(data->'applications')='array' THEN jsonb_array_length(data->'applications') ELSE 0 END AS application_count,
+      CASE WHEN jsonb_typeof(data->'events')='array' THEN jsonb_array_length(data->'events') ELSE 0 END AS event_count
+      FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30`, [userId]);
+    return json(res, 200, { items:result.rows.map(row => ({ name:String(row.id), size:Number(row.size), createdAt:row.created_at, applicationCount:Number(row.application_count||0), eventCount:Number(row.event_count||0) })) });
   }
   if (pathname === '/api/backups/restore' && req.method === 'POST') {
     const body = await readBody(req), id = String(body.name || '');
