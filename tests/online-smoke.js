@@ -74,6 +74,8 @@ assert.doesNotMatch(statsClient, /stageLabels = \[[^\]]*'无消息'/);
 assert.doesNotMatch(statsClient, /return '无消息'/);
 assert.match(statsClient, /const noMessage=activeApplications\.filter/);
 assert.match(appClient, /function eventRecordAt\(event\).*event\.completedAt\|\|event\.endsAt/);
+assert.match(appClient, /if\(window\.isOnlineMode&&!window\.currentUser\)return/);
+assert.match(appClient, /else\{\s*state=initial\(\);\s*localStorage\.setItem\(KEY,JSON\.stringify\(state\)\)/);
 assert.match(appClient, /const TIME_SENSITIVE_REFRESH_MS=60\*1000/);
 assert.match(appClient, /setInterval\(refreshTimeSensitiveView,TIME_SENSITIVE_REFRESH_MS\)/);
 assert.match(appClient, /window\.addEventListener\('focus',refreshTimeSensitiveView\)/);

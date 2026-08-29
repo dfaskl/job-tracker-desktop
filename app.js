@@ -13,6 +13,7 @@ function load(){try{const cached=JSON.parse(localStorage.getItem(KEY)||'{}');if(
 function save(){
   const businessState=JSON.parse(JSON.stringify(state));if(businessState.settings)delete businessState.settings.apiKey;
   localStorage.setItem(KEY,JSON.stringify(businessState));
+  if(window.isOnlineMode&&!window.currentUser)return;
   fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(businessState),keepalive:true})
     .catch(()=>{});
   fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:state.settings.apiKey||''}),keepalive:true}).catch(()=>{});
@@ -31,6 +32,10 @@ async function loadFromLocalFile(){
       render();
       if(migrated)save();
     }else{
+      state=initial();
+      localStorage.setItem(KEY,JSON.stringify(state));
+      document.documentElement.dataset.theme=state.settings.theme||'blue';
+      render();
       save();
     }
   }catch(error){
