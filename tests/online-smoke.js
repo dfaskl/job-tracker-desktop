@@ -28,6 +28,8 @@ assert.match(mobileCss, /\.modal-mask\{align-items:end;z-index:200/);
 assert.match(commercialClient, /id="backupList"/);
 assert.match(commercialClient, /loadBackups\(\)/);
 assert.match(commercialClient, /applicationCount/);
+assert.match(commercialClient, /leftColumn\.appendChild\(apiPanel\)/);
+assert.match(commercialClient, /rightColumn\.appendChild\(dataPanel\)/);
 assert.match(mobileCss, /\.event-card\.event-card-range[^}]*grid-template-columns:minmax\(0,1fr\)!important/);
 assert.match(mobileCss, /\.schedule-calendar-panel \.delivery-weekdays,\.schedule-calendar-grid\{min-width:0!important/);
 assert.match(mobileCss, /\.mail-result-form\{grid-template-columns:minmax\(0,1fr\)!important\}/);
