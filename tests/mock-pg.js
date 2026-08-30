@@ -13,6 +13,8 @@ if (process.env.MOCK_SEED_ADMIN === 'true') {
     password_salt:salt,
     password_hash:crypto.scryptSync('test-admin-password', salt, 64).toString('hex'),
     is_admin:false,
+    nickname:'',
+    show_on_leaderboard:false,
     disabled_at:null,
     created_at:new Date().toISOString()
   });
@@ -35,7 +37,7 @@ class MockPool {
         error.code = '23505';
         throw error;
       }
-      const user = { id:nextUserId++, email:params[0], password_salt:params[1], password_hash:params[2], is_admin:false, disabled_at:null, created_at:new Date().toISOString() };
+      const user = { id:nextUserId++, email:params[0], password_salt:params[1], password_hash:params[2], is_admin:false, nickname:'', show_on_leaderboard:false, disabled_at:null, created_at:new Date().toISOString() };
       state.users.push(user);
       return rows([user]);
     }
@@ -70,12 +72,19 @@ class MockPool {
     }
     if (sql.startsWith('SELECT id,action,target_email,created_at FROM admin_audit_logs')) return rows([...state.audit].reverse());
     if (sql.startsWith('SELECT id,email,is_admin,disabled_at FROM users WHERE id=')) return rows(state.users.filter(item => item.id === Number(params[0])));
+    if (sql.startsWith('SELECT id,email,is_admin,disabled_at,nickname,show_on_leaderboard FROM users WHERE id=')) return rows(state.users.filter(item => item.id === Number(params[0])));
     if (sql.startsWith('SELECT id,email,is_admin FROM users WHERE id=')) return rows(state.users.filter(item => item.id === Number(params[0])));
     if (sql.startsWith('UPDATE users SET disabled_at=')) {
       const user = state.users.find(item => item.id === Number(params[0]));
       if (user) user.disabled_at = params[1] ? new Date().toISOString() : null;
       return rows();
     }
+    if (sql.startsWith('UPDATE users SET nickname=')) {
+      const user=state.users.find(item=>item.id===Number(params[0]));
+      if(user){user.nickname=params[1];user.show_on_leaderboard=Boolean(params[2]);}
+      return rows();
+    }
+    if (sql.startsWith('SELECT u.nickname,')) return rows(state.users.filter(user=>user.show_on_leaderboard&&!user.disabled_at&&user.nickname).map(user=>({ nickname:user.nickname, application_count:0 })));
     if (sql.startsWith('DELETE FROM sessions WHERE user_id=')) {
       state.sessions = state.sessions.filter(item => item.user_id !== Number(params[0]));
       return rows();

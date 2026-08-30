@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const port = 31973;
 const blueprint = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
 const authClient = fs.readFileSync(path.join(root, 'auth.js'), 'utf8');
+const adminClient = fs.readFileSync(path.join(root, 'admin.js'), 'utf8');
 const dedupeClient = fs.readFileSync(path.join(root, 'application-dedupe.js'), 'utf8');
 const migrationClient = fs.readFileSync(path.join(root, 'online-migration.js'), 'utf8');
 const appClient = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
@@ -31,6 +32,9 @@ assert.match(commercialClient, /loadBackups\(\)/);
 assert.match(commercialClient, /applicationCount/);
 assert.match(commercialClient, /leftColumn\.appendChild\(apiPanel\)/);
 assert.match(commercialClient, /rightColumn\.appendChild\(dataPanel\)/);
+assert.doesNotMatch(commercialClient, /渠道亮点/);
+assert.match(commercialClient, /\/api\/leaderboard/);
+assert.match(adminClient, /data-action="save-profile"/);
 assert.match(commercialClient, /rightColumn\.style\.height=matchMedia\('\(min-width:901px\)'\)\.matches/);
 assert.match(commercialClient, /new ResizeObserver\(syncColumnHeight\)/);
 assert.match(commercialCss, /\.settings-right-column\{grid-template-rows:auto minmax\(0,1fr\);height:100%;min-height:0;overflow:hidden\}/);
@@ -213,6 +217,14 @@ async function waitForServer() {
     const userBody = await userRegister.json();
     assert.equal(userBody.user.isAdmin, false);
     const userCookie = userRegister.headers.get('set-cookie').split(';')[0];
+    const profileUpdate = await fetch(`http://127.0.0.1:${port}/api/admin/users/${userBody.user.id}`, {
+      method:'PATCH', headers:{ 'Content-Type':'application/json', Cookie:adminCookie },
+      body:JSON.stringify({ nickname:'小凡', showOnLeaderboard:true })
+    });
+    assert.equal(profileUpdate.status, 200);
+    const leaderboard = await fetch(`http://127.0.0.1:${port}/api/leaderboard`, { headers:{ Cookie:userCookie } });
+    assert.equal(leaderboard.status, 200);
+    assert.deepEqual(await leaderboard.json(), { items:[{ nickname:'小凡', applicationCount:0 }] });
     const forbidden = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, { headers:{ Cookie:userCookie } });
     assert.equal(forbidden.status, 403);
     const forbiddenToggle = await fetch(`http://127.0.0.1:${port}/api/admin/settings/registration`, {
