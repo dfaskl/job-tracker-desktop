@@ -103,6 +103,8 @@ assert.match(reviewReminderClient, /state\.applicationReviewDailyBatch=\{date,id
 assert.match(reviewReminderClient, /今天需要检查 \$\{queue\.total\} 个，还剩 \$\{queue\.items\.length\} 个/);
 assert.match(reviewReminderClient, /applicationOfficialReviewUrl/);
 assert.match(reviewReminderClient, /confirmCurrentApplicationReview/);
+assert.match(reviewReminderClient, /class="review-reminder-url" href="\$\{esc\(url\)\}"/);
+assert.doesNotMatch(reviewReminderClient, />打开投递页 ↗<\/a>/);
 assert.match(officialSearchClient, /window\.applicationOfficialReviewUrl/);
 assert.match(reviewReminderClient, /\['未通过','已放弃','已结束'\]\.includes\(application\.status\)/);
 assert.match(experienceCss, /\.home-workbench>\.two-col>\.panel:nth-child\(2\)>\.cards\{grid-auto-rows:max-content\}/);
