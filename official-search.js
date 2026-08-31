@@ -74,7 +74,6 @@
       <input name="company" value="${esc(item.company || '')}" placeholder="公司名称" required>
       <input name="url" type="url" value="${esc(item.url || '')}" placeholder="暂未填写">
       <button type="button" class="secondary company-link-open" onclick="openCompanyWebsite(this)" title="${item.url ? '打开公司官网' : '搜索公司校园招聘'}">前往</button>
-      <button type="button" class="secondary company-link-check" onclick="beginOfficialInspection(this)" title="使用浏览器扩展检查投递状态" ${item.url ? '' : 'disabled'}>检查</button>
       <button type="button" class="ghost" onclick="removeCompanyLinkRow(this)">删除</button>
     </div>`;
   }
@@ -82,7 +81,7 @@
   function renderCompanyLinksManager() {
     const items = mergedCompanyLinks();
     openModal('公司官网库', `<form id="companyLinksForm" class="company-links-form">
-      <p class="company-links-intro">同一公司只需维护一次。点击“检查”会打开已保存的投递记录页，再通过浏览器扩展读取当前页面。</p>
+      <p class="company-links-intro">官网库只负责保存投递记录页地址；巡检对象来自“投递记录”中的进行中岗位。</p>
       <div class="company-links-list">${items.map(companyLinkRow).join('') || companyLinkRow()}</div>
       <div class="company-links-actions">
         <button type="button" class="secondary" onclick="addCompanyLinkRow()">＋ 添加公司</button>
@@ -271,11 +270,19 @@ window.openCompanyWebsite = function (button) {
   };
   window.openDetail = openDetail;
 
+  window.getOfficialInspectionTargets = async function () {
+    await companyLinksReady;
+    return state.applications
+      .filter(application => !['未通过','已放弃','已结束'].includes(application.status) && application.stage !== '已结束')
+      .map(application => ({ applicationId:application.id, company:application.company, position:application.position, url:customUrl(application) }))
+      .filter(item => /^https?:\/\//i.test(item.url));
+  };
+
   const originalRenderApplications = renderApplications;
   renderApplications = function () {
     originalRenderApplications();
     const tools = document.querySelector('.application-tools');
-    if (tools && !document.querySelector('.company-links-button')) tools.insertAdjacentHTML('beforeend', '<button type="button" class="secondary company-links-button" onclick="openCompanyLinksManager()" title="管理公司官网链接">官网库</button>');
+    if (tools && !document.querySelector('.company-links-button')) tools.insertAdjacentHTML('beforeend', '<button type="button" class="secondary official-inspection-button" onclick="startApplicationInspection()" title="自动检查进行中的投递记录">巡检投递</button><button type="button" class="secondary company-links-button" onclick="openCompanyLinksManager()" title="管理公司官网链接">官网库</button>');
   };
 
   companyLinksReady = loadCompanyLinks();

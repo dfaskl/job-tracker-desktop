@@ -12,4 +12,6 @@
 .official-extension-help code{padding:2px 5px;border-radius:5px;background:#eef3f0}
 .official-extension-help li{margin:5px 0}
 .official-extension-download{display:inline-flex;text-decoration:none}
+.application-tools>.official-inspection-button{order:4!important;flex:0 0 auto;min-height:40px;margin-left:8px;white-space:nowrap}
+.application-tools>.company-links-button{order:5!important;margin-left:0!important}
 @media(max-width:700px){.official-review-item{grid-template-columns:1fr}.official-review-item>div:last-child{justify-content:flex-end}}
