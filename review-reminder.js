@@ -5,7 +5,7 @@
   const activeApplications=()=>state.applications.filter(application=>!terminal(application));
   function localDateKey(value){const date=value?new Date(value):new Date();if(!Number.isFinite(date.getTime()))return'';return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
   function dayNumber(value){const key=localDateKey(value);if(!key)return NaN;const [year,month,day]=key.split('-').map(Number);return Math.floor(Date.UTC(year,month-1,day)/86400000)}
-  function checkedAt(applicationId){return state.applicationReviewChecks?.[applicationId]||state.officialReviewConfirmedAt||''}
+  function checkedAt(applicationId){return state.applicationReviewChecks?.[applicationId]||''}
   function candidates(applications){
     const todayNumber=dayNumber();
     return applications
