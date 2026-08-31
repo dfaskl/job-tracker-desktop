@@ -85,6 +85,8 @@ assert.match(appClient, /else\{\s*state=initial\(\);\s*localStorage\.setItem\(KE
 assert.match(appClient, /const TIME_SENSITIVE_REFRESH_MS=60\*1000/);
 assert.match(appClient, /setInterval\(refreshTimeSensitiveView,TIME_SENSITIVE_REFRESH_MS\)/);
 assert.match(appClient, /window\.addEventListener\('focus',refreshTimeSensitiveView\)/);
+assert.match(appClient, /if\(window\.isOnlineMode&&window\.authReady\)await window\.authReady/);
+assert.match(appClient, /let state=initial\(\)/);
 assert.match(appClient, /document\.addEventListener\('visibilitychange',refreshTimeSensitiveView\)/);
 assert.match(appClient, /日程已到期超过 2 小时/);
 assert.match(appClient, /isRange=eventHasRange\(e\)&&!e\.completed/);

@@ -40,5 +40,5 @@
     content.appendChild(section);
   };
 
-  if (page === 'home') renderHome();
+  if (page === 'home' && (!window.isOnlineMode || window.currentUser)) renderHome();
 })();

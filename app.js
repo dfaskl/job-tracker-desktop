@@ -5,7 +5,7 @@ const STATUSES=['等待结果','已通过','未通过','已放弃','已结束'];
 const TYPES=['测评','笔试','面试','Offer','其他'];
 const CHANNELS=['官网','Boss直聘','实习僧','牛客','猎聘','智联招聘','前程无忧','校园招聘平台','内推','其他'];
 const tones={'等待结果':'amber','已通过':'cyan','未通过':'red','已放弃':'gray','已结束':'gray','已投递':'blue','测评':'purple','笔试':'amber','面试':'cyan','Offer':'green'};
-let state=load(), page='home', selectedId=null, mailResult=null, applicationHeatmapMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let state=initial(), page='home', selectedId=null, mailResult=null, applicationHeatmapMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let localDataReady=false,dailyQuoteRequest=null;
 function initial(){return{applications:[],events:[],settings:{apiUrl:'https://api.deepseek.com',model:'deepseek-chat',apiKey:''}}}
 function normalizeApplicationRecords(data){let changed=false;(data.applications||[]).forEach(application=>{if(application.stage==='准备投递'){application.stage='已投递';changed=true}if(!application.status||['进行中','等待安排'].includes(application.status)){application.status='等待结果';changed=true}});return changed}
@@ -182,8 +182,12 @@ function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'
 function importData(input){const f=input.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(!Array.isArray(data.applications)||!Array.isArray(data.events))throw new Error('备份格式不正确');confirmAction('导入备份',`将用备份中的 ${data.applications.length} 条投递和 ${data.events.length} 项日程替换当前数据。`,()=>{state={...initial(),...data};save();render();toast('备份已恢复')})}catch(e){toast(e.message,{type:'error'})}};reader.readAsText(f)}
 function clearData(){confirmAction('清空全部数据','将清空所有投递和日程，建议操作前确认自动备份可用。',()=>{state.applications=[];state.events=[];save();render();toast('数据已清空')},{danger:true})}
 Object.assign(window,{navigate,openApplicationForm,openDetail,openEventForm,closeModal,quickStatus,removeApplication,completeEvent,missEvent,useMailResult,exportData,importData,clearData});
-render();
-loadFromLocalFile().finally(()=>{localDataReady=true;renderDailyQuote()});
+async function initializeApp(){
+  if(window.isOnlineMode&&window.authReady)await window.authReady;
+  state=load();render();
+  await loadFromLocalFile().finally(()=>{localDataReady=true;renderDailyQuote()});
+}
+initializeApp();
 const TIME_SENSITIVE_REFRESH_MS=60*1000;
 function refreshTimeSensitiveView(){
   const modalClosed=document.querySelector('#modalMask')?.classList.contains('hidden');
