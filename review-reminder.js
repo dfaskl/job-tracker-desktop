@@ -4,13 +4,10 @@
   const terminal=application=>application.stage==='已结束'||['未通过','已放弃','已结束'].includes(application.status);
   const activeApplications=()=>state.applications.filter(application=>!terminal(application));
   function localDateKey(value){const date=value?new Date(value):new Date();if(!Number.isFinite(date.getTime()))return'';return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
-  function dayNumber(value){const key=localDateKey(value);if(!key)return NaN;const [year,month,day]=key.split('-').map(Number);return Math.floor(Date.UTC(year,month-1,day)/86400000)}
   function checkedAt(applicationId){return state.applicationReviewChecks?.[applicationId]||''}
   function candidates(applications){
-    const todayNumber=dayNumber();
     return applications
       .map(application=>({application,checkedAt:checkedAt(application.id)}))
-      .filter(item=>!item.checkedAt||todayNumber-dayNumber(item.checkedAt)>=REVIEW_INTERVAL_DAYS)
       .sort((left,right)=>{if(!left.checkedAt&&right.checkedAt)return-1;if(left.checkedAt&&!right.checkedAt)return 1;return String(left.checkedAt).localeCompare(String(right.checkedAt))||String(left.application.appliedDate||'').localeCompare(String(right.application.appliedDate||''))})
       .map(item=>item.application);
   }

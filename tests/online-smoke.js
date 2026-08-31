@@ -98,6 +98,7 @@ assert.match(scheduleClient, /resolveEvent\(event\)/);
 assert.match(scheduleClient, /restoreEvent\(event\)/);
 assert.match(reviewReminderClient, /const REVIEW_INTERVAL_DAYS=3/);
 assert.match(reviewReminderClient, /Math\.ceil\(applications\.length\/REVIEW_INTERVAL_DAYS\)/);
+assert.doesNotMatch(reviewReminderClient, /todayNumber-dayNumber/);
 assert.match(reviewReminderClient, /state\.applicationReviewDailyBatch=\{date,ids:/);
 assert.match(reviewReminderClient, /if\(valid\.length\|\|!due\.length\)return/);
 assert.doesNotMatch(reviewReminderClient, /state\.officialReviewConfirmedAt/);
