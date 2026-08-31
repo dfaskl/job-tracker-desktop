@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server-online.js",
-    "check": "node --check server.js && node --check server-online.js && node --check auth.js && node --check admin.js && node --check online-migration.js && node --check stats-v2.js && node --check stats-calendar.js && node --check commercial-polish.js && node --check schedule-calendar.js && node --check application-dedupe.js && node --check app.js",
+    "check": "node --check server.js && node --check server-online.js && node --check auth.js && node --check admin.js && node --check online-migration.js && node --check stats-v2.js && node --check stats-calendar.js && node --check commercial-polish.js && node --check official-monitor.js && node --check schedule-calendar.js && node --check application-dedupe.js && node --check app.js && node --check browser-extension/background.js && node --check browser-extension/bridge.js && node --check browser-extension/popup.js",
     "test": "node tests/online-smoke.js"
   },
   "engines": {

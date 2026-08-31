@@ -74,6 +74,7 @@
       <input name="company" value="${esc(item.company || '')}" placeholder="公司名称" required>
       <input name="url" type="url" value="${esc(item.url || '')}" placeholder="暂未填写">
       <button type="button" class="secondary company-link-open" onclick="openCompanyWebsite(this)" title="${item.url ? '打开公司官网' : '搜索公司校园招聘'}">前往</button>
+      <button type="button" class="secondary company-link-check" onclick="beginOfficialInspection(this)" title="使用浏览器扩展检查投递状态" ${item.url ? '' : 'disabled'}>检查</button>
       <button type="button" class="ghost" onclick="removeCompanyLinkRow(this)">删除</button>
     </div>`;
   }
@@ -81,7 +82,7 @@
   function renderCompanyLinksManager() {
     const items = mergedCompanyLinks();
     openModal('公司官网库', `<form id="companyLinksForm" class="company-links-form">
-      <p class="company-links-intro">同一公司只需维护一次，之后所有投递都会自动使用这里的官网链接。</p>
+      <p class="company-links-intro">同一公司只需维护一次。点击“检查”会打开已保存的投递记录页，再通过浏览器扩展读取当前页面。</p>
       <div class="company-links-list">${items.map(companyLinkRow).join('') || companyLinkRow()}</div>
       <div class="company-links-actions">
         <button type="button" class="secondary" onclick="addCompanyLinkRow()">＋ 添加公司</button>
