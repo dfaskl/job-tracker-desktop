@@ -16,6 +16,7 @@ const onlineServer = fs.readFileSync(path.join(root, 'server-online.js'), 'utf8'
 const localServer = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const statsClient = fs.readFileSync(path.join(root, 'stats-v2.js'), 'utf8');
 const scheduleClient = fs.readFileSync(path.join(root, 'schedule-calendar.js'), 'utf8');
+const reviewReminderClient = fs.readFileSync(path.join(root, 'review-reminder.js'), 'utf8');
 const commercialClient = fs.readFileSync(path.join(root, 'commercial-polish.js'), 'utf8');
 const commercialCss = fs.readFileSync(path.join(root, 'commercial-polish.css'), 'utf8');
 const experienceCss = fs.readFileSync(path.join(root, 'experience-polish.css'), 'utf8');
@@ -94,6 +95,10 @@ assert.match(appClient, /结束时间必须晚于开始时间/);
 assert.match(scheduleClient, /eventHasRange\(event\)&&!event\.completed/);
 assert.match(scheduleClient, /resolveEvent\(event\)/);
 assert.match(scheduleClient, /restoreEvent\(event\)/);
+assert.match(reviewReminderClient, /3\*24\*60\*60\*1000/);
+assert.match(reviewReminderClient, /officialReviewConfirmedAt=new Date\(\)\.toISOString\(\)/);
+assert.match(reviewReminderClient, /已记录本次确认，三天后会再次提醒/);
+assert.match(reviewReminderClient, /\['未通过','已放弃','已结束'\]\.includes\(application\.status\)/);
 assert.match(experienceCss, /\.home-workbench>\.two-col>\.panel:nth-child\(2\)>\.cards\{grid-auto-rows:max-content\}/);
 assert.match(experienceCss, /body:has\(#nav button\[data-page="home"\]\.active\)\{height:auto;overflow-y:auto\}/);
 assert.match(experienceCss, /body:has\(#nav button\[data-page="home"\]\.active\) \.home-workbench\{height:auto;display:grid!important;overflow:visible\}/);
