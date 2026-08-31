@@ -15,9 +15,9 @@
       .map(item=>item.application);
   }
   function dailyQueue(){
-    const applications=activeApplications(),date=localDateKey(),saved=state.applicationReviewDailyBatch;
-    if(saved?.date===date&&Array.isArray(saved.ids)){const valid=saved.ids.map(id=>appById(id)).filter(Boolean).filter(application=>!terminal(application));return {total:valid.length,items:valid.filter(application=>localDateKey(state.applicationReviewChecks?.[application.id])!==date)}}
-    const size=Math.ceil(applications.length/REVIEW_INTERVAL_DAYS),items=candidates(applications).slice(0,size);
+    const applications=activeApplications(),date=localDateKey(),saved=state.applicationReviewDailyBatch,due=candidates(applications);
+    if(saved?.date===date&&Array.isArray(saved.ids)){const valid=saved.ids.map(id=>appById(id)).filter(Boolean).filter(application=>!terminal(application));if(valid.length||!due.length)return {total:valid.length,items:valid.filter(application=>localDateKey(state.applicationReviewChecks?.[application.id])!==date)}}
+    const size=Math.ceil(applications.length/REVIEW_INTERVAL_DAYS),items=due.slice(0,size);
     state.applicationReviewDailyBatch={date,ids:items.map(application=>application.id)};
     return {total:items.length,items};
   }
