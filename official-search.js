@@ -269,6 +269,10 @@ window.openCompanyWebsite = function (button) {
     }
   };
   window.openDetail = openDetail;
+  window.applicationOfficialReviewUrl = function (applicationId) {
+    const application = appById(applicationId);
+    return application ? customUrl(application) : '';
+  };
 
   const originalRenderApplications = renderApplications;
   renderApplications = function () {
@@ -277,5 +281,5 @@ window.openCompanyWebsite = function (button) {
     if (tools && !document.querySelector('.company-links-button')) tools.insertAdjacentHTML('beforeend', '<button type="button" class="secondary company-links-button" onclick="openCompanyLinksManager()" title="管理公司官网链接">官网库</button>');
   };
 
-  companyLinksReady = loadCompanyLinks();
+  companyLinksReady = loadCompanyLinks().then(() => { if (page === 'home') render(); });
 })();
