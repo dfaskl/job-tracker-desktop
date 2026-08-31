@@ -1,8 +1,21 @@
-const contextNode=document.querySelector('#context'),progressNode=document.querySelector('#progress'),startButton=document.querySelector('#start'),resumeButton=document.querySelector('#resume'),cancelButton=document.querySelector('#cancel'),statusNode=document.querySelector('#status');
-let currentJob=null;
-function originsFor(job){return [...new Set((job.groups||[]).map(group=>`${new URL(group.url).origin}/*`))]}
-function render(){chrome.storage.local.get('officialInspectionJob',result=>{const job=result.officialInspectionJob;currentJob=job;if(!job){contextNode.textContent='当前没有巡检任务，请在投递记录页点击“巡检投递”。';progressNode.textContent='';startButton.hidden=resumeButton.hidden=cancelButton.hidden=true;return}const total=job.groups?.length||0,done=job.index||0;contextNode.textContent=job.status==='awaiting-permission'?`准备巡检 ${total} 个官网页面`:job.status==='paused'?`巡检已暂停：${job.currentCompany}`:`正在巡检：${job.currentCompany||'准备中'}`;progressNode.textContent=`进度 ${done} / ${total}`;statusNode.textContent=job.error||'';startButton.hidden=job.status!=='awaiting-permission';resumeButton.hidden=job.status!=='paused';cancelButton.hidden=false})}
-startButton.onclick=async()=>{if(!currentJob)return;startButton.disabled=true;try{const origins=originsFor(currentJob),granted=await chrome.permissions.request({origins});if(!granted)throw new Error('未授权官网访问，巡检没有开始');chrome.runtime.sendMessage({type:'run-batch',origins},()=>{statusNode.textContent='巡检已开始，可以关闭此窗口';setTimeout(()=>window.close(),700)})}catch(error){statusNode.textContent=error.message;startButton.disabled=false}};
-resumeButton.onclick=()=>{resumeButton.disabled=true;chrome.runtime.sendMessage({type:'resume-batch'},()=>{statusNode.textContent='正在继续巡检…';setTimeout(()=>window.close(),500)})};
-cancelButton.onclick=()=>chrome.runtime.sendMessage({type:'cancel-batch'},()=>{statusNode.textContent='本次巡检已取消';startButton.hidden=resumeButton.hidden=cancelButton.hidden=true;setTimeout(()=>window.close(),500)});
-render();setInterval(render,1000);
+let context=null;
+const contextNode=document.querySelector('#context'),button=document.querySelector('#capture'),statusNode=document.querySelector('#status');
+chrome.storage.local.get('inspectionContext',result=>{
+  context=result.inspectionContext;
+  if(!context||Date.now()-Number(context.createdAt||0)>24*60*60*1000){contextNode.textContent='请先在求职进度本的官网库中点击“检查”。';return}
+  contextNode.textContent=`正在检查：${context.company}`;button.disabled=false;
+});
+button.onclick=async()=>{
+  button.disabled=true;statusNode.textContent='正在读取当前页面…';
+  try{
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:\/\//i.test(tab.url||''))throw new Error('当前页面不是可读取的网页');
+    const [{result}]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>({title:document.title,url:location.href,text:String(document.body?.innerText||'').slice(0,180000)})});
+    if(!result?.text)throw new Error('当前页面没有可读取的内容');
+    const capture={id:`capture_${Date.now()}`,company:context.company,expectedUrl:context.url,...result,capturedAt:new Date().toISOString()};
+    await chrome.storage.local.set({pendingCapture:capture});
+    statusNode.textContent='读取完成，正在返回求职进度本…';statusNode.className='ok';
+    await chrome.tabs.create({url:`${context.appUrl||'https://job-tracker-web-c8b0.onrender.com'}/`});
+    setTimeout(()=>window.close(),500);
+  }catch(error){statusNode.textContent=error.message||'读取失败';button.disabled=false}
+};

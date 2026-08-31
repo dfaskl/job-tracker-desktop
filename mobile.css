@@ -62,7 +62,7 @@
   .manual-confirm-item .danger{grid-column:1/-1;width:100%;justify-self:stretch}
 
   .application-tools{min-height:0!important;display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:9px!important;padding:12px!important}
-  .application-tools>.application-search-input,.application-tools>.application-status-filter,.application-tools>.application-heatmap,.application-tools>.official-inspection-button,.application-tools>.company-links-button{width:100%;min-width:0;max-width:none;flex:none;margin:0}
+  .application-tools>.application-search-input,.application-tools>.application-status-filter,.application-tools>.application-heatmap,.application-tools>.company-links-button{width:100%;min-width:0;max-width:none;flex:none;margin:0}
   .application-tools>.application-heatmap{overflow-x:auto;padding:8px 0 2px}
   .application-heatmap{grid-template-columns:auto auto auto;column-gap:10px;min-width:300px}
   .application-color-legend{margin:8px 0;gap:10px;padding-bottom:4px}
