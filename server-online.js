@@ -13,14 +13,14 @@ const isProduction = process.env.NODE_ENV === 'production';
 const sessionDays = Math.max(1, Math.min(30, Number(process.env.SESSION_DAYS || 7)));
 const scrypt = promisify(crypto.scrypt);
 const loginAttempts = new Map();
-const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.zip':'application/zip' };
+const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8' };
 const publicFiles = new Set([
-  'admin.html', 'admin.js', 'admin.css', 'online-migration.js', 'job-tracker-official-inspector.zip',
+  'admin.html', 'admin.js', 'admin.css', 'online-migration.js',
   'index.html', 'auth.js', 'auth.css', 'app.js', 'stats-v2.js', 'home-confirm.js', 'theme-selector.js',
-  'help-tooltips.js', 'ai-normalize.js', 'official-search.js', 'official-monitor.js', 'schedule-calendar.js', 'application-dedupe.js',
+  'help-tooltips.js', 'ai-normalize.js', 'official-search.js', 'schedule-calendar.js', 'application-dedupe.js',
   'notes-display.js', 'ui-polish.js', 'commercial-polish.js', 'experience-polish.js', 'styles.css',
   'home-layout.css', 'theme-refresh.css', 'theme-options.css', 'help-tooltips.css', 'ai-normalize.css',
-  'official-search.css', 'official-monitor.css', 'schedule-calendar.css', 'schedule-toolbar.css', 'notes-display.css',
+  'official-search.css', 'schedule-calendar.css', 'schedule-toolbar.css', 'notes-display.css',
   'application-flow.css', 'application-heatmap.css', 'ui-polish.css', 'commercial-polish.css',
   'design-tokens.css', 'components-v2.css', 'layouts-v2.css', 'pages-v2.css', 'experience-polish.css',
   'adaptive-layout.css', 'mobile.css'
