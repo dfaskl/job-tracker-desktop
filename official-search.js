@@ -269,11 +269,6 @@ window.openCompanyWebsite = function (button) {
     }
   };
   window.openDetail = openDetail;
-  window.applicationOfficialReviewUrl = function (applicationId) {
-    const application = appById(applicationId);
-    return application ? customUrl(application) : '';
-  };
-
   const originalRenderApplications = renderApplications;
   renderApplications = function () {
     originalRenderApplications();
