@@ -69,8 +69,6 @@ async function initDatabase() {
     );
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT NOT NULL DEFAULT '';
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS show_on_leaderboard BOOLEAN NOT NULL DEFAULT FALSE;
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -334,7 +332,7 @@ async function adminRoute(req, res, pathname, user) {
 
   if (pathname === '/api/admin/overview' && req.method === 'GET') {
     const userResult = await pool.query(`
-      SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,u.nickname,u.show_on_leaderboard,
+      SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,
         CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,
         CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,
         (c.encrypted_api_key IS NOT NULL) AS has_api_key,
@@ -358,8 +356,6 @@ async function adminRoute(req, res, pathname, user) {
       applicationCount:Number(row.application_count || 0),
       eventCount:Number(row.event_count || 0),
       hasApiKey:Boolean(row.has_api_key)
-      ,nickname:String(row.nickname || ''),
-      showOnLeaderboard:Boolean(row.show_on_leaderboard)
     }));
     return json(res, 200, {
       currentUser:publicUser(user),
@@ -416,7 +412,7 @@ async function adminRoute(req, res, pathname, user) {
   if (userMatch && req.method === 'PATCH') {
     const targetId = userMatch[1];
     const body = await readBody(req);
-    const targetResult = await pool.query('SELECT id,email,is_admin,disabled_at,nickname,show_on_leaderboard FROM users WHERE id=$1', [targetId]);
+    const targetResult = await pool.query('SELECT id,email,is_admin,disabled_at FROM users WHERE id=$1', [targetId]);
     const target = targetResult.rows[0];
     if (!target) return json(res, 404, { error:'用户不存在' });
     if (typeof body.disabled === 'boolean') {
@@ -426,13 +422,6 @@ async function adminRoute(req, res, pathname, user) {
       if (body.disabled) await pool.query('DELETE FROM sessions WHERE user_id=$1', [targetId]);
       await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)', [user.id,targetId,target.email,body.disabled?'disable-user':'enable-user']);
       return json(res,200,{ok:true,disabled:body.disabled});
-    }
-    if (typeof body.nickname === 'string' && typeof body.showOnLeaderboard === 'boolean') {
-      const nickname=body.nickname.trim().replace(/\s+/g,' ').slice(0,30);
-      if(body.showOnLeaderboard&&!nickname)return json(res,400,{error:'勾选首页展示前请先填写昵称'});
-      await pool.query('UPDATE users SET nickname=$2,show_on_leaderboard=$3 WHERE id=$1',[targetId,nickname,body.showOnLeaderboard]);
-      await pool.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES($1,$2,$3,$4)',[user.id,targetId,target.email,'update-user-profile']);
-      return json(res,200,{ok:true,nickname,showOnLeaderboard:body.showOnLeaderboard});
     }
     return json(res,400,{error:'用户设置内容不正确'});
   }
@@ -467,14 +456,6 @@ async function adminRoute(req, res, pathname, user) {
 async function apiRoute(req, res, pathname, user) {
   const userId = user.id;
   if (pathname.startsWith('/api/admin/')) return adminRoute(req, res, pathname, user);
-  if(pathname==='/api/leaderboard'&&req.method==='GET'){
-    const result=await pool.query(`SELECT u.nickname,
-      CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count
-      FROM users u LEFT JOIN user_data d ON d.user_id=u.id
-      WHERE u.show_on_leaderboard=TRUE AND u.disabled_at IS NULL AND btrim(u.nickname)<>''
-      ORDER BY u.created_at ASC`);
-    return json(res,200,{items:result.rows.map(row=>({nickname:String(row.nickname),applicationCount:Number(row.application_count||0)}))});
-  }
   if (pathname === '/api/data' && req.method === 'GET') {
     const result = await pool.query('SELECT data FROM user_data WHERE user_id=$1', [userId]);
     return json(res, 200, result.rows[0] ? { exists:true, data:result.rows[0].data } : { exists:false, data:null });
