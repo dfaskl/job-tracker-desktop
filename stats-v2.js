@@ -1,10 +1,4 @@
 (function () {
-  function stageCategory(application) {
-    if (application.stage === '已结束' || ['未通过', '已放弃', '已结束'].includes(application.status)) return '已结束';
-    if (['测评', '笔试', '面试', 'Offer'].includes(application.stage)) return application.stage;
-    return '仅投递';
-  }
-
   function verticalChart(items, emptyText) {
     const max = Math.max(1, ...items.map(item => item[1]));
     if (!items.length) return `<div class="empty">${emptyText}</div>`;
@@ -17,8 +11,7 @@
   }
 
   renderStats = function () {
-    const stageLabels = ['仅投递', '测评', '笔试', '面试', 'Offer', '已结束'];
-    const stageItems = stageLabels.map(label => [label, state.applications.filter(item => stageCategory(item) === label).length]);
+    const stageItems = STAGE_CATEGORIES.map(label => [label, state.applications.filter(item => applicationStageCategory(item) === label).length]);
     const channelMap = state.applications.reduce((result, item) => {
       const channel = item.channel || '未填写';
       result[channel] = (result[channel] || 0) + 1;

@@ -86,6 +86,10 @@ assert.match(appClient, /setInterval\(refreshTimeSensitiveView,TIME_SENSITIVE_RE
 assert.match(appClient, /window\.addEventListener\('focus',refreshTimeSensitiveView\)/);
 assert.match(appClient, /if\(window\.isOnlineMode&&window\.authReady\)await window\.authReady/);
 assert.match(appClient, /let state=initial\(\)/);
+assert.match(appClient, /const STAGE_CATEGORIES=\['仅投递','测评','笔试','面试','Offer','已结束'\]/);
+assert.match(appClient, /applicationStageCategory\(a\)===s/);
+assert.match(appClient, /id="stageFilter"><option value="">全部阶段/);
+assert.match(statsClient, /STAGE_CATEGORIES\.map/);
 assert.match(appClient, /document\.addEventListener\('visibilitychange',refreshTimeSensitiveView\)/);
 assert.match(appClient, /日程已到期超过 2 小时/);
 assert.match(appClient, /isRange=eventHasRange\(e\)&&!e\.completed/);
