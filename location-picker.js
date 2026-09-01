@@ -46,7 +46,7 @@
     provinceHost.onclick=event=>{const button=event.target.closest('button');if(!button)return;if(button.dataset.value)return toggle(button.dataset.value);activeProvince=button.dataset.province;renderCities()};
     cityHost.onclick=event=>{const button=event.target.closest('[data-value]');if(button)toggle(button.dataset.value)};
     tags.onclick=event=>{const button=event.target.closest('[data-remove]');if(button){selected=selected.filter(value=>value!==button.dataset.remove);sync()}};
-    const closeOnOutside=event=>{if(!field.isConnected){document.removeEventListener('click',closeOnOutside);return}if(!field.contains(event.target)){popover.hidden=true;trigger.setAttribute('aria-expanded','false')}};document.addEventListener('click',closeOnOutside);
+    const closeOnOutside=event=>{if(!field.isConnected){document.removeEventListener('click',closeOnOutside);return}const path=typeof event.composedPath==='function'?event.composedPath():[];if(!path.includes(field)){popover.hidden=true;trigger.setAttribute('aria-expanded','false')}};document.addEventListener('click',closeOnOutside);
     sync();
   }
   const originalOpenApplicationForm=openApplicationForm;

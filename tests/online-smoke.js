@@ -35,6 +35,8 @@ assert.match(locationPickerClient, /'北京市'/);
 assert.match(locationPickerClient, /'新疆维吾尔自治区'/);
 assert.match(locationPickerClient, /selected\.join\('、'\)/);
 assert.match(locationPickerClient, /data-remove/);
+assert.match(locationPickerClient, /event\.composedPath\(\)/);
+assert.match(locationPickerClient, /path\.includes\(field\)/);
 assert.match(commercialClient, /id="backupList"/);
 assert.match(commercialClient, /loadBackups\(\)/);
 assert.match(commercialClient, /applicationCount/);
