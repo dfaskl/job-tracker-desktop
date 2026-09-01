@@ -20,7 +20,7 @@ const publicFiles = new Set([
   'help-tooltips.js', 'ai-normalize.js', 'official-search.js', 'schedule-calendar.js', 'application-dedupe.js',
   'notes-display.js', 'ui-polish.js', 'commercial-polish.js', 'experience-polish.js', 'styles.css',
   'home-layout.css', 'theme-refresh.css', 'theme-options.css', 'help-tooltips.css', 'ai-normalize.css',
-  'official-search.css', 'schedule-calendar.css', 'schedule-toolbar.css', 'notes-display.css',
+  'official-search.css', 'schedule-calendar.css', 'schedule-range.css', 'schedule-toolbar.css', 'notes-display.css',
   'application-flow.css', 'application-heatmap.css', 'ui-polish.css', 'commercial-polish.css',
   'design-tokens.css', 'components-v2.css', 'layouts-v2.css', 'pages-v2.css', 'experience-polish.css',
   'adaptive-layout.css', 'mobile.css'
