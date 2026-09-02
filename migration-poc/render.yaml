@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: job-tracker-migration-poc
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: codex/migration-poc-demo
+    rootDir: migration-poc
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: POC_ACCESS_TOKEN
+        generateValue: true

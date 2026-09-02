@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: job-tracker-migration-poc
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+
+logging:
+  level:
+    root: INFO

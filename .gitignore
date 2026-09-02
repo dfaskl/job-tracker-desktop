@@ -7,3 +7,5 @@ data/*
 *backup*.json
 *before-*.json
 node_modules/
+migration-poc/backend/target/
+migration-poc/frontend/dist/
