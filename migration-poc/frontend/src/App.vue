@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import MigrationApplications from './MigrationApplications.vue'
+import MigrationApplicationCrud from './MigrationApplicationCrud.vue'
 
 type AppStatus = {
   ok: boolean
@@ -87,5 +88,6 @@ async function probeDatabase() {
     </section>
 
     <MigrationApplications />
+    <MigrationApplicationCrud />
   </main>
 </template>
