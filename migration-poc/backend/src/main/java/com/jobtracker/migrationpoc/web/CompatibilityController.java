@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.DatabaseProbeResult;
 import com.jobtracker.migrationpoc.database.LegacyDatabaseProbe;
+import com.jobtracker.migrationpoc.security.PocSessionManager;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +18,11 @@ import java.util.Map;
 @RequestMapping("/api/poc")
 public class CompatibilityController {
     private final LegacyDatabaseProbe databaseProbe;
+    private final PocSessionManager sessionManager;
 
-    public CompatibilityController(LegacyDatabaseProbe databaseProbe) {
+    public CompatibilityController(LegacyDatabaseProbe databaseProbe, PocSessionManager sessionManager) {
         this.databaseProbe = databaseProbe;
+        this.sessionManager = sessionManager;
     }
 
     @GetMapping("/status")
@@ -30,6 +33,7 @@ public class CompatibilityController {
             "javaVersion", System.getProperty("java.version"),
             "databaseConfigured", databaseProbe.isConfigured(),
             "databaseProbeProtected", databaseProbe.isProtected(),
+            "sessionAuthConfigured", sessionManager.isConfigured(),
             "frontendBundled", new ClassPathResource("static/index.html").exists()
         );
     }

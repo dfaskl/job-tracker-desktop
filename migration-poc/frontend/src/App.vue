@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import MigrationApplications from './MigrationApplications.vue'
 
 type AppStatus = {
   ok: boolean
@@ -84,5 +85,7 @@ async function probeDatabase() {
         <div><dt>业务 JSON 结构</dt><dd :class="database.businessJsonCompatible ? 'success' : 'danger'">{{ database.samplePresent ? (database.businessJsonCompatible ? '兼容' : '不兼容') : '没有可抽样数据' }}</dd></div>
       </dl>
     </section>
+
+    <MigrationApplications />
   </main>
 </template>

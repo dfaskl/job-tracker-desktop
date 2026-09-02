@@ -12,3 +12,5 @@ services:
     envVars:
       - key: POC_ACCESS_TOKEN
         generateValue: true
+      - key: POC_SESSION_SECRET
+        generateValue: true
