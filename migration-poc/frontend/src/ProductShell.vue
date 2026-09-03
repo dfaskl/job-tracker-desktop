@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ProductHome from './ProductHome.vue'
-import ProductStats from './ProductStats.vue'
+import ProductAnalytics from './ProductAnalytics.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
 import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MigrationAiMail from './MigrationAiMail.vue'
@@ -78,7 +78,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <ProductApplicationWorkspace v-else-if="activePage === 'applications'" />
         <ProductCalendarWorkspace v-else-if="activePage === 'calendar'" />
         <MigrationAiMail v-else-if="activePage === 'mail'" />
-        <ProductStats v-else-if="activePage === 'stats'" />
+        <ProductAnalytics v-else-if="activePage === 'stats'" />
         <template v-else-if="activePage === 'settings'">
           <MigrationSessionStatus />
           <MigrationBackups />
