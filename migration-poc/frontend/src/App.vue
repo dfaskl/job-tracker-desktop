@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import MigrationApplications from './MigrationApplications.vue'
 import MigrationApplicationCrud from './MigrationApplicationCrud.vue'
+import MigrationEventCalendar from './MigrationEventCalendar.vue'
 
 type AppStatus = {
   ok: boolean
@@ -89,5 +90,6 @@ async function probeDatabase() {
 
     <MigrationApplications />
     <MigrationApplicationCrud />
+    <MigrationEventCalendar />
   </main>
 </template>
