@@ -93,6 +93,21 @@ public class PocAiSandboxController {
         }
     }
 
+    @PostMapping("/normalize-application")
+    public ResponseEntity<?> normalizeApplication(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody NormalizeRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                sandboxService.normalizeApplication(user.get().email(), body == null ? null : body.application())
+            );
+        } catch (Exception exception) { return mapException("normalize-application", exception); }
+    }
     @PostMapping("/daily-quote")
     public ResponseEntity<?> dailyQuote(
         @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
@@ -146,4 +161,5 @@ public class PocAiSandboxController {
     public record ConfigRequest(String apiUrl, String model, String apiKey, boolean clearApiKey) {}
     public record RecognitionRequest(String body) {}
     public record DailyQuoteRequest(String date) {}
+    public record NormalizeRequest(tools.jackson.databind.JsonNode application) {}
 }
