@@ -1,0 +1,38 @@
+name: Migration POC CI
+
+on:
+  push:
+    branches: ["codex/migration-poc-demo"]
+    paths:
+      - "migration-poc/**"
+      - ".github/workflows/migration-poc-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "migration-poc/**"
+      - ".github/workflows/migration-poc-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: migration-poc/frontend/package-lock.json
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build Vue and package Spring Boot JAR
+        run: mvn -B -f migration-poc/backend/pom.xml clean package
