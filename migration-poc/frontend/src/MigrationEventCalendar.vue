@@ -104,7 +104,7 @@ async function checkSandbox() {
 async function loadEvents() {
   const result = await requestJson('/api/poc/event-sandbox/events')
   if (!result.response.ok) throw new Error(
-    result.response.status === 401 ? '请先在上方登录旧账号，再重新检查日程沙箱' : (result.body.message || '读取测试日程失败')
+    result.response.status === 401 ? '请先在上方登录旧账号，再重新检查日程沙箱' : (result.body.message || '读取日程失败')
   )
   events.value = result.body.events as EventItem[]
   applications.value = result.body.applications as ApplicationOption[]
@@ -193,7 +193,7 @@ async function save() {
       { method: current ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
     )
     if (!result.response.ok) throw new Error(result.body.message || '保存日程失败')
-    message.value = current ? '测试日程已更新，并已生成变更前备份' : '测试日程已新增，并已同步岗位进度'
+    message.value = current ? '日程已更新，并已生成变更前备份' : '日程已新增，并已同步岗位进度'
     resetForm()
     await loadEvents()
   } catch (cause) {
@@ -234,7 +234,7 @@ async function remove(item: EventItem) {
       body: JSON.stringify({ expectedUpdatedAt: item.updatedAt })
     })
     if (!result.response.ok) throw new Error(result.body.message || '删除日程失败')
-    message.value = '测试日程及对应岗位历史已删除'
+    message.value = '日程及对应岗位历史已删除'
     if (editing.value?.id === item.id) resetForm()
     await loadEvents()
   } catch (cause) {
@@ -248,10 +248,10 @@ async function remove(item: EventItem) {
 <template>
   <section class="card event-sandbox">
     <div class="section-head">
-      <div><span class="section-kicker">第 2 阶段</span><h2>日程与月历迁移沙箱</h2></div>
-      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '独立测试库' : '安全关闭' }}</span>
+      <div><span class="section-kicker">CALENDAR</span><h2>日程与月历</h2></div>
+      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '可编辑' : '只读' }}</span>
     </div>
-    <p>验证时间点、时间段、完成/错过/恢复以及关联岗位进度；所有变更只进入独立测试数据库。</p>
+    <p>管理时间点、时间段、完成、错过和恢复，并自动同步关联岗位进度。</p>
 
     <div v-if="sandbox && !sandbox.enabled" class="notice">
       <strong>{{ sandbox.message }}</strong><span>日程写入与职位 CRUD 共用同一套隔离测试库开关。</span>
@@ -268,7 +268,7 @@ async function remove(item: EventItem) {
         <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
         <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
         <div class="form-actions wide">
-          <button :disabled="loading">{{ loading ? '处理中…' : (editing ? '保存修改' : '新增测试日程') }}</button>
+          <button :disabled="loading">{{ loading ? '处理中…' : (editing ? '保存修改' : '新增日程') }}</button>
           <button v-if="editing" type="button" class="secondary" @click="resetForm">取消编辑</button>
           <button type="button" class="secondary" :disabled="loading" @click="checkSandbox">重新检查</button>
         </div>
@@ -277,7 +277,7 @@ async function remove(item: EventItem) {
 
       <p v-if="message" class="success">{{ message }}</p>
       <div class="calendar-head">
-        <div><strong>{{ monthTitle }}</strong><span>共 {{ total }} 项测试日程</span></div>
+        <div><strong>{{ monthTitle }}</strong><span>共 {{ total }} 项日程</span></div>
         <div><button class="secondary compact" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" @click="changeMonth(1)">›</button></div>
       </div>
       <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
@@ -308,7 +308,7 @@ async function remove(item: EventItem) {
             <button class="danger-button compact" @click="remove(entry.event)">删除</button>
           </div>
         </article>
-        <div v-if="!selectedEvents.length" class="empty">当天没有测试日程</div>
+        <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
       </div>
     </template>
 

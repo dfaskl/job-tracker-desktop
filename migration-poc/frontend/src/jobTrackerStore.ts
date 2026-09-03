@@ -70,6 +70,15 @@ async function login(email: string, password: string) {
   await refresh()
 }
 
+async function register(email: string, password: string, registrationCode: string) {
+  error.value = ''
+  const result = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/register', {
+    method: 'POST', body: JSON.stringify({ email, password, registrationCode })
+  })
+  user.value = result.user
+  readOnly.value = result.readOnly
+  await refresh()
+}
 async function logout() {
   await api('/api/poc/auth/logout', { method: 'POST' })
   user.value = null
@@ -78,5 +87,5 @@ async function logout() {
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, initialize, refresh, login, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, initialize, refresh, login, register, logout }
 }

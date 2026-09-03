@@ -5,6 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LegacyPasswordVerifierTest {
+    @org.junit.jupiter.api.Test
+    void createsAHashCompatibleWithLegacyLogin() {
+        LegacyPasswordVerifier verifier = new LegacyPasswordVerifier();
+        var record = verifier.create("a-secure-test-password");
+        org.assertj.core.api.Assertions.assertThat(verifier.verify("a-secure-test-password", record.salt(), record.hash())).isTrue();
+        org.assertj.core.api.Assertions.assertThat(verifier.verify("wrong-password", record.salt(), record.hash())).isFalse();
+    }
+
     private final LegacyPasswordVerifier verifier = new LegacyPasswordVerifier();
 
     @Test

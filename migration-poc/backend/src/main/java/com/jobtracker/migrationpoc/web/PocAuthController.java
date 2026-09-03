@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import com.jobtracker.migrationpoc.database.LegacyReadService;
+import com.jobtracker.migrationpoc.database.AccountSandboxService;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import com.jobtracker.migrationpoc.security.PocPersistentSessionStore;
 import com.jobtracker.migrationpoc.security.PocSessionManager;
@@ -42,6 +43,7 @@ public class PocAuthController {
     private static final int MAX_ATTEMPTS = 12;
 
     private final LegacyReadService legacyReadService;
+    private final AccountSandboxService accountSandboxService;
     private final LegacyPasswordVerifier passwordVerifier;
     private final PocSessionManager sessionManager;
     private final PocPersistentSessionStore persistentSessionStore;
@@ -52,9 +54,11 @@ public class PocAuthController {
         LegacyReadService legacyReadService,
         LegacyPasswordVerifier passwordVerifier,
         PocSessionManager sessionManager,
-        PocPersistentSessionStore persistentSessionStore
+        PocPersistentSessionStore persistentSessionStore,
+        AccountSandboxService accountSandboxService
     ) {
         this.legacyReadService = legacyReadService;
+        this.accountSandboxService = accountSandboxService;
         this.passwordVerifier = passwordVerifier;
         this.sessionManager = sessionManager;
         this.persistentSessionStore = persistentSessionStore;
@@ -63,9 +67,17 @@ public class PocAuthController {
     PocAuthController(
         LegacyReadService legacyReadService,
         LegacyPasswordVerifier passwordVerifier,
+        PocSessionManager sessionManager,
+        PocPersistentSessionStore persistentSessionStore
+    ) {
+        this(legacyReadService, passwordVerifier, sessionManager, persistentSessionStore, null);
+    }
+    PocAuthController(
+        LegacyReadService legacyReadService,
+        LegacyPasswordVerifier passwordVerifier,
         PocSessionManager sessionManager
     ) {
-        this(legacyReadService, passwordVerifier, sessionManager, null);
+        this(legacyReadService, passwordVerifier, sessionManager, null, null);
     }
 
     @PostMapping("/login")
@@ -83,7 +95,7 @@ public class PocAuthController {
         }
 
         try {
-            Optional<LegacyUser> found = legacyReadService.findUserByEmail(email);
+            Optional<LegacyUser> found = findUserByEmail(email);
             if (found.isEmpty()
                 || found.get().disabled()
                 || !passwordVerifier.verify(password, found.get().passwordSalt(), found.get().passwordHash())) {
@@ -97,13 +109,32 @@ public class PocAuthController {
             return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.SET_COOKIE, sessionCookie(token, ttl, request))
-                .body(Map.of("user", publicUser(found.get()), "readOnly", true, "sessionMode", sessionMode()));
+                .body(Map.of("user", publicUser(found.get()), "readOnly", !sandboxAccountsEnabled(), "sessionMode", sessionMode()));
         } catch (Exception exception) {
             LOGGER.warn("POC login failed because the legacy database is unavailable", exception);
             return error(HttpStatus.SERVICE_UNAVAILABLE, "数据库暂时不可用");
         }
     }
 
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest body, HttpServletRequest request) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (!sandboxAccountsEnabled()) return error(HttpStatus.SERVICE_UNAVAILABLE, "独立测试数据库注册未开启");
+        String email = normalizeEmail(body == null ? null : body.email());
+        String password = body == null || body.password() == null ? "" : body.password();
+        try {
+            LegacyUser user = accountSandboxService.register(email, password, body == null ? null : body.registrationCode());
+            boolean persistent = persistentSessionEnabled();
+            String token = persistent ? persistentSessionStore.issue(user.email()) : sessionManager.issue(user.id());
+            Duration ttl = persistent ? persistentSessionStore.sessionTtl() : sessionManager.sessionTtl();
+            return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.SET_COOKIE, sessionCookie(token, ttl, request))
+                .body(Map.of("user", publicUser(user), "readOnly", false, "sessionMode", sessionMode()));
+        } catch (AccountSandboxService.AccountValidationException e) { return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (AccountSandboxService.AccountForbiddenException e) { return error(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (AccountSandboxService.AccountConflictException e) { return error(HttpStatus.CONFLICT, e.getMessage());
+        } catch (Exception e) { LOGGER.warn("POC registration failed", e); return error(HttpStatus.SERVICE_UNAVAILABLE, "注册服务暂时不可用"); }
+    }
     @GetMapping("/session")
     public ResponseEntity<?> session(@CookieValue(value = COOKIE_NAME, required = false) String token) {
         if (!ready()) return error(HttpStatus.SERVICE_UNAVAILABLE, "服务器尚未配置只读登录所需环境变量");
@@ -111,7 +142,7 @@ public class PocAuthController {
             Optional<LegacyUser> user = authenticatedUser(token);
             return user.<ResponseEntity<?>>map(value -> ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
-                    .body(Map.of("user", publicUser(value), "readOnly", true, "sessionMode", sessionMode())))
+                    .body(Map.of("user", publicUser(value), "readOnly", !sandboxAccountsEnabled(), "sessionMode", sessionMode())))
                 .orElseGet(() -> error(HttpStatus.UNAUTHORIZED, "请先登录"));
         } catch (Exception exception) {
             LOGGER.warn("POC session check failed because the legacy database is unavailable", exception);
@@ -142,15 +173,18 @@ public class PocAuthController {
         if (persistentSessionEnabled()) {
             Optional<String> email = persistentSessionStore.verifyEmail(token);
             if (email.isEmpty()) return Optional.empty();
-            return legacyReadService.findUserByEmail(email.get()).filter(value -> !value.disabled());
+            return findUserByEmail(email.get()).filter(value -> !value.disabled());
         }
         Optional<PocSessionManager.SessionIdentity> identity = sessionManager.verify(token);
         if (identity.isEmpty()) return Optional.empty();
-        return legacyReadService.findUserById(identity.get().userId()).filter(value -> !value.disabled());
+        return findUserById(identity.get().userId()).filter(value -> !value.disabled());
     }
 
+    private boolean sandboxAccountsEnabled() { return accountSandboxService != null && accountSandboxService.enabled(); }
+    private Optional<LegacyUser> findUserByEmail(String email) throws Exception { return sandboxAccountsEnabled() ? accountSandboxService.findByEmail(email) : legacyReadService.findUserByEmail(email); }
+    private Optional<LegacyUser> findUserById(long id) throws Exception { return sandboxAccountsEnabled() ? accountSandboxService.findById(id) : legacyReadService.findUserById(id); }
     private boolean ready() {
-        return legacyReadService.isConfigured() && (persistentSessionEnabled() || sessionManager.isConfigured());
+        return (sandboxAccountsEnabled() || legacyReadService.isConfigured()) && (persistentSessionEnabled() || sessionManager.isConfigured());
     }
 
     private boolean persistentSessionEnabled() {
@@ -229,4 +263,5 @@ public class PocAuthController {
     }
 
     public record LoginRequest(String email, String password) {}
+    public record RegisterRequest(String email, String password, String registrationCode) {}
 }

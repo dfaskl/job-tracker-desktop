@@ -12,6 +12,8 @@ const store = useJobTrackerStore()
 const links = ref<CompanyLink[]>([])
 const linksUpdatedAt = ref('')
 const linkQuery = ref('')
+const newCompany = ref('')
+const newUrl = ref('')
 const sandbox = ref<SandboxStatus | null>(null)
 const importConfirmation = ref('')
 const clearConfirmation = ref('')
@@ -58,6 +60,24 @@ async function loadSandbox() {
   }
 }
 
+async function saveLinks(next: CompanyLink[]) {
+  loading.value = true; error.value = ''; message.value = ''
+  try {
+    const result = await api<CompanyLinkResponse>('/api/poc/company-links', { method: 'POST', body: JSON.stringify({ items: next }) })
+    links.value = result.items || []; linksUpdatedAt.value = result.updatedAt || ''; message.value = '公司官网库已保存'
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存公司链接失败' }
+  finally { loading.value = false }
+}
+async function addLink() {
+  const company = newCompany.value.trim(), url = newUrl.value.trim()
+  if (!company || !/^https?:\/\//i.test(url)) { error.value = '请填写公司名称和以 http:// 或 https:// 开头的网址'; return }
+  const next = links.value.filter(item => item.company.trim().toLowerCase() !== company.toLowerCase())
+  await saveLinks([...next, { company, url }].sort((a,b)=>a.company.localeCompare(b.company,'zh-CN')))
+  newCompany.value = ''; newUrl.value = ''
+}
+async function removeLink(item: CompanyLink) {
+  if (confirm(`确认删除“${item.company}”的官网链接吗？`)) await saveLinks(links.value.filter(value => value !== item))
+}
 function exportData() {
   message.value = ''
   error.value = ''
@@ -159,10 +179,9 @@ function formatDate(value: string) {
         <label><span>搜索公司或链接</span><input v-model="linkQuery" placeholder="公司名称 / careers URL" /></label>
         <small>{{ formatDate(linksUpdatedAt) }}</small>
       </div>
+      <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
       <div v-if="filteredLinks.length" class="link-list">
-        <a v-for="item in filteredLinks" :key="`${item.company}:${item.url}`" :href="item.url" target="_blank" rel="noreferrer">
-          <strong>{{ item.company }}</strong><span>{{ item.url }}</span>
-        </a>
+        <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete" @click="removeLink(item)">删除</button></article>
       </div>
       <div v-else class="notice">当前账号没有可展示的公司链接。</div>
     </div>
@@ -210,8 +229,11 @@ function formatDate(value: string) {
 .toolbar label, .tool-box label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
 .toolbar label { min-width: min(420px, 100%); }
 .link-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.link-list a { display: grid; gap: 5px; min-width: 0; padding: 13px; border: 1px solid #e4e9f2; border-radius: 8px; color: inherit; background: #fbfcfe; text-decoration: none; }
-.link-list a:hover { border-color: #4461d8; background: #f4f6ff; }
+.link-editor { display: grid; grid-template-columns: 1fr 2fr auto; gap: 9px; }
+.link-list article { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 13px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
+.link-list a { display: grid; flex: 1; gap: 5px; min-width: 0; color: inherit; text-decoration: none; }
+.link-list article:hover { border-color: #4461d8; background: #f4f6ff; }
+.link-delete { padding: 7px 9px; color: #a52d2d; background: #fceaea; }
 .link-list span { overflow: hidden; color: #667085; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .notice { padding: 16px; border: 1px solid #dbe3f1; border-radius: 8px; background: #f7f9fc; color: #667085; }
 .data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -223,7 +245,7 @@ function formatDate(value: string) {
 .danger-button { color: #fff; background: #b43232; }
 
 @media (max-width: 900px) {
-  .data-grid, .link-list { grid-template-columns: 1fr; }
+  .data-grid, .link-list, .link-editor { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {

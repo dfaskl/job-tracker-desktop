@@ -47,6 +47,21 @@ class PocAuthControllerTest {
     }
 
     @Test
+    void registersIntoTheIsolatedDatabaseAndStartsASession() throws Exception {
+        LegacyReadService legacy = mock(LegacyReadService.class);
+        var accounts = mock(com.jobtracker.migrationpoc.database.AccountSandboxService.class);
+        LegacyUser user = new LegacyUser(12, "new@example.com", SALT, HASH, false);
+        when(accounts.enabled()).thenReturn(true);
+        when(accounts.register("new@example.com", "migration-poc-password", "invite")).thenReturn(user);
+        PocSessionManager sessions = new PocSessionManager(new MockEnvironment()
+            .withProperty("POC_SESSION_SECRET", "0123456789abcdef0123456789abcdef"));
+        PocAuthController controller = new PocAuthController(legacy, new LegacyPasswordVerifier(), sessions, null, accounts);
+        var response = controller.register(new PocAuthController.RegisterRequest(
+            "new@example.com", "migration-poc-password", "invite"), secureRequest());
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).contains("poc_session=");
+    }
+    @Test
     void rejectsCrossOriginLoginBeforeReadingCredentials() {
         LegacyReadService legacy = mock(LegacyReadService.class);
         PocSessionManager sessions = new PocSessionManager(new MockEnvironment()

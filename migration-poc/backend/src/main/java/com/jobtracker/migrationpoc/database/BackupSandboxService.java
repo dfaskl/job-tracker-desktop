@@ -4,6 +4,8 @@ import com.jobtracker.migrationpoc.backup.BackupDocumentValidator;
 import com.jobtracker.migrationpoc.backup.BackupDocumentValidator.BackupSummary;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -20,21 +22,78 @@ public class BackupSandboxService {
     private final Environment environment;
     private final ApplicationSandboxService applicationSandboxService;
     private final BackupDocumentValidator validator;
+    private final ObjectMapper objectMapper;
 
     public BackupSandboxService(
         Environment environment,
         ApplicationSandboxService applicationSandboxService,
-        BackupDocumentValidator validator
+        BackupDocumentValidator validator,
+        ObjectMapper objectMapper
     ) {
         this.environment = environment;
         this.applicationSandboxService = applicationSandboxService;
         this.validator = validator;
+        this.objectMapper = objectMapper;
     }
 
     public ApplicationSandboxService.SandboxStatus status() {
         return applicationSandboxService.status();
     }
 
+    public JsonNode businessData(String email) throws Exception {
+        try (Connection connection = openConnection()) {
+            UserDocument current = currentUserDocument(connection, email, false);
+            JsonNode data = objectMapper.readTree(current.json());
+            if (!data.isObject() || !data.path("applications").isArray() || !data.path("events").isArray()) {
+                throw new SandboxDataNotFoundException("测试业务数据结构不兼容");
+            }
+            if (data.has("settings") && data.path("settings").isObject()) {
+                ((tools.jackson.databind.node.ObjectNode) data.path("settings")).remove("apiKey");
+            }
+            return data;
+        }
+    }
+    public CompanyLinks companyLinks(String email) throws Exception {
+        try (Connection connection = openConnection(); PreparedStatement statement = connection.prepareStatement(
+            "SELECT COALESCE(c.items,'[]'::jsonb)::text,c.updated_at FROM users u LEFT JOIN company_links c ON c.user_id=u.id WHERE lower(u.email)=? AND u.disabled_at IS NULL"
+        )) {
+            statement.setString(1, normalizeEmail(email));
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                return new CompanyLinks(objectMapper.readTree(result.getString(1)),
+                    result.getObject(2) == null ? "" : instant(result, "updated_at"));
+            }
+        }
+    }
+
+    public CompanyLinks saveCompanyLinks(String email, JsonNode source) throws Exception {
+        if (source == null || !source.isArray() || source.size() > 500) throw new IllegalArgumentException("官网链接数据格式无效");
+        var clean = objectMapper.createArrayNode();
+        for (JsonNode item : source) {
+            String company = item.path("company").asText("").trim();
+            String url = item.path("url").asText("").trim();
+            if (company.isEmpty() || company.length() > 120 || url.length() > 2048 || !(url.startsWith("https://") || url.startsWith("http://"))) {
+                throw new IllegalArgumentException("公司名称或官网地址无效");
+            }
+            clean.addObject().put("company", company).put("url", url);
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                user.setString(1, normalizeEmail(email));
+                try (ResultSet result = user.executeQuery()) {
+                    if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                    long userId = result.getLong(1);
+                    try (PreparedStatement save = connection.prepareStatement(
+                        "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
+                    )) {
+                        save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(clean));
+                        try (ResultSet saved = save.executeQuery()) { saved.next(); String updatedAt = instant(saved, "updated_at"); connection.commit(); return new CompanyLinks(clean, updatedAt); }
+                    }
+                }
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+    }
     public BackupPage backups(String email) throws Exception {
         try (Connection connection = openConnection()) {
             UserDocument current = currentUserDocument(connection, email, false);
@@ -196,6 +255,7 @@ public class BackupSandboxService {
         int eventCount
     ) {}
 
+    public record CompanyLinks(JsonNode items, String updatedAt) {}
     public record BackupPage(List<BackupItem> items, String currentUpdatedAt) {}
     public record RestoreResult(long backupId, int applicationCount, int eventCount, String currentUpdatedAt) {}
     public record ImportResult(int applicationCount, int eventCount, String currentUpdatedAt) {}
