@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { api, ApiError } from './api'
+import { api, ApiError, clearApiCache } from './api'
 
 export type User = { id: string; email: string }
 export type JobApplication = Record<string, unknown> & {
@@ -47,20 +47,11 @@ async function refresh() {
 
 async function initialize() {
   if (initialized.value || loading.value) return
-  try {
-    const session = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/session')
-    user.value = session.user
-    readOnly.value = session.readOnly
-    await refresh()
-  } catch (cause) {
-    if (!(cause instanceof ApiError && cause.status === 401)) {
-      error.value = cause instanceof Error ? cause.message : '检查登录状态失败'
-    }
-    initialized.value = true
-  }
+  await refresh()
 }
 
 async function login(email: string, password: string) {
+  clearApiCache()
   error.value = ''
   const result = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password })
@@ -71,6 +62,7 @@ async function login(email: string, password: string) {
 }
 
 async function register(email: string, password: string, registrationCode: string) {
+  clearApiCache()
   error.value = ''
   const result = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/register', {
     method: 'POST', body: JSON.stringify({ email, password, registrationCode })
@@ -81,6 +73,7 @@ async function register(email: string, password: string, registrationCode: strin
 }
 async function logout() {
   await api('/api/poc/auth/logout', { method: 'POST' })
+  clearApiCache()
   user.value = null
   data.value = { applications: [], events: [] }
   error.value = ''

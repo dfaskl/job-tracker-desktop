@@ -32,6 +32,10 @@ public class PocSecurityHeadersFilter extends OncePerRequestFilter {
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("X-Frame-Options", "DENY");
         response.setHeader("Referrer-Policy", "no-referrer");
+        String path = request.getRequestURI();
+        response.setHeader("Cache-Control", path.startsWith("/assets/")
+            ? "public, max-age=31536000, immutable"
+            : "no-store");
         filterChain.doFilter(request, response);
     }
 }

@@ -58,7 +58,7 @@ public class AccountSandboxService {
         if(!enabled())throw new AccountDisabledException(sandbox.status().message());
         LegacyDatabaseUrl config=LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
         Properties p=new Properties();if(config.username()!=null)p.setProperty("user",config.username());if(config.password()!=null)p.setProperty("password",config.password());
-        p.setProperty("ApplicationName","job-tracker-migration-poc-accounts");return DriverManager.getConnection(config.jdbcUrl(),p);
+        p.setProperty("ApplicationName","job-tracker-migration-poc-accounts");return PooledConnections.open(config,p);
     }
     private String normalize(String value){return value==null?"":value.trim().toLowerCase(Locale.ROOT);}
     public static class AccountValidationException extends RuntimeException{public AccountValidationException(String m){super(m);}}

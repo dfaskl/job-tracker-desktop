@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { api, ApiError } from './api'
+import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 
 type AiStatus = { sandboxEnabled: boolean; callsEnabled: boolean; message: string }
@@ -31,7 +31,10 @@ const actionSummary = computed(() => hasResult.value
   ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${createSchedule.value && canCreateSchedule.value ? '，并创建关联日程' : ''}`
   : '')
 
-onMounted(async () => { await store.initialize(); await checkStatus() })
+onMounted(async () => {
+  await store.initialize()
+  await Promise.all([checkStatus(false), store.user.value && !store.readOnly.value ? loadConfig() : Promise.resolve()])
+})
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase() }
 function inputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function apiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
@@ -40,16 +43,16 @@ function failure(cause: unknown, fallback: string) {
   if (cause instanceof ApiError && cause.status === 401) return '请先登录旧账号'
   return cause instanceof Error ? cause.message : fallback
 }
-async function checkStatus() {
+async function checkStatus(loadDetails = true) {
   loading.value = true; error.value = ''
   try {
-    status.value = await api<AiStatus>('/api/poc/ai-sandbox/status')
-    if (status.value.sandboxEnabled && store.user.value) await loadConfig()
+    status.value = await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
+    if (loadDetails && status.value.sandboxEnabled && store.user.value) await loadConfig()
   } catch (cause) { error.value = failure(cause, '检查 AI 服务失败') }
   finally { loading.value = false }
 }
 async function loadConfig() {
-  config.value = await api<ConfigView>('/api/poc/ai-sandbox/config')
+  config.value = await apiCached<ConfigView>('/api/poc/ai-sandbox/config')
   Object.assign(configForm, { apiUrl: config.value.apiUrl, model: config.value.model, apiKey: '', clearApiKey: false })
 }
 async function saveConfig() {

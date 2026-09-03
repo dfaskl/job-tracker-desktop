@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.security;
 
 import com.jobtracker.migrationpoc.database.ApplicationSandboxService;
 import com.jobtracker.migrationpoc.database.LegacyDatabaseUrl;
+import com.jobtracker.migrationpoc.database.PooledConnections;
 import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Component;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Duration;
@@ -152,7 +152,7 @@ public class PocPersistentSessionStore {
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
         properties.setProperty("ApplicationName", "job-tracker-migration-poc-persistent-session");
-        return DriverManager.getConnection(config.jdbcUrl(), properties);
+        return PooledConnections.open(config, properties);
     }
 
     private void requireEnabled() {

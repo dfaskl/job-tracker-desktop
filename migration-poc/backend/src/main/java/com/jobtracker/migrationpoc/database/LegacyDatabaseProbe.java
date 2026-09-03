@@ -6,7 +6,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -52,7 +51,7 @@ public class LegacyDatabaseProbe {
             if (config.password() != null) properties.setProperty("password", config.password());
             properties.setProperty("ApplicationName", "job-tracker-migration-poc");
 
-            try (Connection connection = DriverManager.getConnection(config.jdbcUrl(), properties)) {
+            try (Connection connection = PooledConnections.open(config, properties)) {
                 connection.setReadOnly(true);
                 List<String> missingTables = findMissingTables(connection);
                 SampleResult sample = missingTables.contains("user_data")

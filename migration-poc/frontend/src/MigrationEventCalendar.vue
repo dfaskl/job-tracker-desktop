@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string }
@@ -45,6 +45,7 @@ const editing = ref<EventItem | null>(null)
 const loading = ref(false)
 const error = ref('')
 const message = ref('')
+const lastLoadedAt = ref(0)
 const form = reactive<EventForm>(emptyForm())
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
@@ -62,7 +63,8 @@ const cells = computed<CalendarCell[]>(() => {
   })
 })
 
-onMounted(checkSandbox)
+onMounted(async () => { sandbox.value = { enabled:true, configured:true, isolated:false, message:'可写数据源' }; await loadEvents() })
+onActivated(async () => { if (lastLoadedAt.value && Date.now() - lastLoadedAt.value > 30_000) await loadEvents() })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -110,6 +112,7 @@ async function loadEvents() {
   applications.value = result.body.applications as ApplicationOption[]
   total.value = Number(result.body.total || 0)
   if (!form.applicationId && applications.value.length) form.applicationId = applications.value[0].id
+  lastLoadedAt.value = Date.now()
 }
 
 function datesBetween(start: string, end: string) {

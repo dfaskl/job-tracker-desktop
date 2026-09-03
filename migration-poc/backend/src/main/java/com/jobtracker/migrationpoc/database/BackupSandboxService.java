@@ -8,7 +8,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.OffsetDateTime;
@@ -233,7 +232,7 @@ public class BackupSandboxService {
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
         properties.setProperty("ApplicationName", "job-tracker-migration-poc-backup-sandbox");
-        return DriverManager.getConnection(config.jdbcUrl(), properties);
+        return PooledConnections.open(config, properties);
     }
 
     private String instant(ResultSet result, String column) throws Exception {

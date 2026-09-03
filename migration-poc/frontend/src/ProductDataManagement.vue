@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { api, ApiError } from './api'
+import { api, apiCached, ApiError } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
 
 type CompanyLink = { company: string; url: string }
@@ -43,7 +43,7 @@ onMounted(() => {
 async function loadLinks() {
   error.value = ''
   try {
-    const result = await api<CompanyLinkResponse>('/api/poc/company-links')
+    const result = await apiCached<CompanyLinkResponse>('/api/poc/company-links')
     links.value = result.items || []
     linksUpdatedAt.value = result.updatedAt || ''
   } catch (cause) {
@@ -54,7 +54,7 @@ async function loadLinks() {
 
 async function loadSandbox() {
   try {
-    sandbox.value = await api<SandboxStatus>('/api/poc/backup-sandbox/status')
+    sandbox.value = await apiCached<SandboxStatus>('/api/poc/backup-sandbox/status')
   } catch (cause) {
     sandbox.value = { enabled: false, configured: false, isolated: false, message: cause instanceof Error ? cause.message : '无法检查业务数据库' }
   }

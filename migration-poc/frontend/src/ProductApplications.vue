@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { api } from './api'
+import { api, apiCached } from './api'
 import { useJobTrackerStore, type JobApplication } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
@@ -32,7 +32,7 @@ const filtered = computed(() => {
 })
 const selectedEvents = computed(() => selected.value ? store.events.value.filter(event=>event.applicationId===selected.value?.id) : [])
 const selectedTimeline = computed(() => Array.isArray(selected.value?.timeline) ? selected.value.timeline as Record<string,unknown>[] : [])
-onMounted(async()=>{try{const result=await api<{items:{company:string;url:string}[]}>('/api/poc/company-links');companyLinks.value=result.items||[]}catch{/* 登录前使用搜索兜底 */}})
+onMounted(async()=>{try{const result=await apiCached<{items:{company:string;url:string}[]}>('/api/poc/company-links');companyLinks.value=result.items||[]}catch{/* 登录前使用搜索兜底 */}})
 function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||'')))return '已结束';return ['测评','笔试','面试','Offer'].includes(String(item.stage||''))?String(item.stage):'仅投递'}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}

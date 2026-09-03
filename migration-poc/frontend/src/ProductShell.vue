@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductAnalytics from './ProductAnalytics.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
 import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MigrationAiMail from './MigrationAiMail.vue'
-import MigrationSessionStatus from './MigrationSessionStatus.vue'
-import ProductDataManagement from './ProductDataManagement.vue'
-import MigrationBackups from './MigrationBackups.vue'
 import MigrationAdmin from './MigrationAdmin.vue'
-import MigrationDiagnostics from './MigrationDiagnostics.vue'
+import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import AccountAccess from './AccountAccess.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
@@ -24,6 +21,16 @@ const pages: { id: Page; label: string; icon: string; subtitle: string }[] = [
   { id: 'settings', label: '设置', icon: '⚙', subtitle: '管理会话、备份和运行配置' },
   { id: 'admin', label: '管理员', icon: '◇', subtitle: '管理账号、权限与注册策略' }
 ]
+
+const pageComponents: Record<Page, Component> = {
+  home: ProductHome,
+  applications: ProductApplicationWorkspace,
+  calendar: ProductCalendarWorkspace,
+  mail: MigrationAiMail,
+  stats: ProductAnalytics,
+  settings: ProductSettingsWorkspace,
+  admin: MigrationAdmin
+}
 
 const activePage = ref<Page>('home')
 const store = useJobTrackerStore()
@@ -76,18 +83,9 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
 
       <div class="page-content">
         <AccountAccess v-if="!store.user.value" />
-        <ProductHome v-if="activePage === 'home'" @navigate="navigate" />
-        <ProductApplicationWorkspace v-else-if="activePage === 'applications'" />
-        <ProductCalendarWorkspace v-else-if="activePage === 'calendar'" />
-        <MigrationAiMail v-else-if="activePage === 'mail'" />
-        <ProductAnalytics v-else-if="activePage === 'stats'" />
-        <template v-else-if="activePage === 'settings'">
-          <MigrationSessionStatus />
-          <ProductDataManagement />
-          <MigrationBackups />
-          <MigrationDiagnostics />
-        </template>
-        <MigrationAdmin v-else-if="activePage === 'admin'" />
+        <KeepAlive :max="7">
+          <component :is="pageComponents[activePage]" :key="`${activePage}-${cacheEpoch}`" @navigate="navigate" />
+        </KeepAlive>
       </div>
     </main>
   </div>
