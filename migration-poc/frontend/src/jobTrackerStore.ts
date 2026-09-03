@@ -20,6 +20,7 @@ const initialized = ref(false)
 const loading = ref(false)
 const error = ref('')
 const readOnly = ref(true)
+const newApplicationRequest = ref(0)
 
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
@@ -71,6 +72,8 @@ async function register(email: string, password: string, registrationCode: strin
   readOnly.value = result.readOnly
   await refresh()
 }
+function requestNewApplication() { newApplicationRequest.value += 1 }
+
 async function logout() {
   await api('/api/poc/auth/logout', { method: 'POST' })
   clearApiCache()
@@ -80,5 +83,5 @@ async function logout() {
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, initialize, refresh, login, register, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
 }

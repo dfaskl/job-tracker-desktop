@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductAnalytics from './ProductAnalytics.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
@@ -45,6 +45,13 @@ function syncHash() {
   activePage.value = pageFromHash()
 }
 
+async function createApplication() {
+  if (activePage.value !== 'applications') {
+    navigate('applications')
+    await nextTick()
+  }
+  store.requestNewApplication()
+}
 function navigate(page: Page) {
   if (activePage.value === page) return
   window.location.hash = page
@@ -78,7 +85,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       <header class="topbar">
         <div><h1>{{ current.label }}</h1><p>{{ current.subtitle }}</p></div>
         <div v-if="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
-        <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="navigate('applications')">＋ 新建投递</button>
+        <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
       <div class="page-content">
