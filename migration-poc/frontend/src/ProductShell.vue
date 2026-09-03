@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductStats from './ProductStats.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
-import MigrationEventCalendar from './MigrationEventCalendar.vue'
+import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MigrationAiMail from './MigrationAiMail.vue'
 import MigrationSessionStatus from './MigrationSessionStatus.vue'
 import MigrationBackups from './MigrationBackups.vue'
@@ -76,7 +76,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <AccountAccess />
         <ProductHome v-if="activePage === 'home'" @navigate="navigate" />
         <ProductApplicationWorkspace v-else-if="activePage === 'applications'" />
-        <MigrationEventCalendar v-else-if="activePage === 'calendar'" />
+        <ProductCalendarWorkspace v-else-if="activePage === 'calendar'" />
         <MigrationAiMail v-else-if="activePage === 'mail'" />
         <ProductStats v-else-if="activePage === 'stats'" />
         <template v-else-if="activePage === 'settings'">
