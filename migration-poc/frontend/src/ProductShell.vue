@@ -22,7 +22,7 @@ const pages: { id: Page; label: string; icon: string; subtitle: string }[] = [
   { id: 'mail', label: '邮件识别', icon: '✦', subtitle: '从通知邮件中提取关键信息' },
   { id: 'stats', label: '统计', icon: '◫', subtitle: '查看投递阶段与渠道分布' },
   { id: 'settings', label: '设置', icon: '⚙', subtitle: '管理会话、备份和运行配置' },
-  { id: 'admin', label: '管理员', icon: '◇', subtitle: '管理测试环境中的账号与权限' }
+  { id: 'admin', label: '管理员', icon: '◇', subtitle: '管理账号、权限与注册策略' }
 ]
 
 const activePage = ref<Page>('home')
@@ -64,7 +64,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
           <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
         </button>
       </nav>
-      <div class="sidebar-note">新旧服务并行运行<br>当前生产数据保持只读</div>
+      <div class="sidebar-note">新旧服务并行运行<br>{{ store.readOnly.value ? '当前为只读模式' : '当前数据可读写' }}</div>
     </aside>
 
     <main class="product-main">

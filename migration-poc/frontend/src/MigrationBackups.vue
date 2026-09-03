@@ -33,11 +33,11 @@ async function checkSandbox() {
   error.value = ''
   try {
     const statusResult = await requestJson('/api/poc/backup-sandbox/status')
-    if (!statusResult.response.ok) throw new Error(statusResult.body.message || '无法检查备份沙箱')
+    if (!statusResult.response.ok) throw new Error(statusResult.body.message || '无法检查备份数据安全')
     sandbox.value = statusResult.body as SandboxStatus
     if (sandbox.value.enabled) await loadBackups()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '检查备份沙箱失败'
+    error.value = cause instanceof Error ? cause.message : '检查备份数据安全失败'
   } finally {
     loading.value = false
   }
@@ -46,7 +46,7 @@ async function checkSandbox() {
 async function loadBackups() {
   const result = await requestJson('/api/poc/backup-sandbox/backups')
   if (!result.response.ok) throw new Error(
-    result.response.status === 401 ? '请先在上方登录旧账号，再重新检查备份沙箱' : (result.body.message || '读取备份失败')
+    result.response.status === 401 ? '请先在上方登录旧账号，再重新检查备份数据安全' : (result.body.message || '读取备份失败')
   )
   backups.value = result.body.items as BackupItem[]
   currentUpdatedAt.value = String(result.body.currentUpdatedAt || '')
@@ -72,7 +72,7 @@ async function restore() {
       body: JSON.stringify({ expectedCurrentUpdatedAt: currentUpdatedAt.value, confirmation: confirmation.value })
     })
     if (!result.response.ok) throw new Error(result.body.message || '恢复失败')
-    message.value = `已在测试库恢复备份 #${selected.value.id}：${result.body.applicationCount} 条投递、${result.body.eventCount} 项日程`
+    message.value = `已在业务数据库恢复备份 #${selected.value.id}：${result.body.applicationCount} 条投递、${result.body.eventCount} 项日程`
     selected.value = null
     confirmation.value = ''
     await loadBackups()
@@ -97,13 +97,13 @@ function formatSize(value: number) {
 <template>
   <section class="card backup-card">
     <div class="section-head">
-      <div><span class="section-kicker">第 4 阶段</span><h2>备份列表与恢复沙箱</h2></div>
-      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '独立测试库' : '安全关闭' }}</span>
+      <div><span class="section-kicker">第 4 阶段</span><h2>备份列表与恢复数据安全</h2></div>
+      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '独立业务数据库' : '安全关闭' }}</span>
     </div>
     <p>查看测试账号最近 30 份业务备份；恢复前再次备份当前数据，并检查页面读取的数据版本是否仍然最新。</p>
 
     <div v-if="sandbox && !sandbox.enabled" class="notice">
-      <strong>{{ sandbox.message }}</strong><span>备份恢复只使用独立测试数据库，不读取或覆盖生产备份。</span>
+      <strong>{{ sandbox.message }}</strong><span>备份恢复只使用业务数据库，不读取或覆盖生产备份。</span>
     </div>
 
     <template v-else-if="sandbox?.enabled">
@@ -114,18 +114,18 @@ function formatSize(value: number) {
           <div><span>{{ item.applicationCount }} 条投递</span><span>{{ item.eventCount }} 项日程</span><span>{{ formatSize(item.size) }}</span></div>
         </button>
       </div>
-      <div v-else class="notice">测试库中还没有备份；执行职位或日程变更后会自动产生。</div>
+      <div v-else class="notice">业务数据库中还没有备份；执行职位或日程变更后会自动产生。</div>
 
       <div v-if="selected" class="restore-panel">
         <strong>准备恢复备份 #{{ selected.id }}</strong>
-        <p>这会替换测试库中的当前业务数据。系统会先创建一份 <code>before-restore</code> 备份，因此可以再次恢复。</p>
+        <p>这会替换当前数据库中的当前业务数据。系统会先创建一份 <code>before-restore</code> 备份，因此可以再次恢复。</p>
         <label><span>输入“恢复”确认</span><input v-model="confirmation" autocomplete="off" placeholder="恢复" /></label>
-        <div><button class="danger-button" :disabled="loading || confirmation !== '恢复'" @click="restore">{{ loading ? '恢复中…' : '恢复到测试库' }}</button><button class="secondary" @click="selected = null">取消</button></div>
+        <div><button class="danger-button" :disabled="loading || confirmation !== '恢复'" @click="restore">{{ loading ? '恢复中…' : '恢复到业务数据库' }}</button><button class="secondary" @click="selected = null">取消</button></div>
       </div>
       <p v-if="message" class="success">{{ message }}</p>
     </template>
 
-    <p v-else>正在检查备份沙箱…</p>
+    <p v-else>正在检查备份数据安全…</p>
     <p v-if="error" class="danger">{{ error }}</p>
   </section>
 </template>

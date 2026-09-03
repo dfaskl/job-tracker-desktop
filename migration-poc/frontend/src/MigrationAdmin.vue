@@ -78,7 +78,7 @@ async function checkStatus() {
     status.value = await requestJson('/api/poc/admin-sandbox/status') as AdminStatus
     if (status.value.enabled) await loadOverview()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '管理员沙箱检查失败'
+    error.value = cause instanceof Error ? cause.message : '管理员数据安全检查失败'
   } finally {
     loading.value = false
   }
@@ -114,7 +114,7 @@ async function toggleRegistration() {
       body: JSON.stringify({ enabled })
     })
     await loadOverview()
-    message.value = enabled ? '独立测试库已开放注册' : '独立测试库已关闭注册'
+    message.value = enabled ? '独立业务数据库已开放注册' : '独立业务数据库已关闭注册'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '修改注册状态失败'
   } finally {
@@ -149,7 +149,7 @@ async function setDisabled(user: User) {
       body: JSON.stringify({ disabled: !user.disabled })
     })
     await loadOverview()
-    message.value = user.disabled ? '测试账号已重新启用' : '测试账号已停用，测试库会话已撤销'
+    message.value = user.disabled ? '测试账号已重新启用' : '测试账号已停用，业务数据库会话已撤销'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '修改账号状态失败'
   } finally {
@@ -158,7 +158,7 @@ async function setDisabled(user: User) {
 }
 
 async function deleteUser(user: User) {
-  const confirmEmail = window.prompt(`此操作只针对独立测试数据库。请输入 ${user.email} 确认永久删除：`, '')
+  const confirmEmail = window.prompt(`此操作只针对业务数据库。请输入 ${user.email} 确认永久删除：`, '')
   if (confirmEmail === null) return
   busyUser.value = user.id
   error.value = ''
@@ -171,7 +171,7 @@ async function deleteUser(user: User) {
     })
     delete details.value[user.id]
     await loadOverview()
-    message.value = '测试用户及其测试库数据已删除'
+    message.value = '测试用户及其业务数据库数据已删除'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '删除测试用户失败'
   } finally {
@@ -189,10 +189,10 @@ function formatDate(value: string) {
 <template>
   <section class="card admin-card">
     <div class="section-head">
-      <div><span class="section-kicker">第 6 阶段</span><h2>管理员后台迁移沙箱</h2></div>
+      <div><span class="section-kicker">第 6 阶段</span><h2>管理员后台迁移数据安全</h2></div>
       <span :class="['mode-badge', status?.enabled ? 'enabled' : 'disabled']">{{ status?.enabled ? '测试后台已开启' : '默认关闭' }}</span>
     </div>
-    <p>管理员操作只能作用于独立测试数据库；页面不会显示密码、API Key 明文或其他秘密信息。</p>
+    <p>管理员操作只能作用于业务数据库；页面不会显示密码、API Key 明文或其他秘密信息。</p>
 
     <div v-if="status && !status.enabled" class="notice">
       <strong>{{ status.message }}</strong>
@@ -213,7 +213,7 @@ function formatDate(value: string) {
       </div>
 
       <div class="registration-row">
-        <div><strong>测试库注册入口</strong><span>{{ overview.summary.registrationOpen ? '当前开放' : '当前关闭' }}</span></div>
+        <div><strong>业务数据库注册入口</strong><span>{{ overview.summary.registrationOpen ? '当前开放' : '当前关闭' }}</span></div>
         <button :disabled="loading" @click="toggleRegistration">{{ overview.summary.registrationOpen ? '关闭注册' : '开放注册' }}</button>
       </div>
 

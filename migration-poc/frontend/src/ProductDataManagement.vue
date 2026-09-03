@@ -56,7 +56,7 @@ async function loadSandbox() {
   try {
     sandbox.value = await api<SandboxStatus>('/api/poc/backup-sandbox/status')
   } catch (cause) {
-    sandbox.value = { enabled: false, configured: false, isolated: false, message: cause instanceof Error ? cause.message : '无法检查测试库' }
+    sandbox.value = { enabled: false, configured: false, isolated: false, message: cause instanceof Error ? cause.message : '无法检查业务数据库' }
   }
 }
 
@@ -124,7 +124,7 @@ async function importIntoSandbox() {
       method: 'POST',
       body: JSON.stringify({ data: importData.value, confirmation: importConfirmation.value })
     })
-    message.value = `已导入测试库：${result.applicationCount} 条投递、${result.eventCount} 项日程`
+    message.value = `已导入业务数据：${result.applicationCount} 条投递、${result.eventCount} 项日程`
     importConfirmation.value = ''
     await store.refresh()
   } catch (cause) {
@@ -144,7 +144,7 @@ async function clearSandbox() {
       method: 'POST',
       body: JSON.stringify({ confirmation: clearConfirmation.value })
     })
-    message.value = '已清空测试库业务数据'
+    message.value = '已清空业务数据'
     clearConfirmation.value = ''
     await store.refresh()
   } catch (cause) {
@@ -194,19 +194,19 @@ function formatDate(value: string) {
       </div>
 
       <div class="tool-box">
-        <h3>导入到测试库</h3>
-        <p>{{ sandbox?.enabled ? '导入前会自动备份测试库当前数据。' : (sandbox?.message || '正在检查测试库状态') }}</p>
+        <h3>导入业务数据</h3>
+        <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在检查业务数据库状态') }}</p>
         <input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" />
         <label><span>输入“导入”确认</span><input v-model="importConfirmation" :disabled="!sandbox?.enabled || !importData" placeholder="导入" /></label>
-        <button type="button" :disabled="loading || !sandbox?.enabled || !importData || importConfirmation !== '导入'" @click="importIntoSandbox">导入测试库</button>
+        <button type="button" :disabled="loading || !sandbox?.enabled || !importData || importConfirmation !== '导入'" @click="importIntoSandbox">确认导入</button>
         <small v-if="importFileName">{{ importFileName }}</small>
       </div>
 
       <div class="tool-box danger-zone">
-        <h3>清空测试库业务数据</h3>
-        <p>{{ sandbox?.enabled ? '清空前会自动备份测试库当前数据。' : '测试库写入未开启，清空不可用。' }}</p>
+        <h3>清空业务数据</h3>
+        <p>{{ sandbox?.enabled ? '清空前会自动备份当前数据。' : '当前数据源写入未开启，清空不可用。' }}</p>
         <label><span>输入“清空”确认</span><input v-model="clearConfirmation" :disabled="!sandbox?.enabled" placeholder="清空" /></label>
-        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled || clearConfirmation !== '清空'" @click="clearSandbox">清空测试库</button>
+        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled || clearConfirmation !== '清空'" @click="clearSandbox">清空业务数据库</button>
       </div>
     </div>
 

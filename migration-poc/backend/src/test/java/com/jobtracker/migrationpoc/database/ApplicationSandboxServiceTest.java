@@ -45,6 +45,20 @@ class ApplicationSandboxServiceTest {
         assertThat(status.isolated()).isTrue();
     }
 
+    @Test
+    void enablesSharedProductionDatabaseOnlyWithSecondExplicitOptIn() {
+        var status = service(new MockEnvironment()
+            .withProperty("POC_WRITE_ENABLED", "true")
+            .withProperty("POC_SHARED_DATABASE_WRITE_ENABLED", "true")
+            .withProperty("DATABASE_URL", "postgres://user:pass@prod.example.com/main?sslmode=require")
+            .withProperty("POC_WRITE_DATABASE_URL", "postgres://other:pass@prod.example.com/main")
+        ).status();
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.configured()).isTrue();
+        assertThat(status.isolated()).isFalse();
+        assertThat(status.message()).contains("共享生产数据库");
+    }
     private ApplicationSandboxService service(MockEnvironment environment) {
         ObjectMapper mapper = new ObjectMapper();
         return new ApplicationSandboxService(environment, mapper, new ApplicationDocumentMutator(mapper));

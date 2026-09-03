@@ -19,16 +19,25 @@ const recent = computed(() => [...store.applications.value].sort((a, b) =>
 ).slice(0, 5))
 const interviews = computed(() => store.applications.value.filter(item => item.stage === '面试').length)
 const offers = computed(() => store.applications.value.filter(item => item.stage === 'Offer' || item.status === '已通过').length)
-const upcoming = computed(() => store.events.value.filter(item => !item.completed && eventTime(item) >= nowText()).length)
+const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
+  .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
+const upcoming = computed(() => upcomingItems.value.filter(item => eventDeadline(item) >= nowText()).length)
+const overdue = computed(() => upcomingItems.value.filter(item => {
+  const deadline = new Date(eventDeadline(item).replace(' ', 'T')).getTime()
+  return Number.isFinite(deadline) && deadline < Date.now() - 2 * 60 * 60 * 1000
+}))
+const nearby = computed(() => upcomingItems.value.slice(0, 4))
 
 onMounted(async () => {
   await store.initialize()
   const cached = loadCachedQuote()
   if (store.user.value && !cached) await generateQuote(false)
 })
-function today() { return new Date().toISOString().slice(0, 10) }
-function nowText() { return new Date().toISOString().slice(0, 16).replace('T', ' ') }
+function localText(date = new Date()) { const pad=(v:number)=>String(v).padStart(2,'0'); return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+' '+pad(date.getHours())+':'+pad(date.getMinutes()) }
+function today() { return localText().slice(0, 10) }
+function nowText() { return localText() }
 function eventTime(item: Record<string, unknown>) { return String(item.startsAt || item.start || item.date || '') }
+function eventDeadline(item: Record<string, unknown>) { return String(item.endsAt || item.end || eventTime(item)) }
 function fallbackQuote(): Quote {
   const items = [
     '今天多走一步，明天就多一个选择。',
@@ -90,6 +99,10 @@ async function generateQuote(force: boolean) {
     <article><span>待办日程</span><strong>{{ upcoming }}</strong></article>
   </div>
 
+  <section v-if="store.user.value && overdue.length" class="overdue-alert">
+    <div><b>!</b><span><small>日程超时提醒</small><strong>{{ overdue.length }} 项日程已到期超过 2 小时</strong><em>最近一项：{{ overdue[0].company || '未填写公司' }} · {{ overdue[0].title || overdue[0].type || '未命名日程' }}</em></span></div>
+    <button type="button" @click="emit('navigate', 'calendar')">立即处理 →</button>
+  </section>
   <section v-if="store.user.value" class="card recent-card">
     <div class="section-head"><h2>最近投递</h2><button type="button" class="link-button" @click="emit('navigate', 'applications')">查看全部</button></div>
     <div v-if="recent.length" class="recent-list">
@@ -107,6 +120,11 @@ async function generateQuote(force: boolean) {
     <button type="button" @click="emit('navigate', 'applications')">前往登录</button>
   </section>
 
+  <section v-if="store.user.value" class="card recent-card">
+    <div class="section-head"><h2>近期日程</h2><button type="button" class="link-button" @click="emit('navigate', 'calendar')">查看全部</button></div>
+    <div v-if="nearby.length" class="recent-list"><article v-for="item in nearby" :key="item.id"><div><strong>{{ item.company || '未填写公司' }} · {{ item.title || item.type || '未命名日程' }}</strong><span>{{ eventTime(item) || '时间未填写' }}</span></div><div><b>{{ item.missed ? '已错过' : (item.completed ? '已完成' : '待处理') }}</b><small>{{ item.location || '' }}</small></div></article></div>
+    <p v-else>暂无待完成日程。</p>
+  </section>
   <div class="quick-grid">
     <button type="button" @click="emit('navigate', 'calendar')"><span>日程</span><strong>查看待办与历史安排 →</strong></button>
     <button type="button" @click="emit('navigate', 'mail')"><span>邮件识别</span><strong>提取面试与 Offer 信息 →</strong></button>
@@ -116,6 +134,7 @@ async function generateQuote(force: boolean) {
 </template>
 
 <style scoped>
+.overdue-alert{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:18px;padding:17px 20px;border:1px solid #f1c4a8;border-radius:15px;background:#fff6ed}.overdue-alert>div{display:flex;align-items:center;gap:13px}.overdue-alert b{display:grid;width:34px;height:34px;place-items:center;border-radius:50%;color:#fff;background:#dc6b2f}.overdue-alert span{display:grid;gap:3px}.overdue-alert small{color:#a94719;font-weight:800}.overdue-alert em{color:#775242;font-size:12px;font-style:normal}.overdue-alert button{flex:none;background:#c85726}
 .welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin-top: 28px; padding: 34px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, #293e83, #566fd4); box-shadow: 0 18px 55px rgba(41,62,131,.2); }
 .welcome span { font-size: 11px; font-weight: 800; letter-spacing: .14em; opacity: .72; }
 .welcome h2 { max-width: 650px; margin: 11px 0 10px; font-size: clamp(26px,4vw,40px); line-height: 1.2; }

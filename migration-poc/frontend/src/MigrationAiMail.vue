@@ -35,7 +35,7 @@ onMounted(async () => { await store.initialize(); await checkStatus() })
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase() }
 function inputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function apiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
-function today() { return new Date().toISOString().slice(0, 10) }
+function today() { const d=new Date(),pad=(v:number)=>String(v).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()) }
 function failure(cause: unknown, fallback: string) {
   if (cause instanceof ApiError && cause.status === 401) return '请先登录旧账号'
   return cause instanceof Error ? cause.message : fallback
@@ -116,7 +116,7 @@ async function saveResult() {
     </div>
 
     <div v-if="showConfig" class="card config-panel">
-      <div class="panel-title"><div><h3>大模型 API</h3><p>密钥仅加密保存在独立测试数据库中。</p></div><button class="text-button" @click="showConfig = false">收起</button></div>
+      <div class="panel-title"><div><h3>大模型 API</h3><p>密钥仅加密保存在当前业务数据库中。</p></div><button class="text-button" @click="showConfig = false">收起</button></div>
       <form v-if="status?.sandboxEnabled && store.user.value" class="config-form" @submit.prevent="saveConfig">
         <label class="wide"><span>API 地址</span><input v-model="configForm.apiUrl" type="url" maxlength="2048" required /></label>
         <label><span>模型名称</span><input v-model="configForm.model" maxlength="200" required /></label>

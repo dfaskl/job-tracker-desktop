@@ -39,11 +39,11 @@ async function load() {
     <dl v-if="status">
       <div><dt>当前模式</dt><dd :class="status.persistent ? 'success' : ''">{{ status.persistent ? 'Java + PostgreSQL' : '原型签名 Cookie' }}</dd></div>
       <div><dt>会话有效期</dt><dd>{{ status.persistent ? `${status.sessionDays} 天` : '4 小时' }}</dd></div>
-      <div><dt>测试数据库隔离</dt><dd>{{ status.databaseIsolated ? '已确认' : '尚未启用' }}</dd></div>
+      <div><dt>业务数据库隔离</dt><dd>{{ status.databaseIsolated ? '已确认' : '尚未启用' }}</dd></div>
     </dl>
     <div v-if="status && !status.persistent" class="notice">
       <strong>{{ status.message }}</strong>
-      <span>准备好独立测试库后，设置 <code>POC_PERSISTENT_SESSION_ENABLED=true</code>；不会写入生产 sessions 表。</span>
+      <span>准备好独立业务数据库后，设置 <code>POC_PERSISTENT_SESSION_ENABLED=true</code>；不会写入生产 sessions 表。</span>
     </div>
     <p v-if="error" class="danger">{{ error }}</p>
   </section>

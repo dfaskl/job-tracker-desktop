@@ -51,3 +51,18 @@
 写入沙箱会拒绝与 `DATABASE_URL` 指向同一数据库的地址。公开 Render 配置不包含这些变量。
 
 不要把生产数据库连接串、加密主密钥或访问令牌写入仓库。
+
+## 新旧系统并行正式使用
+
+新系统支持独立数据库和与旧系统共享生产数据库两种写入模式。共享模式必须同时满足以下条件：
+
+- `DATABASE_URL`：旧系统正在使用的 PostgreSQL 地址。
+- `POC_WRITE_DATABASE_URL`：填写与 `DATABASE_URL` 相同的地址。
+- `POC_WRITE_ENABLED=true`：开启业务写入。
+- `POC_SHARED_DATABASE_WRITE_ENABLED=true`：第二重确认，允许共享生产数据。
+- `POC_PERSISTENT_SESSION_ENABLED=true`：使用数据库会话。
+- `POC_ENCRYPTION_KEY`：与旧系统 `ENCRYPTION_KEY` 相同，以兼容已有 AI 密钥。
+- `POC_AI_CALLS_ENABLED=true`：按需开启 AI 邮件识别与字段规范化。
+- `POC_ADMIN_ENABLED=true`：按需开启管理员功能。
+
+开启后，新旧系统读取同一组用户、投递、日程、公司链接、AI 配置和备份。每次业务写入前都会生成备份；同一账号不要在两个页面中同时编辑同一条记录，遇到版本冲突时刷新后重试。

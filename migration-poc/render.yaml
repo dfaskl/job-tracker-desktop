@@ -14,3 +14,19 @@ services:
         generateValue: true
       - key: POC_SESSION_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: POC_WRITE_DATABASE_URL
+        sync: false
+      - key: POC_WRITE_ENABLED
+        value: "false"
+      - key: POC_SHARED_DATABASE_WRITE_ENABLED
+        value: "false"
+      - key: POC_PERSISTENT_SESSION_ENABLED
+        value: "false"
+      - key: POC_ENCRYPTION_KEY
+        sync: false
+      - key: POC_AI_CALLS_ENABLED
+        value: "false"
+      - key: POC_ADMIN_ENABLED
+        value: "false"

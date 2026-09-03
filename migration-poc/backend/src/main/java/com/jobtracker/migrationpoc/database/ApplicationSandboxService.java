@@ -39,6 +39,9 @@ public class ApplicationSandboxService {
 
     public SandboxStatus status() {
         boolean requested = Boolean.parseBoolean(environment.getProperty("POC_WRITE_ENABLED", "false"));
+        boolean sharedWriteRequested = Boolean.parseBoolean(
+            environment.getProperty("POC_SHARED_DATABASE_WRITE_ENABLED", "false")
+        );
         String writeUrl = environment.getProperty("POC_WRITE_DATABASE_URL");
         String productionUrl = environment.getProperty("DATABASE_URL");
         if (!requested) {
@@ -53,9 +56,12 @@ public class ApplicationSandboxService {
         }
         try {
             boolean isolated = !databaseIdentity(writeUrl).equals(databaseIdentity(productionUrl));
-            return isolated
-                ? new SandboxStatus(true, true, true, "独立测试数据库写入已开启")
-                : new SandboxStatus(false, true, false, "测试库与生产库地址相同，写入已拒绝");
+            if (isolated) return new SandboxStatus(true, true, true, "独立数据库写入已开启");
+            if (sharedWriteRequested) {
+                return new SandboxStatus(true, true, false, "共享生产数据库写入已开启；新旧系统数据实时一致");
+            }
+            return new SandboxStatus(false, true, false,
+                "写入库与生产库相同；如需新旧系统共享数据，请显式开启共享写入");
         } catch (IllegalArgumentException exception) {
             return new SandboxStatus(false, true, false, "数据库地址格式无效，写入已拒绝");
         }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from './api'
 import { useJobTrackerStore, type JobApplication } from './jobTrackerStore'
 
@@ -16,6 +16,8 @@ const aiChanges = ref<string[]>([])
 const aiWarnings = ref<string[]>([])
 const undo = ref<{ backupId: number; expected: string } | null>(null)
 const stages = ['已投递','测评','笔试','面试','Offer','已结束']
+const stageCategories = ['仅投递','测评','笔试','面试','Offer','已结束']
+const companyLinks = ref<{company:string;url:string}[]>([])
 const statuses = ['等待结果','已通过','未通过','已放弃','已结束']
 const channels = ['官网','Boss直聘','实习僧','牛客','猎聘','智联招聘','前程无忧','校园招聘平台','内推','其他']
 const eventTypes = ['测评','笔试','面试','Offer','其他']
@@ -24,13 +26,23 @@ const eventForm = reactive({ type:'面试', title:'', startsAt:'', endsAt:'', lo
 
 const filtered = computed(() => {
   const keyword=query.value.trim().toLowerCase()
-  return store.applications.value.filter(item => (stageFilter.value==='全部'||item.stage===stageFilter.value)
+  return store.applications.value.filter(item => (stageFilter.value==='全部'||stageCategory(item)===stageFilter.value)
     && (!keyword || Object.values(item).join(' ').toLowerCase().includes(keyword)))
-    .sort((a,b)=>String(b.updatedAt||b.appliedDate||'').localeCompare(String(a.updatedAt||a.appliedDate||'')))
+    .sort(compareApplications)
 })
 const selectedEvents = computed(() => selected.value ? store.events.value.filter(event=>event.applicationId===selected.value?.id) : [])
 const selectedTimeline = computed(() => Array.isArray(selected.value?.timeline) ? selected.value.timeline as Record<string,unknown>[] : [])
-function today(){return new Date().toISOString().slice(0,10)}
+onMounted(async()=>{try{const result=await api<{items:{company:string;url:string}[]}>('/api/poc/company-links');companyLinks.value=result.items||[]}catch{/* 登录前使用搜索兜底 */}})
+function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||'')))return '已结束';return ['测评','笔试','面试','Offer'].includes(String(item.stage||''))?String(item.stage):'仅投递'}
+function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
+function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}
+function health(item:JobApplication){if(['Offer','已结束'].includes(String(item.stage))||['已通过','未通过','已放弃','已结束'].includes(String(item.status)))return null;const related=store.events.value.filter(e=>e.applicationId===item.id&&isInterview(e));if(related.some(e=>!e.completed&&!e.missed&&new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return null;const times=related.filter(e=>e.completed&&!e.missed).map(e=>new Date(String(e.completedAt||eventDeadline(e)).replace(' ','T')).getTime()).filter(Number.isFinite);if(!times.length)return null;const days=Math.max(0,Math.floor((Date.now()-Math.max(...times))/86400000));return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}}
+function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
+function compareApplications(a:JobApplication,b:JobApplication){const rank=(x:JobApplication)=>({pending:0,interview:1,assessment:2,applied:3,offer:4,stopped:5}[cardTone(x)]??3);return rank(a)-rank(b)||String(b.updatedAt||b.appliedDate||'').localeCompare(String(a.updatedAt||a.appliedDate||''))}
+function flow(item:JobApplication){const nodes=[{label:'已投递',at:String(item.appliedDate||'')}];store.events.value.filter(e=>e.applicationId===item.id).sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b))).forEach(e=>nodes.push({label:String(e.title||e.type||'日程'),at:eventDeadline(e)}));const terminal=item.stage==='Offer'||stageCategory(item)==='已结束'?String(item.stage==='Offer'?'Offer':item.status||item.stage):'';if(terminal&&nodes[nodes.length-1]?.label!==terminal)nodes.push({label:terminal,at:'当前状态'});return nodes}
+function officialUrl(item:JobApplication){const company=String(item.company||'').trim().toLowerCase();const direct=companyLinks.value.find(link=>link.company.trim().toLowerCase()===company)?.url;return direct||'https://www.bing.com/search?q='+encodeURIComponent(String(item.company||'')+' 校园招聘 官网')}
+function localParts(date=new Date()){const pad=(v:number)=>String(v).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes())}
+function today(){return localParts().slice(0,10)}
 function emptyApplication(){return {company:'',position:'',city:'',channel:'官网',appliedDate:today(),stage:'已投递',status:'等待结果',notes:''}}
 function text(value:unknown,fallback='未填写'){return String(value||fallback)}
 function openCreate(){selected.value=null;Object.assign(form,emptyApplication());editing.value=true;message.value='';error.value='';aiChanges.value=[];aiWarnings.value=[]}
@@ -47,6 +59,7 @@ async function normalizeApplication(){
   }catch(cause){error.value=cause instanceof Error?cause.message:'AI 规范失败'}finally{busy.value=false}
 }
 async function saveApplication(){
+  if(!selected.value){const duplicate=store.applications.value.find(item=>String(item.company||'').trim().toLowerCase()===form.company.trim().toLowerCase()&&String(item.position||'').trim().toLowerCase()===form.position.trim().toLowerCase());if(duplicate){editing.value=false;selected.value=duplicate;error.value='';message.value='已存在相同公司和岗位的投递，不会重复创建；你可以直接追加日程或编辑原记录';return}}
   busy.value=true;error.value=''
   try{
     const current=selected.value
@@ -81,7 +94,7 @@ async function undoDelete(){
 }
 function openEvent(){
   const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);tomorrow.setHours(9,0,0,0)
-  Object.assign(eventForm,{type:'面试',title:'',startsAt:tomorrow.toISOString().slice(0,16),endsAt:'',location:'',notes:''});eventEditor.value=true
+  Object.assign(eventForm,{type:'面试',title:'',startsAt:localParts(tomorrow),endsAt:'',location:'',notes:''});eventEditor.value=true
 }
 async function saveEvent(){
   if(!selected.value)return
@@ -96,10 +109,10 @@ async function saveEvent(){
 <template>
 <section class="card workspace">
   <div class="head"><div><span>APPLICATIONS</span><h2>全部投递</h2></div><button v-if="!store.readOnly.value" @click="openCreate">＋ 新建投递</button></div>
-  <div v-if="store.user.value" class="toolbar"><input v-model="query" type="search" placeholder="搜索公司、岗位、地点、渠道或备注"><select v-model="stageFilter"><option>全部</option><option v-for="item in stages" :key="item">{{item}}</option></select><button class="secondary" @click="store.refresh">刷新</button></div>
+  <div v-if="store.user.value" class="toolbar"><input v-model="query" type="search" placeholder="搜索公司、岗位、地点、渠道或备注"><select v-model="stageFilter"><option>全部</option><option v-for="item in stageCategories" :key="item">{{item}}</option></select><button class="secondary" @click="store.refresh">刷新</button></div>
   <div v-if="store.user.value&&filtered.length" class="grid">
-    <button v-for="item in filtered" :key="item.id" class="application" @click="selected=item">
-      <strong>{{text(item.company,'未填写公司')}}</strong><span>{{text(item.position,'未填写岗位')}}</span><div><b>{{text(item.stage,'未标记')}}</b><i>{{text(item.status,'未标记')}}</i></div><small>{{text(item.city,'地点未填')}} · {{text(item.channel,'渠道未填')}} · {{item.appliedDate||'日期未填'}}</small>
+    <button v-for="item in filtered" :key="item.id" class="application" :class="`tone-${cardTone(item)}`" @click="selected=item">
+      <div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><span>{{text(item.position,'未填写岗位')}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div><div><b>{{text(item.stage,'未标记')}}</b><i>{{text(item.status,'未标记')}}</i></div><small>{{text(item.city,'地点未填')}} · {{text(item.channel,'渠道未填')}} · {{item.appliedDate||'日期未填'}}</small><div class="flow"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`"><i>{{index===0?'↗':'●'}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span></div>
     </button>
   </div>
   <p v-else-if="store.user.value" class="empty">没有符合条件的投递记录。</p><p v-else>登录后查看和管理投递。</p>
@@ -108,7 +121,7 @@ async function saveEvent(){
 
 <div v-if="selected&&!editing&&!eventEditor" class="backdrop" @click.self="selected=null">
   <section class="modal"><button class="close" @click="selected=null">×</button><div class="detail-head"><div><h2>{{text(selected.company)}}</h2><p>{{text(selected.position)}} · {{text(selected.city,'地点未填')}}</p></div><div class="badges"><b>{{selected.stage}}</b><i>{{selected.status}}</i></div></div>
-    <div v-if="!store.readOnly.value" class="actions"><button @click="openEdit(selected)">编辑</button><button class="secondary" @click="openEvent">＋ 日程</button><button class="offer" @click="quickUpdate('Offer','已通过')">标记 Offer</button><button class="reject" @click="quickUpdate('已结束','未通过')">标记未通过</button><button class="danger-button" @click="removeApplication">删除</button></div>
+    <div class="actions"><a class="official" :href="officialUrl(selected)" target="_blank" rel="noreferrer">打开招聘官网 ↗</a><button v-if="!store.readOnly.value" @click="openEdit(selected)">编辑</button><button v-if="!store.readOnly.value" class="secondary" @click="openEvent">＋ 日程</button><button v-if="!store.readOnly.value" class="offer" @click="quickUpdate('Offer','已通过')">标记 Offer</button><button v-if="!store.readOnly.value" class="reject" @click="quickUpdate('已结束','未通过')">标记未通过</button><button v-if="!store.readOnly.value" class="danger-button" @click="removeApplication">删除</button></div>
     <dl><div><dt>投递日期</dt><dd>{{text(selected.appliedDate)}}</dd></div><div><dt>渠道</dt><dd>{{text(selected.channel)}}</dd></div><div class="wide"><dt>备注</dt><dd>{{text(selected.notes,'暂无备注')}}</dd></div></dl>
     <h3>安排记录</h3><div v-if="selectedEvents.length" class="timeline"><article v-for="item in selectedEvents" :key="item.id"><strong>{{text(item.title||item.type)}}</strong><span>{{text(item.startsAt||item.start||item.date,'时间未填')}} · {{item.completed?'已完成':'待处理'}}</span></article></div><p v-else class="empty">暂无安排。</p>
     <h3>状态历史</h3><div v-if="selectedTimeline.length" class="timeline"><article v-for="(item,index) in selectedTimeline" :key="String(item.id||index)"><strong>{{text(item.title,'状态更新')}}</strong><span>{{text(item.at,'')}}</span></article></div><p v-else class="empty">暂无历史。</p>
@@ -123,5 +136,5 @@ async function saveEvent(){
 </template>
 
 <style scoped>
-.head,.toolbar,.detail-head,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.head span{color:#526ddd;font-size:11px;font-weight:800;letter-spacing:.1em}.head h2{margin:4px 0}.toolbar{margin:18px 0}.toolbar input{flex:1}.toolbar select{width:150px}.secondary{color:#344054;background:#eef2f8}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.application{display:grid;gap:8px;padding:17px;color:#172033;border:1px solid #e2e7f0;background:#fbfcfe;text-align:left}.application>span,.application small{color:#667085}.application div,.badges{display:flex;gap:7px}.application b,.application i,.badges b,.badges i{padding:5px 8px;border-radius:999px;background:#edf1ff;color:#3d55bd;font-size:12px;font-style:normal}.application i,.badges i{color:#475467;background:#eef2f6}.backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.modal{position:relative;width:min(760px,100%);max-height:90vh;overflow:auto;padding:28px;border-radius:18px;background:#fff}.close{position:absolute;top:12px;right:12px;padding:4px 11px;color:#475467;background:#eef2f6;font-size:22px}.detail-head{padding-right:35px}.detail-head h2{margin:0}.actions{justify-content:flex-start;flex-wrap:wrap;margin:18px 0}.ai-button{background:#6b4fd3}.ai-review{padding:12px;border-radius:10px;background:#f4f1ff}.ai-review p{margin:4px 0;color:#476050;font-size:12px}.ai-review .warn{color:#8a5608}.offer{background:#17804b}.reject,.danger-button{background:#bd3434}dl{display:grid;grid-template-columns:1fr 1fr;gap:10px}dl div{padding:12px;border-radius:10px;background:#f7f9fc}dl .wide,.form .wide{grid-column:1/-1}dt{color:#667085;font-size:11px}dd{margin:5px 0 0;white-space:pre-wrap}.timeline{display:grid;gap:8px}.timeline article{display:grid;gap:4px;padding:11px;border-left:3px solid #8396e9;background:#f7f9fc}.timeline span{color:#667085;font-size:12px}.form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form h2{grid-column:1/-1}.form label{display:grid;gap:7px;color:#475467;font-size:13px;font-weight:700}.form select,.form textarea{width:100%;padding:12px 14px;border:1px solid #d4dbea;border-radius:10px;background:#fff;font:inherit}.feedback{position:sticky;bottom:16px;z-index:20;margin:14px auto;padding:12px 16px;border-radius:12px;color:#167647;background:#e9f8ef;box-shadow:0 8px 30px rgba(0,0,0,.12)}.feedback.danger{color:#a52d2d;background:#fceaea}.feedback button{margin-left:12px;padding:7px 11px}.empty{color:#667085}@media(max-width:720px){.toolbar{align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{grid-template-columns:1fr}.form .wide,dl .wide{grid-column:auto}}
+.application-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.application-title>span{color:#667085}.application-title em{margin-left:auto;padding:4px 7px;border-radius:999px;font-size:11px;font-style:normal}.health-good{color:#167647;background:#e9f8ef}.health-watch{color:#8a5608;background:#fff3d6}.health-risk{color:#a52d2d;background:#fceaea}.application.tone-pending{border-left:5px solid #d89226}.application.tone-interview{border-left:5px solid #7a60d1}.application.tone-assessment{border-left:5px solid #4382c4}.application.tone-offer{border-left:5px solid #248459}.application.tone-stopped{border-left:5px solid #a5acb9}.flow{display:flex!important;align-items:flex-start;overflow-x:auto;padding-top:7px;border-top:1px solid #e9edf4}.flow span{display:grid;min-width:92px;gap:2px;color:#667085}.flow span>i{color:#526ddd;font-style:normal}.flow span>b{color:#344054;font-size:11px}.flow span>small{font-size:9px}.official{display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;color:#344054;background:#eef2f8;text-decoration:none}.head,.toolbar,.detail-head,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.head span{color:#526ddd;font-size:11px;font-weight:800;letter-spacing:.1em}.head h2{margin:4px 0}.toolbar{margin:18px 0}.toolbar input{flex:1}.toolbar select{width:150px}.secondary{color:#344054;background:#eef2f8}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.application{display:grid;gap:8px;padding:17px;color:#172033;border:1px solid #e2e7f0;background:#fbfcfe;text-align:left}.application>span,.application small{color:#667085}.application div,.badges{display:flex;gap:7px}.application b,.application i,.badges b,.badges i{padding:5px 8px;border-radius:999px;background:#edf1ff;color:#3d55bd;font-size:12px;font-style:normal}.application i,.badges i{color:#475467;background:#eef2f6}.backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.modal{position:relative;width:min(760px,100%);max-height:90vh;overflow:auto;padding:28px;border-radius:18px;background:#fff}.close{position:absolute;top:12px;right:12px;padding:4px 11px;color:#475467;background:#eef2f6;font-size:22px}.detail-head{padding-right:35px}.detail-head h2{margin:0}.actions{justify-content:flex-start;flex-wrap:wrap;margin:18px 0}.ai-button{background:#6b4fd3}.ai-review{padding:12px;border-radius:10px;background:#f4f1ff}.ai-review p{margin:4px 0;color:#476050;font-size:12px}.ai-review .warn{color:#8a5608}.offer{background:#17804b}.reject,.danger-button{background:#bd3434}dl{display:grid;grid-template-columns:1fr 1fr;gap:10px}dl div{padding:12px;border-radius:10px;background:#f7f9fc}dl .wide,.form .wide{grid-column:1/-1}dt{color:#667085;font-size:11px}dd{margin:5px 0 0;white-space:pre-wrap}.timeline{display:grid;gap:8px}.timeline article{display:grid;gap:4px;padding:11px;border-left:3px solid #8396e9;background:#f7f9fc}.timeline span{color:#667085;font-size:12px}.form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form h2{grid-column:1/-1}.form label{display:grid;gap:7px;color:#475467;font-size:13px;font-weight:700}.form select,.form textarea{width:100%;padding:12px 14px;border:1px solid #d4dbea;border-radius:10px;background:#fff;font:inherit}.feedback{position:sticky;bottom:16px;z-index:20;margin:14px auto;padding:12px 16px;border-radius:12px;color:#167647;background:#e9f8ef;box-shadow:0 8px 30px rgba(0,0,0,.12)}.feedback.danger{color:#a52d2d;background:#fceaea}.feedback button{margin-left:12px;padding:7px 11px}.empty{color:#667085}@media(max-width:720px){.toolbar{align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{grid-template-columns:1fr}.form .wide,dl .wide{grid-column:auto}}
 </style>
