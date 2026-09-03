@@ -41,6 +41,19 @@ class AiSandboxServiceTest {
         assertThat(parsed.path("company").asText()).isEqualTo("Example");
     }
 
+    @Test
+    void sanitizesDailyQuoteFields() throws Exception {
+        ApplicationSandboxService sandbox = mock(ApplicationSandboxService.class);
+        when(sandbox.status()).thenReturn(new ApplicationSandboxService.SandboxStatus(true, true, true, "已开启"));
+        AiSandboxService service = service(new MockEnvironment(), sandbox);
+
+        var quote = service.dailyQuote(new ObjectMapper().readTree(
+            "{\"quote\":\"慢一点\\n也没关系\",\"author\":\"朋友\"}"
+        ));
+
+        assertThat(quote.quote()).isEqualTo("慢一点 也没关系");
+        assertThat(quote.author()).isEqualTo("朋友");
+    }
     private AiSandboxService service(MockEnvironment environment, ApplicationSandboxService sandbox) {
         ObjectMapper mapper = new ObjectMapper();
         LegacySecretCrypto crypto = new LegacySecretCrypto();

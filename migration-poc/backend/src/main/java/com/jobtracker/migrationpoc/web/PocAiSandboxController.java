@@ -93,6 +93,23 @@ public class PocAiSandboxController {
         }
     }
 
+    @PostMapping("/daily-quote")
+    public ResponseEntity<?> dailyQuote(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) DailyQuoteRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                sandboxService.dailyQuote(user.get().email(), body == null ? null : body.date())
+            );
+        } catch (Exception exception) {
+            return mapException("daily-quote", exception);
+        }
+    }
     private ResponseEntity<?> mapException(String operation, Exception exception) {
         if (exception instanceof AiValidationException || exception instanceof UnsafeEndpointException) {
             return error(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -128,4 +145,5 @@ public class PocAiSandboxController {
 
     public record ConfigRequest(String apiUrl, String model, String apiKey, boolean clearApiKey) {}
     public record RecognitionRequest(String body) {}
+    public record DailyQuoteRequest(String date) {}
 }
