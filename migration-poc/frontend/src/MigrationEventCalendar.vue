@@ -251,34 +251,15 @@ async function remove(item: EventItem) {
 <template>
   <section class="card event-sandbox">
     <div class="section-head">
-      <div><span class="section-kicker">CALENDAR</span><h2>日程与月历</h2></div>
-      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '可编辑' : '只读' }}</span>
+      <div><span class="section-kicker">CALENDAR</span><h2>日历</h2></div>
     </div>
-    <p>管理时间点、时间段、完成、错过和恢复，并自动同步关联岗位进度。</p>
 
     <div v-if="sandbox && !sandbox.enabled" class="notice">
       <strong>{{ sandbox.message }}</strong><span>日程写入与职位 CRUD 共用同一套隔离测试库开关。</span>
     </div>
 
     <template v-else-if="sandbox?.enabled">
-      <form v-if="applications.length" class="event-form" @submit.prevent="save">
-        <label class="wide"><span>关联岗位 *</span><select v-model="form.applicationId" :disabled="Boolean(editing)" required><option v-for="item in applications" :key="item.id" :value="item.id">{{ item.company }} · {{ item.position }}</option></select></label>
-        <label><span>类型</span><select v-model="form.type"><option v-for="item in eventTypes" :key="item">{{ item }}</option></select></label>
-        <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required placeholder="如：一面、在线笔试" /></label>
-        <label><span>时间类型</span><select v-model="form.timeMode"><option value="point">时间点</option><option value="range">时间段</option></select></label>
-        <label><span>开始时间 *</span><input v-model="form.startsAt" type="datetime-local" required /></label>
-        <label v-if="form.timeMode === 'range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" required /></label>
-        <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
-        <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
-        <div class="form-actions wide">
-          <button :disabled="loading">{{ loading ? '处理中…' : (editing ? '保存修改' : '新增日程') }}</button>
-          <button v-if="editing" type="button" class="secondary" @click="resetForm">取消编辑</button>
-          <button type="button" class="secondary" :disabled="loading" @click="checkSandbox">重新检查</button>
-        </div>
-      </form>
-      <div v-else class="notice"><strong>测试库暂无职位申请</strong><span>请先在第 1 阶段沙箱新增一条职位申请，再创建日程。</span></div>
-
-      <p v-if="message" class="success">{{ message }}</p>
+<p v-if="message" class="success">{{ message }}</p>
       <div class="calendar-head">
         <div><strong>{{ monthTitle }}</strong><span>共 {{ total }} 项日程</span></div>
         <div><button class="secondary compact" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" @click="changeMonth(1)">›</button></div>
@@ -288,7 +269,7 @@ async function remove(item: EventItem) {
         <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
           <span>{{ cell.day }}</span>
           <small v-for="entry in cell.events.slice(0, 3)" :key="entry.event.id + entry.position" :class="['event-chip', entry.position, `type-${entry.event.type}`]">
-            {{ entry.position === 'middle' ? '进行中' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
+            {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
           </small>
           <i v-if="cell.events.length > 3">+{{ cell.events.length - 3 }}</i>
         </button>
@@ -305,6 +286,7 @@ async function remove(item: EventItem) {
           </div>
           <div class="event-actions">
             <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
+            
             <button class="secondary compact" @click="edit(entry.event)">编辑</button>
             <button v-if="entry.event.completed" class="secondary compact" @click="resolve(entry.event, 'restore')">恢复</button>
             <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
@@ -312,6 +294,22 @@ async function remove(item: EventItem) {
           </div>
         </article>
         <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
+      </div>
+
+      <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
+        <form class="event-form edit-modal" @submit.prevent="save">
+          <button type="button" class="modal-close" @click="resetForm">×</button>
+          <h3 class="wide">编辑日程</h3>
+          <label class="wide"><span>关联岗位</span><select v-model="form.applicationId" disabled><option v-for="item in applications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></select></label>
+          <label><span>类型</span><select v-model="form.type"><option v-for="item in eventTypes" :key="item">{{item}}</option></select></label>
+          <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>
+          <label><span>时间类型</span><select v-model="form.timeMode"><option value="point">时间点</option><option value="range">时间段</option></select></label>
+          <label><span>开始时间 *</span><input v-model="form.startsAt" type="datetime-local" required /></label>
+          <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" required /></label>
+          <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
+          <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
+          <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="resetForm">取消</button></div>
+        </form>
       </div>
     </template>
 
@@ -321,7 +319,7 @@ async function remove(item: EventItem) {
 </template>
 
 <style scoped>
-.section-head, .calendar-head, .selected-list article, .form-actions, .event-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.edit-backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.edit-modal{position:relative;width:min(720px,100%);max-height:90vh;overflow:auto;margin:0;padding:24px;border-radius:16px;background:#fff}.edit-modal h3{margin:0}.modal-close{position:absolute;top:10px;right:10px;padding:4px 10px;color:#475467;background:#eef2f8;font-size:20px}.section-head, .calendar-head, .selected-list article, .form-actions, .event-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .section-head h2 { margin-bottom: 0; }
 .mode-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
@@ -343,8 +341,15 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .day.outside { color: #b3bac7; background: #f8fafc; }
 .day.selected { position: relative; z-index: 1; outline: 2px solid #4461d8; }
 .day.today > span { display: inline-grid; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: #4461d8; place-items: center; }
-.day > small { display: block; overflow: hidden; margin-top: 4px; padding: 3px 5px; border-radius: 5px; color: #4357ad; background: #edf1ff; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.day > small.middle { height: 4px; padding: 0; color: transparent; background: #aab7ed; }
+.day > small { --event-color:#4357ad; --event-bg:#edf1ff; display:block; overflow:hidden; margin-top:4px; padding:3px 5px; border-radius:5px; color:var(--event-color); background:var(--event-bg); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.day > small.type-测评 { --event-color:#71602f; --event-bg:#f7edc7; }
+.day > small.type-笔试 { --event-color:#8a5a16; --event-bg:#f8e7ca; }
+.day > small.type-面试 { --event-color:#27656b; --event-bg:#dceff0; }
+.day > small.type-Offer { --event-color:#1f7448; --event-bg:#dff3e8; }
+.day > small.type-其他 { --event-color:#596579; --event-bg:#e8edf3; }
+.day > small.middle { height:3px; margin:7px -7px 0; padding:0; border-radius:0; color:transparent; background:var(--event-color); opacity:.55; }
+.day > small.start { border-radius:5px 2px 2px 5px; }
+.day > small.end { border-radius:2px 5px 5px 2px; }
 .day > i { color: #667085; font-size: 10px; }
 .selected-list { margin-top: 20px; }
 .selected-list h3 { font-size: 16px; }
