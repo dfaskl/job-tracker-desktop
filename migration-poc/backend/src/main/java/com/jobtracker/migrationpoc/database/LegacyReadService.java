@@ -4,6 +4,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -64,6 +65,35 @@ public class LegacyReadService {
                 return mapApplications(result.getString(1));
             }
         }
+    }
+
+    public Optional<JsonNode> findBusinessData(long userId) throws Exception {
+        String sql = "SELECT data::text FROM user_data WHERE user_id=?";
+        try (Connection connection = openReadOnlyConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, userId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return Optional.empty();
+                return Optional.of(mapBusinessData(result.getString(1)));
+            }
+        }
+    }
+
+    JsonNode mapBusinessData(String json) throws Exception {
+        JsonNode parsed = objectMapper.readTree(json == null ? "{}" : json);
+        if (!(parsed instanceof ObjectNode root)) {
+            throw new IllegalStateException("Legacy business data is not an object");
+        }
+        if (!root.path("applications").isArray()) {
+            throw new IllegalStateException("Legacy applications data is not an array");
+        }
+        if (!root.path("events").isArray()) {
+            throw new IllegalStateException("Legacy events data is not an array");
+        }
+        ObjectNode safe = root.deepCopy();
+        JsonNode settings = safe.path("settings");
+        if (settings instanceof ObjectNode settingsObject) settingsObject.remove("apiKey");
+        return safe;
     }
 
     ApplicationPage mapApplications(String json) throws Exception {

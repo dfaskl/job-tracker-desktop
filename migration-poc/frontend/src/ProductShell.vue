@@ -10,6 +10,8 @@ import MigrationSessionStatus from './MigrationSessionStatus.vue'
 import MigrationBackups from './MigrationBackups.vue'
 import MigrationAdmin from './MigrationAdmin.vue'
 import MigrationDiagnostics from './MigrationDiagnostics.vue'
+import AccountAccess from './AccountAccess.vue'
+import { useJobTrackerStore } from './jobTrackerStore'
 
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
 
@@ -24,6 +26,7 @@ const pages: { id: Page; label: string; icon: string; subtitle: string }[] = [
 ]
 
 const activePage = ref<Page>('home')
+const store = useJobTrackerStore()
 const current = computed(() => pages.find((item) => item.id === activePage.value) || pages[0])
 
 function pageFromHash(): Page {
@@ -43,6 +46,7 @@ function navigate(page: Page) {
 }
 
 onMounted(() => {
+  store.initialize()
   syncHash()
   window.addEventListener('hashchange', syncHash)
 })
@@ -70,6 +74,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       </header>
 
       <div class="page-content">
+        <AccountAccess />
         <ProductHome v-if="activePage === 'home'" @navigate="navigate" />
         <template v-else-if="activePage === 'applications'">
           <MigrationApplications />

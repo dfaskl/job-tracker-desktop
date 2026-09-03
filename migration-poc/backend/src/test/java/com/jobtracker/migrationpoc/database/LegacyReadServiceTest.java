@@ -32,4 +32,22 @@ class LegacyReadServiceTest {
     void rejectsAnIncompatibleBusinessDocument() {
         assertThrows(IllegalStateException.class, () -> service.mapApplications("{\"applications\":{}}"));
     }
+
+    @Test
+    void returnsACompleteBusinessDocumentWithoutTheLegacyApiKey() throws Exception {
+        var data = service.mapBusinessData("""
+            {"applications":[{"id":"app-1","notes":"keep me"}],"events":[{"id":"event-1"}],
+             "settings":{"apiKey":"secret","apiUrl":"https://example.com","model":"demo"}}
+            """);
+
+        assertEquals("keep me", data.path("applications").get(0).path("notes").asText());
+        assertEquals("event-1", data.path("events").get(0).path("id").asText());
+        assertFalse(data.path("settings").has("apiKey"));
+        assertEquals("demo", data.path("settings").path("model").asText());
+    }
+
+    @Test
+    void rejectsBusinessDocumentsWithoutCompatibleCollections() {
+        assertThrows(IllegalStateException.class, () -> service.mapBusinessData("{\"applications\":[],\"events\":{}}"));
+    }
 }
