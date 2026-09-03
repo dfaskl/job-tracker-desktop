@@ -6,6 +6,7 @@ import MigrationEventCalendar from './MigrationEventCalendar.vue'
 import MigrationSessionStatus from './MigrationSessionStatus.vue'
 import MigrationBackups from './MigrationBackups.vue'
 import MigrationAiMail from './MigrationAiMail.vue'
+import MigrationAdmin from './MigrationAdmin.vue'
 
 type AppStatus = {
   ok: boolean
@@ -97,5 +98,6 @@ async function probeDatabase() {
     <MigrationSessionStatus />
     <MigrationBackups />
     <MigrationAiMail />
+    <MigrationAdmin />
   </main>
 </template>
