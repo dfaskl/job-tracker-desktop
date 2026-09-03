@@ -3,10 +3,12 @@ package com.jobtracker.migrationpoc.web;
 import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import com.jobtracker.migrationpoc.database.LegacyReadService;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
+import com.jobtracker.migrationpoc.security.PocPersistentSessionStore;
 import com.jobtracker.migrationpoc.security.PocSessionManager;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -42,16 +44,28 @@ public class PocAuthController {
     private final LegacyReadService legacyReadService;
     private final LegacyPasswordVerifier passwordVerifier;
     private final PocSessionManager sessionManager;
+    private final PocPersistentSessionStore persistentSessionStore;
     private final ConcurrentHashMap<String, Deque<Long>> loginAttempts = new ConcurrentHashMap<>();
 
+    @Autowired
     public PocAuthController(
         LegacyReadService legacyReadService,
         LegacyPasswordVerifier passwordVerifier,
-        PocSessionManager sessionManager
+        PocSessionManager sessionManager,
+        PocPersistentSessionStore persistentSessionStore
     ) {
         this.legacyReadService = legacyReadService;
         this.passwordVerifier = passwordVerifier;
         this.sessionManager = sessionManager;
+        this.persistentSessionStore = persistentSessionStore;
+    }
+
+    PocAuthController(
+        LegacyReadService legacyReadService,
+        LegacyPasswordVerifier passwordVerifier,
+        PocSessionManager sessionManager
+    ) {
+        this(legacyReadService, passwordVerifier, sessionManager, null);
     }
 
     @PostMapping("/login")
@@ -77,11 +91,13 @@ public class PocAuthController {
             }
 
             loginAttempts.remove(remote);
-            String token = sessionManager.issue(found.get().id());
+            boolean persistent = persistentSessionEnabled();
+            String token = persistent ? persistentSessionStore.issue(found.get().email()) : sessionManager.issue(found.get().id());
+            Duration ttl = persistent ? persistentSessionStore.sessionTtl() : sessionManager.sessionTtl();
             return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .header(HttpHeaders.SET_COOKIE, sessionCookie(token, sessionManager.sessionTtl(), request))
-                .body(Map.of("user", publicUser(found.get()), "readOnly", true));
+                .header(HttpHeaders.SET_COOKIE, sessionCookie(token, ttl, request))
+                .body(Map.of("user", publicUser(found.get()), "readOnly", true, "sessionMode", sessionMode()));
         } catch (Exception exception) {
             LOGGER.warn("POC login failed because the legacy database is unavailable", exception);
             return error(HttpStatus.SERVICE_UNAVAILABLE, "数据库暂时不可用");
@@ -95,7 +111,7 @@ public class PocAuthController {
             Optional<LegacyUser> user = authenticatedUser(token);
             return user.<ResponseEntity<?>>map(value -> ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
-                    .body(Map.of("user", publicUser(value), "readOnly", true)))
+                    .body(Map.of("user", publicUser(value), "readOnly", true, "sessionMode", sessionMode())))
                 .orElseGet(() -> error(HttpStatus.UNAUTHORIZED, "请先登录"));
         } catch (Exception exception) {
             LOGGER.warn("POC session check failed because the legacy database is unavailable", exception);
@@ -104,8 +120,18 @@ public class PocAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request) {
+    public ResponseEntity<?> logout(
+        @CookieValue(value = COOKIE_NAME, required = false) String token,
+        HttpServletRequest request
+    ) {
         if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (persistentSessionEnabled()) {
+            try {
+                persistentSessionStore.revoke(token);
+            } catch (Exception exception) {
+                LOGGER.warn("POC persistent session revocation failed", exception);
+            }
+        }
         return ResponseEntity.ok()
             .cacheControl(CacheControl.noStore())
             .header(HttpHeaders.SET_COOKIE, sessionCookie("", Duration.ZERO, request))
@@ -113,13 +139,26 @@ public class PocAuthController {
     }
 
     Optional<LegacyUser> authenticatedUser(String token) throws Exception {
+        if (persistentSessionEnabled()) {
+            Optional<String> email = persistentSessionStore.verifyEmail(token);
+            if (email.isEmpty()) return Optional.empty();
+            return legacyReadService.findUserByEmail(email.get()).filter(value -> !value.disabled());
+        }
         Optional<PocSessionManager.SessionIdentity> identity = sessionManager.verify(token);
         if (identity.isEmpty()) return Optional.empty();
         return legacyReadService.findUserById(identity.get().userId()).filter(value -> !value.disabled());
     }
 
     private boolean ready() {
-        return legacyReadService.isConfigured() && sessionManager.isConfigured();
+        return legacyReadService.isConfigured() && (persistentSessionEnabled() || sessionManager.isConfigured());
+    }
+
+    private boolean persistentSessionEnabled() {
+        return persistentSessionStore != null && persistentSessionStore.isEnabled();
+    }
+
+    private String sessionMode() {
+        return persistentSessionEnabled() ? "postgresql" : "signed-cookie";
     }
 
     private Map<String, Object> publicUser(LegacyUser user) {
