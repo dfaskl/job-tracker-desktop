@@ -64,7 +64,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
           <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
         </button>
       </nav>
-      <div class="sidebar-note">新旧服务并行运行<br>{{ store.readOnly.value ? '当前为只读模式' : '当前数据可读写' }}</div>
+      <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
     <main class="product-main">
@@ -74,7 +74,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       </header>
 
       <div class="page-content">
-        <AccountAccess />
+        <AccountAccess v-if="!store.user.value" />
         <ProductHome v-if="activePage === 'home'" @navigate="navigate" />
         <ProductApplicationWorkspace v-else-if="activePage === 'applications'" />
         <ProductCalendarWorkspace v-else-if="activePage === 'calendar'" />
@@ -104,7 +104,7 @@ nav { display: grid; gap: 6px; margin-top: 32px; }
 nav button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 13px; color: #aebbd9; background: transparent; text-align: left; }
 nav button span { width: 20px; color: #8392b7; font-size: 17px; text-align: center; }
 nav button:hover, nav button.active { color: #fff; background: #273552; }
-.sidebar-note { margin-top: auto; padding: 13px; border: 1px solid #344362; border-radius: 11px; color: #91a0c5; font-size: 11px; line-height: 1.7; }
+.sidebar-account { margin-top: auto; }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 228px; padding: 0 42px 72px; }
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; min-height: 112px; gap: 20px; border-bottom: 1px solid #e4e9f2; background: rgba(244, 247, 251, .94); backdrop-filter: blur(14px); }
 .topbar h1 { margin: 0 0 6px; font-size: 28px; }
@@ -115,7 +115,11 @@ nav button:hover, nav button.active { color: #fff; background: #273552; }
 @media (max-width: 820px) {
   .sidebar { position: sticky; top: 0; width: 100%; height: auto; padding: 10px 14px; }
   .brand { width: auto; }
-  .brand small, .sidebar-note { display: none; }
+  .brand small { display: none; }
+  .sidebar-account { position: absolute; top: 10px; right: 14px; margin: 0; }
+  .sidebar-account :deep(.signed.compact) { display: flex; padding: 6px 8px; }
+  .sidebar-account :deep(.signed.compact span) { display: none; }
+  .sidebar-account :deep(.signed.compact button) { width: auto; }
   nav { display: flex; margin: 8px -4px 0; overflow-x: auto; }
   nav button { flex: 0 0 auto; width: auto; padding: 9px 11px; }
   nav button span { display: none; }
