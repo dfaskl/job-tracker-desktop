@@ -84,6 +84,28 @@ public class BackupSandboxService {
         }
     }
 
+    public ImportResult importDocument(String email, String documentJson, String reason) throws Exception {
+        BackupSummary summary = validator.validate(documentJson);
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                UserDocument current = currentUserDocument(connection, email, true);
+                insertBackup(connection, current.userId(), current.json(), reason);
+                String updatedAt = replaceDocument(connection, current.userId(), documentJson);
+                pruneBackups(connection, current.userId());
+                connection.commit();
+                return new ImportResult(summary.applicationCount(), summary.eventCount(), updatedAt);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public ImportResult clearDocument(String email) throws Exception {
+        return importDocument(email, "{\"applications\":[],\"events\":[]}", "poc-clear-data");
+    }
+
     private UserDocument currentUserDocument(Connection connection, String email, boolean lock) throws Exception {
         String sql = "SELECT u.id,d.data::text,d.updated_at FROM users u JOIN user_data d ON d.user_id=u.id "
             + "WHERE lower(u.email)=? AND u.disabled_at IS NULL" + (lock ? " FOR UPDATE OF d" : "");
@@ -176,6 +198,7 @@ public class BackupSandboxService {
 
     public record BackupPage(List<BackupItem> items, String currentUpdatedAt) {}
     public record RestoreResult(long backupId, int applicationCount, int eventCount, String currentUpdatedAt) {}
+    public record ImportResult(int applicationCount, int eventCount, String currentUpdatedAt) {}
 
     public static class SandboxDisabledException extends RuntimeException {
         public SandboxDisabledException(String message) { super(message); }

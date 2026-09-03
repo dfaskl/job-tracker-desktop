@@ -6,6 +6,7 @@ import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
 import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MigrationAiMail from './MigrationAiMail.vue'
 import MigrationSessionStatus from './MigrationSessionStatus.vue'
+import ProductDataManagement from './ProductDataManagement.vue'
 import MigrationBackups from './MigrationBackups.vue'
 import MigrationAdmin from './MigrationAdmin.vue'
 import MigrationDiagnostics from './MigrationDiagnostics.vue'
@@ -81,6 +82,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <ProductAnalytics v-else-if="activePage === 'stats'" />
         <template v-else-if="activePage === 'settings'">
           <MigrationSessionStatus />
+          <ProductDataManagement />
           <MigrationBackups />
           <MigrationDiagnostics />
         </template>

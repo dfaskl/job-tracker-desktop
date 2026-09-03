@@ -79,6 +79,19 @@ public class LegacyReadService {
         }
     }
 
+
+    public CompanyLinks findCompanyLinks(long userId) throws Exception {
+        String sql = "SELECT items::text,updated_at FROM company_links WHERE user_id=?";
+        try (Connection connection = openReadOnlyConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, userId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return new CompanyLinks(List.of(), "");
+                return new CompanyLinks(mapCompanyLinks(result.getString(1)), text(result, "updated_at", 80));
+            }
+        }
+    }
+
     JsonNode mapBusinessData(String json) throws Exception {
         JsonNode parsed = objectMapper.readTree(json == null ? "{}" : json);
         if (!(parsed instanceof ObjectNode root)) {
@@ -124,6 +137,19 @@ public class LegacyReadService {
         return new ApplicationPage(visible, total, total > MAX_APPLICATIONS);
     }
 
+    List<CompanyLink> mapCompanyLinks(String json) throws Exception {
+        JsonNode source = objectMapper.readTree(json == null ? "[]" : json);
+        if (!source.isArray()) throw new IllegalStateException("Legacy company links data is not an array");
+        List<CompanyLink> items = new ArrayList<>();
+        for (JsonNode item : source) {
+            String company = text(item, "company", 120);
+            String url = text(item, "url", 2048);
+            if (!company.isBlank() && isHttpUrl(url)) items.add(new CompanyLink(company, url));
+        }
+        items.sort(Comparator.comparing(link -> link.company().toLowerCase()));
+        return List.copyOf(items);
+    }
+
     private Connection openReadOnlyConnection() throws Exception {
         LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("DATABASE_URL"));
         Properties properties = new Properties();
@@ -152,7 +178,22 @@ public class LegacyReadService {
         return text.length() <= maxLength ? text : text.substring(0, maxLength);
     }
 
+
+    private String text(ResultSet result, String column, int maxLength) throws Exception {
+        String value = result.getString(column);
+        if (value == null) return "";
+        String text = value.trim();
+        return text.length() <= maxLength ? text : text.substring(0, maxLength);
+    }
+
+    private boolean isHttpUrl(String value) {
+        return value.startsWith("http://") || value.startsWith("https://");
+    }
+
     public record LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled) {}
+
+    public record CompanyLink(String company, String url) {}
+    public record CompanyLinks(List<CompanyLink> items, String updatedAt) {}
 
     public record ApplicationSummary(
         String id,

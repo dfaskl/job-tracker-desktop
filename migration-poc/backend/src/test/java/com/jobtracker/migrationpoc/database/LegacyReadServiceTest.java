@@ -50,4 +50,19 @@ class LegacyReadServiceTest {
     void rejectsBusinessDocumentsWithoutCompatibleCollections() {
         assertThrows(IllegalStateException.class, () -> service.mapBusinessData("{\"applications\":[],\"events\":{}}"));
     }
+    @Test
+    void mapsCompanyLinksAndDropsInvalidEntries() throws Exception {
+        var links = service.mapCompanyLinks("""
+            [
+              {"company":"Beta","url":"https://beta.example/jobs"},
+              {"company":"Alpha","url":"http://alpha.example/careers"},
+              {"company":"Skip","url":"javascript:alert(1)"},
+              {"company":"","url":"https://empty.example"}
+            ]
+            """);
+
+        assertEquals(2, links.size());
+        assertEquals("Alpha", links.getFirst().company());
+        assertEquals("http://alpha.example/careers", links.getFirst().url());
+    }
 }

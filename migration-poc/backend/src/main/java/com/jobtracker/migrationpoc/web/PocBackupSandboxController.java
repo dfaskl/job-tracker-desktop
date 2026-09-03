@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
 import java.util.Map;
@@ -79,6 +80,48 @@ public class PocBackupSandboxController {
         }
     }
 
+    @PostMapping("/import")
+    public ResponseEntity<?> importDocument(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody ImportRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || !"导入".equals(body.confirmation()) || body.data() == null) {
+            return error(HttpStatus.BAD_REQUEST, "请选择 JSON 文件并输入“导入”确认操作");
+        }
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                sandboxService.importDocument(user.get().email(), body.data().toString(), "poc-import-data")
+            );
+        } catch (Exception exception) {
+            return mapException("import", exception);
+        }
+    }
+
+    @PostMapping("/clear")
+    public ResponseEntity<?> clear(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody ClearRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || !"清空".equals(body.confirmation())) {
+            return error(HttpStatus.BAD_REQUEST, "请输入“清空”确认操作");
+        }
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(
+                sandboxService.clearDocument(user.get().email())
+            );
+        } catch (Exception exception) {
+            return mapException("clear", exception);
+        }
+    }
+
     private ResponseEntity<?> mapException(String operation, Exception exception) {
         if (exception instanceof BackupConflictException) return error(HttpStatus.CONFLICT, exception.getMessage());
         if (exception instanceof BackupNotFoundException || exception instanceof SandboxDataNotFoundException) {
@@ -113,4 +156,6 @@ public class PocBackupSandboxController {
     }
 
     public record RestoreRequest(String expectedCurrentUpdatedAt, String confirmation) {}
+    public record ImportRequest(JsonNode data, String confirmation) {}
+    public record ClearRequest(String confirmation) {}
 }
