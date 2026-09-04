@@ -150,7 +150,7 @@ public class PocAiSandboxController {
         if (exception instanceof AiDisabledException) return error(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
         if (exception instanceof AiResponseException) return error(HttpStatus.BAD_GATEWAY, exception.getMessage());
         LOGGER.warn("POC AI sandbox {} failed", operation, exception);
-        return error(HttpStatus.SERVICE_UNAVAILABLE, "AI 测试服务暂时不可用");
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "AI 服务暂时不可用");
     }
 
     private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {

@@ -9,7 +9,8 @@ type Quote = { date: string; quote: string; author: string; generated: boolean }
 type ScheduleAdvice = { summary: string; plans: string[]; conflicts: string[] }
 const emit = defineEmits<{ navigate: [page: Page] }>()
 const store = useJobTrackerStore()
-const quoteKey = 'job_tracker_daily_quote_vue_v1'
+const quoteKey = 'job_tracker_daily_quote_vue_v2'
+const legacyQuoteKey = 'job_tracker_daily_quote_vue_v1'
 const quote = ref<Quote>(fallbackQuote())
 const quoteLoading = ref(false)
 const message = ref('')
@@ -52,7 +53,15 @@ function eventDayRange(item:Record<string,unknown>){const start=eventStart(item)
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
 function adviceCacheKey(){return 'job_tracker_schedule_advice_v1_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
-async function generateScheduleAdvice(signature:string,attempt=0){
+function localScheduleAdvice():ScheduleAdvice{
+  const items=[...adviceCandidates.value].sort((a,b)=>eventStart(a).localeCompare(eventStart(b)))
+  const label=(event:JobEvent)=>eventCompany(event)+' · '+String(event.title||event.type||'未命名日程')
+  const clock=(value:string)=>value.slice(11,16)||'时间待定'
+  const plans=items.map(event=>{const start=eventStart(event),end=String(event.endsAt||event.end||'');return end&&end!==start?clock(start)+'-'+clock(end)+' '+label(event):clock(start)+' '+label(event)})
+  const conflicts:string[]=[]
+  for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){const aStart=parseTime(eventStart(items[i])),bStart=parseTime(eventStart(items[j])),aEnd=parseTime(eventDeadline(items[i])),bEnd=parseTime(eventDeadline(items[j]));if(aStart===bStart||(aStart<bEnd&&bStart<aEnd))conflicts.push(label(items[i])+' 与 '+label(items[j])+' 时间冲突，无法同时完成')}
+  return{summary:conflicts.length?'已按时间排序，并发现 '+conflicts.length+' 处冲突':'已按开始时间生成建议顺序',plans,conflicts}
+}async function generateScheduleAdvice(signature:string,attempt=0){
   if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;adviceNotice.value='';return}
   if(loadScheduleAdvice(signature)||adviceLoading.value)return
   adviceLoading.value=true
@@ -68,7 +77,7 @@ async function generateScheduleAdvice(signature:string,attempt=0){
     if(cause instanceof ApiError&&cause.status===429&&attempt<2&&adviceSignature.value===signature){
       adviceNotice.value='AI 请求正在排队，将自动重试…'
       adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature,attempt+1),3500)
-    }else adviceNotice.value=cause instanceof Error?cause.message:'安排建议生成失败'
+    }else{scheduleAdvice.value=localScheduleAdvice();adviceNotice.value=''}
   }finally{adviceLoading.value=false}
 }
 function isEnded(item:JobApplication){return item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||''))}
@@ -95,8 +104,9 @@ function eventDate(event:JobEvent){
   return {tag:same?'今天':range?'时间段':'',date:dateText,time,range,end}
 }
 function fallbackQuote():Quote{const items=['今天多走一步，明天就多一个选择。','把注意力放在能推进的下一步上。','每一次认真准备，都在靠近更合适的机会。','慢一点没有关系，只要方向仍在向前。','机会会迟到，但你的积累不会白费。','先完成今天能完成的，再把答案交给时间。','保持行动，好的结果往往在坚持之后出现。'];return {date:today(),quote:items[new Date().getDay()],author:'',generated:false}}
-function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;return true}}catch{/* 使用本地内容 */}return false}
-async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteKey,JSON.stringify(quote.value));if(force)message.value='已经换了一句'}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一句生成失败'}finally{quoteLoading.value=false}}
+function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
+function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteCacheKey())||localStorage.getItem(legacyQuoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;localStorage.setItem(quoteCacheKey(),JSON.stringify(cached));return true}}catch{/* 使用本地内容 */}return false}
+async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value));if(force)message.value='已经换了一句'}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一语生成失败'}finally{quoteLoading.value=false}}
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
@@ -104,7 +114,7 @@ watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(st
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>{{quote.generated?'AI 每日一句':'每日一句'}}</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
+    <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
     <section class="briefing">
       <div class="briefing-head"><div class="briefing-title"><i>◆</i><span><strong>今日求职简报</strong><small>数据更新至今天</small></span></div><b :class="{attention}">● {{progressTone}}</b></div>
       <div class="briefing-metrics"><div><strong>{{store.applications.value.length}}</strong><span>总岗位</span></div><div><strong>{{active}}</strong><span>推进中</span></div><div><strong>{{upcomingItems.length}}</strong><span>待参加</span></div><div><strong>{{attention}}</strong><span>需关注</span></div></div>
