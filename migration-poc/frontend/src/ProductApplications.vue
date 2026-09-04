@@ -131,7 +131,7 @@ async function saveEvent(){
 <template>
 <Teleport to="#application-toolbar-slot">
   <div class="application-toolbar-portal">
-    <div class="head"><div><span>APPLICATIONS</span><h2>全部投递</h2></div></div>
+
     <div v-if="store.user.value" class="toolbar"><input v-model="query" type="search" placeholder="搜索公司、岗位、地点、渠道或备注"><select v-model="stageFilter"><option>全部</option><option v-for="item in stageCategories" :key="item">{{item}}</option></select><button class="secondary" @click="store.refresh">刷新</button></div>
     <div v-if="store.user.value" class="application-legend" aria-label="投递卡片颜色说明"><span class="legend-title">卡片颜色</span><span><i class="pending"></i>待参加日程</span><span><i class="interview"></i>有面试进展</span><span><i class="assessment"></i>测评 / 笔试</span><span><i class="applied"></i>仅投递</span><span><i class="stopped"></i>未通过 / 已结束</span><span><i class="offer"></i>Offer / 已通过</span></div>
   </div>
