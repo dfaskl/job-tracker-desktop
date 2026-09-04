@@ -54,6 +54,7 @@ const form = reactive<EventForm>(emptyForm())
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
 const eventLanes = computed(() => allocateEventLanes(events.value))
+const eventColorAssignments = computed(() => allocateEventColors(events.value))
 const selectedEvents = computed(() => calendarEventsOn(selectedDate.value).sort((left, right) => left.event.recordAt.localeCompare(right.event.recordAt)))
 const monthEventCount = computed(() => {
   const prefix = `${month.value.getFullYear()}-${pad(month.value.getMonth() + 1)}`
@@ -169,11 +170,26 @@ function calendarEntries(event: EventItem): Array<{ key: string; position: Calen
   return [{ key: displayAt(event).slice(0, 10), position: 'point' }]
 }
 
-function eventColor(event: EventItem) {
+function stableColor(event: EventItem) {
   let hash = 0
   for (const character of String(event.id || `${event.company}-${event.title}-${event.startsAt}`)) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0
-  return Math.abs(hash) % 8
+  return Math.abs(hash) % eventColors.length
 }
+function allocateEventColors(items: EventItem[]) {
+  const result = new Map<string, number>()
+  const dateColors = new Map<string, Set<number>>()
+  const ordered = [...items].sort((left, right) => (calendarEntries(left)[0]?.key || '').localeCompare(calendarEntries(right)[0]?.key || '') || left.id.localeCompare(right.id))
+  for (const event of ordered) {
+    const dates = calendarEntries(event).map(entry => entry.key)
+    const used = new Set(dates.flatMap(date => [...(dateColors.get(date) || [])]))
+    const preferred = stableColor(event)
+    const color = [preferred, ...eventColors.map((_, index) => index)].find(index => !used.has(index)) ?? preferred
+    result.set(event.id, color)
+    dates.forEach(date => { if (!dateColors.has(date)) dateColors.set(date, new Set()); dateColors.get(date)!.add(color) })
+  }
+  return result
+}
+function eventColor(event: EventItem) { return eventColorAssignments.value.get(event.id) ?? stableColor(event) }
 function allocateEventLanes(items: EventItem[]) {
   const occupied: Array<Set<string>> = []
   const result = new Map<string, number>()

@@ -7,8 +7,13 @@ const cursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const selectedDate = ref(key(new Date()))
 const monthTitle = computed(() => `${cursor.value.getFullYear()}年${cursor.value.getMonth() + 1}月`)
 const normalized = computed(() => store.events.value.map(event => ({ ...event, startsAt: startOf(event), endsAt: endOf(event) })))
-type CalendarEntry = { event: JobEvent; position: 'point' | 'start' | 'middle' | 'end'; lane: number }
+type CalendarEntry = { event: JobEvent; position: 'point' | 'start' | 'middle' | 'end'; lane: number; color: number }
+const eventColors = [
+  ['#356fc0','#e3efff'], ['#7b58bd','#eee7fb'], ['#c47819','#fff0d5'], ['#198176','#ddf4f0'],
+  ['#c34f5a','#fde6e9'], ['#347f9d','#e0f1f7'], ['#66752e','#edf2d8'], ['#a04f91','#f7e4f3']
+] as const
 const eventLanes = computed(() => allocateEventLanes(normalized.value))
+const eventColorAssignments = computed(() => allocateEventColors(normalized.value))
 const selectedEvents = computed(() => normalized.value.filter(event => datesFor(event).includes(selectedDate.value)).sort(compareEvents))
 const overdue = computed(() => normalized.value.filter(event => !Boolean(event.completed) && startOf(event) && endOf(event) < nowText()).sort(compareEvents))
 const applicationBounds = computed(() => {
@@ -74,9 +79,28 @@ function allocateEventLanes(events: JobEvent[]) {
   }
   return lanes
 }
-function calendarEventsOn(dateKey: string): CalendarEntry[] {
-  return normalized.value.filter(event => datesFor(event).includes(dateKey)).map(event => ({ event, position: calendarPosition(event, dateKey), lane: eventLanes.value.get(String(event.id)) || 0 }))
+function stableColor(event: JobEvent) {
+  let hash = 0
+  for (const character of String(event.id || `${eventCompany(event)}-${eventName(event)}-${startOf(event)}`)) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0
+  return Math.abs(hash) % eventColors.length
 }
+function allocateEventColors(events: JobEvent[]) {
+  const result = new Map<string, number>()
+  const dateColors = new Map<string, Set<number>>()
+  const ordered = [...events].sort((left, right) => (datesFor(left)[0] || '').localeCompare(datesFor(right)[0] || '') || String(left.id).localeCompare(String(right.id)))
+  for (const event of ordered) {
+    const dates = datesFor(event)
+    const used = new Set(dates.flatMap(date => [...(dateColors.get(date) || [])]))
+    const preferred = stableColor(event)
+    const color = [preferred, ...eventColors.map((_, index) => index)].find(index => !used.has(index)) ?? preferred
+    result.set(String(event.id), color)
+    dates.forEach(date => { if (!dateColors.has(date)) dateColors.set(date, new Set()); dateColors.get(date)!.add(color) })
+  }
+  return result
+}function calendarEventsOn(dateKey: string): CalendarEntry[] {
+  return normalized.value.filter(event => datesFor(event).includes(dateKey)).map(event => ({ event, position: calendarPosition(event, dateKey), lane: eventLanes.value.get(String(event.id)) || 0, color: eventColorAssignments.value.get(String(event.id)) ?? stableColor(event) }))
+}
+function eventStyle(entry: CalendarEntry) { const color = eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String(entry.lane+1) } }
 function visibleCalendarEvents(events: CalendarEntry[]) { return events.filter(entry => entry.lane < 3) }
 function hiddenCalendarEventCount(events: CalendarEntry[]) { return events.filter(entry => entry.lane >= 3).length }
 function move(offset: number) { cursor.value = clampMonth(new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1)) }
@@ -95,7 +119,7 @@ function eventCompany(event: JobEvent) {
         <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</b></div>
         <div class="month-grid">
           <button v-for="cell in cells" :key="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" @click="selectedDate=cell.key">
-            <span class="day-number">{{ cell.day }}</span><span class="day-events"><i v-for="entry in visibleCalendarEvents(cell.events)" :key="entry.event.id + '-' + entry.position" :class="[entry.position,{ completed:Boolean(entry.event.completed) }]" :style="{gridRow:String(entry.lane+1)}"><template v-if="entry.position==='start'">开始 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='end'">截止 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='point'">{{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template></i></span><small v-if="hiddenCalendarEventCount(cell.events)">+{{ hiddenCalendarEventCount(cell.events) }}</small>
+            <span class="day-number">{{ cell.day }}</span><span class="day-events"><i v-for="entry in visibleCalendarEvents(cell.events)" :key="entry.event.id + '-' + entry.position" :class="[entry.position,{ completed:Boolean(entry.event.completed) }]" :style="eventStyle(entry)"><template v-if="entry.position==='start'">开始 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='end'">截止 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='point'">{{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template></i></span><small v-if="hiddenCalendarEventCount(cell.events)">+{{ hiddenCalendarEventCount(cell.events) }}</small>
           </button>
         </div>
       </section>
@@ -106,5 +130,5 @@ function eventCompany(event: JobEvent) {
 </template>
 
 <style scoped>
-.overdue-alert{display:flex;justify-content:space-between;gap:12px;margin-top:22px;padding:14px 18px;border:1px solid #f4c7c7;border-radius:12px;color:#982d2d;background:#fff1f1}.calendar-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:18px}.calendar-head{display:flex;align-items:center;justify-content:space-between}.weekdays,.month-grid{display:grid;grid-template-columns:repeat(7,1fr)}.weekdays b{padding:12px 4px;color:#667085;font-size:12px;text-align:center}.day{min-height:88px;padding:7px;border:1px solid #e4e9f2;border-radius:0;color:#344054;background:#fff;text-align:left}.day.muted{color:#b3bac7;background:#f8fafc}.day.selected{position:relative;z-index:1;outline:2px solid #526ddd}.day.today>.day-number{display:grid;width:23px;height:23px;place-items:center;border-radius:50%;color:#fff;background:#526ddd}.day-events{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>i{display:block;align-self:center;overflow:hidden;padding:3px 5px;border-radius:4px;color:#3d55bd;background:#edf1ff;font-size:10px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}.day-events>i.start{margin-right:-7px;border-radius:4px 0 0 4px}.day-events>i.middle{height:4px;margin:0 -7px;padding:0;border-radius:0;color:transparent;background:#7d91c8;opacity:.65}.day-events>i.end{margin-left:-7px;border-radius:0 4px 4px 0}.day-events>i.completed{color:#747b86;background:#e5e7eb;text-decoration:line-through}.day small{color:#667085}.selected-card h2{margin-top:0}.selected-card article{display:grid;gap:5px;padding:13px 0;border-top:1px solid #edf0f5}.selected-card span{color:#667085;font-size:12px}.selected-card article.completed{color:#747b86;background:#f3f4f6}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-weight:700;text-decoration:none}.upcoming article{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:13px 0;border-top:1px solid #edf0f5}.upcoming div{display:grid;gap:4px}.upcoming time{color:#526ddd;font-weight:700}@media(min-width:851px) and (min-height:620px){.calendar-overview{height:calc(100vh - 112px);min-height:0;overflow:hidden}.calendar-overview>.calendar-layout{height:100%;min-height:0}.calendar-layout>.card{height:calc(100% - 22px);min-height:0;overflow:hidden}.month-card{display:flex;flex-direction:column}.month-card>.calendar-head,.month-card>.weekdays{flex:0 0 auto}.month-card>.month-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.month-card .day{position:relative;min-height:0;padding:34px 7px 7px}.month-card .day-number{position:absolute;top:7px;left:7px;display:grid;width:23px;height:23px;place-items:center}.selected-card{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-card>h2{position:sticky;top:0;z-index:2;padding-bottom:12px;background:#fff}}@media(max-width:850px){.calendar-layout{grid-template-columns:1fr}.day{min-height:62px}.day i{height:5px;padding:0;font-size:0}.upcoming article{grid-template-columns:1fr}.overdue-alert{flex-direction:column}}
+.overdue-alert{display:flex;justify-content:space-between;gap:12px;margin-top:22px;padding:14px 18px;border:1px solid #f4c7c7;border-radius:12px;color:#982d2d;background:#fff1f1}.calendar-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:18px}.calendar-head{display:flex;align-items:center;justify-content:space-between}.weekdays,.month-grid{display:grid;grid-template-columns:repeat(7,1fr)}.weekdays b{padding:12px 4px;color:#667085;font-size:12px;text-align:center}.day{min-height:88px;padding:7px;border:1px solid #e4e9f2;border-radius:0;color:#344054;background:#fff;text-align:left}.day.muted{color:#b3bac7;background:#f8fafc}.day.selected{position:relative;z-index:1;outline:2px solid #526ddd}.day.today>.day-number{display:grid;width:23px;height:23px;place-items:center;border-radius:50%;color:#fff;background:#526ddd}.day-events{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>i{display:block;align-self:center;overflow:hidden;padding:3px 5px;border-radius:4px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}.day-events>i.start{margin-right:-7px;border-radius:4px 0 0 4px}.day-events>i.middle{height:4px;margin:0 -7px;padding:0;border-radius:0;color:transparent;background:var(--event-color);opacity:.65}.day-events>i.end{margin-left:-7px;border-radius:0 4px 4px 0}.day-events>i.completed{color:#747b86;background:#e5e7eb;text-decoration:line-through}.day small{color:#667085}.selected-card h2{margin-top:0}.selected-card article{display:grid;gap:5px;padding:13px 0;border-top:1px solid #edf0f5}.selected-card span{color:#667085;font-size:12px}.selected-card article.completed{color:#747b86;background:#f3f4f6}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-weight:700;text-decoration:none}.upcoming article{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:13px 0;border-top:1px solid #edf0f5}.upcoming div{display:grid;gap:4px}.upcoming time{color:#526ddd;font-weight:700}@media(min-width:851px) and (min-height:620px){.calendar-overview{height:calc(100vh - 112px);min-height:0;overflow:hidden}.calendar-overview>.calendar-layout{height:100%;min-height:0}.calendar-layout>.card{height:calc(100% - 22px);min-height:0;overflow:hidden}.month-card{display:flex;flex-direction:column}.month-card>.calendar-head,.month-card>.weekdays{flex:0 0 auto}.month-card>.month-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.month-card .day{position:relative;min-height:0;padding:34px 7px 7px}.month-card .day-number{position:absolute;top:7px;left:7px;display:grid;width:23px;height:23px;place-items:center}.selected-card{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-card>h2{position:sticky;top:0;z-index:2;padding-bottom:12px;background:#fff}}@media(max-width:850px){.calendar-layout{grid-template-columns:1fr}.day{min-height:62px}.day i{height:5px;padding:0;font-size:0}.upcoming article{grid-template-columns:1fr}.overdue-alert{flex-direction:column}}
 </style>
