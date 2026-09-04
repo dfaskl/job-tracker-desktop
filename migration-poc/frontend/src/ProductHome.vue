@@ -17,14 +17,13 @@ const busyId = ref('')
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
-const upcoming = computed(() => upcomingItems.value.filter(item => parseTime(eventDeadline(item)) >= Date.now()))
 const overdue = computed(() => upcomingItems.value.filter(item => parseTime(eventDeadline(item)) < Date.now() - 2 * 60 * 60 * 1000))
-const recentSchedules = computed(() => upcomingItems.value.slice(0, 4))
+const recentSchedules = computed(() => upcomingItems.value)
 const active = computed(() => store.applications.value.filter(item => !isEnded(item)).length)
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
 const attention = computed(() => overdue.value.length + staleApplications.value.length)
-const progressTone = computed(() => attention.value ? '需要关注' : upcoming.value.length ? '稳步推进' : '保持行动')
+const progressTone = computed(() => attention.value ? '需要关注' : upcomingItems.value.length ? '稳步推进' : '保持行动')
 
 onMounted(async () => {
   await store.initialize()
@@ -64,7 +63,7 @@ async function markRejected(item:JobApplication){if(!confirm(`确认将“${item
     <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>{{quote.generated?'AI 每日一句':'每日一句'}}</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
     <section class="briefing">
       <div class="briefing-head"><div class="briefing-title"><i>◆</i><span><strong>今日求职简报</strong><small>数据更新至今天</small></span></div><b :class="{attention}">● {{progressTone}}</b></div>
-      <div class="briefing-metrics"><div><strong>{{store.applications.value.length}}</strong><span>总岗位</span></div><div><strong>{{active}}</strong><span>推进中</span></div><div><strong>{{upcoming.length}}</strong><span>待参加</span></div><div><strong>{{attention}}</strong><span>需关注</span></div></div>
+      <div class="briefing-metrics"><div><strong>{{store.applications.value.length}}</strong><span>总岗位</span></div><div><strong>{{active}}</strong><span>推进中</span></div><div><strong>{{upcomingItems.length}}</strong><span>待参加</span></div><div><strong>{{attention}}</strong><span>需关注</span></div></div>
       <button class="text-link" @click="emit('navigate','stats')">查看统计 →</button>
     </section>
 
