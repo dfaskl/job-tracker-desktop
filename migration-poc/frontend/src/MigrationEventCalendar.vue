@@ -2,7 +2,7 @@
 import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
-type ApplicationOption = { id: string; company: string; position: string }
+type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
 type EventItem = {
   id: string
   applicationId: string
@@ -82,8 +82,8 @@ function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth
 function firstOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
 function monthValue(date: Date) { return date.getFullYear() * 12 + date.getMonth() }
 function scheduleBounds() {
-  const values = events.value.flatMap(event => event.endsAt && !event.completed ? [event.startsAt, event.endsAt] : [displayAt(event)])
-    .map(value => String(value || '').slice(0, 7)).filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
+  const values = applications.value.map(application => String(application.appliedDate || '').slice(0, 7))
+    .filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
   const fallback = firstOfMonth(new Date())
   if (!values.length) return { first:fallback, last:fallback }
   const toDate = (value:string) => new Date(Number(value.slice(0,4)), Number(value.slice(5,7)) - 1, 1)

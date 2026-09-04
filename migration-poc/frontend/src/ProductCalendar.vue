@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useJobTrackerStore, type JobEvent } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
@@ -9,6 +9,16 @@ const monthTitle = computed(() => `${cursor.value.getFullYear()}年${cursor.valu
 const normalized = computed(() => store.events.value.map(event => ({ ...event, startsAt: startOf(event), endsAt: endOf(event) })))
 const selectedEvents = computed(() => normalized.value.filter(event => datesFor(event).includes(selectedDate.value)).sort(compareEvents))
 const overdue = computed(() => normalized.value.filter(event => !Boolean(event.completed) && startOf(event) && endOf(event) < nowText()).sort(compareEvents))
+const applicationBounds = computed(() => {
+  const months=store.applications.value.map(item => String(item.appliedDate || item.createdAt || '').slice(0,7)).filter(value => /^\\d{4}-\\d{2}$/.test(value)).sort()
+  const fallback=firstOfMonth(new Date())
+  if(!months.length)return {first:fallback,last:fallback}
+  const parse=(value:string)=>new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1)
+  return {first:parse(months[0]),last:parse(months[months.length-1])}
+})
+const canGoPrevious=computed(()=>monthValue(cursor.value)>monthValue(applicationBounds.value.first))
+const canGoNext=computed(()=>monthValue(cursor.value)<monthValue(applicationBounds.value.last))
+watch(applicationBounds,bounds=>{cursor.value=clampMonth(cursor.value,bounds)},{immediate:true})
 const cells = computed(() => {
   const first = cursor.value
   const offset = (first.getDay() + 6) % 7
@@ -21,6 +31,9 @@ const cells = computed(() => {
 })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
+function firstOfMonth(date: Date) { return new Date(date.getFullYear(),date.getMonth(),1) }
+function monthValue(date: Date) { return date.getFullYear()*12+date.getMonth() }
+function clampMonth(date: Date,bounds=applicationBounds.value) { const value=monthValue(date); return value<monthValue(bounds.first)?bounds.first:value>monthValue(bounds.last)?bounds.last:date }
 function key(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
 function nowText() { return new Date().toISOString().slice(0, 16).replace('T', ' ') }
 function value(event: JobEvent, ...names: string[]) { for (const name of names) { const found = event[name]; if (found) return String(found) } return '' }
@@ -38,7 +51,7 @@ function datesFor(event: JobEvent) {
   while (date <= last && result.length < 370) { result.push(key(date)); date.setDate(date.getDate() + 1) }
   return result
 }
-function move(offset: number) { cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1) }
+function move(offset: number) { cursor.value = clampMonth(new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1)) }
 function eventName(event: JobEvent) { return value(event, 'title', 'type') || '未命名安排' }
 function eventCompany(event: JobEvent) {
   return value(event, 'company') || String(store.applications.value.find(item => item.id === event.applicationId)?.company || '未关联公司')
@@ -50,7 +63,7 @@ function eventCompany(event: JobEvent) {
     <div v-if="overdue.length" class="overdue-alert"><strong>{{ overdue.length }} 项日程已过期</strong><span>请在启用隔离写入后标记为完成或错过。</span></div>
     <div class="calendar-layout">
       <section class="card month-card">
-        <div class="calendar-head"><button class="secondary" @click="move(-1)">‹</button><strong>{{ monthTitle }}</strong><button class="secondary" @click="move(1)">›</button></div>
+        <div class="calendar-head"><button class="secondary" :disabled="!canGoPrevious" @click="move(-1)">‹</button><strong>{{ monthTitle }}</strong><button class="secondary" :disabled="!canGoNext" @click="move(1)">›</button></div>
         <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</b></div>
         <div class="month-grid">
           <button v-for="cell in cells" :key="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" @click="selectedDate=cell.key">

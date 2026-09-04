@@ -140,7 +140,8 @@ public class EventDocumentMutator {
         for (JsonNode item : document.applications()) {
             ObjectNode application = requireObject(item, "投递记录不是 JSON 对象");
             applications.add(new ApplicationOption(
-                text(application, "id"), text(application, "company"), text(application, "position")
+                text(application, "id"), text(application, "company"), text(application, "position"),
+                text(application, "appliedDate").isEmpty() ? text(application, "createdAt") : text(application, "appliedDate")
             ));
         }
         return new EventPage(visible, List.copyOf(applications), total, total > maximum);
@@ -372,7 +373,7 @@ public class EventDocumentMutator {
         String recordAt
     ) {}
 
-    public record ApplicationOption(String id, String company, String position) {}
+    public record ApplicationOption(String id, String company, String position, String appliedDate) {}
     public record EventPage(List<EventView> events, List<ApplicationOption> applications, int total, boolean truncated) {}
     public record Mutation(String documentJson, EventView event, int total) {}
 
