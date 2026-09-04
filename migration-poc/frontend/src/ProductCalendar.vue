@@ -67,7 +67,7 @@ function eventCompany(event: JobEvent) {
         <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</b></div>
         <div class="month-grid">
           <button v-for="cell in cells" :key="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" @click="selectedDate=cell.key">
-            <span class="day-number">{{ cell.day }}</span><i v-for="event in cell.events.slice(0,2)" :key="event.id" :class="{ completed:Boolean(event.completed) }">{{ eventName(event) }}</i><small v-if="cell.events.length>2">+{{ cell.events.length-2 }}</small>
+            <span class="day-number">{{ cell.day }}</span><i v-for="event in cell.events.slice(0,3)" :key="event.id" :class="{ completed:Boolean(event.completed) }">{{ eventCompany(event) }} · {{ eventName(event) }}</i><small v-if="cell.events.length>3">+{{ cell.events.length-3 }}</small>
           </button>
         </div>
       </section>

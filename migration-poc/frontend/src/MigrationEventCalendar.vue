@@ -326,7 +326,7 @@ async function remove(item: EventItem) {
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
                 <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed }]">
-                  {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
+                  {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.company} · ${entry.event.title || entry.event.type}` : entry.position === 'end' ? `截止 ${entry.event.company} · ${entry.event.title || entry.event.type}` : `${entry.event.company} · ${entry.event.title || entry.event.type}` }}
                 </small>
               </span>
               <i v-if="hiddenEventCount(cell.events)">+{{ hiddenEventCount(cell.events) }}</i>
