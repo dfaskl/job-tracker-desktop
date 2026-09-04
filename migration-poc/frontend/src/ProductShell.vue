@@ -89,7 +89,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content">
+      <div class="page-content" :class="{ 'application-content': activePage === 'applications' }">
         <AccountAccess v-if="!store.user.value" />
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="`${activePage}-${cacheEpoch}`" @navigate="navigate" />
@@ -121,6 +121,7 @@ nav button:hover, nav button.active { color: #fff; background: #273552; }
 .product-main.application-page { height: 100vh; overflow: hidden; padding-bottom: 0; }
 .topbar p { margin: 0; line-height: 1.4; }
 .page-content { width: min(1120px, 100%); margin: 0 auto; }
+.page-content.application-content { width: 100%; max-width: none; }
 .page-content :deep(.card) { margin-top: 22px; }
 
 @media (max-width: 820px) {
