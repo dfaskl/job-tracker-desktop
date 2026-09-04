@@ -22,9 +22,11 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const showConfig = ref(false)
+const selectedApplicationId = ref('')
 
-const matchedApplication = computed(() => store.applications.value.find(item =>
-  normalize(item.company) === normalize(result.company) && normalize(item.position) === normalize(result.position)
+const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
+const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
+  applicationMatchScore(b, result.company, result.position) - applicationMatchScore(a, result.company, result.position)
 ))
 const canCreateSchedule = computed(() => Boolean(result.startsAt) && result.noticeType !== '未通过')
 const actionSummary = computed(() => hasResult.value
@@ -35,7 +37,27 @@ onMounted(async () => {
   await store.initialize()
   await Promise.all([checkStatus(false), store.user.value && !store.readOnly.value ? loadConfig() : Promise.resolve()])
 })
-function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase() }
+function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
+function companyKey(value: unknown) { return normalize(value).replace(/股份有限公司|有限责任公司|有限公司|集团|公司$/g, '') }
+function textSimilarity(left: unknown, right: unknown) {
+  const a=normalize(left),b=normalize(right)
+  if(!a||!b)return 0
+  if(a===b)return 1
+  if(a.includes(b)||b.includes(a))return .86
+  const chars=new Set(a),other=new Set(b),common=[...other].filter(char=>chars.has(char)).length
+  return common/Math.max(chars.size,other.size)
+}
+function applicationMatchScore(item:JobApplication,company:unknown,position:unknown) {
+  return textSimilarity(companyKey(item.company),companyKey(company))*.68+textSimilarity(item.position,position)*.32
+}
+function suggestApplication(company:unknown,position:unknown) {
+  const ranked=store.applications.value.map(item=>({item,score:applicationMatchScore(item,company,position)})).sort((a,b)=>b.score-a.score)
+  const exactCompany=ranked.filter(row=>companyKey(row.item.company)===companyKey(company))
+  if(exactCompany.length===1)return exactCompany[0].item
+  if(exactCompany.length>1){const best=exactCompany.sort((a,b)=>textSimilarity(b.item.position,position)-textSimilarity(a.item.position,position))[0];return textSimilarity(best.item.position,position)>=.45?best.item:undefined}
+  const best=ranked[0],companyScore=best?textSimilarity(companyKey(best.item.company),companyKey(company)):0
+  return best&&companyScore>=.72&&best.score>=.65?best.item:undefined
+}
 function inputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function apiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
 function today() { const d=new Date(),pad=(v:number)=>String(v).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()) }
@@ -69,6 +91,7 @@ async function recognize() {
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
     Object.assign(result, value, { startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
+    selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
     createSchedule.value = Boolean(value.startsAt) && value.noticeType !== '未通过'
     message.value = '识别完成，请核对后确认录入'
@@ -77,7 +100,7 @@ async function recognize() {
 }
 function applicationPayload(item?: JobApplication) {
   return {
-    company: result.company.trim(), position: result.position.trim(),
+    company: String(item?.company || result.company).trim(), position: String(item?.position || result.position).trim(),
     city: String(item?.city || ''), channel: String(item?.channel || '邮件识别'),
     appliedDate: String(item?.appliedDate || today()), stage: result.suggestedStage,
     status: result.suggestedStatus, notes: result.notes.trim() || String(item?.notes || ''),
@@ -102,7 +125,7 @@ async function saveResult() {
     }
     await store.refresh()
     message.value = `已${matched ? '更新投递' : '新建投递'}${createSchedule.value && canCreateSchedule.value ? '并创建日程' : ''}，写入前备份已自动生成`
-    mailBody.value = ''; hasResult.value = false
+    mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
 }
@@ -141,6 +164,7 @@ async function saveResult() {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult">
+          <label class="wide application-match"><span>关联已有投递</span><select v-model="selectedApplicationId"><option value="">不关联，新建一条投递</option><option v-for="item in rankedApplications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></select><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
@@ -179,7 +203,7 @@ async function saveResult() {
 .config-form, .result-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
 .config-form label, .result-form label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
 .config-form .wide, .result-form .wide { grid-column: 1 / -1; }
-.check { display: flex !important; align-items: center; }
+.application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:#667085;font-weight:400}.check { display: flex !important; align-items: center; }
 .check input { flex: none; width: 18px; }
 .mail-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 20px; }
 .source-panel, .review-panel { min-width: 0; }
