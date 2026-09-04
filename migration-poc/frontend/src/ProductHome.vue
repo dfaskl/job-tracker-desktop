@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { api, apiCached } from './api'
+import { api, apiCached, ApiError } from './api'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
@@ -52,7 +52,7 @@ function eventDayRange(item:Record<string,unknown>){const start=eventStart(item)
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
 function adviceCacheKey(){return 'job_tracker_schedule_advice_v1_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
-async function generateScheduleAdvice(signature:string){
+async function generateScheduleAdvice(signature:string,attempt=0){
   if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;adviceNotice.value='';return}
   if(loadScheduleAdvice(signature)||adviceLoading.value)return
   adviceLoading.value=true
