@@ -64,8 +64,12 @@ async function generateScheduleAdvice(signature:string,attempt=0){
     if(adviceSignature.value!==signature)return
     scheduleAdvice.value=advice
     localStorage.setItem(adviceCacheKey(),JSON.stringify({signature,advice}))
-  }catch(cause){adviceNotice.value=cause instanceof Error?cause.message:'安排建议生成失败'}
-  finally{adviceLoading.value=false}
+  }catch(cause){
+    if(cause instanceof ApiError&&cause.status===429&&attempt<2&&adviceSignature.value===signature){
+      adviceNotice.value='AI 请求正在排队，将自动重试…'
+      adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature,attempt+1),3500)
+    }else adviceNotice.value=cause instanceof Error?cause.message:'安排建议生成失败'
+  }finally{adviceLoading.value=false}
 }
 function isEnded(item:JobApplication){return item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||''))}
 function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}
