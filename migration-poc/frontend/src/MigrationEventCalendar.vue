@@ -50,6 +50,12 @@ const form = reactive<EventForm>(emptyForm())
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
 const selectedEvents = computed(() => calendarEventsOn(selectedDate.value))
+const monthEventCount = computed(() => {
+  const prefix = `${month.value.getFullYear()}-${pad(month.value.getMonth() + 1)}`
+  return events.value.filter(event => calendarEntries(event).some(entry => entry.key.startsWith(prefix))).length
+})
+const canGoPrevious = computed(() => monthValue(month.value) > monthValue(scheduleBounds().first))
+const canGoNext = computed(() => monthValue(month.value) < monthValue(scheduleBounds().last))
 const cells = computed<CalendarCell[]>(() => {
   const year = month.value.getFullYear()
   const monthIndex = month.value.getMonth()
@@ -69,6 +75,21 @@ onActivated(async () => { if (lastLoadedAt.value && Date.now() - lastLoadedAt.va
 function pad(value: number) { return String(value).padStart(2, '0') }
 function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
 function firstOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
+function monthValue(date: Date) { return date.getFullYear() * 12 + date.getMonth() }
+function scheduleBounds() {
+  const values = events.value.flatMap(event => event.endsAt && !event.completed ? [event.startsAt, event.endsAt] : [event.recordAt || event.startsAt])
+    .map(value => String(value || '').slice(0, 7)).filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
+  const fallback = firstOfMonth(new Date())
+  if (!values.length) return { first:fallback, last:fallback }
+  const toDate = (value:string) => new Date(Number(value.slice(0,4)), Number(value.slice(5,7)) - 1, 1)
+  return { first:toDate(values[0]), last:toDate(values[values.length - 1]) }
+}
+function clampMonth(candidate: Date) {
+  const bounds = scheduleBounds(), value = monthValue(candidate)
+  if (value < monthValue(bounds.first)) return bounds.first
+  if (value > monthValue(bounds.last)) return bounds.last
+  return candidate
+}
 function tomorrowAtNine() {
   const date = new Date()
   date.setDate(date.getDate() + 1)
@@ -112,6 +133,7 @@ async function loadEvents() {
   applications.value = result.body.applications as ApplicationOption[]
   total.value = Number(result.body.total || 0)
   if (!form.applicationId && applications.value.length) form.applicationId = applications.value[0].id
+  month.value = clampMonth(month.value)
   lastLoadedAt.value = Date.now()
 }
 
@@ -144,10 +166,10 @@ function calendarEventsOn(key: string): CalendarEvent[] {
 }
 
 function changeMonth(offset: number) {
-  month.value = new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1)
+  month.value = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
 }
 function resetMonth() {
-  month.value = firstOfMonth(new Date())
+  month.value = clampMonth(firstOfMonth(new Date()))
   selectedDate.value = dateKey(new Date())
 }
 function selectDate(key: string) { selectedDate.value = key }
@@ -261,14 +283,14 @@ async function remove(item: EventItem) {
     <template v-else-if="sandbox?.enabled">
 <p v-if="message" class="success">{{ message }}</p>
       <div class="calendar-head">
-        <div><strong>{{ monthTitle }}</strong><span>共 {{ total }} 项日程</span></div>
-        <div><button class="secondary compact" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" @click="changeMonth(1)">›</button></div>
+        <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
+        <div><button class="secondary compact" :disabled="!canGoPrevious" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" @click="changeMonth(1)">›</button></div>
       </div>
       <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
       <div class="calendar-grid">
         <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
           <span>{{ cell.day }}</span>
-          <small v-for="entry in cell.events.slice(0, 3)" :key="entry.event.id + entry.position" :class="['event-chip', entry.position, `type-${entry.event.type}`]">
+          <small v-for="entry in cell.events.slice(0, 3)" :key="entry.event.id + entry.position" :class="['event-chip', entry.position, `type-${entry.event.type}`, { completed:entry.event.completed, missed:entry.event.missed }]">
             {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
           </small>
           <i v-if="cell.events.length > 3">+{{ cell.events.length - 3 }}</i>
@@ -347,7 +369,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .day > small.type-面试 { --event-color:#27656b; --event-bg:#dceff0; }
 .day > small.type-Offer { --event-color:#1f7448; --event-bg:#dff3e8; }
 .day > small.type-其他 { --event-color:#596579; --event-bg:#e8edf3; }
-.day > small.middle { height:3px; margin:7px -7px 0; padding:0; border-radius:0; color:transparent; background:var(--event-color); opacity:.55; }
+.day > small.completed { --event-color:#7b8491; --event-bg:#e5e7eb; color:#707782; background:#e5e7eb; opacity:.78; text-decoration:line-through; }.day > small.middle.completed { background:#9aa1aa; text-decoration:none; }.day > small.missed { --event-color:#a15a5a; --event-bg:#f3dfdf; }.day > small.middle { height:3px; margin:7px -7px 0; padding:0; border-radius:0; color:transparent; background:var(--event-color); opacity:.55; }
 .day > small.start { border-radius:5px 2px 2px 5px; }
 .day > small.end { border-radius:2px 5px 5px 2px; }
 .day > i { color: #667085; font-size: 10px; }
@@ -360,7 +382,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .event-actions b { color: #7a4d0b; font-size: 12px; }
 .event-actions b.done { color: #167647; }
 .event-actions b.missed { color: #ad2f2f; }
-.secondary { color: #344054; background: #eef2f8; }
+.secondary { color: #344054; background: #eef2f8; }.secondary:disabled { cursor:not-allowed; opacity:.35; }
 .success-button { color: #167647; background: #e9f8ef; }
 .warning-button { color: #8a5608; background: #fff1cf; }
 .danger-button { color: #a52d2d; background: #fceaea; }
