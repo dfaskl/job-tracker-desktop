@@ -23,7 +23,9 @@ services:
       - key: POC_SHARED_DATABASE_WRITE_ENABLED
         value: "false"
       - key: POC_PERSISTENT_SESSION_ENABLED
-        value: "false"
+        value: "true"
+      - key: POC_SESSION_DAYS
+        value: "7"
       - key: POC_ENCRYPTION_KEY
         sync: false
       - key: POC_AI_CALLS_ENABLED

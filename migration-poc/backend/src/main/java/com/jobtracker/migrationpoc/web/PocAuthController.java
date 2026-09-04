@@ -172,8 +172,8 @@ public class PocAuthController {
     Optional<LegacyUser> authenticatedUser(String token) throws Exception {
         if (persistentSessionEnabled()) {
             Optional<String> email = persistentSessionStore.verifyEmail(token);
-            if (email.isEmpty()) return Optional.empty();
-            return findUserByEmail(email.get()).filter(value -> !value.disabled());
+            if (email.isPresent()) return findUserByEmail(email.get()).filter(value -> !value.disabled());
+            // Keep previously issued four-hour signed cookies valid during the migration window.
         }
         Optional<PocSessionManager.SessionIdentity> identity = sessionManager.verify(token);
         if (identity.isEmpty()) return Optional.empty();

@@ -56,7 +56,9 @@ public class PocPersistentSessionStore {
             return new SessionModeStatus(true, false, sandbox.isolated(), sessionDays(),
                 "持久化会话已请求，但独立测试数据库写入未就绪");
         }
-        return new SessionModeStatus(true, true, true, sessionDays(), "Java PostgreSQL 持久化会话已开启");
+        return new SessionModeStatus(true, true, sandbox.isolated(), sessionDays(), sandbox.isolated()
+            ? "Java PostgreSQL 持久化会话已开启（独立数据库）"
+            : "Java PostgreSQL 持久化会话已开启（共享数据库）");
     }
 
     public boolean isEnabled() {
