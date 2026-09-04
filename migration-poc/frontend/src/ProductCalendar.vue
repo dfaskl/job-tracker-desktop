@@ -10,7 +10,7 @@ const normalized = computed(() => store.events.value.map(event => ({ ...event, s
 const selectedEvents = computed(() => normalized.value.filter(event => datesFor(event).includes(selectedDate.value)).sort(compareEvents))
 const overdue = computed(() => normalized.value.filter(event => !Boolean(event.completed) && startOf(event) && endOf(event) < nowText()).sort(compareEvents))
 const applicationBounds = computed(() => {
-  const months=store.applications.value.map(item => String(item.appliedDate || item.createdAt || '').slice(0,7)).filter(value => /^\\d{4}-\\d{2}$/.test(value)).sort()
+  const months=[...store.applications.value.map(item => String(item.appliedDate || item.createdAt || '').slice(0,7)),...normalized.value.flatMap(event=>datesFor(event).map(date=>date.slice(0,7)))].filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
   const fallback=firstOfMonth(new Date())
   if(!months.length)return {first:fallback,last:fallback}
   const parse=(value:string)=>new Date(Number(value.slice(0,4)),Number(value.slice(5,7))-1,1)

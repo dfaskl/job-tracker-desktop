@@ -82,8 +82,10 @@ function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth
 function firstOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
 function monthValue(date: Date) { return date.getFullYear() * 12 + date.getMonth() }
 function scheduleBounds() {
-  const values = applications.value.map(application => String(application.appliedDate || '').slice(0, 7))
-    .filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
+  const values = [
+    ...applications.value.map(application => String(application.appliedDate || '').slice(0, 7)),
+    ...events.value.flatMap(event => calendarEntries(event).map(entry => entry.key.slice(0, 7)))
+  ].filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
   const fallback = firstOfMonth(new Date())
   if (!values.length) return { first:fallback, last:fallback }
   const toDate = (value:string) => new Date(Number(value.slice(0,4)), Number(value.slice(5,7)) - 1, 1)
