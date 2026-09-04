@@ -82,7 +82,7 @@ function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth
 function firstOfMonth(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
 function monthValue(date: Date) { return date.getFullYear() * 12 + date.getMonth() }
 function scheduleBounds() {
-  const values = events.value.flatMap(event => event.endsAt && !event.completed ? [event.startsAt, event.endsAt] : [event.recordAt || event.startsAt])
+  const values = events.value.flatMap(event => event.endsAt && !event.completed ? [event.startsAt, event.endsAt] : [displayAt(event)])
     .map(value => String(value || '').slice(0, 7)).filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
   const fallback = firstOfMonth(new Date())
   if (!values.length) return { first:fallback, last:fallback }
@@ -107,6 +107,9 @@ function emptyForm(): EventForm {
 function toInputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function toApiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
 function formatTime(value: string) { return value ? value.replace('T', ' ') : '未设置' }
+function displayAt(event: EventItem) { return event.completed && event.completedAt ? event.completedAt : (event.recordAt || event.startsAt) }
+function locationLink(value: string) { return String(value || '').match(/https?:\/\/[^\s]+/i)?.[0] || '' }
+function locationText(value: string) { const link=locationLink(value); return String(value || '').replace(link,'').replace(/^[\s·,，;；:：-]+|[\s·,，;；:：-]+$/g,'') }
 
 async function requestJson(url: string, init?: RequestInit) {
   const response = await fetch(url, { cache: 'no-store', ...init })
@@ -161,7 +164,7 @@ function calendarEntries(event: EventItem): Array<{ key: string; position: Calen
       position: dates.length === 1 ? 'point' : index === 0 ? 'start' : index === dates.length - 1 ? 'end' : 'middle'
     }))
   }
-  return [{ key: (event.recordAt || event.startsAt).slice(0, 10), position: 'point' }]
+  return [{ key: displayAt(event).slice(0, 10), position: 'point' }]
 }
 
 function eventColor(event: EventItem) {
@@ -335,12 +338,12 @@ async function remove(item: EventItem) {
         <aside class="selected-list">
           <h3>{{ selectedDate }} 的日程</h3>
           <div class="selected-scroll">
-            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)">
+            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed }">
               <div class="event-main">
                 <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
                 <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
                 <span>{{ entry.event.endsAt && !entry.event.completed ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.recordAt) }}</span>
-                <span v-if="entry.event.location">{{ entry.event.location }}</span>
+                <span v-if="entry.event.location" class="event-location"><span v-if="locationText(entry.event.location)">{{ locationText(entry.event.location) }}</span><a v-if="locationLink(entry.event.location)" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer">打开链接 ↗</a></span>
               </div>
               <div class="event-actions">
                 <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
@@ -424,7 +427,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .danger-button { color: #a52d2d; background: #fceaea; }
 .compact { padding: 8px 11px; }
 
-.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid #dbe3f1;border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{display:inline-grid;width:24px;height:24px;flex:0 0 24px;align-self:flex-start;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid #dbe3f1;border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{display:inline-grid;width:24px;height:24px;flex:0 0 24px;align-self:flex-start;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}.selected-list article.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important}.selected-list article.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{display:inline-flex;padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-size:12px;font-weight:700;text-decoration:none}.event-location a:hover{border-color:#7998ce;background:#e9f1ff}
 @media (max-width: 720px) {
   .event-form { grid-template-columns: 1fr; }
   .event-form .wide { grid-column: auto; }
