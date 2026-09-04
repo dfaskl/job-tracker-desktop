@@ -98,6 +98,7 @@ public class EventSandboxService {
     }
 
     private void insertBackup(Connection connection, long userId, String json, String reason) throws Exception {
+        makeRoomForBackup(connection, userId);
         try (PreparedStatement statement = connection.prepareStatement(
             "INSERT INTO data_backups(user_id,data,reason) VALUES(?,?::jsonb,?)"
         )) {
@@ -118,10 +119,21 @@ public class EventSandboxService {
         }
     }
 
+    private void makeRoomForBackup(Connection connection, long userId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "DELETE FROM data_backups WHERE user_id=? AND id IN "
+                + "(SELECT id FROM data_backups WHERE user_id=? ORDER BY created_at DESC,id DESC OFFSET 29)"
+        )) {
+            statement.setLong(1, userId);
+            statement.setLong(2, userId);
+            statement.executeUpdate();
+        }
+    }
+
     private void pruneBackups(Connection connection, long userId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
             "DELETE FROM data_backups WHERE user_id=? AND id NOT IN "
-                + "(SELECT id FROM data_backups WHERE user_id=? ORDER BY created_at DESC LIMIT 30)"
+                + "(SELECT id FROM data_backups WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 30)"
         )) {
             statement.setLong(1, userId);
             statement.setLong(2, userId);

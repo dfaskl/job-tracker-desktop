@@ -466,12 +466,15 @@ async function apiRoute(req, res, pathname, user) {
     try {
       await client.query('BEGIN');
       const old = await client.query('SELECT data FROM user_data WHERE user_id=$1 FOR UPDATE', [userId]);
-      if (old.rows[0]) await client.query('INSERT INTO data_backups(user_id,data,reason) VALUES($1,$2,$3)', [userId, old.rows[0].data, 'auto']);
+      if (old.rows[0]) {
+        await client.query('DELETE FROM data_backups WHERE user_id=$1 AND id IN (SELECT id FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC,id DESC OFFSET 29)', [userId]);
+        await client.query('INSERT INTO data_backups(user_id,data,reason) VALUES($1,$2,$3)', [userId, old.rows[0].data, 'auto']);
+      }
       await client.query('INSERT INTO user_data(user_id,data) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()', [userId, data]);
       const settings = data.settings || {};
       if (settings.apiUrl && settings.model) await client.query(`INSERT INTO api_configs(user_id,api_url,model)
         VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET api_url=EXCLUDED.api_url,model=EXCLUDED.model,updated_at=NOW()`, [userId, String(settings.apiUrl).slice(0,2048), String(settings.model).slice(0,200)]);
-      await client.query('DELETE FROM data_backups WHERE user_id=$1 AND id NOT IN (SELECT id FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30)', [userId]);
+      await client.query('DELETE FROM data_backups WHERE user_id=$1 AND id NOT IN (SELECT id FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 30)', [userId]);
       await client.query('COMMIT');
       res.writeHead(204); return res.end();
     } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -520,8 +523,12 @@ async function apiRoute(req, res, pathname, user) {
     const backup = await pool.query('SELECT data FROM data_backups WHERE id=$1 AND user_id=$2', [id, userId]);
     if (!backup.rows[0]) return json(res, 404, { error:'备份不存在' });
     const current = await pool.query('SELECT data FROM user_data WHERE user_id=$1', [userId]);
-    if (current.rows[0]) await pool.query('INSERT INTO data_backups(user_id,data,reason) VALUES($1,$2,$3)', [userId, current.rows[0].data, 'before-restore']);
+    if (current.rows[0]) {
+      await pool.query('DELETE FROM data_backups WHERE user_id=$1 AND id IN (SELECT id FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC,id DESC OFFSET 29)', [userId]);
+      await pool.query('INSERT INTO data_backups(user_id,data,reason) VALUES($1,$2,$3)', [userId, current.rows[0].data, 'before-restore']);
+    }
     await pool.query('INSERT INTO user_data(user_id,data) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()', [userId, backup.rows[0].data]);
+    await pool.query('DELETE FROM data_backups WHERE user_id=$1 AND id NOT IN (SELECT id FROM data_backups WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 30)', [userId]);
     return json(res, 200, { data:backup.rows[0].data });
   }
   if (pathname === '/api/session' && req.method === 'GET') {
