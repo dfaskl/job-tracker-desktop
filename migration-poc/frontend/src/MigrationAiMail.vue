@@ -28,6 +28,8 @@ const matchedApplication = computed(() => store.applications.value.find(item => 
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
   applicationMatchScore(b, result.company, result.position) - applicationMatchScore(a, result.company, result.position)
 ))
+const recommendedApplications = computed(() => rankedApplications.value.filter(isRecommendedApplication))
+const otherApplications = computed(() => rankedApplications.value.filter(item => !isRecommendedApplication(item)))
 const canCreateSchedule = computed(() => Boolean(result.startsAt) && result.noticeType !== '未通过')
 const actionSummary = computed(() => hasResult.value
   ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${createSchedule.value && canCreateSchedule.value ? '，并创建关联日程' : ''}`
@@ -50,6 +52,10 @@ function textSimilarity(left: unknown, right: unknown) {
 function applicationMatchScore(item:JobApplication,company:unknown,position:unknown) {
   return textSimilarity(companyKey(item.company),companyKey(company))*.68+textSimilarity(item.position,position)*.32
 }
+function isRecommendedApplication(item:JobApplication) {
+  return textSimilarity(companyKey(item.company),companyKey(result.company))>=.72&&applicationMatchScore(item,result.company,result.position)>=.65
+}
+function matchPercent(item:JobApplication) { return Math.round(applicationMatchScore(item,result.company,result.position)*100) }
 function suggestApplication(company:unknown,position:unknown) {
   const ranked=store.applications.value.map(item=>({item,score:applicationMatchScore(item,company,position)})).sort((a,b)=>b.score-a.score)
   const exactCompany=ranked.filter(row=>companyKey(row.item.company)===companyKey(company))
@@ -164,7 +170,7 @@ async function saveResult() {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult">
-          <label class="wide application-match"><span>关联已有投递</span><select v-model="selectedApplicationId"><option value="">不关联，新建一条投递</option><option v-for="item in rankedApplications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></select><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
+          <label class="wide application-match"><span>关联已有投递</span><select v-model="selectedApplicationId"><option value="">不关联，新建一条投递</option><optgroup v-if="recommendedApplications.length" label="★ 高匹配推荐"><option v-for="item in recommendedApplications" :key="item.id" :value="item.id">★ {{matchPercent(item)}}%｜{{item.company}} · {{item.position}}</option></optgroup><optgroup v-if="otherApplications.length" label="其他已有投递"><option v-for="item in otherApplications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></optgroup></select><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
