@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api, apiCached } from './api'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
 type AiStatus = { callsEnabled: boolean; message: string }
 type Quote = { date: string; quote: string; author: string; generated: boolean }
+type ScheduleAdvice = { summary: string; plans: string[]; conflicts: string[] }
 const emit = defineEmits<{ navigate: [page: Page] }>()
 const store = useJobTrackerStore()
 const quoteKey = 'job_tracker_daily_quote_vue_v1'
@@ -14,11 +15,21 @@ const quoteLoading = ref(false)
 const message = ref('')
 const error = ref('')
 const busyId = ref('')
+const scheduleAdvice = ref<ScheduleAdvice | null>(null)
+const adviceLoading = ref(false)
+let adviceTimer: ReturnType<typeof setTimeout> | null = null
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
 const overdue = computed(() => upcomingItems.value.filter(item => parseTime(eventDeadline(item)) < Date.now() - 2 * 60 * 60 * 1000))
 const recentSchedules = computed(() => upcomingItems.value)
+const adviceCandidates = computed(() => upcomingItems.value.filter((event, index, all) =>
+  all.some((other, otherIndex) => otherIndex !== index && sharesCalendarDay(event, other))
+))
+const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
+  id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
+  startsAt:eventStart(event), endsAt:String(event.endsAt || event.end || eventStart(event)), updatedAt:String(event.updatedAt || '')
+}))))
 const active = computed(() => store.applications.value.filter(item => !isEnded(item)).length)
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
@@ -36,6 +47,25 @@ function today(){return localText().slice(0,10)}
 function eventStart(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||'')}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
+function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
+function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v1_'+String(store.user.value?.email||'guest').toLowerCase()}
+function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
+async function generateScheduleAdvice(signature:string){
+  if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;return}
+  if(loadScheduleAdvice(signature)||adviceLoading.value)return
+  adviceLoading.value=true
+  try{
+    const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
+    if(!status.callsEnabled)return
+    const schedules=adviceCandidates.value.map(event=>({id:event.id,company:eventCompany(event),title:String(event.title||event.type||'未命名日程'),startsAt:eventStart(event),endsAt:String(event.endsAt||event.end||eventStart(event))}))
+    const advice=await api<ScheduleAdvice>('/api/poc/ai-sandbox/schedule-advice',{method:'POST',body:JSON.stringify({schedules})})
+    if(adviceSignature.value!==signature)return
+    scheduleAdvice.value=advice
+    localStorage.setItem(adviceCacheKey(),JSON.stringify({signature,advice}))
+  }catch(cause){error.value=cause instanceof Error?cause.message:'安排建议生成失败'}
+  finally{adviceLoading.value=false}
+}
 function isEnded(item:JobApplication){return item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||''))}
 function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}
 function progressHealth(item:JobApplication){
@@ -64,7 +94,8 @@ function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quot
 async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteKey,JSON.stringify(quote.value));if(force)message.value='已经换了一句'}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一句生成失败'}finally{quoteLoading.value=false}}
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
-</script>
+
+watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(store.user.value)adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),3200)},{immediate:true})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
@@ -77,6 +108,7 @@ async function markRejected(item:JobApplication){if(!confirm(`确认将“${item
 
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
+      <section v-if="adviceLoading || scheduleAdvice" class="schedule-advice"><div class="advice-title"><i>✦</i><div><strong>安排建议</strong><small>{{adviceLoading?'正在根据时间生成建议…':scheduleAdvice?.summary}}</small></div></div><template v-if="scheduleAdvice"><ol v-if="scheduleAdvice.plans?.length"><li v-for="item in scheduleAdvice.plans" :key="item">{{item}}</li></ol><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
       <div v-if="recentSchedules.length" class="schedule-list">
         <article v-for="(event,index) in recentSchedules" :key="event.id">
           <div class="date-block" :class="{range:eventDate(event).range}"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small><span v-if="eventDate(event).range">至 {{eventDate(event).end}}</span></div>
@@ -99,6 +131,6 @@ async function markRejected(item:JobApplication){if(!confirm(`确认将“${item
 </template>
 
 <style scoped>
-.home-dashboard{display:grid;gap:16px;padding-top:16px}.quote-strip{display:flex;align-items:center;gap:10px;width:min(500px,100%);margin:0;padding:10px 14px;border:1px solid #cdd9e9;border-radius:10px;background:#f9fbff}.quote-strip>i{display:grid;width:28px;height:28px;place-items:center;border-radius:8px;color:#285dac;background:#edf3fb;font-style:normal}.quote-strip>span{display:grid;flex:1}.quote-strip small{color:#285dac;font-size:10px}.quote-strip strong{font-size:12px;font-weight:500}.quote-strip em{color:#74808c;font-style:normal}.quote-strip button{padding:5px 8px;color:#285dac;background:transparent}.briefing,.dashboard-panel{padding:20px 24px;border:1px solid #dbe3ec;border-radius:14px;background:#fff}.briefing{border-left:3px solid #3264b8}.briefing-head,.briefing-title,.panel-head,.schedule-list article,.schedule-actions,.confirmation-list article{display:flex;align-items:center;justify-content:space-between;gap:14px}.briefing-title{justify-content:flex-start}.briefing-title>i{display:grid;width:36px;height:36px;place-items:center;border-radius:10px;color:#fff;background:#3264b8;font-style:normal}.briefing-title span{display:grid}.briefing-title strong{color:#285dac}.briefing-title small{color:#7a8794}.briefing-head>b{padding:6px 10px;border-radius:999px;color:#2d679e;background:#eaf4ed;font-size:12px}.briefing-head>b.attention{color:#a04b18;background:#fff0e7}.briefing-metrics{display:grid;grid-template-columns:repeat(4,1fr);margin:14px 0;border:1px solid #dbe3ec;border-radius:10px;background:#f8fafb}.briefing-metrics div{display:grid;gap:2px;padding:11px 14px;border-right:1px solid #dbe3ec}.briefing-metrics div:last-child{border:0}.briefing-metrics strong{font-size:21px}.briefing-metrics span{color:#667785;font-size:11px}.text-link{padding:5px;color:#2260b5;background:transparent}.panel-head h2{margin:0;font-size:19px}.panel-head h2 span{color:#3667ad;font-size:15px}.panel-head p{margin:5px 0 0}.schedule-list{display:grid;gap:10px;margin-top:18px}.schedule-list article{padding:16px 20px;border:1px solid #cbd9eb;border-radius:12px}.date-block{display:grid;width:80px;flex:none;gap:3px;padding:8px 10px;border-radius:10px;background:#fff8f5}.date-block em{width:max-content;padding:2px 7px;border-radius:999px;color:#d5562e;background:#ffebe4;font-size:10px;font-style:normal}.date-block strong{color:#285dac}.date-block small{color:#667785}.date-block.range{width:138px;background:#f3f7ff}.date-block>span{color:#52677d;font-size:11px;white-space:nowrap}.schedule-copy{display:grid;flex:1;gap:5px}.schedule-copy p{margin:0}.schedule-copy p b{padding:3px 8px;border:1px solid #6d989c;border-radius:6px;color:#376d73;background:#edf7f7;font-size:11px}.schedule-copy>small{padding:6px 8px;border-radius:6px;color:#68757d;background:#f3f5f5}.schedule-actions{position:relative;justify-content:flex-end;flex-wrap:wrap}.schedule-actions>i{position:absolute;right:-20px;top:-41px;padding:6px 12px;border-radius:0 10px 0 8px;color:#fff;background:#3264b8;font-size:11px;font-style:normal}.secondary{color:#344054;background:#eef2f8}.confirmation-panel .panel-head>b{padding:5px 9px;border-radius:6px;color:#bd3d34;background:#ffe9e7;font-size:11px}.confirmation-list{display:grid;gap:9px;margin-top:14px}.confirmation-list article{padding:14px;border:1px solid #dbe3ec;border-radius:10px}.confirmation-list article>div:first-child{display:grid;min-width:180px}.confirmation-list article>div:first-child span{color:#667785;font-size:12px}.progress-line{display:flex;align-items:center;flex:1;gap:8px;color:#8796a4;font-size:11px}.progress-line .current{color:#a95c20}.confirmation-list article>em{padding:5px 8px;border-radius:6px;color:#be3f35;background:#ffebe8;font-size:11px;font-style:normal}.confirmation-list article>button{color:#b63e35;background:#fff;border:1px solid #edc7c3}.empty{padding:28px;color:#758390;text-align:center}.feedback{position:sticky;bottom:14px;margin:14px 0 0;padding:12px 16px;border-radius:10px;background:#fff;box-shadow:0 8px 25px rgba(0,0,0,.1)}
+.home-dashboard{display:grid;gap:16px;padding-top:16px}.quote-strip{display:flex;align-items:center;gap:10px;width:min(500px,100%);margin:0;padding:10px 14px;border:1px solid #cdd9e9;border-radius:10px;background:#f9fbff}.quote-strip>i{display:grid;width:28px;height:28px;place-items:center;border-radius:8px;color:#285dac;background:#edf3fb;font-style:normal}.quote-strip>span{display:grid;flex:1}.quote-strip small{color:#285dac;font-size:10px}.quote-strip strong{font-size:12px;font-weight:500}.quote-strip em{color:#74808c;font-style:normal}.quote-strip button{padding:5px 8px;color:#285dac;background:transparent}.briefing,.dashboard-panel{padding:20px 24px;border:1px solid #dbe3ec;border-radius:14px;background:#fff}.briefing{border-left:3px solid #3264b8}.briefing-head,.briefing-title,.panel-head,.schedule-list article,.schedule-actions,.confirmation-list article{display:flex;align-items:center;justify-content:space-between;gap:14px}.briefing-title{justify-content:flex-start}.briefing-title>i{display:grid;width:36px;height:36px;place-items:center;border-radius:10px;color:#fff;background:#3264b8;font-style:normal}.briefing-title span{display:grid}.briefing-title strong{color:#285dac}.briefing-title small{color:#7a8794}.briefing-head>b{padding:6px 10px;border-radius:999px;color:#2d679e;background:#eaf4ed;font-size:12px}.briefing-head>b.attention{color:#a04b18;background:#fff0e7}.briefing-metrics{display:grid;grid-template-columns:repeat(4,1fr);margin:14px 0;border:1px solid #dbe3ec;border-radius:10px;background:#f8fafb}.briefing-metrics div{display:grid;gap:2px;padding:11px 14px;border-right:1px solid #dbe3ec}.briefing-metrics div:last-child{border:0}.briefing-metrics strong{font-size:21px}.briefing-metrics span{color:#667785;font-size:11px}.text-link{padding:5px;color:#2260b5;background:transparent}.panel-head h2{margin:0;font-size:19px}.panel-head h2 span{color:#3667ad;font-size:15px}.panel-head p{margin:5px 0 0}.schedule-advice{display:grid;gap:11px;margin-top:14px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--accent,#4461d8) 24%,#dbe3ec);border-radius:11px;background:color-mix(in srgb,var(--accent,#4461d8) 5%,#fff)}.advice-title{display:flex;align-items:center;gap:10px}.advice-title>i{display:grid;width:30px;height:30px;place-items:center;border-radius:9px;color:#fff;background:var(--accent,#4461d8);font-style:normal}.advice-title>div{display:grid;gap:2px}.advice-title small{color:#667785}.schedule-advice ol{display:grid;gap:6px;margin:0;padding-left:24px;color:#344054;font-size:13px}.advice-conflicts{display:grid;gap:5px;padding:10px 12px;border-radius:8px;color:#9d342e;background:#fff0ee;font-size:12px}.advice-conflicts span::before{content:"• ";}.schedule-list{display:grid;gap:10px;margin-top:18px}.schedule-list article{padding:16px 20px;border:1px solid #cbd9eb;border-radius:12px}.date-block{display:grid;width:80px;flex:none;gap:3px;padding:8px 10px;border-radius:10px;background:#fff8f5}.date-block em{width:max-content;padding:2px 7px;border-radius:999px;color:#d5562e;background:#ffebe4;font-size:10px;font-style:normal}.date-block strong{color:#285dac}.date-block small{color:#667785}.date-block.range{width:138px;background:#f3f7ff}.date-block>span{color:#52677d;font-size:11px;white-space:nowrap}.schedule-copy{display:grid;flex:1;gap:5px}.schedule-copy p{margin:0}.schedule-copy p b{padding:3px 8px;border:1px solid #6d989c;border-radius:6px;color:#376d73;background:#edf7f7;font-size:11px}.schedule-copy>small{padding:6px 8px;border-radius:6px;color:#68757d;background:#f3f5f5}.schedule-actions{position:relative;justify-content:flex-end;flex-wrap:wrap}.schedule-actions>i{position:absolute;right:-20px;top:-41px;padding:6px 12px;border-radius:0 10px 0 8px;color:#fff;background:#3264b8;font-size:11px;font-style:normal}.secondary{color:#344054;background:#eef2f8}.confirmation-panel .panel-head>b{padding:5px 9px;border-radius:6px;color:#bd3d34;background:#ffe9e7;font-size:11px}.confirmation-list{display:grid;gap:9px;margin-top:14px}.confirmation-list article{padding:14px;border:1px solid #dbe3ec;border-radius:10px}.confirmation-list article>div:first-child{display:grid;min-width:180px}.confirmation-list article>div:first-child span{color:#667785;font-size:12px}.progress-line{display:flex;align-items:center;flex:1;gap:8px;color:#8796a4;font-size:11px}.progress-line .current{color:#a95c20}.confirmation-list article>em{padding:5px 8px;border-radius:6px;color:#be3f35;background:#ffebe8;font-size:11px;font-style:normal}.confirmation-list article>button{color:#b63e35;background:#fff;border:1px solid #edc7c3}.empty{padding:28px;color:#758390;text-align:center}.feedback{position:sticky;bottom:14px;margin:14px 0 0;padding:12px 16px;border-radius:10px;background:#fff;box-shadow:0 8px 25px rgba(0,0,0,.1)}
 @media(max-width:780px){.briefing-metrics{grid-template-columns:repeat(2,1fr)}.briefing-metrics div:nth-child(2){border-right:0}.schedule-list article,.confirmation-list article{align-items:stretch;flex-direction:column}.date-block,.date-block.range{width:100%}.schedule-actions>i{display:none}.progress-line{overflow-x:auto}.panel-head{align-items:flex-start}}
 </style>

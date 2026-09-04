@@ -54,6 +54,20 @@ class AiSandboxServiceTest {
         assertThat(quote.quote()).isEqualTo("慢一点 也没关系");
         assertThat(quote.author()).isEqualTo("朋友");
     }
+    @Test
+    void sanitizesScheduleAdviceFields() throws Exception {
+        ApplicationSandboxService sandbox = mock(ApplicationSandboxService.class);
+        when(sandbox.status()).thenReturn(new ApplicationSandboxService.SandboxStatus(true, true, true, "已开启"));
+        AiSandboxService service = service(new MockEnvironment(), sandbox);
+
+        var advice = service.scheduleAdviceResult(new ObjectMapper().readTree(
+            "{\"summary\":\"先完成笔试\\n再参加面试\",\"plans\":[\"09:00-10:00 甲公司笔试\"],\"conflicts\":[\"两项安排重叠\"]}"
+        ));
+
+        assertThat(advice.path("summary").asText()).isEqualTo("先完成笔试 再参加面试");
+        assertThat(advice.path("plans").get(0).asText()).isEqualTo("09:00-10:00 甲公司笔试");
+        assertThat(advice.path("conflicts").get(0).asText()).isEqualTo("两项安排重叠");
+    }
     private AiSandboxService service(MockEnvironment environment, ApplicationSandboxService sandbox) {
         ObjectMapper mapper = new ObjectMapper();
         LegacySecretCrypto crypto = new LegacySecretCrypto();
