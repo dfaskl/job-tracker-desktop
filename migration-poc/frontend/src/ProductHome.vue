@@ -51,27 +51,30 @@ function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||i
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
 function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
-function adviceCacheKey(){return 'job_tracker_schedule_advice_v2_'+String(store.user.value?.email||'guest').toLowerCase()}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v3_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
 function localScheduleAdvice():ScheduleAdvice{
   const duration=90*60*1000
-  const items=[...adviceCandidates.value].sort((a,b)=>eventStart(a).localeCompare(eventStart(b)))
+  const items=[...adviceCandidates.value]
   const label=(event:JobEvent)=>eventCompany(event)+' · '+String(event.title||event.type||'未命名日程')
   const format=(time:number)=>{const date=new Date(time),pad=(value:number)=>String(value).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+' '+pad(date.getHours())+':'+pad(date.getMinutes())}
-  const plans:string[]=[],conflicts:string[]=[]
-  let cursor=-Infinity
-  for(const event of items){
-    const preferred=parseTime(eventStart(event)),rawEnd=String(event.endsAt||event.end||''),windowEnd=rawEnd?parseTime(rawEnd):Infinity
-    if(!Number.isFinite(preferred))continue
-    const scheduled=Math.max(preferred,cursor),scheduledEnd=scheduled+duration
-    if(Number.isFinite(windowEnd)&&rawEnd!==eventStart(event)&&scheduledEnd>windowEnd){
-      conflicts.push(label(event)+'：可用时间段内无法安排连续 90 分钟')
-      continue
+  const fixed=items.filter(event=>{const end=String(event.endsAt||event.end||'');return !end||end===eventStart(event)}).map(event=>({event,start:parseTime(eventStart(event)),end:parseTime(eventStart(event))+duration}))
+  const flexible=items.filter(event=>{const end=String(event.endsAt||event.end||'');return Boolean(end&&end!==eventStart(event))}).sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
+  const occupied=fixed.filter(slot=>Number.isFinite(slot.start)),scheduled=[...fixed.filter(slot=>Number.isFinite(slot.start))],conflicts:string[]=[]
+  for(let i=0;i<fixed.length;i++)for(let j=i+1;j<fixed.length;j++)if(fixed[i].start<fixed[j].end&&fixed[j].start<fixed[i].end)conflicts.push(label(fixed[i].event)+' 与 '+label(fixed[j].event)+' 的固定时间冲突')
+  for(const event of flexible){
+    const windowStart=parseTime(eventStart(event)),windowEnd=parseTime(eventDeadline(event))
+    let candidate=windowStart
+    while(candidate+duration<=windowEnd){
+      const collision=occupied.filter(slot=>candidate<slot.end&&slot.start<candidate+duration).sort((a,b)=>a.end-b.end)[0]
+      if(!collision)break
+      candidate=collision.end
     }
-    plans.push(format(scheduled)+'-'+format(scheduledEnd).slice(11)+' '+label(event))
-    cursor=scheduledEnd
+    if(!Number.isFinite(candidate)||candidate+duration>windowEnd){conflicts.push(label(event)+'：可用时间段内无法安排连续 90 分钟');continue}
+    const slot={event,start:candidate,end:candidate+duration};occupied.push(slot);scheduled.push(slot)
   }
-  return{summary:conflicts.length?'已按每项约 90 分钟排程，仍有 '+conflicts.length+' 项无法放入可用时间段':'已按每项约 90 分钟安排完成顺序',plans,conflicts}
+  const plans=scheduled.sort((a,b)=>a.start-b.start).map(slot=>format(slot.start)+'-'+format(slot.end).slice(11)+' '+label(slot.event))
+  return{summary:conflicts.length?'已保留固定时间并发现 '+conflicts.length+' 处冲突':'已保留固定时间，并将弹性日程安排到可用空档',plans,conflicts}
 }async function generateScheduleAdvice(signature:string,attempt=0){
   if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;adviceNotice.value='';return}
   if(loadScheduleAdvice(signature)||adviceLoading.value)return
