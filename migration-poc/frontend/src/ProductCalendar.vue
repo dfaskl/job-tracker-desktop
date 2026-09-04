@@ -78,7 +78,8 @@ function calendarEventsOn(dateKey: string): CalendarEntry[] {
   return normalized.value.filter(event => datesFor(event).includes(dateKey)).map(event => ({ event, position: calendarPosition(event, dateKey), lane: eventLanes.value.get(String(event.id)) || 0 }))
 }
 function visibleCalendarEvents(events: CalendarEntry[]) { return events.filter(entry => entry.lane < 3) }
-function hiddenCalendarEventCount(events: CalendarEntry[]) { return events.filter(entry => entry.lane >= 3).length }`r`nfunction move(offset: number) { cursor.value = clampMonth(new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1)) }
+function hiddenCalendarEventCount(events: CalendarEntry[]) { return events.filter(entry => entry.lane >= 3).length }
+function move(offset: number) { cursor.value = clampMonth(new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1)) }
 function eventName(event: JobEvent) { return value(event, 'title', 'type') || '未命名安排' }
 function eventCompany(event: JobEvent) {
   return value(event, 'company') || String(store.applications.value.find(item => item.id === event.applicationId)?.company || '未关联公司')
