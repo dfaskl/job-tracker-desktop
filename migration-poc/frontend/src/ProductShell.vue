@@ -71,7 +71,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
   <div class="product-shell">
     <aside class="sidebar">
       <button class="brand" type="button" @click="navigate('home')">
-        <span>✓</span><div><strong>求职进度本</strong><small>Vue + Java</small></div>
+        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职进度本</strong><small>Vue + Java</small></div>
       </button>
       <nav aria-label="主要导航">
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id }" @click="navigate(item.id)">
@@ -102,7 +102,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
 .product-shell { min-height: 100vh; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 10; display: flex; width: 228px; flex-direction: column; padding: 24px 16px; color: #dce5ff; background: #17213a; }
 .brand { display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px; color: inherit; background: transparent; text-align: left; }
-.brand > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #fff; background: #526ddd; }
+.brand > img { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 11px; box-shadow: 0 5px 14px rgba(18, 31, 73, .32); }
 .brand div { display: grid; gap: 2px; }
 .brand strong { font-size: 16px; }
 .brand small { color: #91a0c5; font-size: 11px; }
