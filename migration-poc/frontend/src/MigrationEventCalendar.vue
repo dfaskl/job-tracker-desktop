@@ -31,10 +31,14 @@ type EventForm = {
   location: string
   notes: string
 }
-type CalendarEvent = { event: EventItem; position: 'point' | 'start' | 'middle' | 'end' }
+type CalendarEvent = { event: EventItem; position: 'point' | 'start' | 'middle' | 'end'; lane: number; color: number }
 type CalendarCell = { key: string; day: number; inMonth: boolean; events: CalendarEvent[] }
 
 const eventTypes = ['测评', '笔试', '面试', 'Offer', '其他']
+const eventColors = [
+  ['#356fc0','#e3efff'], ['#7b58bd','#eee7fb'], ['#c47819','#fff0d5'], ['#198176','#ddf4f0'],
+  ['#c34f5a','#fde6e9'], ['#347f9d','#e0f1f7'], ['#66752e','#edf2d8'], ['#a04f91','#f7e4f3']
+] as const
 const sandbox = ref<SandboxStatus | null>(null)
 const applications = ref<ApplicationOption[]>([])
 const events = ref<EventItem[]>([])
@@ -49,7 +53,8 @@ const lastLoadedAt = ref(0)
 const form = reactive<EventForm>(emptyForm())
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
-const selectedEvents = computed(() => calendarEventsOn(selectedDate.value))
+const eventLanes = computed(() => allocateEventLanes(events.value))
+const selectedEvents = computed(() => calendarEventsOn(selectedDate.value).sort((left, right) => left.event.recordAt.localeCompare(right.event.recordAt)))
 const monthEventCount = computed(() => {
   const prefix = `${month.value.getFullYear()}-${pad(month.value.getMonth() + 1)}`
   return events.value.filter(event => calendarEntries(event).some(entry => entry.key.startsWith(prefix))).length
@@ -159,11 +164,36 @@ function calendarEntries(event: EventItem): Array<{ key: string; position: Calen
   return [{ key: (event.recordAt || event.startsAt).slice(0, 10), position: 'point' }]
 }
 
+function eventColor(event: EventItem) {
+  let hash = 0
+  for (const character of String(event.id || `${event.company}-${event.title}-${event.startsAt}`)) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0
+  return Math.abs(hash) % 8
+}
+function allocateEventLanes(items: EventItem[]) {
+  const occupied: Array<Set<string>> = []
+  const result = new Map<string, number>()
+  const ordered = [...items].sort((left, right) => {
+    const leftStart = calendarEntries(left)[0]?.key || ''
+    const rightStart = calendarEntries(right)[0]?.key || ''
+    return leftStart.localeCompare(rightStart) || left.recordAt.localeCompare(right.recordAt) || left.id.localeCompare(right.id)
+  })
+  for (const event of ordered) {
+    const dates = calendarEntries(event).map(entry => entry.key)
+    let lane = occupied.findIndex(taken => dates.every(date => !taken.has(date)))
+    if (lane < 0) { lane = occupied.length; occupied.push(new Set()) }
+    dates.forEach(date => occupied[lane].add(date))
+    result.set(event.id, lane)
+  }
+  return result
+}
 function calendarEventsOn(key: string): CalendarEvent[] {
   return events.value.flatMap((event) =>
-    calendarEntries(event).filter((entry) => entry.key === key).map((entry) => ({ event, position: entry.position }))
-  ).sort((left, right) => left.event.recordAt.localeCompare(right.event.recordAt))
+    calendarEntries(event).filter((entry) => entry.key === key).map((entry) => ({ event, position: entry.position, lane:eventLanes.value.get(event.id) || 0, color:eventColor(event) }))
+  )
 }
+function visibleEvents(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane < 3) }
+function hiddenEventCount(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane >= 3).length }
+function eventStyle(entry: CalendarEvent) { const color=eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String(entry.lane + 1) } }
 
 function changeMonth(offset: number) {
   month.value = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
@@ -282,42 +312,48 @@ async function remove(item: EventItem) {
 
     <template v-else-if="sandbox?.enabled">
 <p v-if="message" class="success">{{ message }}</p>
-      <div class="calendar-head">
-        <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
-        <div><button class="secondary compact" :disabled="!canGoPrevious" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" @click="changeMonth(1)">›</button></div>
-      </div>
-      <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
-      <div class="calendar-grid">
-        <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
-          <span>{{ cell.day }}</span>
-          <small v-for="entry in cell.events.slice(0, 3)" :key="entry.event.id + entry.position" :class="['event-chip', entry.position, `type-${entry.event.type}`, { completed:entry.event.completed, missed:entry.event.missed }]">
-            {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
-          </small>
-          <i v-if="cell.events.length > 3">+{{ cell.events.length - 3 }}</i>
-        </button>
-      </div>
-
-      <div class="selected-list">
-        <h3>{{ selectedDate }} 的日程</h3>
-        <article v-for="entry in selectedEvents" :key="entry.event.id">
-          <div class="event-main">
-            <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
-            <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
-            <span>{{ entry.event.endsAt && !entry.event.completed ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.recordAt) }}</span>
-            <span v-if="entry.event.location">{{ entry.event.location }}</span>
+      <div class="calendar-layout">
+        <div class="calendar-pane">
+          <div class="calendar-head">
+            <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
+            <div><button class="secondary compact" :disabled="!canGoPrevious" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" @click="changeMonth(1)">›</button></div>
           </div>
-          <div class="event-actions">
-            <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
-            
-            <button class="secondary compact" @click="edit(entry.event)">编辑</button>
-            <button v-if="entry.event.completed" class="secondary compact" @click="resolve(entry.event, 'restore')">恢复</button>
-            <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
-            <button class="danger-button compact" @click="remove(entry.event)">删除</button>
+          <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
+          <div class="calendar-grid">
+            <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
+              <span class="day-number">{{ cell.day }}</span>
+              <span class="day-events">
+                <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed }]">
+                  {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.title}` : entry.position === 'end' ? `截止 ${entry.event.title}` : entry.event.title }}
+                </small>
+              </span>
+              <i v-if="hiddenEventCount(cell.events)">+{{ hiddenEventCount(cell.events) }}</i>
+            </button>
           </div>
-        </article>
-        <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
-      </div>
+        </div>
 
+        <aside class="selected-list">
+          <h3>{{ selectedDate }} 的日程</h3>
+          <div class="selected-scroll">
+            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)">
+              <div class="event-main">
+                <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
+                <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
+                <span>{{ entry.event.endsAt && !entry.event.completed ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.recordAt) }}</span>
+                <span v-if="entry.event.location">{{ entry.event.location }}</span>
+              </div>
+              <div class="event-actions">
+                <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
+                <button class="secondary compact" @click="edit(entry.event)">编辑</button>
+                <button v-if="entry.event.completed" class="secondary compact" @click="resolve(entry.event, 'restore')">恢复</button>
+                <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
+                <button class="danger-button compact" @click="remove(entry.event)">删除</button>
+              </div>
+            </article>
+            <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
+          </div>
+        </aside>
+      </div>
       <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
         <form class="event-form edit-modal" @submit.prevent="save">
           <button type="button" class="modal-close" @click="resetForm">×</button>
@@ -388,6 +424,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .danger-button { color: #a52d2d; background: #fceaea; }
 .compact { padding: 8px 11px; }
 
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid #dbe3f1;border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{display:inline-grid;width:24px;height:24px;flex:0 0 24px;align-self:flex-start;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}
 @media (max-width: 720px) {
   .event-form { grid-template-columns: 1fr; }
   .event-form .wide { grid-column: auto; }
