@@ -51,20 +51,22 @@ function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||i
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
 function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
-function adviceCacheKey(){return 'job_tracker_schedule_advice_v3_'+String(store.user.value?.email||'guest').toLowerCase()}
-function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v4_'+String(store.user.value?.email||'guest').toLowerCase()}
+function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.date===today()&&cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
 function localScheduleAdvice():ScheduleAdvice{
   const duration=90*60*1000
+  const now=Date.now()
   const items=[...adviceCandidates.value]
   const label=(event:JobEvent)=>eventCompany(event)+' · '+String(event.title||event.type||'未命名日程')
   const format=(time:number)=>{const date=new Date(time),pad=(value:number)=>String(value).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+' '+pad(date.getHours())+':'+pad(date.getMinutes())}
   const fixed=items.filter(event=>{const end=String(event.endsAt||event.end||'');return !end||end===eventStart(event)}).map(event=>({event,start:parseTime(eventStart(event)),end:parseTime(eventStart(event))+duration}))
   const flexible=items.filter(event=>{const end=String(event.endsAt||event.end||'');return Boolean(end&&end!==eventStart(event))}).sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
-  const occupied=fixed.filter(slot=>Number.isFinite(slot.start)),scheduled=[...fixed.filter(slot=>Number.isFinite(slot.start))],conflicts:string[]=[]
-  for(let i=0;i<fixed.length;i++)for(let j=i+1;j<fixed.length;j++)if(fixed[i].start<fixed[j].end&&fixed[j].start<fixed[i].end)conflicts.push(label(fixed[i].event)+' 与 '+label(fixed[j].event)+' 的固定时间冲突')
+  const futureFixed=fixed.filter(slot=>Number.isFinite(slot.start)&&slot.start>=now)
+  const occupied=[...futureFixed],scheduled=[...futureFixed],conflicts:string[]=[]
+  for(let i=0;i<futureFixed.length;i++)for(let j=i+1;j<futureFixed.length;j++)if(futureFixed[i].start<futureFixed[j].end&&futureFixed[j].start<futureFixed[i].end)conflicts.push(label(futureFixed[i].event)+' 与 '+label(futureFixed[j].event)+' 的固定时间冲突')
   for(const event of flexible){
     const windowStart=parseTime(eventStart(event)),windowEnd=parseTime(eventDeadline(event))
-    let candidate=windowStart
+    let candidate=Math.max(windowStart,now)
     while(candidate+duration<=windowEnd){
       const collision=occupied.filter(slot=>candidate<slot.end&&slot.start<candidate+duration).sort((a,b)=>a.end-b.end)[0]
       if(!collision)break
@@ -86,7 +88,7 @@ function localScheduleAdvice():ScheduleAdvice{
     const advice=await api<ScheduleAdvice>('/api/poc/ai-sandbox/schedule-advice',{method:'POST',body:JSON.stringify({schedules})})
     if(adviceSignature.value!==signature)return
     scheduleAdvice.value=advice
-    localStorage.setItem(adviceCacheKey(),JSON.stringify({signature,advice}))
+    localStorage.setItem(adviceCacheKey(),JSON.stringify({date:today(),signature,advice}))
   }catch(cause){
     if(cause instanceof ApiError&&cause.status===429&&attempt<2&&adviceSignature.value===signature){
       adviceNotice.value='AI 请求正在排队，将自动重试…'
