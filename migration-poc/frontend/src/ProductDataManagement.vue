@@ -56,7 +56,7 @@ async function loadSandbox() {
   try {
     sandbox.value = await apiCached<SandboxStatus>('/api/poc/backup-sandbox/status')
   } catch (cause) {
-    sandbox.value = { enabled: false, configured: false, isolated: false, message: cause instanceof Error ? cause.message : '无法检查业务数据库' }
+    sandbox.value = { enabled: false, configured: false, isolated: false, message: cause instanceof Error ? cause.message : '无法读取数据状态' }
   }
 }
 
@@ -124,7 +124,7 @@ async function importIntoSandbox() {
       method: 'POST',
       body: JSON.stringify({ data: importData.value, confirmation: importConfirmation.value })
     })
-    message.value = `已导入业务数据：${result.applicationCount} 条投递、${result.eventCount} 项日程`
+    message.value = `已导入数据：${result.applicationCount} 条投递、${result.eventCount} 项日程`
     importConfirmation.value = ''
     await store.refresh()
   } catch (cause) {
@@ -164,7 +164,7 @@ function formatDate(value: string) {
 <template>
   <section class="card data-card">
     <div class="section-head">
-      <div><span class="section-kicker">资料管理</span><h2>公司链接与数据迁移</h2></div>
+      <div><span class="section-kicker">数据管理</span><h2>公司官网库与业务数据</h2></div>
       <button class="secondary" type="button" @click="loadLinks">刷新链接</button>
     </div>
 
@@ -188,14 +188,14 @@ function formatDate(value: string) {
 
     <div class="data-grid">
       <div class="tool-box">
-        <h3>导出业务 JSON</h3>
+        <h3>导出数据</h3>
         <p>导出当前登录账号的完整业务数据，已去除旧系统保存的 AI 密钥字段。</p>
-        <button type="button" :disabled="!store.user.value" @click="exportData">下载 JSON</button>
+        <button type="button" :disabled="!store.user.value" @click="exportData">导出数据</button>
       </div>
 
       <div class="tool-box">
-        <h3>导入业务数据</h3>
-        <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在检查业务数据库状态') }}</p>
+        <h3>导入数据</h3>
+        <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
         <input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" />
         <label><span>输入“导入”确认</span><input v-model="importConfirmation" :disabled="!sandbox?.enabled || !importData" placeholder="导入" /></label>
         <button type="button" :disabled="loading || !sandbox?.enabled || !importData || importConfirmation !== '导入'" @click="importIntoSandbox">确认导入</button>
@@ -204,9 +204,9 @@ function formatDate(value: string) {
 
       <div class="tool-box danger-zone">
         <h3>清空业务数据</h3>
-        <p>{{ sandbox?.enabled ? '清空前会自动备份当前数据。' : '当前数据源写入未开启，清空不可用。' }}</p>
+        <p>{{ sandbox?.enabled ? '清空前会自动备份当前数据。' : '当前数据暂时不可修改。' }}</p>
         <label><span>输入“清空”确认</span><input v-model="clearConfirmation" :disabled="!sandbox?.enabled" placeholder="清空" /></label>
-        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled || clearConfirmation !== '清空'" @click="clearSandbox">清空业务数据库</button>
+        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled || clearConfirmation !== '清空'" @click="clearSandbox">清空全部数据</button>
       </div>
     </div>
 

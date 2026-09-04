@@ -31,3 +31,12 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .card { padding: 20px; }
   .form-row { flex-direction: column; }
 }
+
+:root { --accent:#4461d8; --sidebar:#17213a; --sidebar-active:#273552; }
+:root[data-theme="purple"] { --accent:#7953ad; --sidebar:#2c203c; --sidebar-active:#49345f; }
+:root[data-theme="orange"] { --accent:#b86b34; --sidebar:#3a271c; --sidebar-active:#5a3925; }
+:root[data-theme="green"] { --accent:#32845c; --sidebar:#102c20; --sidebar-active:#204735; }
+:root[data-theme] .topbar>button,:root[data-theme] .primary-action,:root[data-theme] .api-form>button,:root[data-theme] .link-editor>button,:root[data-theme] .tool-box>button:not(.danger-button) { background-color:var(--accent); }
+:root[data-theme] .sidebar { background:var(--sidebar)!important; }
+:root[data-theme] .sidebar nav button:hover,:root[data-theme] .sidebar nav button.active { background:var(--sidebar-active)!important; }
+:root[data-theme] .eyebrow { color:var(--accent); }

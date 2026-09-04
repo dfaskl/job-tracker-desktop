@@ -72,7 +72,7 @@ async function restore() {
       body: JSON.stringify({ expectedCurrentUpdatedAt: currentUpdatedAt.value, confirmation: confirmation.value })
     })
     if (!result.response.ok) throw new Error(result.body.message || '恢复失败')
-    message.value = `已在业务数据库恢复备份 #${selected.value.id}：${result.body.applicationCount} 条投递、${result.body.eventCount} 项日程`
+    message.value = `已恢复备份 #${selected.value.id}：${result.body.applicationCount} 条投递、${result.body.eventCount} 项日程`
     selected.value = null
     confirmation.value = ''
     await loadBackups()
@@ -97,13 +97,12 @@ function formatSize(value: number) {
 <template>
   <section class="card backup-card">
     <div class="section-head">
-      <div><span class="section-kicker">第 4 阶段</span><h2>备份列表与恢复数据安全</h2></div>
-      <span :class="['mode-badge', sandbox?.enabled ? 'enabled' : 'disabled']">{{ sandbox?.enabled ? '独立业务数据库' : '安全关闭' }}</span>
+      <div><span class="section-kicker">数据保护</span><h2>云端历史备份</h2></div>
     </div>
-    <p>查看测试账号最近 30 份业务备份；恢复前再次备份当前数据，并检查页面读取的数据版本是否仍然最新。</p>
+    <p>最多保留最近 30 份；恢复历史版本前会自动备份当前数据。</p>
 
     <div v-if="sandbox && !sandbox.enabled" class="notice">
-      <strong>{{ sandbox.message }}</strong><span>备份恢复只使用业务数据库，不读取或覆盖生产备份。</span>
+      <strong>备份功能暂时不可用</strong><span>{{ sandbox.message }}</span>
     </div>
 
     <template v-else-if="sandbox?.enabled">
@@ -114,18 +113,18 @@ function formatSize(value: number) {
           <div><span>{{ item.applicationCount }} 条投递</span><span>{{ item.eventCount }} 项日程</span><span>{{ formatSize(item.size) }}</span></div>
         </button>
       </div>
-      <div v-else class="notice">业务数据库中还没有备份；执行职位或日程变更后会自动产生。</div>
+      <div v-else class="notice">还没有可恢复的云端备份；修改投递或日程后会自动生成。</div>
 
       <div v-if="selected" class="restore-panel">
         <strong>准备恢复备份 #{{ selected.id }}</strong>
-        <p>这会替换当前数据库中的当前业务数据。系统会先创建一份 <code>before-restore</code> 备份，因此可以再次恢复。</p>
+        <p>这会用所选版本替换当前数据。恢复前系统会自动保存当前版本，以便需要时撤销。</p>
         <label><span>输入“恢复”确认</span><input v-model="confirmation" autocomplete="off" placeholder="恢复" /></label>
-        <div><button class="danger-button" :disabled="loading || confirmation !== '恢复'" @click="restore">{{ loading ? '恢复中…' : '恢复到业务数据库' }}</button><button class="secondary" @click="selected = null">取消</button></div>
+        <div><button class="danger-button" :disabled="loading || confirmation !== '恢复'" @click="restore">{{ loading ? '恢复中…' : '确认恢复' }}</button><button class="secondary" @click="selected = null">取消</button></div>
       </div>
       <p v-if="message" class="success">{{ message }}</p>
     </template>
 
-    <p v-else>正在检查备份数据安全…</p>
+    <p v-else>正在读取云端备份…</p>
     <p v-if="error" class="danger">{{ error }}</p>
   </section>
 </template>
