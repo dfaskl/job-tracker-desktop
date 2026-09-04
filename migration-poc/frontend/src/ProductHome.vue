@@ -51,16 +51,27 @@ function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||i
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
 function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
-function adviceCacheKey(){return 'job_tracker_schedule_advice_v1_'+String(store.user.value?.email||'guest').toLowerCase()}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v2_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
 function localScheduleAdvice():ScheduleAdvice{
+  const duration=90*60*1000
   const items=[...adviceCandidates.value].sort((a,b)=>eventStart(a).localeCompare(eventStart(b)))
   const label=(event:JobEvent)=>eventCompany(event)+' · '+String(event.title||event.type||'未命名日程')
-  const clock=(value:string)=>value.slice(11,16)||'时间待定'
-  const plans=items.map(event=>{const start=eventStart(event),end=String(event.endsAt||event.end||'');return end&&end!==start?clock(start)+'-'+clock(end)+' '+label(event):clock(start)+' '+label(event)})
-  const conflicts:string[]=[]
-  for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){const aStart=parseTime(eventStart(items[i])),bStart=parseTime(eventStart(items[j])),aEnd=parseTime(eventDeadline(items[i])),bEnd=parseTime(eventDeadline(items[j]));if(aStart===bStart||(aStart<bEnd&&bStart<aEnd))conflicts.push(label(items[i])+' 与 '+label(items[j])+' 时间冲突，无法同时完成')}
-  return{summary:conflicts.length?'已按时间排序，并发现 '+conflicts.length+' 处冲突':'已按开始时间生成建议顺序',plans,conflicts}
+  const format=(time:number)=>{const date=new Date(time),pad=(value:number)=>String(value).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+' '+pad(date.getHours())+':'+pad(date.getMinutes())}
+  const plans:string[]=[],conflicts:string[]=[]
+  let cursor=-Infinity
+  for(const event of items){
+    const preferred=parseTime(eventStart(event)),rawEnd=String(event.endsAt||event.end||''),windowEnd=rawEnd?parseTime(rawEnd):Infinity
+    if(!Number.isFinite(preferred))continue
+    const scheduled=Math.max(preferred,cursor),scheduledEnd=scheduled+duration
+    if(Number.isFinite(windowEnd)&&rawEnd!==eventStart(event)&&scheduledEnd>windowEnd){
+      conflicts.push(label(event)+'：可用时间段内无法安排连续 90 分钟')
+      continue
+    }
+    plans.push(format(scheduled)+'-'+format(scheduledEnd).slice(11)+' '+label(event))
+    cursor=scheduledEnd
+  }
+  return{summary:conflicts.length?'已按每项约 90 分钟排程，仍有 '+conflicts.length+' 项无法放入可用时间段':'已按每项约 90 分钟安排完成顺序',plans,conflicts}
 }async function generateScheduleAdvice(signature:string,attempt=0){
   if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;adviceNotice.value='';return}
   if(loadScheduleAdvice(signature)||adviceLoading.value)return
