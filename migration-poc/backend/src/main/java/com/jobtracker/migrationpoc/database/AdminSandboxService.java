@@ -306,15 +306,31 @@ public class AdminSandboxService {
     }
 
     private AdminIdentity requireAdmin(Connection connection, String email) throws Exception {
+        String normalizedEmail = normalizeEmail(email);
+        String configuredAdminEmail = normalizeEmail(environment.getProperty("ADMIN_EMAIL"));
+        boolean configuredAdmin = !configuredAdminEmail.isBlank() && configuredAdminEmail.equals(normalizedEmail);
         try (PreparedStatement statement = connection.prepareStatement(
             "SELECT id,email,is_admin FROM users WHERE lower(email)=? AND disabled_at IS NULL"
         )) {
-            statement.setString(1, normalizeEmail(email));
+            statement.setString(1, normalizedEmail);
             try (ResultSet result = statement.executeQuery()) {
-                if (!result.next() || !result.getBoolean("is_admin")) {
-                    throw new AdminForbiddenException("需要独立测试数据库的管理员权限");
+                if (!result.next()) {
+                    throw new AdminForbiddenException("当前管理员账号不存在或已停用");
                 }
-                return new AdminIdentity(result.getLong("id"), result.getString("email"));
+                long id = result.getLong("id");
+                boolean databaseAdmin = result.getBoolean("is_admin");
+                if (!databaseAdmin && !configuredAdmin) {
+                    throw new AdminForbiddenException("当前账号没有管理员权限");
+                }
+                if (configuredAdmin && !databaseAdmin) {
+                    try (PreparedStatement promote = connection.prepareStatement(
+                        "UPDATE users SET is_admin=TRUE WHERE id=?"
+                    )) {
+                        promote.setLong(1, id);
+                        promote.executeUpdate();
+                    }
+                }
+                return new AdminIdentity(id, result.getString("email"));
             }
         }
     }
