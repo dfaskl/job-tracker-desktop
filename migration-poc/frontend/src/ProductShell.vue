@@ -111,7 +111,7 @@ nav { display: grid; gap: 6px; margin-top: 32px; }
 nav button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 13px; color: #aebbd9; background: transparent; text-align: left; }
 nav button span { width: 20px; color: #8392b7; font-size: 17px; text-align: center; }
 nav button:hover, nav button.active { color: #fff; background: #273552; }
-.sidebar-account { width: 100%; margin-top: auto; }
+.sidebar-account { display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 228px; padding: 0 42px 72px; }
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; min-height: 112px; gap: 20px; border-bottom: 1px solid #e4e9f2; background: rgba(244, 247, 251, .94); backdrop-filter: blur(14px); }
 .topbar h1 { margin: 0 0 6px; font-size: 28px; }
@@ -129,7 +129,7 @@ nav button:hover, nav button.active { color: #fff; background: #273552; }
   .brand { width: auto; }
   .brand small { display: none; }
   .sidebar-account { position: absolute; top: 10px; right: 14px; width: auto; margin: 0; }
-  .sidebar-account :deep(.signed.compact) { display: flex; padding: 6px 8px; }
+  .sidebar-account :deep(.signed.compact) { display: flex; width: auto; padding: 6px 8px; }
   .sidebar-account :deep(.signed.compact span) { display: none; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
   nav { display: flex; margin: 8px -4px 0; overflow-x: auto; }
