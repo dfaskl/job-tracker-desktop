@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
@@ -21,6 +21,7 @@ const scheduleAdvice = ref<ScheduleAdvice | null>(null)
 const adviceLoading = ref(false)
 const adviceNotice = ref('')
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
+let messageTimer: ReturnType<typeof setTimeout> | null = null
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
@@ -146,7 +147,9 @@ async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.v
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
-watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(store.user.value)adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),3200)},{immediate:true})</script>
+watch(message,value=>{if(messageTimer)clearTimeout(messageTimer);if(value)messageTimer=setTimeout(()=>{if(message.value===value)message.value=''},2600)})
+watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(store.user.value)adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),3200)},{immediate:true})
+onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
