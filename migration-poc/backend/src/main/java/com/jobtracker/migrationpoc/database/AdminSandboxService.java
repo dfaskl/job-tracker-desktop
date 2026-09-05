@@ -139,6 +139,27 @@ public class AdminSandboxService {
         }
     }
 
+    public SessionResult revokeSessions(String adminEmail, long targetId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                rejectProtectedAdmin(admin, target, "撤销会话");
+                int revoked;
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM sessions WHERE user_id=?")) {
+                    statement.setLong(1, target.id());
+                    revoked = statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "revoke-sessions");
+                connection.commit();
+                return new SessionResult(true, revoked);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
     public DeleteResult deleteUser(String adminEmail, long targetId, String confirmEmail) throws Exception {
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
@@ -411,6 +432,7 @@ public class AdminSandboxService {
                               int totalApplications, boolean truncated) {}
     public record RegistrationResult(boolean ok, boolean registrationOpen) {}
     public record DisabledResult(boolean ok, boolean disabled) {}
+    public record SessionResult(boolean ok, int revoked) {}
     public record DeleteResult(boolean ok) {}
 
     public static class AdminDisabledException extends RuntimeException {

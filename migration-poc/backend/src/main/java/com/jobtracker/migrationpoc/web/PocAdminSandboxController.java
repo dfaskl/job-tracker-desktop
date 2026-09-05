@@ -105,6 +105,21 @@ public class PocAdminSandboxController {
         }
     }
 
+    @PatchMapping("/users/{id}/sessions/revoke")
+    public ResponseEntity<?> revokeSessions(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.revokeSessions(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("revoke-sessions", exception);
+        }
+    }
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(
         @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,

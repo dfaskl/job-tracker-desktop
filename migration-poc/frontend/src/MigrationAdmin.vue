@@ -1,302 +1,99 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
-type AdminStatus = { enabled: boolean; requested: boolean; sandboxEnabled: boolean; message: string }
-type Summary = {
-  totalUsers: number
-  enabledUsers: number
-  totalApplications: number
-  activeSessions: number
-  configuredApiKeys: number
-  registrationOpen: boolean
-}
-type User = {
-  id: string
-  email: string
-  isAdmin: boolean
-  disabled: boolean
-  createdAt: string
-  lastLoginAt: string
-  applicationCount: number
-  eventCount: number
-  hasApiKey: boolean
-}
-type Audit = { id: string; action: string; targetEmail: string; createdAt: string }
-type ApplicationDetail = {
-  id: string
-  company: string
-  position: string
-  stage: string
-  status: string
-  flow: { at: string; title: string }[]
-}
-type UserDetails = {
-  user: { id: string; email: string }
-  applications: ApplicationDetail[]
-  totalApplications: number
-  truncated: boolean
-}
-type Overview = {
-  currentUser: { id: string; email: string }
-  summary: Summary
-  users: User[]
-  usersTruncated: boolean
-  audit: Audit[]
-}
+type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
+type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
+type User={id:string;email:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastLoginAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean}
+type Audit={id:string;action:string;targetEmail:string;createdAt:string}
+type ApplicationDetail={id:string;company:string;position:string;stage:string;status:string;appliedDate:string;city:string;channel:string;flow:{at:string;title:string}[]}
+type UserDetails={user:{id:string;email:string};applications:ApplicationDetail[];totalApplications:number;truncated:boolean}
+type Overview={currentUser:{id:string;email:string};summary:Summary;users:User[];usersTruncated:boolean;audit:Audit[]}
 
-const status = ref<AdminStatus | null>(null)
-const overview = ref<Overview | null>(null)
-const details = ref<Record<string, UserDetails>>({})
-const expanded = ref<Record<string, boolean>>({})
-const loading = ref(false)
-const busyUser = ref('')
-const error = ref('')
-const message = ref('')
-
-const actionLabels: Record<string, string> = {
-  'disable-user': '停用了账号',
-  'enable-user': '启用了账号',
-  'delete-user': '永久删除了账号',
-  'open-registration': '开放了用户注册',
-  'close-registration': '关闭了用户注册',
-  'view-user-details': '查看了用户数据'
-}
+const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
+const query=ref(''),stateFilter=ref('all'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
+const actionLabels:Record<string,string>={'disable-user':'停用账号','enable-user':'启用账号','delete-user':'删除账号','open-registration':'开放注册','close-registration':'关闭注册','view-user-details':'查看用户详情','revoke-sessions':'撤销登录会话'}
+const users=computed(()=>overview.value?.users||[])
+const filteredUsers=computed(()=>{const keyword=query.value.trim().toLowerCase();return users.value.filter(user=>(!keyword||user.email.toLowerCase().includes(keyword))&&(stateFilter.value==='all'||stateFilter.value==='admin'&&user.isAdmin||stateFilter.value==='enabled'&&!user.disabled||stateFilter.value==='disabled'&&user.disabled))})
+const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCount,0))
+const disabledUsers=computed(()=>users.value.filter(user=>user.disabled).length)
+const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastLoginAt)>edge).length})
+const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
 
 onMounted(checkStatus)
-
-async function requestJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, { cache: 'no-store', ...init })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(body.message || '操作失败')
-  return body
-}
-
-async function checkStatus() {
-  loading.value = true
-  error.value = ''
-  try {
-    status.value = await requestJson('/api/poc/admin-sandbox/status') as AdminStatus
-    if (status.value.enabled) await loadOverview()
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '管理员数据安全检查失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadOverview() {
-  overview.value = await requestJson('/api/poc/admin-sandbox/overview') as Overview
-}
-
-async function refresh() {
-  loading.value = true
-  error.value = ''
-  message.value = ''
-  try {
-    await loadOverview()
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '刷新失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function toggleRegistration() {
-  if (!overview.value) return
-  loading.value = true
-  error.value = ''
-  message.value = ''
-  const enabled = !overview.value.summary.registrationOpen
-  try {
-    await requestJson('/api/poc/admin-sandbox/settings/registration', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled })
-    })
-    await loadOverview()
-    message.value = enabled ? '独立业务数据库已开放注册' : '独立业务数据库已关闭注册'
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '修改注册状态失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function toggleDetails(user: User) {
-  expanded.value[user.id] = !expanded.value[user.id]
-  if (!expanded.value[user.id] || details.value[user.id]) return
-  busyUser.value = user.id
-  error.value = ''
-  try {
-    details.value[user.id] = await requestJson(`/api/poc/admin-sandbox/users/${user.id}/details`) as UserDetails
-    await loadOverview()
-  } catch (cause) {
-    expanded.value[user.id] = false
-    error.value = cause instanceof Error ? cause.message : '读取用户详情失败'
-  } finally {
-    busyUser.value = ''
-  }
-}
-
-async function setDisabled(user: User) {
-  busyUser.value = user.id
-  error.value = ''
-  message.value = ''
-  try {
-    await requestJson(`/api/poc/admin-sandbox/users/${user.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ disabled: !user.disabled })
-    })
-    await loadOverview()
-    message.value = user.disabled ? '测试账号已重新启用' : '测试账号已停用，业务数据库会话已撤销'
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '修改账号状态失败'
-  } finally {
-    busyUser.value = ''
-  }
-}
-
-async function deleteUser(user: User) {
-  const confirmEmail = window.prompt(`此操作只针对业务数据库。请输入 ${user.email} 确认永久删除：`, '')
-  if (confirmEmail === null) return
-  busyUser.value = user.id
-  error.value = ''
-  message.value = ''
-  try {
-    await requestJson(`/api/poc/admin-sandbox/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirmEmail })
-    })
-    delete details.value[user.id]
-    await loadOverview()
-    message.value = '测试用户及其业务数据库数据已删除'
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '删除测试用户失败'
-  } finally {
-    busyUser.value = ''
-  }
-}
-
-function formatDate(value: string) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
-}
+async function requestJson(url:string,init?:RequestInit){const response=await fetch(url,{cache:'no-store',...init});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.message||'操作失败');return body}
+async function checkStatus(){loading.value=true;error.value='';try{status.value=await requestJson('/api/poc/admin-sandbox/status') as AdminStatus;if(status.value.enabled)await loadOverview()}catch(cause){error.value=failure(cause,'管理员服务检查失败')}finally{loading.value=false}}
+async function loadOverview(){overview.value=await requestJson('/api/poc/admin-sandbox/overview') as Overview}
+async function refresh(){loading.value=true;error.value='';try{await loadOverview();message.value='管理员数据已刷新'}catch(cause){error.value=failure(cause,'刷新失败')}finally{loading.value=false}}
+async function toggleRegistration(){if(!overview.value)return;loading.value=true;error.value='';const enabled=!overview.value.summary.registrationOpen;try{await requestJson('/api/poc/admin-sandbox/settings/registration',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});await loadOverview();message.value=enabled?'注册入口已开放':'注册入口已关闭'}catch(cause){error.value=failure(cause,'修改注册状态失败')}finally{loading.value=false}}
+async function openDetails(user:User){selected.value=user;detail.value=null;busyUser.value=user.id;error.value='';try{detail.value=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/details`) as UserDetails;await loadOverview()}catch(cause){selected.value=null;error.value=failure(cause,'读取用户详情失败')}finally{busyUser.value=''}}
+async function setDisabled(user:User){busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({disabled:!user.disabled})});await loadOverview();message.value=user.disabled?'账号已启用':'账号已停用并撤销会话'}catch(cause){error.value=failure(cause,'修改账号状态失败')}finally{busyUser.value=''}}
+async function revokeSessions(user:User){if(!confirm(`确认让 ${user.email} 的所有设备重新登录吗？`))return;busyUser.value=user.id;error.value='';try{const result=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/sessions/revoke`,{method:'PATCH'});await loadOverview();message.value=`已撤销 ${Number(result.revoked||0)} 个登录会话`}catch(cause){error.value=failure(cause,'撤销会话失败')}finally{busyUser.value=''}}
+async function deleteUser(user:User){const confirmEmail=prompt(`删除后无法恢复。请输入 ${user.email} 确认：`,'');if(confirmEmail===null)return;busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmEmail})});if(selected.value?.id===user.id){selected.value=null;detail.value=null}await loadOverview();message.value='用户及其业务数据已删除'}catch(cause){error.value=failure(cause,'删除用户失败')}finally{busyUser.value=''}}
+function failure(cause:unknown,fallback:string){return cause instanceof Error?cause.message:fallback}
+function formatDate(value:string){if(!value)return '从未';const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString('zh-CN',{hour12:false})}
+function relativeDate(value:string){if(!value)return '从未登录';const time=Date.parse(value);if(!Number.isFinite(time))return value;const days=Math.floor((Date.now()-time)/86400000);return days<=0?'今天':days===1?'昨天':`${days} 天前`}
 </script>
 
 <template>
-  <section class="card admin-card">
-    <div class="section-head">
-      <div><span class="section-kicker">第 6 阶段</span><h2>管理员后台迁移数据安全</h2></div>
-      <span :class="['mode-badge', status?.enabled ? 'enabled' : 'disabled']">{{ status?.enabled ? '测试后台已开启' : '默认关闭' }}</span>
-    </div>
-    <p>管理员操作只能作用于业务数据库；页面不会显示密码、API Key 明文或其他秘密信息。</p>
-
-    <div v-if="status && !status.enabled" class="notice">
-      <strong>{{ status.message }}</strong>
-      <span>需同时开启独立测试写入和 <code>POC_ADMIN_ENABLED=true</code>，生产数据库地址会被拒绝。</span>
-    </div>
-
+  <section class="admin-shell">
+    <div v-if="status&&!status.enabled" class="card disabled-panel"><h2>管理员功能未开启</h2><p>{{status.message}}</p><small>需要开启管理员环境配置后才能使用。</small></div>
     <template v-else-if="overview">
-      <div class="toolbar">
-        <span>当前测试管理员：<strong>{{ overview.currentUser.email }}</strong></span>
-        <button class="secondary" :disabled="loading" @click="refresh">{{ loading ? '刷新中…' : '刷新概览' }}</button>
-      </div>
+      <header class="admin-head">
+        <div><span>管理中心</span><h2>系统运行与账号管理</h2><p>当前管理员：{{overview.currentUser.email}}</p></div>
+        <button class="secondary" :disabled="loading" @click="refresh">{{loading?'刷新中…':'刷新数据'}}</button>
+      </header>
 
       <div class="summary-grid">
-        <article><span>用户</span><strong>{{ overview.summary.enabledUsers }} / {{ overview.summary.totalUsers }}</strong></article>
-        <article><span>投递记录</span><strong>{{ overview.summary.totalApplications }}</strong></article>
-        <article><span>有效会话</span><strong>{{ overview.summary.activeSessions }}</strong></article>
-        <article><span>已配 API Key</span><strong>{{ overview.summary.configuredApiKeys }}</strong></article>
+        <article><i>用户</i><strong>{{overview.summary.totalUsers}}</strong><small>近 30 天活跃 {{recentUsers}}</small></article>
+        <article><i>业务数据</i><strong>{{overview.summary.totalApplications}}</strong><small>{{totalEvents}} 项日程</small></article>
+        <article><i>有效会话</i><strong>{{overview.summary.activeSessions}}</strong><small>{{disabledUsers}} 个停用账号</small></article>
+        <article><i>AI 配置</i><strong>{{overview.summary.configuredApiKeys}}</strong><small>已配置独立密钥</small></article>
       </div>
 
-      <div class="registration-row">
-        <div><strong>业务数据库注册入口</strong><span>{{ overview.summary.registrationOpen ? '当前开放' : '当前关闭' }}</span></div>
-        <button :disabled="loading" @click="toggleRegistration">{{ overview.summary.registrationOpen ? '关闭注册' : '开放注册' }}</button>
-      </div>
-
-      <h3>用户管理</h3>
-      <p v-if="overview.usersTruncated" class="hint">用户列表仅显示前 500 个账号，统计数字仍覆盖全部账号。</p>
-      <div class="user-list">
-        <article v-for="user in overview.users" :key="user.id" class="user-card">
-          <div class="user-head">
-            <div><strong>{{ user.email }}</strong><span>{{ user.isAdmin ? '管理员' : (user.disabled ? '已停用' : '正常') }}</span></div>
-            <div class="actions">
-              <button class="secondary" :disabled="busyUser === user.id" @click="toggleDetails(user)">{{ expanded[user.id] ? '收起' : '查看流程' }}</button>
-              <button v-if="!user.isAdmin" class="secondary" :disabled="busyUser === user.id" @click="setDisabled(user)">{{ user.disabled ? '启用' : '停用' }}</button>
-              <button v-if="!user.isAdmin" class="danger-button" :disabled="busyUser === user.id" @click="deleteUser(user)">删除</button>
+      <div class="admin-grid">
+        <div class="left-column">
+          <section class="card control-card">
+            <div class="section-title"><div><span>访问控制</span><h3>注册与系统状态</h3></div><b :class="overview.summary.registrationOpen?'ok':'muted'">{{overview.summary.registrationOpen?'允许注册':'停止注册'}}</b></div>
+            <div class="registration"><div><strong>新用户注册</strong><small>{{overview.summary.registrationCodeEnabled?'已配置注册码':'未配置注册码'}}</small></div><button :class="overview.summary.registrationOpen?'danger-outline':''" @click="toggleRegistration">{{overview.summary.registrationOpen?'关闭':'开放'}}</button></div>
+            <div class="health-grid">
+              <div><i class="dot ok"></i><span>数据库</span><b>连接正常</b></div>
+              <div><i :class="['dot',status?.sandboxEnabled?'ok':'warn']"></i><span>业务写入</span><b>{{status?.sandboxEnabled?'正常':'受限'}}</b></div>
+              <div><i :class="['dot',overview.summary.adminEmailConfigured?'ok':'warn']"></i><span>管理员配置</span><b>{{overview.summary.adminEmailConfigured?'完整':'待配置'}}</b></div>
+              <div><i :class="['dot',emptyDataUsers?'warn':'ok']"></i><span>空数据账号</span><b>{{emptyDataUsers}} 个</b></div>
             </div>
-          </div>
-          <div class="user-metrics">
-            <span>投递 {{ user.applicationCount }}</span><span>日程 {{ user.eventCount }}</span><span>API Key {{ user.hasApiKey ? '已配置' : '未配置' }}</span><span>最近登录 {{ formatDate(user.lastLoginAt) }}</span>
-          </div>
-          <div v-if="expanded[user.id]" class="details">
-            <p v-if="busyUser === user.id">正在读取测试数据…</p>
-            <template v-else-if="details[user.id]">
-              <p v-if="details[user.id].truncated" class="hint">共 {{ details[user.id].totalApplications }} 条，仅显示前 500 条。</p>
-              <p v-if="!details[user.id].applications.length">该用户暂无投递记录。</p>
-              <article v-for="application in details[user.id].applications" :key="application.id" class="application-row">
-                <div><strong>{{ application.company || '未填写公司' }} · {{ application.position || '未填写岗位' }}</strong><span>{{ application.stage || '—' }} / {{ application.status || '—' }}</span></div>
-                <ol><li v-for="step in application.flow" :key="`${step.at}-${step.title}`"><time>{{ step.at || '时间未知' }}</time>{{ step.title }}</li></ol>
-              </article>
-            </template>
-          </div>
-        </article>
-      </div>
+          </section>
 
-      <h3>最近 30 条操作记录</h3>
-      <div class="audit-list">
-        <div v-for="item in overview.audit" :key="item.id"><span>{{ actionLabels[item.action] || item.action }} · {{ item.targetEmail }}</span><time>{{ formatDate(item.createdAt) }}</time></div>
-        <p v-if="!overview.audit.length">暂无管理操作。</p>
+          <section class="card audit-card">
+            <div class="section-title"><div><span>操作审计</span><h3>最近操作</h3></div><small>最近 {{overview.audit.length}} 条</small></div>
+            <div class="audit-scroll"><div v-for="item in overview.audit" :key="item.id"><i></i><span><b>{{actionLabels[item.action]||item.action}}</b><small>{{item.targetEmail||'系统设置'}}</small></span><time>{{formatDate(item.createdAt)}}</time></div><p v-if="!overview.audit.length">暂无管理操作</p></div>
+          </section>
+        </div>
+
+        <section class="card users-card">
+          <div class="section-title"><div><span>账号管理</span><h3>用户列表</h3></div><small>{{filteredUsers.length}} / {{overview.summary.totalUsers}}</small></div>
+          <div class="user-tools"><input v-model="query" placeholder="搜索用户邮箱" /><select v-model="stateFilter"><option value="all">全部状态</option><option value="enabled">正常</option><option value="disabled">已停用</option><option value="admin">管理员</option></select></div>
+          <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>
+          <div class="user-scroll">
+            <article v-for="user in filteredUsers" :key="user.id" :class="{disabled:user.disabled}">
+              <div class="avatar">{{user.email.slice(0,1).toUpperCase()}}</div>
+              <div class="identity"><strong>{{user.email}}</strong><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span></div>
+              <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span>{{relativeDate(user.lastLoginAt)}}</span></div>
+              <div class="actions"><button class="secondary" :disabled="busyUser===user.id" @click="openDetails(user)">详情</button><template v-if="!user.isAdmin"><button class="secondary" :disabled="busyUser===user.id" @click="revokeSessions(user)">下线</button><button class="secondary" :disabled="busyUser===user.id" @click="setDisabled(user)">{{user.disabled?'启用':'停用'}}</button><button class="danger-button" :disabled="busyUser===user.id" @click="deleteUser(user)">删除</button></template></div>
+            </article>
+            <p v-if="!filteredUsers.length" class="empty">没有符合条件的用户</p>
+          </div>
+        </section>
       </div>
     </template>
+    <div v-else-if="loading" class="card loading-panel">正在读取管理员数据…</div>
+    <p v-if="message" class="success feedback">{{message}}</p><p v-if="error" class="danger feedback">{{error}}</p>
 
-    <p v-else-if="status?.enabled && loading">正在读取管理员概览…</p>
-    <p v-if="message" class="success">{{ message }}</p>
-    <p v-if="error" class="danger">{{ error }}</p>
+    <div v-if="selected" class="modal-backdrop" @click.self="selected=null">
+      <section class="detail-modal"><button class="modal-close" @click="selected=null">×</button><header><div class="avatar large">{{selected.email.slice(0,1).toUpperCase()}}</div><div><span>用户详情</span><h2>{{selected.email}}</h2><p>{{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.section-head, .toolbar, .registration-row, .user-head, .actions, .user-metrics, .audit-list div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.section-head h2 { margin-bottom: 0; }
-.mode-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
-.mode-badge.enabled { color: #167647; background: #e9f8ef; }
-.mode-badge.disabled { color: #7a4d0b; background: #fff3d6; }
-.notice { display: grid; gap: 7px; padding: 18px; border: 1px solid #dbe3f1; border-radius: 12px; background: #f7f9fc; }
-.notice span, .hint { color: #667085; }
-code { padding: 2px 5px; border-radius: 5px; background: #e9edf5; }
-.toolbar { margin: 22px 0 14px; }
-.secondary { color: #344054; background: #eef2f8; }
-.danger-button { background: #bd3434; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.summary-grid article { display: grid; gap: 7px; padding: 15px; border: 1px solid #e4e9f2; border-radius: 12px; }
-.summary-grid span, .registration-row span, .user-head span { color: #667085; font-size: 13px; }
-.summary-grid strong { font-size: 22px; }
-.registration-row { margin: 16px 0 24px; padding: 16px; border-radius: 12px; background: #f7f9fc; }
-.registration-row div, .user-head > div, .application-row > div { display: grid; gap: 4px; }
-h3 { margin: 26px 0 12px; font-size: 16px; }
-.user-list { display: grid; gap: 10px; }
-.user-card { padding: 16px; border: 1px solid #e4e9f2; border-radius: 12px; }
-.actions { justify-content: flex-end; }
-.actions button { padding: 8px 11px; font-size: 12px; }
-.user-metrics { justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; color: #667085; font-size: 12px; }
-.details { margin-top: 16px; padding-top: 12px; border-top: 1px solid #edf0f5; }
-.application-row { margin-top: 10px; padding: 12px; border-radius: 10px; background: #f7f9fc; }
-.application-row ol { margin: 10px 0 0; padding-left: 22px; }
-.application-row li { margin: 6px 0; color: #475467; }
-.application-row time { display: inline-block; min-width: 145px; color: #667085; font-size: 12px; }
-.audit-list { display: grid; gap: 0; }
-.audit-list div { padding: 11px 0; border-top: 1px solid #edf0f5; }
-.audit-list time { color: #667085; font-size: 12px; }
-
-@media (max-width: 720px) {
-  .summary-grid { grid-template-columns: 1fr 1fr; }
-  .user-head, .toolbar, .registration-row { align-items: flex-start; flex-direction: column; }
-  .actions { flex-wrap: wrap; justify-content: flex-start; }
-  .application-row time { display: block; min-width: 0; }
-}
+.admin-shell{display:flex;height:calc(100vh - 128px);min-height:560px;flex-direction:column;gap:14px;padding:14px 0 0;overflow:hidden}.admin-head,.section-title,.registration,.user-tools,.users-card article,.actions,.detail-modal header{display:flex;align-items:center;justify-content:space-between;gap:12px}.admin-head h2,.admin-head p,.section-title h3,.detail-modal h2,.detail-modal p{margin:0}.admin-head>div>span,.section-title>div>span{color:var(--accent,#4461d8);font-size:11px;font-weight:800;letter-spacing:.09em}.admin-head h2{margin:3px 0;font-size:22px}.admin-head p{color:#667085;font-size:12px}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.summary-grid article{display:grid;gap:4px;padding:13px 16px;border:1px solid #dfe5ef;border-radius:12px;background:#fff}.summary-grid i{color:#667085;font-size:11px;font-style:normal}.summary-grid strong{font-size:24px}.summary-grid small{color:#7a8699}.admin-grid{display:grid;min-height:0;flex:1;grid-template-columns:minmax(320px,.76fr) minmax(600px,1.65fr);gap:14px}.left-column{display:grid;min-height:0;grid-template-rows:auto minmax(0,1fr);gap:14px}.card{min-width:0;margin:0;padding:17px;border-radius:14px}.section-title h3{margin-top:3px;font-size:17px}.section-title>small{color:#667085}.section-title>b{padding:5px 8px;border-radius:999px;font-size:11px}.section-title>b.ok{color:#147847;background:#e8f7ee}.section-title>b.muted{color:#83591a;background:#fff2d7}.registration{margin-top:14px;padding:12px;border-radius:10px;background:#f6f8fb}.registration>div{display:grid;gap:3px}.registration small{color:#667085}.registration button{padding:8px 12px}.danger-outline{border:1px solid #efc4c0;color:#a63731;background:#fff}.health-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.health-grid>div{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:7px;padding:9px;border:1px solid #e7ebf2;border-radius:9px}.health-grid span,.health-grid b{font-size:11px}.health-grid b{color:#667085}.dot{width:8px;height:8px;border-radius:50%}.dot.ok{background:#32a66a}.dot.warn{background:#e2a336}.audit-card,.users-card{display:flex;min-height:0;flex-direction:column}.audit-scroll,.user-scroll,.detail-scroll{min-height:0;overflow:auto;scrollbar-width:thin}.audit-scroll{margin-top:10px}.audit-scroll>div{display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:8px;padding:10px 2px;border-top:1px solid #edf0f5}.audit-scroll>div>i{width:7px;height:7px;border-radius:50%;background:var(--accent,#4461d8)}.audit-scroll span{display:grid;gap:2px}.audit-scroll small,.audit-scroll time{color:#7b8798;font-size:10px}.user-tools{margin:12px 0}.user-tools input{flex:1}.user-tools select{width:130px}.users-card article{padding:11px 4px;border-top:1px solid #e9edf3}.users-card article.disabled{opacity:.65}.avatar{display:grid;width:36px;height:36px;flex:none;place-items:center;border-radius:10px;color:#fff;background:var(--accent,#4461d8);font-weight:800}.avatar.large{width:48px;height:48px;border-radius:13px}.identity{display:grid;min-width:0;flex:1;gap:4px}.identity strong{overflow:hidden;text-overflow:ellipsis}.identity span{color:#788496;font-size:11px}.identity span b{color:#6a4a96}.identity span b.good{color:#197348}.identity span b.bad{color:#a63833}.counts{display:flex;min-width:235px;gap:14px;color:#697587;font-size:11px}.counts b{color:#26364e}.actions{justify-content:flex-end}.actions button{padding:7px 9px;font-size:11px}.danger-button{background:#c33b36}.hint,.empty{color:#758195;font-size:11px}.empty{text-align:center}.feedback{position:fixed;top:18px;left:50%;z-index:70;transform:translateX(-50%);padding:11px 18px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14)}.modal-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:rgba(18,28,45,.58)}.detail-modal{position:relative;display:flex;width:min(960px,94vw);height:min(760px,88vh);flex-direction:column;padding:24px;border-radius:18px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.26)}.detail-modal header{justify-content:flex-start;padding-bottom:16px;border-bottom:1px solid #e7ebf1}.detail-modal header>div:last-child{display:grid;gap:3px}.detail-modal header>div>span{color:var(--accent,#4461d8);font-size:11px;font-weight:800}.modal-close{position:absolute;top:16px;right:16px;width:38px;height:38px;padding:0;color:#506078;background:#eef2f7;font-size:22px}.detail-scroll{margin-top:10px}.detail-scroll>article{padding:14px 2px;border-bottom:1px solid #e8edf3}.detail-scroll>article>div{display:grid;gap:4px}.detail-scroll>article>div span{color:#687689;font-size:12px}.detail-scroll ol{margin:10px 0 0;padding-left:20px}.detail-scroll li{display:grid;grid-template-columns:150px 1fr;gap:10px;margin:6px 0;color:#445166}.detail-scroll time{color:#798698;font-size:11px}.disabled-panel,.loading-panel{text-align:center}@media(max-width:1100px){.admin-shell{height:auto;overflow:visible}.admin-grid{grid-template-columns:1fr}.audit-scroll,.user-scroll{max-height:520px}}@media(max-width:720px){.summary-grid{grid-template-columns:1fr 1fr}.users-card article{align-items:flex-start;flex-wrap:wrap}.counts{width:100%;min-width:0;margin-left:48px}.actions{width:100%;margin-left:48px;justify-content:flex-start}.health-grid{grid-template-columns:1fr}.detail-scroll li{grid-template-columns:1fr}}
 </style>

@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.AdminSandboxService;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.DisabledResult;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.SessionResult;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,21 @@ class PocAdminSandboxControllerTest {
         verify(service).setDisabled("admin@example.com", 9, true);
     }
 
+    @Test
+    void revokesUserSessionsForAnAuthenticatedSameOriginRequest() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        AdminSandboxService service = mock(AdminSandboxService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.revokeSessions("admin@example.com", 9)).thenReturn(new SessionResult(true, 2));
+        PocAdminSandboxController controller = new PocAdminSandboxController(auth, service);
+
+        var response = controller.revokeSessions("token", 9, sameOriginRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new SessionResult(true, 2));
+        verify(service).revokeSessions("admin@example.com", 9);
+    }
     @Test
     void rejectsCrossOriginMutationBeforeAuthenticationOrDatabaseAccess() {
         PocAuthController auth = mock(PocAuthController.class);
