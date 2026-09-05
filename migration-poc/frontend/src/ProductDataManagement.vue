@@ -12,6 +12,7 @@ const store = useJobTrackerStore()
 const links = ref<CompanyLink[]>([])
 const linksUpdatedAt = ref('')
 const linkQuery = ref('')
+const linkDetailsOpen = ref(false)
 const newCompany = ref('')
 const newUrl = ref('')
 const sandbox = ref<SandboxStatus | null>(null)
@@ -165,25 +166,13 @@ function formatDate(value: string) {
   <section class="card data-card">
     <div class="section-head">
       <div><span class="section-kicker">数据管理</span><h2>公司官网库与业务数据</h2></div>
-      <button class="secondary" type="button" @click="loadLinks">刷新链接</button>
+      <button class="secondary" type="button" @click="linkDetailsOpen=true;loadLinks()">官网库详情</button>
     </div>
 
     <div class="metrics-row">
       <div><strong>{{ links.length }}</strong><span>公司链接</span></div>
       <div><strong>{{ store.applications.value.length }}</strong><span>投递记录</span></div>
       <div><strong>{{ store.events.value.length }}</strong><span>日程事件</span></div>
-    </div>
-
-    <div class="link-panel">
-      <div class="toolbar">
-        <label><span>搜索公司或链接</span><input v-model="linkQuery" placeholder="公司名称 / careers URL" /></label>
-        <small>{{ formatDate(linksUpdatedAt) }}</small>
-      </div>
-      <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
-      <div v-if="filteredLinks.length" class="link-list">
-        <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete" @click="removeLink(item)">删除</button></article>
-      </div>
-      <div v-else class="notice">当前账号没有可展示的公司链接。</div>
     </div>
 
     <div class="data-grid">
@@ -213,6 +202,21 @@ function formatDate(value: string) {
     <p v-if="message" class="success">{{ message }}</p>
     <p v-if="error" class="danger">{{ error }}</p>
   </section>
+
+  <div v-if="linkDetailsOpen" class="link-backdrop" @click.self="linkDetailsOpen=false">
+    <section class="link-modal" role="dialog" aria-modal="true" aria-labelledby="company-links-title">
+      <button type="button" class="modal-close" aria-label="关闭" @click="linkDetailsOpen=false">×</button>
+      <div class="modal-heading"><div><span class="section-kicker">官网库详情</span><h2 id="company-links-title">公司官网库</h2></div><small>共 {{ links.length }} 条 · {{ formatDate(linksUpdatedAt) }}</small></div>
+      <div class="link-panel">
+        <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary" type="button" :disabled="loading" @click="loadLinks">刷新</button></div>
+        <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
+        <div v-if="filteredLinks.length" class="link-list">
+          <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete" @click="removeLink(item)">删除</button></article>
+        </div>
+        <div v-else class="notice">{{ linkQuery ? '没有匹配的公司官网。' : '当前账号没有可展示的公司链接。' }}</div>
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
@@ -225,7 +229,15 @@ function formatDate(value: string) {
 .metrics-row div { padding: 14px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
 .metrics-row strong { display: block; font-size: 24px; }
 .metrics-row span, .toolbar small, .tool-box small { color: #667085; font-size: 12px; }
-.link-panel { display: grid; gap: 12px; }
+.link-panel { display: grid; min-height: 0; gap: 12px; }
+.link-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; padding: 28px; place-items: center; background: rgba(17, 24, 39, .58); }
+.link-modal { position: relative; display: flex; width: min(980px, 100%); max-height: min(820px, calc(100vh - 56px)); min-height: min(620px, calc(100vh - 56px)); flex-direction: column; gap: 18px; padding: 26px; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .28); }
+.modal-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; padding: 0; color: #475467; background: #eef2f6; font-size: 22px; }
+.modal-heading { display: flex; padding-right: 48px; align-items: flex-end; justify-content: space-between; gap: 18px; }
+.modal-heading h2 { margin: 0; }
+.modal-heading>small { color: #667085; }
+.link-modal .link-panel { flex: 1; grid-template-rows: auto auto minmax(0, 1fr); }
+.link-modal .link-list { align-content: start; overflow-y: auto; padding-right: 6px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b9c5d5 transparent; }
 .toolbar label, .tool-box label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
 .toolbar label { min-width: min(420px, 100%); }
 .link-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
@@ -246,10 +258,14 @@ function formatDate(value: string) {
 
 @media (max-width: 900px) {
   .data-grid, .link-list, .link-editor { grid-template-columns: 1fr; }
+  .link-modal { min-height: calc(100vh - 32px); }
 }
 
 @media (max-width: 640px) {
   .section-head, .toolbar { align-items: stretch; flex-direction: column; }
   .metrics-row { grid-template-columns: 1fr; }
+  .link-backdrop { padding: 10px; }
+  .link-modal { max-height: calc(100vh - 20px); min-height: calc(100vh - 20px); padding: 20px 14px; }
+  .modal-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
 }
 </style>
