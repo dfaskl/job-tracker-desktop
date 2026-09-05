@@ -15,6 +15,7 @@ import java.util.List;
 
 final class ScheduleAdvicePlanner {
     private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FORMAT_SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final long IDEAL_MINUTES = 90;
     private static final long MINIMUM_MINUTES = 60;
     private final ObjectMapper mapper;
@@ -116,7 +117,13 @@ final class ScheduleAdvicePlanner {
     }
 
     private String label(JsonNode node) { return node.path("company").asText("未填写公司") + " · " + node.path("title").asText("未命名日程"); }
-    private LocalDateTime parse(String value) { try { return LocalDateTime.parse(value.replace('T', ' '), FORMAT); } catch (DateTimeParseException exception) { return null; } }
+    private LocalDateTime parse(String value) {
+        String normalized = value == null ? "" : value.trim().replace('T', ' ');
+        for (DateTimeFormatter formatter : List.of(FORMAT, FORMAT_SECONDS)) {
+            try { return LocalDateTime.parse(normalized, formatter); } catch (DateTimeParseException ignored) { }
+        }
+        return null;
+    }
     private record Item(String id, String label, LocalDateTime start, LocalDateTime end) {}
     private record Slot(Item item, LocalDateTime start, LocalDateTime end) {}
 }

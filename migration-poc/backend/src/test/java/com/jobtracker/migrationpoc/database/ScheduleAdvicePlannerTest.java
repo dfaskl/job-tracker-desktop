@@ -12,6 +12,15 @@ class ScheduleAdvicePlannerTest {
     private final ScheduleAdvicePlanner planner = new ScheduleAdvicePlanner(mapper);
 
     @Test
+    void acceptsLegacyTimestampsWithSeconds() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"米哈游","title":"笔试","startsAt":"2026-09-06 10:00:00","endsAt":"2026-09-06 10:00:00"},
+             {"id":"b","company":"其他公司","title":"面试","startsAt":"2026-09-06 14:00","endsAt":"2026-09-06 14:00"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 5, 12, 0));
+        assertThat(result.path("plans").toString()).contains("米哈游").contains("2026-09-06 10:00-11:30");
+    }
+    @Test
     void shortensFixedPointToSixtyMinutesWithWarning() throws Exception {
         var schedules = mapper.readTree("""
             [{"id":"a","company":"甲","title":"笔试","startsAt":"2026-09-06 19:00","endsAt":"2026-09-06 19:00"},
