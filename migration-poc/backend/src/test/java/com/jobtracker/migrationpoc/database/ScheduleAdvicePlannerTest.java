@@ -29,6 +29,7 @@ class ScheduleAdvicePlannerTest {
         var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
         assertThat(result.path("plans").get(0).asText()).contains("19:00-20:00");
         assertThat(result.path("warnings").get(0).asText()).contains("60 分钟");
+        assertThat(result.path("timeline").get(0).path("status").asText()).isEqualTo("tight");
         assertThat(result.path("conflicts").isEmpty()).isTrue();
     }
 
@@ -40,6 +41,7 @@ class ScheduleAdvicePlannerTest {
             """);
         var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
         assertThat(result.path("conflicts").get(0).asText()).contains("不足 60 分钟");
+        assertThat(result.path("timeline").get(0).path("status").asText()).isEqualTo("conflict");
     }
 
     @Test
@@ -51,5 +53,18 @@ class ScheduleAdvicePlannerTest {
         var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
         assertThat(result.path("plans").toString()).contains("10:00-11:15");
         assertThat(result.path("warnings").toString()).contains("75 分钟");
+        assertThat(result.path("timeline").toString()).contains("\"status\":\"tight\"");
+    }
+
+    @Test
+    void exposesUnconstrainedFlexibleWindowOnTimeline() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"自由安排","title":"笔试","startsAt":"2026-09-06 10:00","endsAt":"2026-09-06 18:00"},
+             {"id":"b","company":"次日安排","title":"面试","startsAt":"2026-09-07 10:00","endsAt":"2026-09-07 10:00"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 5, 12, 0));
+        assertThat(result.path("timeline").get(0).path("showWindow").asBoolean()).isTrue();
+        assertThat(result.path("timeline").get(0).path("windowStart").asText()).isEqualTo("2026-09-06 10:00");
+        assertThat(result.path("timeline").get(0).path("windowEnd").asText()).isEqualTo("2026-09-06 18:00");
     }
 }

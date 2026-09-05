@@ -11,7 +11,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class ScheduleAdvicePlanner {
     private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -23,8 +25,7 @@ final class ScheduleAdvicePlanner {
     ScheduleAdvicePlanner(ObjectMapper mapper) { this.mapper = mapper; }
 
     ObjectNode plan(JsonNode input, LocalDateTime now) {
-        List<Item> fixed = new ArrayList<>();
-        List<Item> flexible = new ArrayList<>();
+        List<Item> fixed = new ArrayList<>(), flexible = new ArrayList<>();
         for (JsonNode node : input) {
             LocalDateTime start = parse(node.path("startsAt").asText(""));
             LocalDateTime end = parse(node.path("endsAt").asText(""));
@@ -33,32 +34,28 @@ final class ScheduleAdvicePlanner {
             if (end != null && end.isAfter(start)) flexible.add(item); else fixed.add(item);
         }
         fixed.sort(Comparator.comparing(Item::start));
-        flexible.sort(Comparator.comparing(item -> item.end == null ? item.start : item.end));
-        List<Slot> occupied = new ArrayList<>();
-        List<Slot> plans = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-        List<String> conflicts = new ArrayList<>();
+        flexible.sort(Comparator.comparing(item -> item.end));
+        List<Slot> occupied = new ArrayList<>(), plans = new ArrayList<>();
+        List<Item> failedFlexible = new ArrayList<>();
+        Set<Item> tightItems = new HashSet<>(), conflictItems = new HashSet<>();
+        List<String> warnings = new ArrayList<>(), conflicts = new ArrayList<>();
 
         for (int index = 0; index < fixed.size(); index++) {
             Item item = fixed.get(index);
             if (item.start.isBefore(now)) continue;
-            LocalDateTime idealEnd = item.start.plusMinutes(IDEAL_MINUTES);
-            LocalDateTime next = null;
+            LocalDateTime idealEnd = item.start.plusMinutes(IDEAL_MINUTES), next = null;
             for (int other = index + 1; other < fixed.size(); other++) {
                 if (fixed.get(other).start.isAfter(item.start)) { next = fixed.get(other).start; break; }
             }
             long available = next == null ? IDEAL_MINUTES : Math.min(IDEAL_MINUTES, Duration.between(item.start, next).toMinutes());
-            if (fixed.stream().filter(candidate -> candidate.start.equals(item.start)).count() > 1) {
-                plans.add(new Slot(item, item.start, idealEnd));
-                occupied.add(new Slot(item, item.start, idealEnd));
-                continue;
-            }
-            if (available >= MINIMUM_MINUTES) {
-                LocalDateTime end = item.start.plusMinutes(available);
-                Slot slot = new Slot(item, item.start, end); plans.add(slot); occupied.add(slot);
-                if (available < IDEAL_MINUTES) warnings.add(item.label + "：仅安排 " + available + " 分钟，时间紧张");
+            boolean sameStart = fixed.stream().filter(candidate -> candidate.start.equals(item.start)).count() > 1;
+            if (sameStart) {
+                Slot slot = new Slot(item, item.start, idealEnd); plans.add(slot); occupied.add(slot); conflictItems.add(item);
+            } else if (available >= MINIMUM_MINUTES) {
+                Slot slot = new Slot(item, item.start, item.start.plusMinutes(available)); plans.add(slot); occupied.add(slot);
+                if (available < IDEAL_MINUTES) { tightItems.add(item); warnings.add(item.label + "：仅安排 " + available + " 分钟，时间紧张"); }
             } else {
-                Slot slot = new Slot(item, item.start, idealEnd); plans.add(slot); occupied.add(slot);
+                Slot slot = new Slot(item, item.start, idealEnd); plans.add(slot); occupied.add(slot); conflictItems.add(item);
                 conflicts.add(item.label + "：距下一项固定日程不足 60 分钟");
             }
         }
@@ -71,24 +68,45 @@ final class ScheduleAdvicePlanner {
         occupied.sort(Comparator.comparing(Slot::start));
         for (Item item : flexible) {
             LocalDateTime windowStart = item.start.isAfter(now) ? item.start : now;
-            if (item.end == null || !item.end.isAfter(windowStart.plusMinutes(MINIMUM_MINUTES - 1))) {
-                conflicts.add(item.label + "：剩余可用时间不足 60 分钟"); continue;
+            if (!item.end.isAfter(windowStart.plusMinutes(MINIMUM_MINUTES - 1))) {
+                conflictItems.add(item); failedFlexible.add(item); conflicts.add(item.label + "：剩余可用时间不足 60 分钟"); continue;
             }
             Slot slot = findSlot(item, windowStart, item.end, IDEAL_MINUTES, occupied);
             if (slot == null) slot = findBestShortSlot(item, windowStart, item.end, occupied);
-            if (slot == null) { conflicts.add(item.label + "：可用时间段内无法安排连续 60 分钟"); continue; }
+            if (slot == null) {
+                conflictItems.add(item); failedFlexible.add(item); conflicts.add(item.label + "：可用时间段内无法安排连续 60 分钟"); continue;
+            }
             plans.add(slot); occupied.add(slot); occupied.sort(Comparator.comparing(Slot::start));
             long minutes = Duration.between(slot.start, slot.end).toMinutes();
-            if (minutes < IDEAL_MINUTES) warnings.add(item.label + "：仅安排 " + minutes + " 分钟，时间紧张");
+            if (minutes < IDEAL_MINUTES) { tightItems.add(item); warnings.add(item.label + "：仅安排 " + minutes + " 分钟，时间紧张"); }
         }
         plans.sort(Comparator.comparing(Slot::start).thenComparing(slot -> slot.item.label));
         ObjectNode result = mapper.createObjectNode();
-        result.put("summary", "已安排 " + plans.size() + " 项日程" + (warnings.isEmpty() ? "" : "，其中 " + warnings.size() + " 项时间紧张") + (conflicts.isEmpty() ? "" : "，发现 " + conflicts.size() + " 处冲突"));
+        result.put("summary", "已安排 " + plans.size() + " 项日程" + (warnings.isEmpty() ? "" : "，其中 " + warnings.size() + " 项时间紧张") + (conflicts.isEmpty() ? "" : "，发现 " + conflicts.stream().distinct().count() + " 处冲突"));
         ArrayNode planArray = result.putArray("plans");
         plans.forEach(slot -> planArray.add(FORMAT.format(slot.start) + "-" + slot.end.format(DateTimeFormatter.ofPattern("HH:mm")) + " " + slot.item.label));
+        ArrayNode timeline = result.putArray("timeline");
+        for (Slot slot : plans) addTimeline(timeline, slot.item, slot.start, slot.end, status(slot.item, tightItems, conflictItems), freelyAdjustable(slot.item, plans));
+        for (Item item : failedFlexible) addTimeline(timeline, item, item.start.isAfter(now) ? item.start : now, item.end, "conflict", true);
         ArrayNode warningArray = result.putArray("warnings"); warnings.forEach(warningArray::add);
         ArrayNode conflictArray = result.putArray("conflicts"); conflicts.stream().distinct().forEach(conflictArray::add);
         return result;
+    }
+
+    private void addTimeline(ArrayNode output, Item item, LocalDateTime start, LocalDateTime end, String status, boolean showWindow) {
+        ObjectNode node = output.addObject();
+        node.put("id", item.id); node.put("label", item.label); node.put("date", start.toLocalDate().toString());
+        node.put("start", start.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", end.format(DateTimeFormatter.ofPattern("HH:mm")));
+        node.put("status", status); node.put("flexible", item.end != null && item.end.isAfter(item.start)); node.put("showWindow", showWindow);
+        if (item.end != null && item.end.isAfter(item.start)) {
+            node.put("windowStart", item.start.format(FORMAT)); node.put("windowEnd", item.end.format(FORMAT));
+        }
+    }
+
+    private String status(Item item, Set<Item> tight, Set<Item> conflicts) { return conflicts.contains(item) ? "conflict" : tight.contains(item) ? "tight" : "normal"; }
+    private boolean freelyAdjustable(Item item, List<Slot> plans) {
+        if (item.end == null || !item.end.isAfter(item.start)) return false;
+        return plans.stream().filter(slot -> !slot.item.equals(item)).noneMatch(slot -> slot.start.isBefore(item.end) && item.start.isBefore(slot.end));
     }
 
     private Slot findSlot(Item item, LocalDateTime start, LocalDateTime end, long minutes, List<Slot> occupied) {
