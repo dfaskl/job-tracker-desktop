@@ -182,9 +182,9 @@ function formatDate(value: string) {
       <div class="tool-box">
         <h3>导入数据</h3>
         <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
-        <input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" />
+        <label class="file-picker"><span class="file-button">选择文件</span><input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" /><small>{{ importFileName || '未选择任何文件' }}</small></label>
         <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">确认导入</button>
-        <small v-if="importFileName">{{ importFileName }}</small>
+        
       </div>
 
       <div class="tool-box danger-zone">
@@ -248,7 +248,11 @@ function formatDate(value: string) {
 .tool-box { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
 .tool-box h3 { margin: 0; font-size: 16px; }
 .tool-box p { margin: 0; }
-.tool-box input[type="file"] { padding: 10px; background: #fff; }
+.tool-box input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.file-picker { display: grid; justify-items: start; gap: 7px; }
+.file-button { display: inline-flex; min-height: 38px; align-items: center; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 9px; color: #344054; background: #fff; cursor: pointer; }
+.file-picker:focus-within .file-button { border-color: var(--accent,#4461d8); box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent,#4461d8) 13%,transparent); }
+.file-picker small { display: block; width: 100%; overflow: hidden; color: #667085; font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .tool-box > button:last-of-type { width: 100%; margin-top: auto; }
 .danger-zone { border-color: #f0c7c7; background: #fff8f8; }
 .danger-button { color: #fff; background: #b43232; }
