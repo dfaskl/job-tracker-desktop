@@ -120,10 +120,11 @@ async function normalizeApplication(){
 }
 async function saveCompanyOfficialLink(){
   const company=form.company.trim(),url=(officialChoice.value==='__manual__'?officialManual.value:officialChoice.value).trim()
-  if(url&&!/^https?:\/\//i.test(url))throw new Error('官网链接需以 http:// 或 https:// 开头')
+  if(!url)return
+  if(!/^https?:\/\//i.test(url))throw new Error('官网链接需以 http:// 或 https:// 开头')
   const key=normalizeCompanyName(company)
-  const items=companyLinks.value.filter(item=>normalizeCompanyName(item.company)!==key)
-  if(company&&url)items.push({company,url})
+  const items=companyLinks.value.filter(item=>normalizeCompanyName(item.company)!==key&&Boolean(item.company.trim())&&/^https?:\/\//i.test(item.url.trim())).map(item=>({company:item.company.trim(),url:item.url.trim()}))
+  items.push({company,url})
   const result=await api<{items:{company:string;url:string}[]}>('/api/poc/company-links',{method:'POST',body:JSON.stringify({items:items.sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))})})
   companyLinks.value=result.items||items
 }
