@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, reactive, ref } from 'vue'
+import { loadCalendarData } from './calendarDataCache'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
@@ -55,6 +56,18 @@ const form = reactive<EventForm>(emptyForm())
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
 const eventLanes = computed(() => allocateEventLanes(events.value))
 const eventColorAssignments = computed(() => allocateEventColors(events.value))
+const eventEntries = computed(() => new Map(events.value.map(event => [event.id, buildCalendarEntries(event)])))
+const eventsByDate = computed(() => {
+  const result = new Map<string, CalendarEvent[]>()
+  for (const event of events.value) {
+    for (const entry of calendarEntries(event)) {
+      const items = result.get(entry.key) || []
+      items.push({ event, position:entry.position, lane:eventLanes.value.get(event.id) || 0, color:eventColor(event) })
+      result.set(entry.key, items)
+    }
+  }
+  return result
+})
 const selectedEvents = computed(() => calendarEventsOn(selectedDate.value).sort((left, right) => left.event.recordAt.localeCompare(right.event.recordAt)))
 const monthEventCount = computed(() => {
   const prefix = `${month.value.getFullYear()}-${pad(month.value.getMonth() + 1)}`
@@ -76,7 +89,7 @@ const cells = computed<CalendarCell[]>(() => {
 })
 
 onMounted(async () => { sandbox.value = { enabled:true, configured:true, isolated:false, message:'可写数据源' }; await loadEvents() })
-onActivated(async () => { if (lastLoadedAt.value && Date.now() - lastLoadedAt.value > 30_000) await loadEvents() })
+onActivated(() => { if (lastLoadedAt.value && Date.now() - lastLoadedAt.value > 30_000) void loadEvents(true) })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -127,7 +140,7 @@ async function checkSandbox() {
     const statusResult = await requestJson('/api/poc/event-sandbox/status')
     if (!statusResult.response.ok) throw new Error(statusResult.body.message || '无法检查日程沙箱')
     sandbox.value = statusResult.body as SandboxStatus
-    if (sandbox.value.enabled) await loadEvents()
+    if (sandbox.value.enabled) await loadEvents(true)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '检查失败'
   } finally {
@@ -135,14 +148,11 @@ async function checkSandbox() {
   }
 }
 
-async function loadEvents() {
-  const result = await requestJson('/api/poc/event-sandbox/events')
-  if (!result.response.ok) throw new Error(
-    result.response.status === 401 ? '请先在上方登录旧账号，再重新检查日程沙箱' : (result.body.message || '读取日程失败')
-  )
-  events.value = result.body.events as EventItem[]
-  applications.value = result.body.applications as ApplicationOption[]
-  total.value = Number(result.body.total || 0)
+async function loadEvents(force = false) {
+  const result = await loadCalendarData(force)
+  events.value = result.events as EventItem[]
+  applications.value = result.applications as ApplicationOption[]
+  total.value = result.total
   if (!form.applicationId && applications.value.length) form.applicationId = applications.value[0].id
   month.value = clampMonth(month.value)
   lastLoadedAt.value = Date.now()
@@ -159,7 +169,7 @@ function datesBetween(start: string, end: string) {
   return result
 }
 
-function calendarEntries(event: EventItem): Array<{ key: string; position: CalendarEvent['position'] }> {
+function buildCalendarEntries(event: EventItem): Array<{ key: string; position: CalendarEvent['position'] }> {
   if (event.endsAt && !event.completed) {
     const dates = datesBetween(event.startsAt.slice(0, 10), event.endsAt.slice(0, 10))
     return dates.map((key, index) => ({
@@ -169,6 +179,8 @@ function calendarEntries(event: EventItem): Array<{ key: string; position: Calen
   }
   return [{ key: displayAt(event).slice(0, 10), position: 'point' }]
 }
+
+function calendarEntries(event: EventItem) { return eventEntries.value.get(event.id) || buildCalendarEntries(event) }
 
 function stableColor(event: EventItem) {
   let hash = 0
@@ -208,9 +220,7 @@ function allocateEventLanes(items: EventItem[]) {
   return result
 }
 function calendarEventsOn(key: string): CalendarEvent[] {
-  return events.value.flatMap((event) =>
-    calendarEntries(event).filter((entry) => entry.key === key).map((entry) => ({ event, position: entry.position, lane:eventLanes.value.get(event.id) || 0, color:eventColor(event) }))
-  )
+  return eventsByDate.value.get(key) || []
 }
 function visibleEvents(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane < 3) }
 function hiddenEventCount(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane >= 3).length }
@@ -271,7 +281,7 @@ async function save() {
     if (!result.response.ok) throw new Error(result.body.message || '保存日程失败')
     message.value = current ? '日程已更新，并已生成变更前备份' : '日程已新增，并已同步岗位进度'
     resetForm()
-    await loadEvents()
+    await loadEvents(true)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '保存日程失败'
   } finally {
@@ -291,7 +301,7 @@ async function resolve(item: EventItem, action: 'complete' | 'miss' | 'restore')
     })
     if (!result.response.ok) throw new Error(result.body.message || '更新日程状态失败')
     message.value = action === 'complete' ? '日程已完成' : action === 'miss' ? '日程已标记错过' : '日程已恢复为待完成'
-    await loadEvents()
+    await loadEvents(true)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '更新日程状态失败'
   } finally {
@@ -312,7 +322,7 @@ async function remove(item: EventItem) {
     if (!result.response.ok) throw new Error(result.body.message || '删除日程失败')
     message.value = '日程及对应岗位历史已删除'
     if (editing.value?.id === item.id) resetForm()
-    await loadEvents()
+    await loadEvents(true)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '删除日程失败'
   } finally {
