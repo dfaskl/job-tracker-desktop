@@ -84,7 +84,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
     <main class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings' }">
       <header class="topbar">
         <div><h1>{{ current.label }}</h1><p>{{ current.subtitle }}</p></div>
-        <div v-if="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
+        <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
         <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
@@ -92,7 +92,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings' }">
         <AccountAccess v-if="!store.user.value" />
         <KeepAlive :max="7">
-          <component :is="pageComponents[activePage]" :key="`${activePage}-${cacheEpoch}`" @navigate="navigate" />
+          <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
         </KeepAlive>
       </div>
     </main>

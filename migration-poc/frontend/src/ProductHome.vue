@@ -148,7 +148,15 @@ async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
 watch(message,value=>{if(messageTimer)clearTimeout(messageTimer);if(value)messageTimer=setTimeout(()=>{if(message.value===value)message.value=''},2600)})
-watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(store.user.value)adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),3200)},{immediate:true})
+function syncScheduleAdvice(signature:string){
+  if(adviceTimer)clearTimeout(adviceTimer)
+  if(!store.user.value)return
+  if(!signature||adviceCandidates.value.length<2){scheduleAdvice.value=null;adviceNotice.value='';return}
+  if(loadScheduleAdvice(signature))return
+  scheduleAdvice.value=localScheduleAdvice()
+  adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
+}
+watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
 onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
