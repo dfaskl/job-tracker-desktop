@@ -21,29 +21,35 @@ const loading = ref(false)
 const error = ref('')
 const readOnly = ref(true)
 const newApplicationRequest = ref(0)
+let refreshPromise: Promise<void> | null = null
 
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
 
-async function refresh() {
+function refresh() {
+  if (refreshPromise) return refreshPromise
   loading.value = true
   error.value = ''
-  try {
-    const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
-    user.value = result.user
-    data.value = result.data || { applications: [], events: [] }
-    readOnly.value = result.readOnly
-  } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 401) {
-      user.value = null
-      data.value = { applications: [], events: [] }
-      return
+  refreshPromise = (async () => {
+    try {
+      const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
+      user.value = result.user
+      data.value = result.data || { applications: [], events: [] }
+      readOnly.value = result.readOnly
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        user.value = null
+        data.value = { applications: [], events: [] }
+        return
+      }
+      error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
+    } finally {
+      loading.value = false
+      initialized.value = true
+      refreshPromise = null
     }
-    error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
-  } finally {
-    loading.value = false
-    initialized.value = true
-  }
+  })()
+  return refreshPromise
 }
 
 async function initialize() {

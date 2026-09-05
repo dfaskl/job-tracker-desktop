@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, reactive, ref } from 'vue'
-import { loadCalendarData } from './calendarDataCache'
+import { computed, reactive, ref } from 'vue'
+import { useJobTrackerStore } from './jobTrackerStore'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
@@ -40,17 +40,32 @@ const eventColors = [
   ['#356fc0','#e3efff'], ['#7b58bd','#eee7fb'], ['#c47819','#fff0d5'], ['#198176','#ddf4f0'],
   ['#c34f5a','#fde6e9'], ['#347f9d','#e0f1f7'], ['#66752e','#edf2d8'], ['#a04f91','#f7e4f3']
 ] as const
-const sandbox = ref<SandboxStatus | null>(null)
-const applications = ref<ApplicationOption[]>([])
-const events = ref<EventItem[]>([])
-const total = ref(0)
+const store = useJobTrackerStore()
+const sandbox: SandboxStatus = { enabled:true, configured:true, isolated:false, message:'可写数据源' }
+const applications = computed<ApplicationOption[]>(() => store.applications.value.map(item => ({
+  id:String(item.id), company:String(item.company || ''), position:String(item.position || ''), appliedDate:String(item.appliedDate || '')
+})))
+const events = computed<EventItem[]>(() => store.events.value.map(item => {
+  const application = store.applications.value.find(value => value.id === item.applicationId)
+  const startsAt = String(item.startsAt || item.start || item.date || item.at || '')
+  const endsAt = String(item.endsAt || item.end || '')
+  const completed = Boolean(item.completed)
+  const completedAt = String(item.completedAt || '')
+  return {
+    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, createdAt:'', updatedAt:'',
+    ...item,
+    id:String(item.id), startsAt, endsAt, completed, completedAt,
+    company:String(item.company || application?.company || '未关联公司'),
+    position:String(item.position || application?.position || '未关联岗位'),
+    recordAt:String(item.recordAt || (completed ? completedAt || endsAt || startsAt : startsAt))
+  } as EventItem
+}))
 const month = ref(firstOfMonth(new Date()))
 const selectedDate = ref(dateKey(new Date()))
 const editing = ref<EventItem | null>(null)
 const loading = ref(false)
 const error = ref('')
 const message = ref('')
-const lastLoadedAt = ref(0)
 const form = reactive<EventForm>(emptyForm())
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
@@ -88,8 +103,6 @@ const cells = computed<CalendarCell[]>(() => {
   })
 })
 
-onMounted(async () => { sandbox.value = { enabled:true, configured:true, isolated:false, message:'可写数据源' }; await loadEvents() })
-onActivated(() => { if (lastLoadedAt.value && Date.now() - lastLoadedAt.value > 30_000) void loadEvents(true) })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -133,30 +146,6 @@ async function requestJson(url: string, init?: RequestInit) {
   return { response, body }
 }
 
-async function checkSandbox() {
-  loading.value = true
-  error.value = ''
-  try {
-    const statusResult = await requestJson('/api/poc/event-sandbox/status')
-    if (!statusResult.response.ok) throw new Error(statusResult.body.message || '无法检查日程沙箱')
-    sandbox.value = statusResult.body as SandboxStatus
-    if (sandbox.value.enabled) await loadEvents(true)
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '检查失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadEvents(force = false) {
-  const result = await loadCalendarData(force)
-  events.value = result.events as EventItem[]
-  applications.value = result.applications as ApplicationOption[]
-  total.value = result.total
-  if (!form.applicationId && applications.value.length) form.applicationId = applications.value[0].id
-  month.value = clampMonth(month.value)
-  lastLoadedAt.value = Date.now()
-}
 
 function datesBetween(start: string, end: string) {
   const result: string[] = []
@@ -281,7 +270,7 @@ async function save() {
     if (!result.response.ok) throw new Error(result.body.message || '保存日程失败')
     message.value = current ? '日程已更新，并已生成变更前备份' : '日程已新增，并已同步岗位进度'
     resetForm()
-    await loadEvents(true)
+    await store.refresh()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '保存日程失败'
   } finally {
@@ -301,7 +290,7 @@ async function resolve(item: EventItem, action: 'complete' | 'miss' | 'restore')
     })
     if (!result.response.ok) throw new Error(result.body.message || '更新日程状态失败')
     message.value = action === 'complete' ? '日程已完成' : action === 'miss' ? '日程已标记错过' : '日程已恢复为待完成'
-    await loadEvents(true)
+    await store.refresh()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '更新日程状态失败'
   } finally {
@@ -322,7 +311,7 @@ async function remove(item: EventItem) {
     if (!result.response.ok) throw new Error(result.body.message || '删除日程失败')
     message.value = '日程及对应岗位历史已删除'
     if (editing.value?.id === item.id) resetForm()
-    await loadEvents(true)
+    await store.refresh()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '删除日程失败'
   } finally {

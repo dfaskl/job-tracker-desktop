@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useJobTrackerStore } from './jobTrackerStore'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type BackupItem = {
@@ -11,6 +12,7 @@ type BackupItem = {
   eventCount: number
 }
 
+const store = useJobTrackerStore()
 const sandbox = ref<SandboxStatus | null>(null)
 const backups = ref<BackupItem[]>([])
 const currentUpdatedAt = ref('')
@@ -75,7 +77,7 @@ async function restore() {
     message.value = `已恢复备份 #${selected.value.id}：${result.body.applicationCount} 条投递、${result.body.eventCount} 项日程`
     selected.value = null
     confirmation.value = ''
-    await loadBackups()
+    await Promise.all([loadBackups(), store.refresh()])
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '恢复失败'
   } finally {

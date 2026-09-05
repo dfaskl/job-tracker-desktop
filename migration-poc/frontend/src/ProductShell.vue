@@ -9,7 +9,6 @@ import MigrationAdmin from './MigrationAdmin.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import AccountAccess from './AccountAccess.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
-import { preloadCalendarData } from './calendarDataCache'
 
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
 
@@ -63,12 +62,7 @@ function navigate(page: Page) {
 onMounted(() => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
-  void store.initialize().then(() => {
-    if (!store.user.value || store.readOnly.value) return
-    const preload = () => preloadCalendarData()
-    if ('requestIdleCallback' in window) window.requestIdleCallback(preload, { timeout: 1200 })
-    else window.setTimeout(preload, 0)
-  })
+  void store.initialize()
 })
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
 </script>
