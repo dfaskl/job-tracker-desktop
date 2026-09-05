@@ -147,8 +147,8 @@ async function saveResult() {
           <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
           <label><span>时间类型</span><select v-model="timeMode" @change="timeMode==='point'&&(result.endsAt='')"><option value="point">时间点</option><option value="range">时间段</option></select></label>
           <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
-          <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
+          <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
           <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
           <label v-if="canCreateSchedule" class="check wide"><input v-model="createSchedule" type="checkbox" /><span>同时创建关联日程</span></label>
           <div class="commit-box wide"><span>{{ actionSummary }}</span><button :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
