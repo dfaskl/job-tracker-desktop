@@ -96,10 +96,8 @@ final class ScheduleAdvicePlanner {
     private void addTimeline(ArrayNode output, Item item, LocalDateTime start, LocalDateTime end, String status, boolean showWindow) {
         ObjectNode node = output.addObject();
         boolean flexible = item.end != null && item.end.isAfter(item.start);
-        LocalDateTime displayStart = showWindow && flexible ? item.start : start;
-        LocalDateTime displayEnd = showWindow && flexible ? item.end : end;
-        node.put("id", item.id); node.put("label", item.label); node.put("date", displayStart.toLocalDate().toString());
-        node.put("start", displayStart.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", displayEnd.format(DateTimeFormatter.ofPattern("HH:mm")));
+        node.put("id", item.id); node.put("label", item.label); node.put("date", start.toLocalDate().toString());
+        node.put("start", start.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", end.format(DateTimeFormatter.ofPattern("HH:mm")));
         node.put("status", status); node.put("flexible", flexible); node.put("showWindow", showWindow);
         if (item.end != null && item.end.isAfter(item.start)) {
             node.put("windowStart", item.start.format(FORMAT)); node.put("windowEnd", item.end.format(FORMAT));

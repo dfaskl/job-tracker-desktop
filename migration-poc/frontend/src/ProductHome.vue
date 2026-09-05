@@ -42,7 +42,9 @@ const adviceTimeline = computed(() => {
       const key=entry.date+' '+entry.start, status=entry.status||'normal'
       const windowStart=entry.windowStart||'',windowEnd=entry.windowEnd||''
       const sameWindowDay=windowStart.slice(0,10)===windowEnd.slice(0,10)
-      const rangeLabel=sameWindowDay?windowStart.slice(11,16)+'–'+windowEnd.slice(11,16):windowStart.slice(5,16).replace('-','月').replace(' ','日 ')+'–'+windowEnd.slice(5,16).replace('-','月').replace(' ','日 ')
+      const dayStart=windowStart.slice(0,10)===entry.date?windowStart.slice(11,16):entry.start
+      const dayEnd=windowEnd.slice(0,10)===entry.date?windowEnd.slice(11,16):'23:59'
+      const rangeLabel=sameWindowDay?windowStart.slice(11,16)+'–'+windowEnd.slice(11,16):dayStart+'–'+dayEnd
       const timeLabel=entry.showWindow?rangeLabel:entry.start
       const group=groups.get(key)
       if(group){group.labels.push({text:entry.label,status});if(rank[status]>rank[group.status])group.status=status;if(entry.showWindow)group.timeLabel=timeLabel}
@@ -73,7 +75,7 @@ function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||i
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
 function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
 function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
-function adviceCacheKey(){return 'job_tracker_schedule_advice_v9_'+String(store.user.value?.email||'guest').toLowerCase()}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v10_'+String(store.user.value?.email||'guest').toLowerCase()}
 function scheduleAdviceExpiry(){const now=Date.now();const times=adviceCandidates.value.map(event=>parseTime(eventDeadline(event))).filter(time=>Number.isFinite(time)&&time>now);return times.length?Math.min(...times):now}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(Number(cached?.expiresAt)>Date.now()&&cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
 function localScheduleAdvice():ScheduleAdvice{
