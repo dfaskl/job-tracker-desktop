@@ -81,7 +81,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
-    <main class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail' }">
+    <main class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings' }">
       <header class="topbar">
         <div><h1>{{ current.label }}</h1><p>{{ current.subtitle }}</p></div>
         <div v-if="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
@@ -89,7 +89,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail' }">
+      <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings' }">
         <AccountAccess v-if="!store.user.value" />
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="`${activePage}-${cacheEpoch}`" @navigate="navigate" />
@@ -118,14 +118,16 @@ nav button:hover, nav button.active { color: #fff; background: #273552; }
 .home-quote-slot { display: flex; flex: 1; justify-content: center; min-width: 0; }
 .application-toolbar-slot { display: none; flex: 1; min-width: 0; margin: 7px 20px; }
 .application-toolbar-slot.active { display: flex; }
-.product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell { height: 100vh; overflow: hidden; padding-bottom: 0; }
+.product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.settings-page-shell { height: 100vh; overflow: hidden; padding-bottom: 0; }
 .topbar p { margin: 0; line-height: 1.4; }
 .page-content { width: min(1120px, 100%); margin: 0 auto; }
-.page-content.application-content, .page-content.calendar-content, .page-content.mail-content { width: 100%; max-width: none; }
-.page-content.mail-content { height: calc(100vh - 112px); }
+.page-content.application-content, .page-content.calendar-content, .page-content.mail-content, .page-content.settings-content { width: 100%; max-width: none; }
+.page-content.mail-content, .page-content.settings-content { height: calc(100vh - 112px); }
 .page-content :deep(.card) { margin-top: 22px; }
 
-@media (max-width: 900px) { .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 48px; } .page-content.mail-content { height: auto; } }
+@media (max-width: 1200px) { .product-main.settings-page-shell { height: auto; overflow: visible; padding-bottom: 48px; } .page-content.settings-content { height: auto; } }
+
+@media (max-width: 900px) { .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 48px; } .page-content.mail-content, .page-content.settings-content { height: auto; } }
 
 @media (max-width: 820px) {
   .sidebar { position: sticky; top: 0; width: 100%; height: auto; padding: 10px 14px; }
@@ -139,8 +141,8 @@ nav button:hover, nav button.active { color: #fff; background: #273552; }
   nav button { flex: 0 0 auto; width: auto; padding: 9px 11px; }
   nav button span { display: none; }
   .product-main { margin-left: 0; padding: 0 16px 48px; }
-  .product-main.calendar-page, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 48px; }
-  .page-content.mail-content { height: auto; }
+  .product-main.calendar-page, .product-main.mail-page-shell, .product-main.settings-page-shell { height: auto; overflow: visible; padding-bottom: 48px; }
+  .page-content.mail-content, .page-content.settings-content { height: auto; }
   .topbar { min-height: 92px; }
   .topbar h1 { font-size: 23px; }
   .home-quote-slot { order: 3; width: 100%; flex-basis: 100%; }

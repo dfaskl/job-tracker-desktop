@@ -130,6 +130,7 @@ function formatSize(value: number) {
 </template>
 
 <style scoped>
+.backup-card { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; }
 .section-head, .toolbar, .backup-list button, .restore-panel > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .section-head h2 { margin-bottom: 0; }
@@ -139,7 +140,7 @@ function formatSize(value: number) {
 .notice { display: grid; gap: 7px; padding: 18px; border: 1px solid #dbe3f1; border-radius: 12px; background: #f7f9fc; }
 .notice span { color: #667085; }
 .toolbar { margin: 20px 0 12px; }
-.backup-list { display: grid; gap: 9px; }
+.backup-list { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; gap: 9px; overflow-y: auto; padding-right: 6px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b9c5d5 transparent; }
 .backup-list button { width: 100%; color: #344054; border: 1px solid #e4e9f2; background: #fbfcfe; text-align: left; }
 .backup-list button.selected { border-color: #4461d8; background: #f1f4ff; }
 .backup-list button > div { display: flex; flex-wrap: wrap; gap: 6px 12px; }
