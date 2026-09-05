@@ -36,6 +36,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 :root[data-theme="purple"] { --accent:#7953ad; --sidebar:#2c203c; --sidebar-active:#49345f; }
 :root[data-theme="orange"] { --accent:#b86b34; --sidebar:#3a271c; --sidebar-active:#5a3925; }
 :root[data-theme="green"] { --accent:#32845c; --sidebar:#102c20; --sidebar-active:#204735; }
+:root[data-theme="teal"] { --accent:#25858f; --sidebar:#102d33; --sidebar-active:#1d4b53; }
+:root[data-theme="rose"] { --accent:#ad5272; --sidebar:#3a202d; --sidebar-active:#5a3043; }
+:root[data-theme="slate"] { --accent:#5f6c80; --sidebar:#202630; --sidebar-active:#35404e; }
+:root[data-theme="sky"] { --accent:#347fae; --sidebar:#142b3a; --sidebar-active:#21475e; }
 :root[data-theme] .topbar>button,:root[data-theme] .primary-action,:root[data-theme] .api-form>button,:root[data-theme] .link-editor>button,:root[data-theme] .tool-box>button:not(.danger-button) { background-color:var(--accent); }
 :root[data-theme] .sidebar { background:var(--sidebar)!important; }
 :root[data-theme] .sidebar nav button:hover,:root[data-theme] .sidebar nav button.active { background:var(--sidebar-active)!important; }
