@@ -14,6 +14,7 @@ const mailBody = ref('')
 const result = reactive({ company: '', position: '', noticeType: '其他', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
 const hasResult = ref(false)
 const createSchedule = ref(true)
+const timeMode = ref<'point' | 'range'>('point')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -53,12 +54,9 @@ function isRecommendedApplication(item:JobApplication) {
 }
 function matchPercent(item:JobApplication) { return Math.round(applicationMatchScore(item,result.company,result.position)*100) }
 function suggestApplication(company:unknown,position:unknown) {
-  const ranked=store.applications.value.map(item=>({item,score:applicationMatchScore(item,company,position)})).sort((a,b)=>b.score-a.score)
-  const exactCompany=ranked.filter(row=>companyKey(row.item.company)===companyKey(company))
-  if(exactCompany.length===1)return exactCompany[0].item
-  if(exactCompany.length>1){const best=exactCompany.sort((a,b)=>textSimilarity(b.item.position,position)-textSimilarity(a.item.position,position))[0];return textSimilarity(best.item.position,position)>=.45?best.item:undefined}
-  const best=ranked[0],companyScore=best?textSimilarity(companyKey(best.item.company),companyKey(company)):0
-  return best&&companyScore>=.72&&best.score>=.65?best.item:undefined
+  const targetCompany=normalize(company),targetPosition=normalize(position)
+  if(!targetCompany||!targetPosition)return undefined
+  return store.applications.value.find(item=>normalize(item.company)===targetCompany&&normalize(item.position)===targetPosition)
 }
 function inputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function apiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
@@ -81,6 +79,7 @@ async function recognize() {
     Object.assign(result, value, { startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
+    timeMode.value = value.endsAt ? 'range' : 'point'
     createSchedule.value = Boolean(value.startsAt) && value.noticeType !== '未通过'
     message.value = '识别完成，请核对后确认录入'
   } catch (cause) { error.value = failure(cause, '邮件识别失败') }
@@ -97,22 +96,29 @@ function applicationPayload(item?: JobApplication) {
 }
 async function saveResult() {
   if (!result.company.trim() || !result.position.trim()) { error.value = '请补全公司和岗位后再录入'; return }
+  if(createSchedule.value&&canCreateSchedule.value&&timeMode.value==='range'&&!result.endsAt){error.value='时间段日程必须填写结束时间';return}
+  const startTime=result.startsAt?new Date(result.startsAt).getTime():NaN,endTime=result.endsAt?new Date(result.endsAt).getTime():NaN
+  if(createSchedule.value&&timeMode.value==='range'&&(!Number.isFinite(startTime)||!Number.isFinite(endTime)||endTime<=startTime)){error.value='结束时间必须晚于开始时间';return}
   saving.value = true; error.value = ''; message.value = ''
   try {
     const matched = matchedApplication.value
     const response = matched
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
+    let duplicateSchedule=false
     if (createSchedule.value && canCreateSchedule.value) {
-      await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
-        applicationId: response.application.id, type: result.noticeType === '其他' ? '其他' : result.noticeType,
-        title: result.noticeType === '其他' ? '邮件通知' : `${result.noticeType}安排`,
-        startsAt: apiTime(result.startsAt), endsAt: apiTime(result.endsAt),
+      const eventType=result.noticeType==='其他'?'其他':result.noticeType
+      const startsAt=apiTime(result.startsAt),endsAt=timeMode.value==='range'?apiTime(result.endsAt):''
+      duplicateSchedule=store.events.value.some(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
+      if(!duplicateSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
+        applicationId: response.application.id, type: eventType,
+        title: eventType==='其他'?'邮件通知':eventType,
+        startsAt, endsAt,
         location: result.location.trim(), notes: result.notes.trim(), expectedUpdatedAt: ''
       }) })
     }
     await store.refresh()
-    message.value = `已${matched ? '更新投递' : '新建投递'}${createSchedule.value && canCreateSchedule.value ? '并创建日程' : ''}，写入前备份已自动生成`
+    message.value = duplicateSchedule ? `已${matched ? '更新投递' : '新建投递'}；相同日程已存在，未重复创建` : `已${matched ? '更新投递' : '新建投递'}${createSchedule.value && canCreateSchedule.value ? '并创建日程' : ''}，写入前备份已自动生成`
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
@@ -140,10 +146,11 @@ async function saveResult() {
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
+          <label><span>时间类型</span><select v-model="timeMode" @change="timeMode==='point'&&(result.endsAt='')"><option value="point">时间点</option><option value="range">时间段</option></select></label>
           <label><span>投递阶段</span><select v-model="result.suggestedStage"><option v-for="item in stages" :key="item">{{ item }}</option></select></label>
           <label><span>当前状态</span><select v-model="result.suggestedStatus"><option v-for="item in statuses" :key="item">{{ item }}</option></select></label>
-          <label><span>开始时间</span><input v-model="result.startsAt" type="datetime-local" /></label>
-          <label><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
+          <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
+          <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
           <label v-if="canCreateSchedule" class="check wide"><input v-model="createSchedule" type="checkbox" /><span>同时创建关联日程</span></label>
