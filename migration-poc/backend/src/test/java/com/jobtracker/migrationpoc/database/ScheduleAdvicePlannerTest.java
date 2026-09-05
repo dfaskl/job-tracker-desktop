@@ -1,0 +1,46 @@
+package com.jobtracker.migrationpoc.database;
+
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ScheduleAdvicePlannerTest {
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final ScheduleAdvicePlanner planner = new ScheduleAdvicePlanner(mapper);
+
+    @Test
+    void shortensFixedPointToSixtyMinutesWithWarning() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"甲","title":"笔试","startsAt":"2026-09-06 19:00","endsAt":"2026-09-06 19:00"},
+             {"id":"b","company":"乙","title":"面试","startsAt":"2026-09-06 20:00","endsAt":"2026-09-06 20:00"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
+        assertThat(result.path("plans").get(0).asText()).contains("19:00-20:00");
+        assertThat(result.path("warnings").get(0).asText()).contains("60 分钟");
+        assertThat(result.path("conflicts").isEmpty()).isTrue();
+    }
+
+    @Test
+    void reportsConflictWhenFixedPointHasLessThanSixtyMinutes() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"甲","title":"笔试","startsAt":"2026-09-06 19:00","endsAt":"2026-09-06 19:00"},
+             {"id":"b","company":"乙","title":"面试","startsAt":"2026-09-06 19:45","endsAt":"2026-09-06 19:45"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
+        assertThat(result.path("conflicts").get(0).asText()).contains("不足 60 分钟");
+    }
+
+    @Test
+    void usesShortFlexibleGapBeforeDeclaringConflict() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"固定","title":"面试","startsAt":"2026-09-06 11:15","endsAt":"2026-09-06 11:15"},
+             {"id":"b","company":"弹性","title":"笔试","startsAt":"2026-09-06 10:00","endsAt":"2026-09-06 11:15"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 6, 10, 0));
+        assertThat(result.path("plans").toString()).contains("10:00-11:15");
+        assertThat(result.path("warnings").toString()).contains("75 分钟");
+    }
+}
