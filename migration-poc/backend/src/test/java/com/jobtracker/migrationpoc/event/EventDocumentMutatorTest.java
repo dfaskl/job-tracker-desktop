@@ -95,6 +95,22 @@ class EventDocumentMutatorTest {
     }
 
     @Test
+    void upgradesAnUnversionedLegacyEventOnItsFirstMutation() throws Exception {
+        String source = """
+            {"applications":[{"id":"app-1","company":"Example","position":"Engineer","stage":"笔试",
+            "status":"等待结果","timeline":[]}],"events":[{"id":"evt-legacy","applicationId":"app-1",
+            "type":"笔试","title":"旧版笔试","startsAt":"2026-09-05 09:00"}]}
+            """;
+
+        var completed = mutator.resolve(
+            source, "evt-legacy", EventDocumentMutator.Resolution.COMPLETE, "__legacy_unversioned__"
+        );
+
+        assertThat(completed.event().completed()).isTrue();
+        assertThat(completed.event().updatedAt()).isEqualTo("2026-09-03 06:30");
+    }
+
+    @Test
     void deletesTimelineHistoryAndRollsProgressBackToTheLatestRemainingEvent() throws Exception {
         String source = """
             {"applications":[{"id":"app-1","company":"Example","position":"Engineer","stage":"面试",

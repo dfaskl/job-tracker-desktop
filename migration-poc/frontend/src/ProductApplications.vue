@@ -144,7 +144,7 @@ function eventDateLabel(item:JobEvent){const value=String(item.completed&&item.c
 function eventTimeLabel(item:JobEvent){const start=String(item.completed&&item.completedAt?item.completedAt:item.startsAt||item.start||item.date||'');const end=String(item.endsAt||item.end||'');const startTime=start.slice(11,16)||'时间未填';return end&&!item.completed?`${startTime} 至 ${end.slice(0,10)===start.slice(0,10)?end.slice(11,16):end.slice(0,16).replace('T',' ')}`:startTime}
 function eventState(item:JobEvent){return item.missed?'已错过':item.completed?'已完成':'待处理'}
 function eventLink(value:unknown){const text=String(value||'').trim();return /^https?:\/\//i.test(text)?text:''}
-function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdAt||'')}
+function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdAt||'__legacy_unversioned__')}
 async function refreshSelected(){const id=selected.value?.id;await store.refresh();if(id)selected.value=store.applications.value.find(item=>item.id===id)||selected.value}
 function openEvent(item?:JobEvent){
   editingEvent.value=item||null

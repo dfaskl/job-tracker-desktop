@@ -267,7 +267,11 @@ public class EventDocumentMutator {
         if (expectedUpdatedAt == null || expectedUpdatedAt.isBlank()) {
             throw new ValidationException("缺少日程版本，请刷新后重试");
         }
-        if (!expectedUpdatedAt.equals(version(event))) throw new ConflictException("日程已更新，请刷新后重试");
+        String currentVersion = version(event);
+        boolean legacyUnversioned = currentVersion.isEmpty() && "__legacy_unversioned__".equals(expectedUpdatedAt);
+        if (!legacyUnversioned && !expectedUpdatedAt.equals(currentVersion)) {
+            throw new ConflictException("日程已更新，请刷新后重试");
+        }
     }
 
     private String version(ObjectNode event) {
