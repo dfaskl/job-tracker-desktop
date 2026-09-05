@@ -16,7 +16,6 @@ const linkDetailsOpen = ref(false)
 const newCompany = ref('')
 const newUrl = ref('')
 const sandbox = ref<SandboxStatus | null>(null)
-const importConfirmation = ref('')
 const clearConfirmation = ref('')
 const importFileName = ref('')
 const importData = ref<BusinessData | null>(null)
@@ -100,7 +99,6 @@ async function chooseImportFile(event: Event) {
   const file = input.files?.[0]
   importData.value = null
   importFileName.value = file?.name || ''
-  importConfirmation.value = ''
   message.value = ''
   error.value = ''
   if (!file) return
@@ -116,17 +114,16 @@ async function chooseImportFile(event: Event) {
 }
 
 async function importIntoSandbox() {
-  if (!sandbox.value?.enabled || !importData.value || importConfirmation.value !== '导入') return
+  if (!sandbox.value?.enabled || !importData.value) return
   loading.value = true
   message.value = ''
   error.value = ''
   try {
     const result = await api<ImportResult>('/api/poc/backup-sandbox/import', {
       method: 'POST',
-      body: JSON.stringify({ data: importData.value, confirmation: importConfirmation.value })
+      body: JSON.stringify({ data: importData.value, confirmation: '导入' })
     })
     message.value = `已导入数据：${result.applicationCount} 条投递、${result.eventCount} 项日程`
-    importConfirmation.value = ''
     await store.refresh()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '导入失败'
@@ -186,8 +183,7 @@ function formatDate(value: string) {
         <h3>导入数据</h3>
         <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
         <input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" />
-        <label><span>输入“导入”确认</span><input v-model="importConfirmation" :disabled="!sandbox?.enabled || !importData" placeholder="导入" /></label>
-        <button type="button" :disabled="loading || !sandbox?.enabled || !importData || importConfirmation !== '导入'" @click="importIntoSandbox">确认导入</button>
+        <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">确认导入</button>
         <small v-if="importFileName">{{ importFileName }}</small>
       </div>
 
@@ -249,10 +245,11 @@ function formatDate(value: string) {
 .link-list span { overflow: hidden; color: #667085; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .notice { padding: 16px; border: 1px solid #dbe3f1; border-radius: 8px; background: #f7f9fc; color: #667085; }
 .data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.tool-box { display: grid; align-content: start; gap: 12px; padding: 16px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
+.tool-box { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
 .tool-box h3 { margin: 0; font-size: 16px; }
 .tool-box p { margin: 0; }
 .tool-box input[type="file"] { padding: 10px; background: #fff; }
+.tool-box > button:last-of-type { width: 100%; margin-top: auto; }
 .danger-zone { border-color: #f0c7c7; background: #fff8f8; }
 .danger-button { color: #fff; background: #b43232; }
 
