@@ -265,6 +265,7 @@ public class EventDocumentMutator {
 
     private void assertVersion(ObjectNode event, String expectedUpdatedAt) {
         if (expectedUpdatedAt == null || expectedUpdatedAt.isBlank()) {
+            if (text(event, "updatedAt").isEmpty()) return;
             throw new ValidationException("缺少日程版本，请刷新后重试");
         }
         String currentVersion = version(event);
