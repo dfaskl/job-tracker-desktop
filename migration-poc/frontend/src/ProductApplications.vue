@@ -125,7 +125,7 @@ async function removeApplication(){
   const item=selected.value;if(!item||!confirm(`确认删除“${item.company} / ${item.position}”及其关联日程吗？`))return
   busy.value=true;error.value=''
   try{
-    await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:item.updatedAt||''})})
+    await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:eventVersion(item)})})
     const backups=await api<{items:{id:number}[];currentUpdatedAt:string}>('/api/poc/backup-sandbox/backups')
     undo.value=backups.items.length?{backupId:backups.items[0].id,expected:backups.currentUpdatedAt}:null
     selected.value=null;await store.refresh();message.value='投递及关联日程已删除'
@@ -144,6 +144,7 @@ function eventDateLabel(item:JobEvent){const value=String(item.completed&&item.c
 function eventTimeLabel(item:JobEvent){const start=String(item.completed&&item.completedAt?item.completedAt:item.startsAt||item.start||item.date||'');const end=String(item.endsAt||item.end||'');const startTime=start.slice(11,16)||'时间未填';return end&&!item.completed?`${startTime} 至 ${end.slice(0,10)===start.slice(0,10)?end.slice(11,16):end.slice(0,16).replace('T',' ')}`:startTime}
 function eventState(item:JobEvent){return item.missed?'已错过':item.completed?'已完成':'待处理'}
 function eventLink(value:unknown){const text=String(value||'').trim();return /^https?:\/\//i.test(text)?text:''}
+function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdAt||'')}
 async function refreshSelected(){const id=selected.value?.id;await store.refresh();if(id)selected.value=store.applications.value.find(item=>item.id===id)||selected.value}
 function openEvent(item?:JobEvent){
   editingEvent.value=item||null
@@ -156,19 +157,19 @@ async function saveEvent(){
   busy.value=true;error.value=''
   try{
     const current=editingEvent.value
-    await api(current?`/api/poc/event-sandbox/events/${encodeURIComponent(current.id)}`:'/api/poc/event-sandbox/events',{method:current?'PUT':'POST',body:JSON.stringify({applicationId:selected.value.id,...eventForm,startsAt:eventForm.startsAt.replace('T',' '),endsAt:eventForm.endsAt.replace('T',' '),expectedUpdatedAt:current?.updatedAt||''})})
+    await api(current?`/api/poc/event-sandbox/events/${encodeURIComponent(current.id)}`:'/api/poc/event-sandbox/events',{method:current?'PUT':'POST',body:JSON.stringify({applicationId:selected.value.id,...eventForm,startsAt:eventForm.startsAt.replace('T',' '),endsAt:eventForm.endsAt.replace('T',' '),expectedUpdatedAt:current?eventVersion(current):''})})
     eventEditor.value=false;editingEvent.value=null;await refreshSelected();message.value=current?'日程已更新':'关联日程已创建'
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存日程失败'}finally{busy.value=false}
 }
 async function resolveEvent(item:JobEvent,action:'complete'|'restore'){
   busy.value=true;error.value=''
-  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}/resolution`,{method:'POST',body:JSON.stringify({action,expectedUpdatedAt:item.updatedAt||''})});await refreshSelected();message.value=action==='complete'?'日程已完成':'日程已恢复为待处理'}
+  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}/resolution`,{method:'POST',body:JSON.stringify({action,expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value=action==='complete'?'日程已完成':'日程已恢复为待处理'}
   catch(cause){error.value=cause instanceof Error?cause.message:'更新日程状态失败'}finally{busy.value=false}
 }
 async function removeEvent(item:JobEvent){
   if(!confirm(`确认删除“${item.title||item.type||'日程'}”吗？`))return
   busy.value=true;error.value=''
-  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:item.updatedAt||''})});await refreshSelected();message.value='日程已删除'}
+  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value='日程已删除'}
   catch(cause){error.value=cause instanceof Error?cause.message:'删除日程失败'}finally{busy.value=false}
 }
 </script>
