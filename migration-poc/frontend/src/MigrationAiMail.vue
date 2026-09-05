@@ -6,8 +6,6 @@ import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 type AiStatus = { callsEnabled: boolean }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
-const stages = ['已投递', '测评', '笔试', '面试', 'Offer', '已结束']
-const statuses = ['等待结果', '已通过', '未通过', '已放弃', '已结束']
 const store = useJobTrackerStore()
 const status = ref<AiStatus | null>(null)
 const mailBody = ref('')
@@ -148,8 +146,6 @@ async function saveResult() {
           <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
           <label><span>时间类型</span><select v-model="timeMode" @change="timeMode==='point'&&(result.endsAt='')"><option value="point">时间点</option><option value="range">时间段</option></select></label>
           <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
-          <label><span>投递阶段</span><select v-model="result.suggestedStage"><option v-for="item in stages" :key="item">{{ item }}</option></select></label>
-          <label><span>当前状态</span><select v-model="result.suggestedStatus"><option v-for="item in statuses" :key="item">{{ item }}</option></select></label>
           <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
           <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
