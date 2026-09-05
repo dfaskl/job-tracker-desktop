@@ -184,7 +184,7 @@ function formatDate(value: string) {
         <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
         <label class="file-picker"><span class="file-button">选择文件</span><input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" /><small>{{ importFileName || '未选择任何文件' }}</small></label>
         <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">确认导入</button>
-        
+
       </div>
 
       <div class="tool-box danger-zone">
