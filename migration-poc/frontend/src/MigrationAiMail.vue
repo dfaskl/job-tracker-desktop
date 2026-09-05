@@ -4,14 +4,14 @@ import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 
 type AiStatus = { callsEnabled: boolean }
-type Recognition = { company: string; position: string; noticeType: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
+type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
 const stages = ['已投递', '测评', '笔试', '面试', 'Offer', '已结束']
 const statuses = ['等待结果', '已通过', '未通过', '已放弃', '已结束']
 const store = useJobTrackerStore()
 const status = ref<AiStatus | null>(null)
 const mailBody = ref('')
-const result = reactive({ company: '', position: '', noticeType: '其他', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
+const result = reactive({ company: '', position: '', noticeType: '其他', scheduleTitle: '', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
 const hasResult = ref(false)
 const createSchedule = ref(true)
 const timeMode = ref<'point' | 'range'>('point')
@@ -76,7 +76,7 @@ async function recognize() {
   loading.value = true; error.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
-    Object.assign(result, value, { startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
+    Object.assign(result, value, { scheduleTitle: value.scheduleTitle || value.noticeType || '日程', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
     timeMode.value = value.endsAt ? 'range' : 'point'
@@ -112,7 +112,7 @@ async function saveResult() {
       duplicateSchedule=store.events.value.some(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
       if(!duplicateSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
         applicationId: response.application.id, type: eventType,
-        title: eventType==='其他'?'邮件通知':eventType,
+        title: result.scheduleTitle.trim()||(eventType==='其他'?'邮件通知':eventType),
         startsAt, endsAt,
         location: result.location.trim(), notes: result.notes.trim(), expectedUpdatedAt: ''
       }) })
@@ -147,6 +147,7 @@ async function saveResult() {
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
           <label><span>时间类型</span><select v-model="timeMode" @change="timeMode==='point'&&(result.endsAt='')"><option value="point">时间点</option><option value="range">时间段</option></select></label>
+          <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
           <label><span>投递阶段</span><select v-model="result.suggestedStage"><option v-for="item in stages" :key="item">{{ item }}</option></select></label>
           <label><span>当前状态</span><select v-model="result.suggestedStatus"><option v-for="item in statuses" :key="item">{{ item }}</option></select></label>
           <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
