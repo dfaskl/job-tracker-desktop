@@ -86,24 +86,52 @@ final class ScheduleAdvicePlanner {
         ArrayNode planArray = result.putArray("plans");
         plans.forEach(slot -> planArray.add(FORMAT.format(slot.start) + "-" + slot.end.format(DateTimeFormatter.ofPattern("HH:mm")) + " " + slot.item.label));
         ArrayNode timeline = result.putArray("timeline");
-        for (Slot slot : plans) addTimeline(timeline, slot.item, slot.start, slot.end, status(slot.item, tightItems, conflictItems), slot.item.end != null && slot.item.end.isAfter(slot.item.start));
-        for (Item item : failedFlexible) addTimeline(timeline, item, item.start.isAfter(now) ? item.start : now, item.end, "conflict", true);
+        for (Slot slot : plans) {
+            LocalDateTime[] range = availableStartRange(slot, plans, now);
+            addTimeline(timeline, slot.item, slot.start, slot.end, status(slot.item, tightItems, conflictItems), range);
+        }
+        for (Item item : failedFlexible) addTimeline(timeline, item, item.start.isAfter(now) ? item.start : now, item.end, "conflict", null);
         ArrayNode warningArray = result.putArray("warnings"); warnings.forEach(warningArray::add);
         ArrayNode conflictArray = result.putArray("conflicts"); conflicts.stream().distinct().forEach(conflictArray::add);
         return result;
     }
 
-    private void addTimeline(ArrayNode output, Item item, LocalDateTime start, LocalDateTime end, String status, boolean showWindow) {
+    private void addTimeline(ArrayNode output, Item item, LocalDateTime start, LocalDateTime end, String status, LocalDateTime[] startRange) {
+        boolean showWindow = startRange != null && startRange[1].isAfter(startRange[0]);
+        LocalDateTime displayStart = showWindow ? startRange[0] : start;
+        LocalDateTime displayEnd = showWindow ? startRange[1] : end;
         ObjectNode node = output.addObject();
-        boolean flexible = item.end != null && item.end.isAfter(item.start);
-        node.put("id", item.id); node.put("label", item.label); node.put("date", start.toLocalDate().toString());
-        node.put("start", start.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", end.format(DateTimeFormatter.ofPattern("HH:mm")));
-        node.put("status", status); node.put("flexible", flexible); node.put("showWindow", showWindow);
-        if (item.end != null && item.end.isAfter(item.start)) {
-            node.put("windowStart", item.start.format(FORMAT)); node.put("windowEnd", item.end.format(FORMAT));
+        node.put("id", item.id); node.put("label", item.label); node.put("date", displayStart.toLocalDate().toString());
+        node.put("start", displayStart.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", displayEnd.format(DateTimeFormatter.ofPattern("HH:mm")));
+        node.put("status", status); node.put("flexible", item.end != null && item.end.isAfter(item.start)); node.put("showWindow", showWindow);
+        if (showWindow) {
+            node.put("windowStart", displayStart.format(FORMAT)); node.put("windowEnd", displayEnd.format(FORMAT));
         }
     }
 
+    private LocalDateTime[] availableStartRange(Slot target, List<Slot> plans, LocalDateTime now) {
+        Item item = target.item;
+        if (item.end == null || !item.end.isAfter(item.start) || Duration.between(target.start, target.end).toMinutes() < IDEAL_MINUTES) return null;
+        LocalDateTime dayStart = target.start.toLocalDate().atStartOfDay();
+        LocalDateTime dayEnd = dayStart.plusDays(1);
+        LocalDateTime earliest = maximum(item.start, dayStart, now);
+        LocalDateTime boundary = minimum(item.end, dayEnd);
+        for (Slot other : plans) {
+            if (other == target || other.item.equals(item)) continue;
+            if (!other.end.isAfter(dayStart) || !other.start.isBefore(dayEnd)) continue;
+            if (!other.end.isAfter(target.start) && other.end.isAfter(earliest)) earliest = other.end;
+            if (!other.start.isBefore(target.end) && other.start.isBefore(boundary)) boundary = other.start;
+        }
+        LocalDateTime latest = boundary.minusMinutes(IDEAL_MINUTES);
+        return latest.isBefore(earliest) ? null : new LocalDateTime[]{earliest, latest};
+    }
+
+    private LocalDateTime maximum(LocalDateTime... values) {
+        LocalDateTime result = values[0]; for (LocalDateTime value : values) if (value.isAfter(result)) result = value; return result;
+    }
+    private LocalDateTime minimum(LocalDateTime... values) {
+        LocalDateTime result = values[0]; for (LocalDateTime value : values) if (value.isBefore(result)) result = value; return result;
+    }
     private String status(Item item, Set<Item> tight, Set<Item> conflicts) { return conflicts.contains(item) ? "conflict" : tight.contains(item) ? "tight" : "normal"; }
 
     private Slot findSlot(Item item, LocalDateTime start, LocalDateTime end, long minutes, List<Slot> occupied) {

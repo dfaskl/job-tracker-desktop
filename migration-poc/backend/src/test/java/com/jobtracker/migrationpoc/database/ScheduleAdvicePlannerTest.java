@@ -57,7 +57,7 @@ class ScheduleAdvicePlannerTest {
     }
 
     @Test
-    void exposesFlexibleWindowEvenWhenAnotherScheduleFallsInsideIt() throws Exception {
+    void exposesStartTimeRangeEndingNinetyMinutesBeforeNextSchedule() throws Exception {
         var schedules = mapper.readTree("""
             [{"id":"a","company":"自由安排","title":"笔试","startsAt":"2026-09-06 10:00","endsAt":"2026-09-06 18:00"},
              {"id":"b","company":"窗口内安排","title":"面试","startsAt":"2026-09-06 14:00","endsAt":"2026-09-06 14:00"}]
@@ -65,6 +65,6 @@ class ScheduleAdvicePlannerTest {
         var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 5, 12, 0));
         assertThat(result.path("timeline").get(0).path("showWindow").asBoolean()).isTrue();
         assertThat(result.path("timeline").get(0).path("windowStart").asText()).isEqualTo("2026-09-06 10:00");
-        assertThat(result.path("timeline").get(0).path("windowEnd").asText()).isEqualTo("2026-09-06 18:00");
+        assertThat(result.path("timeline").get(0).path("windowEnd").asText()).isEqualTo("2026-09-06 12:30");
     }
 }
