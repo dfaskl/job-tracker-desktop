@@ -86,7 +86,7 @@ final class ScheduleAdvicePlanner {
         ArrayNode planArray = result.putArray("plans");
         plans.forEach(slot -> planArray.add(FORMAT.format(slot.start) + "-" + slot.end.format(DateTimeFormatter.ofPattern("HH:mm")) + " " + slot.item.label));
         ArrayNode timeline = result.putArray("timeline");
-        for (Slot slot : plans) addTimeline(timeline, slot.item, slot.start, slot.end, status(slot.item, tightItems, conflictItems), freelyAdjustable(slot.item, plans));
+        for (Slot slot : plans) addTimeline(timeline, slot.item, slot.start, slot.end, status(slot.item, tightItems, conflictItems), slot.item.end != null && slot.item.end.isAfter(slot.item.start));
         for (Item item : failedFlexible) addTimeline(timeline, item, item.start.isAfter(now) ? item.start : now, item.end, "conflict", true);
         ArrayNode warningArray = result.putArray("warnings"); warnings.forEach(warningArray::add);
         ArrayNode conflictArray = result.putArray("conflicts"); conflicts.stream().distinct().forEach(conflictArray::add);
@@ -95,19 +95,18 @@ final class ScheduleAdvicePlanner {
 
     private void addTimeline(ArrayNode output, Item item, LocalDateTime start, LocalDateTime end, String status, boolean showWindow) {
         ObjectNode node = output.addObject();
-        node.put("id", item.id); node.put("label", item.label); node.put("date", start.toLocalDate().toString());
-        node.put("start", start.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", end.format(DateTimeFormatter.ofPattern("HH:mm")));
-        node.put("status", status); node.put("flexible", item.end != null && item.end.isAfter(item.start)); node.put("showWindow", showWindow);
+        boolean flexible = item.end != null && item.end.isAfter(item.start);
+        LocalDateTime displayStart = showWindow && flexible ? item.start : start;
+        LocalDateTime displayEnd = showWindow && flexible ? item.end : end;
+        node.put("id", item.id); node.put("label", item.label); node.put("date", displayStart.toLocalDate().toString());
+        node.put("start", displayStart.format(DateTimeFormatter.ofPattern("HH:mm"))); node.put("end", displayEnd.format(DateTimeFormatter.ofPattern("HH:mm")));
+        node.put("status", status); node.put("flexible", flexible); node.put("showWindow", showWindow);
         if (item.end != null && item.end.isAfter(item.start)) {
             node.put("windowStart", item.start.format(FORMAT)); node.put("windowEnd", item.end.format(FORMAT));
         }
     }
 
     private String status(Item item, Set<Item> tight, Set<Item> conflicts) { return conflicts.contains(item) ? "conflict" : tight.contains(item) ? "tight" : "normal"; }
-    private boolean freelyAdjustable(Item item, List<Slot> plans) {
-        if (item.end == null || !item.end.isAfter(item.start)) return false;
-        return plans.stream().filter(slot -> !slot.item.equals(item)).noneMatch(slot -> slot.start.isBefore(item.end) && item.start.isBefore(slot.end));
-    }
 
     private Slot findSlot(Item item, LocalDateTime start, LocalDateTime end, long minutes, List<Slot> occupied) {
         LocalDateTime candidate = start;
