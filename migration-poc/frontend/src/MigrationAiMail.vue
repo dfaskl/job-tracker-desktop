@@ -162,7 +162,7 @@ async function saveResult() {
 </template>
 
 <style scoped>
-.mail-page { display: grid; gap: 20px; padding-top: 22px; }
+.mail-page { display: grid; height: 100%; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 18px; padding-top: 18px; box-sizing: border-box; overflow: hidden; }
 .mail-toolbar, .panel-title, .panel-title > div, .commit-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .mail-toolbar h2 { margin: 5px 0 4px; font-size: 24px; }
 .mail-toolbar p, .panel-title p { margin: 0; }
@@ -170,25 +170,27 @@ async function saveResult() {
 .match-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .match-badge { color: #4259bd; background: #edf1ff; }
 .text-button { padding: 7px 10px; color: #344054; background: transparent; }
-.card { margin-top: 0; }
+.card { margin-top: 0 !important; }
 .panel-title h3 { margin: 0; font-size: 17px; }
 .result-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
 .result-form label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
 .result-form .wide { grid-column: 1 / -1; }
 .application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:#667085;font-weight:400}.check { display: flex !important; align-items: center; }
 .check input { flex: none; width: 18px; }
-.mail-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 20px; }
-.source-panel, .review-panel { min-width: 0; }
+.mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 20px; padding-bottom: 18px; }
+.source-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
+.source-panel { display: flex; flex-direction: column; }
+.review-panel { overflow-y: auto; overscroll-behavior: contain; }
 .step { display: grid; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: #526ddd; place-items: center; font-size: 13px; font-weight: 800; }
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
-.source-panel > textarea { min-height: 340px; margin: 18px 0 10px; line-height: 1.65; }
+.source-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
 .privacy-note { margin-bottom: 14px; color: #667085; font-size: 12px; }
 .primary-action { width: 100%; }
 .empty-state { display: grid; min-height: 280px; gap: 8px; padding: 24px; border: 1px dashed #d4dbea; border-radius: 12px; color: #667085; background: #fafbfc; place-content: center; text-align: center; }
 .empty-state.small { min-height: 100px; }
 .commit-box { padding: 14px; border-radius: 12px; color: #475467; background: #f4f6fb; }
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
-@media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: 1fr; padding-bottom: 0; } .source-panel, .review-panel { height: auto; } .source-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {
   .mail-toolbar { align-items: flex-start; flex-direction: column; }
   .result-form { grid-template-columns: 1fr; }
