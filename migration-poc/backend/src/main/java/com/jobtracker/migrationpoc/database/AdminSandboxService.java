@@ -39,12 +39,12 @@ public class AdminSandboxService {
         boolean requested = Boolean.parseBoolean(environment.getProperty("POC_ADMIN_ENABLED", "false"));
         ApplicationSandboxService.SandboxStatus sandbox = applicationSandboxService.status();
         if (!requested) {
-            return new AdminStatus(false, false, sandbox.enabled(), "管理员迁移功能未开启");
+            return new AdminStatus(false, false, sandbox.enabled(), "管理员功能未开启");
         }
         if (!sandbox.enabled()) {
             return new AdminStatus(false, true, false, sandbox.message());
         }
-        return new AdminStatus(true, true, true, "独立测试数据库管理员功能已开启");
+        return new AdminStatus(true, true, true, "管理员功能已开启");
     }
 
     public Overview overview(String adminEmail) throws Exception {

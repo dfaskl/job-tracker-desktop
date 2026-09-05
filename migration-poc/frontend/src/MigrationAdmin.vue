@@ -36,7 +36,7 @@ function relativeDate(value:string){if(!value)return '从未登录';const time=D
 
 <template>
   <section class="admin-shell">
-    <div v-if="status&&!status.enabled" class="card disabled-panel"><h2>管理员功能未开启</h2><p>{{status.message}}</p><small>需要开启管理员环境配置后才能使用。</small></div>
+    <div v-if="status&&!status.enabled" class="card disabled-panel"><h2>管理员功能暂不可用</h2><p>{{status.message}}</p><small>请检查业务数据库连接和管理员账号配置。</small></div>
     <template v-else-if="overview">
       <header class="admin-head">
         <div><span>管理中心</span><h2>系统运行与账号管理</h2><p>当前管理员：{{overview.currentUser.email}}</p></div>

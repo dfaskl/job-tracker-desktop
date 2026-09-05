@@ -31,4 +31,4 @@ services:
       - key: POC_AI_CALLS_ENABLED
         value: "false"
       - key: POC_ADMIN_ENABLED
-        value: "false"
+        value: "true"

@@ -63,6 +63,6 @@
 - `POC_PERSISTENT_SESSION_ENABLED=true`：使用数据库会话。
 - `POC_ENCRYPTION_KEY`：与旧系统 `ENCRYPTION_KEY` 相同，以兼容已有 AI 密钥。
 - `POC_AI_CALLS_ENABLED=true`：按需开启 AI 邮件识别与字段规范化。
-- `POC_ADMIN_ENABLED=true`：按需开启管理员功能。
+- `POC_ADMIN_ENABLED=true`：开启管理员功能（正式部署默认开启）。
 
 开启后，新旧系统读取同一组用户、投递、日程、公司链接、AI 配置和备份。每次业务写入前都会生成备份；同一账号不要在两个页面中同时编辑同一条记录，遇到版本冲突时刷新后重试。
