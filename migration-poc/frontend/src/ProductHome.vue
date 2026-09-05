@@ -25,9 +25,7 @@ let adviceTimer: ReturnType<typeof setTimeout> | null = null
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
 const recentSchedules = computed(() => upcomingItems.value)
-const adviceCandidates = computed(() => upcomingItems.value.filter((event, index, all) =>
-  all.some((other, otherIndex) => otherIndex !== index && sharesCalendarDay(event, other))
-))
+const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
   id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
   startsAt:eventStart(event), endsAt:String(event.endsAt || event.end || eventStart(event)), updatedAt:String(event.updatedAt || '')
@@ -73,9 +71,7 @@ function today(){return localText().slice(0,10)}
 function eventStart(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||'')}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
-function eventDayRange(item:Record<string,unknown>){const start=eventStart(item).slice(0,10),end=eventDeadline(item).slice(0,10)||start;return {start,end}}
-function sharesCalendarDay(left:Record<string,unknown>,right:Record<string,unknown>){const a=eventDayRange(left),b=eventDayRange(right);return Boolean(a.start&&b.start&&a.start<=b.end&&b.start<=a.end)}
-function adviceCacheKey(){return 'job_tracker_schedule_advice_v11_'+String(store.user.value?.email||'guest').toLowerCase()}
+function adviceCacheKey(){return 'job_tracker_schedule_advice_v12_'+String(store.user.value?.email||'guest').toLowerCase()}
 function scheduleAdviceExpiry(){const now=Date.now();const times=adviceCandidates.value.map(event=>parseTime(eventDeadline(event))).filter(time=>Number.isFinite(time)&&time>now);return times.length?Math.min(...times):now}
 function loadScheduleAdvice(signature:string){try{const cached=JSON.parse(localStorage.getItem(adviceCacheKey())||'null');if(Number(cached?.expiresAt)>Date.now()&&cached?.signature===signature&&cached.advice){scheduleAdvice.value=cached.advice;return true}}catch{/* 重新生成 */}return false}
 function localScheduleAdvice():ScheduleAdvice{
@@ -147,7 +143,7 @@ function fallbackQuote():Quote{const items=['今天多走一步，明天就多�
 function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteCacheKey())||localStorage.getItem(legacyQuoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;localStorage.setItem(quoteCacheKey(),JSON.stringify(cached));return true}}catch{/* 使用本地内容 */}return false}
 async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value));if(force)message.value='已经换了一句'}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一语生成失败'}finally{quoteLoading.value=false}}
-async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
+async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
 watch(adviceSignature,signature=>{if(adviceTimer)clearTimeout(adviceTimer);if(store.user.value)adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),3200)},{immediate:true})</script>
