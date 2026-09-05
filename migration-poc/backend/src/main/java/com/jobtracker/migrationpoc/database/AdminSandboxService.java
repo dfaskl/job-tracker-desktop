@@ -42,7 +42,7 @@ public class AdminSandboxService {
             return new AdminStatus(false, false, sandbox.enabled(), "管理员功能未开启");
         }
         if (!sandbox.enabled()) {
-            return new AdminStatus(false, true, false, sandbox.message());
+            return new AdminStatus(false, true, false, "业务数据库当前不可写：" + sandbox.message());
         }
         return new AdminStatus(true, true, true, "管理员功能已开启");
     }
