@@ -23,7 +23,7 @@ const adviceNotice = ref('')
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 
-const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed)
+const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
 const recentSchedules = computed(() => upcomingItems.value)
 const adviceCandidates = computed(() => upcomingItems.value)
@@ -117,7 +117,7 @@ function localScheduleAdvice():ScheduleAdvice{
     }else{scheduleAdvice.value=localScheduleAdvice();adviceNotice.value=''}
   }finally{adviceLoading.value=false}
 }
-function isEnded(item:JobApplication){return item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||''))}
+function isEnded(item:JobApplication|undefined){return Boolean(item)&&(item?.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item?.status||'')))}
 function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}
 function progressHealth(item:JobApplication){
   if(isEnded(item)||item.stage==='Offer'||item.status==='已通过')return null
