@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 
@@ -29,6 +29,13 @@ const canCreateSchedule = computed(() => Boolean(result.startsAt) && result.noti
 const actionSummary = computed(() => hasResult.value
   ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${createSchedule.value && canCreateSchedule.value ? '，并创建关联日程' : ''}`
   : '')
+
+watch(selectedApplicationId, () => {
+  const matched = matchedApplication.value
+  if (!matched) return
+  result.company = matched.company
+  result.position = matched.position
+})
 
 onMounted(async () => {
   await store.initialize()
@@ -93,13 +100,13 @@ function applicationPayload(item?: JobApplication) {
   }
 }
 async function saveResult() {
-  if (!result.company.trim() || !result.position.trim()) { error.value = '请补全公司和岗位后再录入'; return }
+  const matched = matchedApplication.value
+  if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
   if(createSchedule.value&&canCreateSchedule.value&&timeMode.value==='range'&&!result.endsAt){error.value='时间段日程必须填写结束时间';return}
   const startTime=result.startsAt?new Date(result.startsAt).getTime():NaN,endTime=result.endsAt?new Date(result.endsAt).getTime():NaN
   if(createSchedule.value&&timeMode.value==='range'&&(!Number.isFinite(startTime)||!Number.isFinite(endTime)||endTime<=startTime)){error.value='结束时间必须晚于开始时间';return}
   saving.value = true; error.value = ''; message.value = ''
   try {
-    const matched = matchedApplication.value
     const response = matched
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
