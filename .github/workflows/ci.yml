@@ -2,30 +2,39 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/migration-poc-demo"]
+    paths:
+      - "migration-poc/**"
+      - ".github/workflows/ci.yml"
+      - "render.yaml"
   pull_request:
     branches: [main]
+    paths:
+      - "migration-poc/**"
+      - ".github/workflows/ci.yml"
+      - "render.yaml"
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  package:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.22.0
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Check JavaScript syntax
-        run: npm run check
-      - name: Run online smoke test
-        run: npm test
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+          cache-dependency-path: migration-poc/frontend/package-lock.json
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build current Vue and Spring Boot application
+        run: mvn -B -f migration-poc/backend/pom.xml clean package

@@ -1,29 +1,24 @@
 services:
   - type: web
     name: job-tracker-web
-    runtime: docker
+    runtime: node
     plan: free
     region: singapore
-    branch: main
-    rootDir: migration-poc
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    buildCommand: npm ci
+    startCommand: npm start
     healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
     envVars:
-      - key: APP_DATABASE_URL
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
         sync: false
-      - key: SESSION_SECRET
-        generateValue: true
       - key: ENCRYPTION_KEY
         sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ALLOW_REGISTRATION
-        value: "true"
-      - key: SESSION_DAYS
-        value: "7"
-      - key: AI_CALLS_ENABLED
-        value: "true"
+        value: true
       - key: AI_ALLOWED_HOSTS
         value: api.deepseek.com,api.openai.com
       - key: REGISTRATION_CODE
