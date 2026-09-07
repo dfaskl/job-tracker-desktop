@@ -56,7 +56,7 @@ public class AccountSandboxService {
     }
     private Connection open()throws Exception{
         if(!enabled())throw new AccountDisabledException(sandbox.status().message());
-        LegacyDatabaseUrl config=LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config=LegacyDatabaseUrl.parse(com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment));
         Properties p=new Properties();if(config.username()!=null)p.setProperty("user",config.username());if(config.password()!=null)p.setProperty("password",config.password());
         p.setProperty("ApplicationName","job-tracker-migration-poc-accounts");return PooledConnections.open(config,p);
     }

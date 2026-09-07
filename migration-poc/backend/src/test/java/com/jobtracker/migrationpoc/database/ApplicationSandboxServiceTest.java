@@ -9,56 +9,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApplicationSandboxServiceTest {
     @Test
-    void remainsDisabledWithoutExplicitOptIn() {
+    void remainsDisabledWithoutADatabase() {
+        var status = service(new MockEnvironment()).status();
+        assertThat(status.enabled()).isFalse();
+        assertThat(status.configured()).isFalse();
+        assertThat(status.message()).contains("尚未配置");
+    }
+
+    @Test
+    void enablesTheFormalSingleDatabaseConfiguration() {
+        var status = service(new MockEnvironment()
+            .withProperty("APP_DATABASE_URL", "postgres://user:pass@db.example.com/jobtracker")
+        ).status();
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.configured()).isTrue();
+        assertThat(status.message()).contains("已连接");
+    }
+
+    @Test
+    void keepsExistingRenderDatabaseVariablesCompatible() {
         var status = service(new MockEnvironment()
             .withProperty("DATABASE_URL", "postgres://user:pass@prod.example.com/main")
             .withProperty("POC_WRITE_DATABASE_URL", "postgres://user:pass@test.example.com/test")
         ).status();
-
-        assertThat(status.enabled()).isFalse();
-        assertThat(status.message()).contains("未开启");
-    }
-
-    @Test
-    void refusesTheProductionDatabaseEvenWhenQueryParametersDiffer() {
-        var status = service(new MockEnvironment()
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://user:pass@prod.example.com/main?sslmode=require")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://other:pass@prod.example.com/main?connectTimeout=10")
-        ).status();
-
-        assertThat(status.enabled()).isFalse();
-        assertThat(status.isolated()).isFalse();
-        assertThat(status.message()).contains("相同");
-    }
-
-    @Test
-    void enablesOnlyAnExplicitlyConfiguredDifferentDatabase() {
-        var status = service(new MockEnvironment()
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://user:pass@prod.example.com/main")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://user:pass@test.example.com/test")
-        ).status();
-
         assertThat(status.enabled()).isTrue();
-        assertThat(status.configured()).isTrue();
-        assertThat(status.isolated()).isTrue();
     }
 
     @Test
-    void enablesSharedProductionDatabaseOnlyWithSecondExplicitOptIn() {
-        var status = service(new MockEnvironment()
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("POC_SHARED_DATABASE_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://user:pass@prod.example.com/main?sslmode=require")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://other:pass@prod.example.com/main")
-        ).status();
-
-        assertThat(status.enabled()).isTrue();
+    void rejectsMalformedDatabaseAddresses() {
+        var status = service(new MockEnvironment().withProperty("APP_DATABASE_URL", "not-a-database" )).status();
+        assertThat(status.enabled()).isFalse();
         assertThat(status.configured()).isTrue();
-        assertThat(status.isolated()).isFalse();
-        assertThat(status.message()).contains("共享生产数据库");
+        assertThat(status.message()).contains("格式无效");
     }
+
     private ApplicationSandboxService service(MockEnvironment environment) {
         ObjectMapper mapper = new ObjectMapper();
         return new ApplicationSandboxService(environment, mapper, new ApplicationDocumentMutator(mapper));

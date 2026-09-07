@@ -1,5 +1,7 @@
 package com.jobtracker.migrationpoc.database;
 
+import com.jobtracker.migrationpoc.config.AppEnvironment;
+
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -28,7 +30,7 @@ public class LegacyReadService {
     }
 
     public boolean isConfigured() {
-        String databaseUrl = environment.getProperty("DATABASE_URL");
+        String databaseUrl = AppEnvironment.databaseUrl(environment);
         return databaseUrl != null && !databaseUrl.isBlank();
     }
 
@@ -150,11 +152,11 @@ public class LegacyReadService {
     }
 
     private Connection openReadOnlyConnection() throws Exception {
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
-        properties.setProperty("ApplicationName", "job-tracker-migration-poc-readonly");
+        properties.setProperty("ApplicationName", "job-tracker-readonly");
         Connection connection = PooledConnections.open(config, properties);
         connection.setReadOnly(true);
         return connection;

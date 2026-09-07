@@ -10,14 +10,14 @@ import static org.mockito.Mockito.when;
 
 class PocPersistentSessionStoreTest {
     @Test
-    void staysInSignedCookieModeByDefault() {
+    void usesPersistentSessionsByDefault() {
         ApplicationSandboxService sandbox = isolatedSandbox();
         PocPersistentSessionStore store = new PocPersistentSessionStore(new MockEnvironment(), sandbox);
 
         var status = store.status();
 
-        assertThat(status.requested()).isFalse();
-        assertThat(status.persistent()).isFalse();
+        assertThat(status.requested()).isTrue();
+        assertThat(status.persistent()).isTrue();
         assertThat(status.sessionDays()).isEqualTo(7);
     }
 
@@ -25,7 +25,7 @@ class PocPersistentSessionStoreTest {
     void refusesPersistentModeUntilTheSandboxDatabaseIsEnabled() {
         ApplicationSandboxService sandbox = mock(ApplicationSandboxService.class);
         when(sandbox.status()).thenReturn(new ApplicationSandboxService.SandboxStatus(
-            false, true, false, "测试库与生产库地址相同"
+            false, true, false, "业务数据库未配置"
         ));
         PocPersistentSessionStore store = new PocPersistentSessionStore(
             new MockEnvironment().withProperty("POC_PERSISTENT_SESSION_ENABLED", "true"), sandbox
@@ -36,7 +36,7 @@ class PocPersistentSessionStoreTest {
     }
 
     @Test
-    void enablesPersistentModeOnlyWithAnIsolatedSandboxAndClampsTheTtl() {
+    void supportsLegacySessionSettingsAndClampsTheTtl() {
         PocPersistentSessionStore store = new PocPersistentSessionStore(
             new MockEnvironment()
                 .withProperty("POC_PERSISTENT_SESSION_ENABLED", "true")

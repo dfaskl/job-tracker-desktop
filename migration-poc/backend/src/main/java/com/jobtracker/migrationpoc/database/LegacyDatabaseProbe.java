@@ -28,20 +28,20 @@ public class LegacyDatabaseProbe {
     }
 
     public boolean isConfigured() {
-        return hasText(environment.getProperty("DATABASE_URL"));
+        return hasText(com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment));
     }
 
     public boolean isProtected() {
-        return hasText(environment.getProperty("POC_ACCESS_TOKEN"));
+        return hasText(com.jobtracker.migrationpoc.config.AppEnvironment.maintenanceAccessToken(environment));
     }
 
     public boolean isAuthorized(String candidate) {
-        String expected = environment.getProperty("POC_ACCESS_TOKEN");
+        String expected = com.jobtracker.migrationpoc.config.AppEnvironment.maintenanceAccessToken(environment);
         return hasText(expected) && expected.equals(candidate);
     }
 
     public DatabaseProbeResult probe() {
-        String databaseUrl = environment.getProperty("DATABASE_URL");
+        String databaseUrl = com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment);
         if (!hasText(databaseUrl)) return DatabaseProbeResult.notConfigured();
 
         try {
@@ -49,7 +49,7 @@ public class LegacyDatabaseProbe {
             Properties properties = new Properties();
             if (config.username() != null) properties.setProperty("user", config.username());
             if (config.password() != null) properties.setProperty("password", config.password());
-            properties.setProperty("ApplicationName", "job-tracker-migration-poc");
+            properties.setProperty("ApplicationName", "job-tracker");
 
             try (Connection connection = PooledConnections.open(config, properties)) {
                 connection.setReadOnly(true);

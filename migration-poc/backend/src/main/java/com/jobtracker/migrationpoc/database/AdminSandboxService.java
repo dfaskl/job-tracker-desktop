@@ -36,7 +36,7 @@ public class AdminSandboxService {
     }
 
     public AdminStatus status() {
-        boolean requested = Boolean.parseBoolean(environment.getProperty("POC_ADMIN_ENABLED", "false"));
+        boolean requested = com.jobtracker.migrationpoc.config.AppEnvironment.adminEnabled(environment);
         ApplicationSandboxService.SandboxStatus sandbox = applicationSandboxService.status();
         if (!requested) {
             return new AdminStatus(false, false, sandbox.enabled(), "管理员功能未开启");
@@ -386,7 +386,7 @@ public class AdminSandboxService {
     private Connection openConnection() throws Exception {
         AdminStatus status = status();
         if (!status.enabled()) throw new AdminDisabledException(status.message());
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());

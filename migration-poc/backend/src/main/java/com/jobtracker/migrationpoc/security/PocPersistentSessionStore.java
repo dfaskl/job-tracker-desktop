@@ -3,6 +3,7 @@ package com.jobtracker.migrationpoc.security;
 import com.jobtracker.migrationpoc.database.ApplicationSandboxService;
 import com.jobtracker.migrationpoc.database.LegacyDatabaseUrl;
 import com.jobtracker.migrationpoc.database.PooledConnections;
+import com.jobtracker.migrationpoc.config.AppEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -44,9 +45,7 @@ public class PocPersistentSessionStore {
     }
 
     public SessionModeStatus status() {
-        boolean requested = Boolean.parseBoolean(
-            environment.getProperty("POC_PERSISTENT_SESSION_ENABLED", "false")
-        );
+        boolean requested = AppEnvironment.persistentSessionsEnabled(environment);
         var sandbox = sandboxService.status();
         if (!requested) {
             return new SessionModeStatus(false, false, sandbox.isolated(), sessionDays(),
@@ -54,11 +53,9 @@ public class PocPersistentSessionStore {
         }
         if (!sandbox.enabled()) {
             return new SessionModeStatus(true, false, sandbox.isolated(), sessionDays(),
-                "持久化会话已请求，但独立测试数据库写入未就绪");
+                "持久化会话已请求，但业务数据库未就绪");
         }
-        return new SessionModeStatus(true, true, sandbox.isolated(), sessionDays(), sandbox.isolated()
-            ? "Java PostgreSQL 持久化会话已开启（独立数据库）"
-            : "Java PostgreSQL 持久化会话已开启（共享数据库）");
+        return new SessionModeStatus(true, true, sandbox.isolated(), sessionDays(), "PostgreSQL 持久化会话已开启");
     }
 
     public boolean isEnabled() {
@@ -141,7 +138,7 @@ public class PocPersistentSessionStore {
         )) {
             statement.setString(1, email == null ? "" : email.trim().toLowerCase(Locale.ROOT));
             try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SessionStoreException("测试库中没有当前账号，无法创建持久化会话");
+                if (!result.next()) throw new SessionStoreException("业务数据库中没有当前账号，无法创建持久化会话");
                 return result.getLong(1);
             }
         }
@@ -149,11 +146,11 @@ public class PocPersistentSessionStore {
 
     private Connection openConnection() throws Exception {
         requireEnabled();
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
-        properties.setProperty("ApplicationName", "job-tracker-migration-poc-persistent-session");
+        properties.setProperty("ApplicationName", "job-tracker-session");
         return PooledConnections.open(config, properties);
     }
 
@@ -167,14 +164,7 @@ public class PocPersistentSessionStore {
     }
 
     private int sessionDays() {
-        try {
-            int configured = Integer.parseInt(environment.getProperty(
-                "POC_SESSION_DAYS", String.valueOf(DEFAULT_SESSION_DAYS)
-            ));
-            return Math.max(1, Math.min(30, configured));
-        } catch (NumberFormatException exception) {
-            return DEFAULT_SESSION_DAYS;
-        }
+        return AppEnvironment.sessionDays(environment);
     }
 
     public record SessionModeStatus(

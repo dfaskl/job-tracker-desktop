@@ -14,6 +14,6 @@ RUN mvn -B -DskipTests -Dfrontend.skip=true clean package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=backend /workspace/backend/target/job-tracker-migration-poc.jar app.jar
+COPY --from=backend /workspace/backend/target/job-tracker.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

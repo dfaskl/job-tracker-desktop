@@ -1,5 +1,7 @@
 package com.jobtracker.migrationpoc.security;
 
+import com.jobtracker.migrationpoc.config.AppEnvironment;
+
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -34,7 +36,7 @@ public class PocSessionManager {
     }
 
     public String issue(long userId) {
-        if (!isConfigured() || userId <= 0) throw new IllegalStateException("POC session auth is not configured");
+        if (!isConfigured() || userId <= 0) throw new IllegalStateException("Session authentication is not configured");
         long expiresAt = Instant.now().plus(SESSION_TTL).getEpochSecond();
         String payload = ENCODER.encodeToString((userId + ":" + expiresAt).getBytes(StandardCharsets.UTF_8));
         return payload + "." + ENCODER.encodeToString(sign(payload));
@@ -70,7 +72,7 @@ public class PocSessionManager {
     }
 
     private String secret() {
-        return environment.getProperty("POC_SESSION_SECRET");
+        return AppEnvironment.sessionSecret(environment);
     }
 
     public record SessionIdentity(long userId, long expiresAt) {}

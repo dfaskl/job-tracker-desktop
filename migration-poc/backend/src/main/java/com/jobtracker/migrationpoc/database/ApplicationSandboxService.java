@@ -1,6 +1,7 @@
 package com.jobtracker.migrationpoc.database;
 
 import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator;
+import com.jobtracker.migrationpoc.config.AppEnvironment;
 import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator.ApplicationInput;
 import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator.ApplicationView;
 import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator.Mutation;
@@ -37,35 +38,15 @@ public class ApplicationSandboxService {
     }
 
     public SandboxStatus status() {
-        boolean requested = Boolean.parseBoolean(environment.getProperty("POC_WRITE_ENABLED", "false"));
-        boolean sharedWriteRequested = Boolean.parseBoolean(
-            environment.getProperty("POC_SHARED_DATABASE_WRITE_ENABLED", "false")
-        );
-        String writeUrl = environment.getProperty("POC_WRITE_DATABASE_URL");
-        String productionUrl = environment.getProperty("DATABASE_URL");
-        if (!requested) {
-            return new SandboxStatus(false, writeUrl != null && !writeUrl.isBlank(), false,
-                "测试写入未开启；现有数据库保持只读");
-        }
-        if (writeUrl == null || writeUrl.isBlank()) {
-            return new SandboxStatus(false, false, false, "尚未配置独立测试数据库");
-        }
-        if (productionUrl == null || productionUrl.isBlank()) {
-            return new SandboxStatus(false, true, false, "无法核对生产数据库地址，写入已拒绝");
-        }
+        String databaseUrl = AppEnvironment.databaseUrl(environment);
+        if (databaseUrl == null) return new SandboxStatus(false, false, false, "尚未配置业务数据库");
         try {
-            boolean isolated = !databaseIdentity(writeUrl).equals(databaseIdentity(productionUrl));
-            if (isolated) return new SandboxStatus(true, true, true, "独立数据库写入已开启");
-            if (sharedWriteRequested) {
-                return new SandboxStatus(true, true, false, "共享生产数据库写入已开启；新旧系统数据实时一致");
-            }
-            return new SandboxStatus(false, true, false,
-                "写入库与生产库相同；如需新旧系统共享数据，请显式开启共享写入");
+            LegacyDatabaseUrl.parse(databaseUrl);
+            return new SandboxStatus(true, true, false, "业务数据库已连接");
         } catch (IllegalArgumentException exception) {
-            return new SandboxStatus(false, true, false, "数据库地址格式无效，写入已拒绝");
+            return new SandboxStatus(false, true, false, "业务数据库地址格式无效");
         }
     }
-
     public ApplicationPage findApplications(String email) throws Exception {
         try (Connection connection = openConnection();
              PreparedStatement statement = connection.prepareStatement(
@@ -169,11 +150,11 @@ public class ApplicationSandboxService {
     private Connection openConnection() throws Exception {
         SandboxStatus status = status();
         if (!status.enabled()) throw new SandboxDisabledException(status.message());
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
-        properties.setProperty("ApplicationName", "job-tracker-migration-poc-sandbox-write");
+        properties.setProperty("ApplicationName", "job-tracker");
         return PooledConnections.open(config, properties);
     }
 

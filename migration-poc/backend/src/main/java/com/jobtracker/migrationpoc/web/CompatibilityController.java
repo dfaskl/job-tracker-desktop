@@ -42,7 +42,7 @@ public class CompatibilityController {
     public ResponseEntity<?> database(@RequestHeader(value = "X-POC-Token", required = false) String token) {
         if (!databaseProbe.isProtected()) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("message", "服务器未配置 POC_ACCESS_TOKEN，数据库检查已禁用"));
+                .body(Map.of("message", "服务器未配置 MAINTENANCE_ACCESS_TOKEN，数据库检查已禁用"));
         }
         if (!databaseProbe.isAuthorized(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "验证令牌不正确"));

@@ -144,7 +144,7 @@ public class EventSandboxService {
     private Connection openConnection() throws Exception {
         var status = status();
         if (!status.enabled()) throw new SandboxDisabledException(status.message());
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());

@@ -73,11 +73,11 @@ public class AiSandboxService {
     public AiStatus status() {
         var sandbox = sandboxService.status();
         boolean encryptionConfigured = encryptionKey().length() >= 32;
-        boolean callsRequested = Boolean.parseBoolean(environment.getProperty("POC_AI_CALLS_ENABLED", "false"));
+        boolean callsRequested = com.jobtracker.migrationpoc.config.AppEnvironment.aiCallsEnabled(environment);
         boolean callsEnabled = sandbox.enabled() && encryptionConfigured && callsRequested;
         String message;
         if (!sandbox.enabled()) message = "独立测试数据库写入未开启";
-        else if (!encryptionConfigured) message = "尚未配置 POC_ENCRYPTION_KEY";
+        else if (!encryptionConfigured) message = "尚未配置 ENCRYPTION_KEY";
         else if (!callsRequested) message = "AI 外部调用未开启";
         else message = "测试库 AI 配置与邮件识别已开启";
         return new AiStatus(sandbox.enabled(), encryptionConfigured, callsRequested, callsEnabled, message);
@@ -428,7 +428,7 @@ public class AiSandboxService {
 
     private Connection openConnection() throws Exception {
         requireSandbox();
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(environment.getProperty("POC_WRITE_DATABASE_URL"));
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(com.jobtracker.migrationpoc.config.AppEnvironment.databaseUrl(environment));
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
@@ -446,11 +446,12 @@ public class AiSandboxService {
     }
 
     private void requireEncryption() {
-        if (encryptionKey().length() < 32) throw new AiDisabledException("尚未配置 POC_ENCRYPTION_KEY");
+        if (encryptionKey().length() < 32) throw new AiDisabledException("尚未配置 ENCRYPTION_KEY");
     }
 
     private String encryptionKey() {
-        return environment.getProperty("POC_ENCRYPTION_KEY", "").trim();
+        String key = com.jobtracker.migrationpoc.config.AppEnvironment.encryptionKey(environment);
+        return key == null ? "" : key;
     }
 
     private void enforceRateLimit(String email) {

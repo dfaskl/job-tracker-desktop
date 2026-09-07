@@ -10,10 +10,10 @@
   </parent>
 
   <groupId>com.jobtracker</groupId>
-  <artifactId>job-tracker-migration-poc</artifactId>
+  <artifactId>job-tracker</artifactId>
   <version>0.1.0</version>
-  <name>job-tracker-migration-poc</name>
-  <description>Vue and Java migration compatibility proof of concept</description>
+  <name>job-tracker</name>
+  <description>Job application and schedule tracker</description>
 
   <properties>
     <java.version>21</java.version>
@@ -48,7 +48,7 @@
   </dependencies>
 
   <build>
-    <finalName>job-tracker-migration-poc</finalName>
+    <finalName>job-tracker</finalName>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>

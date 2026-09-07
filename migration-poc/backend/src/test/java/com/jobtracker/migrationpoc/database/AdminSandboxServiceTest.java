@@ -9,42 +9,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminSandboxServiceTest {
     @Test
-    void remainsDisabledUnlessBothAdminAndIsolatedWriteFlagsAreEnabled() {
+    void enablesAdminByDefaultWhenTheBusinessDatabaseIsConfigured() {
         MockEnvironment environment = new MockEnvironment()
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://prod.example.com/main")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://test.example.com/test");
-
+            .withProperty("APP_DATABASE_URL", "postgres://db.example.com/main");
         var status = service(environment).status();
-
-        assertThat(status.enabled()).isFalse();
-        assertThat(status.requested()).isFalse();
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.requested()).isTrue();
         assertThat(status.sandboxEnabled()).isTrue();
     }
 
     @Test
-    void refusesAdminModeWhenTheWriteDatabaseIsProduction() {
+    void canBeExplicitlyDisabled() {
         MockEnvironment environment = new MockEnvironment()
-            .withProperty("POC_ADMIN_ENABLED", "true")
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://same.example.com/main")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://same.example.com/main?sslmode=require");
-
-        var status = service(environment).status();
-
-        assertThat(status.enabled()).isFalse();
-        assertThat(status.message()).contains("相同");
+            .withProperty("APP_DATABASE_URL", "postgres://db.example.com/main")
+            .withProperty("ADMIN_ENABLED", "false");
+        assertThat(service(environment).status().enabled()).isFalse();
     }
 
     @Test
-    void enablesAdminOnlyForAnExplicitIndependentSandbox() {
-        MockEnvironment environment = new MockEnvironment()
-            .withProperty("POC_ADMIN_ENABLED", "true")
-            .withProperty("POC_WRITE_ENABLED", "true")
-            .withProperty("DATABASE_URL", "postgres://prod.example.com/main")
-            .withProperty("POC_WRITE_DATABASE_URL", "postgres://test.example.com/test");
-
-        assertThat(service(environment).status().enabled()).isTrue();
+    void remainsDisabledUntilTheDatabaseIsConfigured() {
+        var status = service(new MockEnvironment()).status();
+        assertThat(status.enabled()).isFalse();
+        assertThat(status.message()).contains("数据库");
     }
 
     @Test
@@ -63,9 +49,7 @@ class AdminSandboxServiceTest {
               }]
             }
             """;
-
         var details = service.mapDetails(8, "person@example.com", document);
-
         assertThat(details.totalApplications()).isEqualTo(1);
         assertThat(details.applications().getFirst().flow())
             .extracting(AdminSandboxService.FlowStep::title)
