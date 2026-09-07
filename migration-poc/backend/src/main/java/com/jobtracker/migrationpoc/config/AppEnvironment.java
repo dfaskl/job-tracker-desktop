@@ -27,7 +27,7 @@ public final class AppEnvironment {
     }
 
     public static boolean aiCallsEnabled(Environment environment) {
-        return flag(environment, true, "AI_CALLS_ENABLED", "POC_AI_CALLS_ENABLED");
+        return flag(environment, true, "AI_CALLS_ENABLED");
     }
 
     public static boolean adminEnabled(Environment environment) {

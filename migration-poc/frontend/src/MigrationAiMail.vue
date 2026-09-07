@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 
-type AiStatus = { callsEnabled: boolean }
+type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
 const store = useJobTrackerStore()
@@ -134,6 +134,7 @@ async function saveResult() {
         <div class="panel-title"><div><span class="step">1</span><h3>粘贴通知正文</h3></div><button class="text-button" :disabled="!mailBody" @click="mailBody = ''">清空</button></div>
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
+        <div v-if="status && !status.callsEnabled" class="service-unavailable">{{ status.message || '邮件识别服务当前不可用' }}</div>
         <button class="primary-action" :disabled="loading || !status?.callsEnabled || !mailBody.trim()" @click="recognize">{{ loading ? '正在识别…' : '✦ 开始识别' }}</button>
       </section>
 
@@ -185,6 +186,7 @@ async function saveResult() {
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .source-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
 .privacy-note { margin-bottom: 14px; color: #667085; font-size: 12px; }
+.service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
 .empty-state { display: grid; min-height: 280px; gap: 8px; padding: 24px; border: 1px dashed #d4dbea; border-radius: 12px; color: #667085; background: #fafbfc; place-content: center; text-align: center; }
 .empty-state.small { min-height: 100px; }

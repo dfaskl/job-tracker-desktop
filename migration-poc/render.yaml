@@ -28,7 +28,7 @@ services:
         value: "7"
       - key: POC_ENCRYPTION_KEY
         sync: false
-      - key: POC_AI_CALLS_ENABLED
-        value: "false"
+      - key: AI_CALLS_ENABLED
+        value: "true"
       - key: POC_ADMIN_ENABLED
         value: "true"
