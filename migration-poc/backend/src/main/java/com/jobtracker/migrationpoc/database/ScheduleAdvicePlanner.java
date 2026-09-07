@@ -112,20 +112,33 @@ final class ScheduleAdvicePlanner {
     private LocalDateTime[] availableStartRange(Slot target, List<Slot> plans, LocalDateTime now) {
         Item item = target.item;
         if (item.end == null || !item.end.isAfter(item.start) || Duration.between(target.start, target.end).toMinutes() < IDEAL_MINUTES) return null;
-        LocalDateTime dayStart = target.start.toLocalDate().atStartOfDay();
-        LocalDateTime dayEnd = dayStart.plusDays(1);
-        LocalDateTime earliest = maximum(item.start, dayStart, now);
-        LocalDateTime boundary = minimum(item.end, dayEnd);
-        for (Slot other : plans) {
-            if (other == target || other.item.equals(item)) continue;
-            if (!other.end.isAfter(dayStart) || !other.start.isBefore(dayEnd)) continue;
-            if (!other.end.isAfter(target.start) && other.end.isAfter(earliest)) earliest = other.end;
-            if (!other.start.isBefore(target.end) && other.start.isBefore(boundary)) boundary = other.start;
+        LocalDateTime firstPossible = maximum(item.start, now);
+        var day = firstPossible.toLocalDate();
+        while (!day.isAfter(item.end.toLocalDate())) {
+            LocalDateTime dayStart = day.atStartOfDay();
+            LocalDateTime dayEnd = dayStart.plusDays(1);
+            LocalDateTime cursor = maximum(item.start, firstPossible, dayStart);
+            LocalDateTime boundary = minimum(item.end, dayEnd);
+            if (boundary.isAfter(cursor.plusMinutes(IDEAL_MINUTES - 1))) {
+                for (Slot other : plans) {
+                    if (other == target || other.item.equals(item)) continue;
+                    if (!other.end.isAfter(cursor)) continue;
+                    if (!other.start.isBefore(boundary)) break;
+                    LocalDateTime gapEnd = other.start.isBefore(boundary) ? other.start : boundary;
+                    if (!gapEnd.isBefore(cursor.plusMinutes(IDEAL_MINUTES))) {
+                        return new LocalDateTime[]{cursor, gapEnd.minusMinutes(IDEAL_MINUTES)};
+                    }
+                    if (other.end.isAfter(cursor)) cursor = other.end;
+                    if (!cursor.isBefore(boundary)) break;
+                }
+                if (!boundary.isBefore(cursor.plusMinutes(IDEAL_MINUTES))) {
+                    return new LocalDateTime[]{cursor, boundary.minusMinutes(IDEAL_MINUTES)};
+                }
+            }
+            day = day.plusDays(1);
         }
-        LocalDateTime latest = boundary.minusMinutes(IDEAL_MINUTES);
-        return latest.isBefore(earliest) ? null : new LocalDateTime[]{earliest, latest};
+        return null;
     }
-
     private LocalDateTime maximum(LocalDateTime... values) {
         LocalDateTime result = values[0]; for (LocalDateTime value : values) if (value.isAfter(result)) result = value; return result;
     }

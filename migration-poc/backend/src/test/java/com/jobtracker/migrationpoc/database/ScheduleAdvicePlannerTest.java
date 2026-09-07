@@ -67,4 +67,16 @@ class ScheduleAdvicePlannerTest {
         assertThat(result.path("timeline").get(0).path("windowStart").asText()).isEqualTo("2026-09-06 10:00");
         assertThat(result.path("timeline").get(0).path("windowEnd").asText()).isEqualTo("2026-09-06 12:30");
     }
-}
+
+    @Test
+    void movesFlexibleStartWindowToNextDayWhenTodayIsTooShort() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"海信集团","title":"在线测评","startsAt":"2026-09-07 23:47","endsAt":"2026-09-09 23:47"},
+             {"id":"b","company":"小鹏汽车","title":"面试","startsAt":"2026-09-09 15:00","endsAt":"2026-09-09 15:00"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 7, 23, 48));
+        var flexible = result.path("timeline").get(0);
+        assertThat(flexible.path("showWindow").asBoolean()).isTrue();
+        assertThat(flexible.path("windowStart").asText()).isEqualTo("2026-09-08 00:00");
+        assertThat(flexible.path("windowEnd").asText()).isEqualTo("2026-09-08 22:30");
+    }}
