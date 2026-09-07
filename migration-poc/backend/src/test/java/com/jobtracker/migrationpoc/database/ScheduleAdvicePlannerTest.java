@@ -77,6 +77,21 @@ class ScheduleAdvicePlannerTest {
         var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 7, 23, 48));
         var flexible = result.path("timeline").get(0);
         assertThat(flexible.path("showWindow").asBoolean()).isTrue();
-        assertThat(flexible.path("windowStart").asText()).isEqualTo("2026-09-08 00:00");
-        assertThat(flexible.path("windowEnd").asText()).isEqualTo("2026-09-08 22:30");
+        assertThat(flexible.path("windowStart").asText()).isEqualTo("2026-09-08 09:00");
+        assertThat(flexible.path("windowEnd").asText()).isEqualTo("2026-09-08 20:30");
+    }
+    @Test
+    void keepsMultipleFlexibleSchedulesAsDaytimeStartWindows() throws Exception {
+        var schedules = mapper.readTree("""
+            [{"id":"a","company":"海信","title":"测评","startsAt":"2026-09-07 23:47","endsAt":"2026-09-09 23:47"},
+             {"id":"b","company":"米哈游","title":"笔试","startsAt":"2026-09-07 20:00","endsAt":"2026-09-10 19:00"},
+             {"id":"c","company":"中国平安","title":"测评","startsAt":"2026-09-07 23:57","endsAt":"2026-09-11 23:55"},
+             {"id":"d","company":"小鹏汽车","title":"面试","startsAt":"2026-09-09 15:00","endsAt":"2026-09-09 15:00"}]
+            """);
+        var result = planner.plan(schedules, LocalDateTime.of(2026, 9, 8, 0, 5));
+        assertThat(result.path("plans").toString()).doesNotContain(" 00:").doesNotContain(" 01:").doesNotContain(" 02:").doesNotContain(" 03:");
+        for (int index = 0; index < 3; index++) {
+            assertThat(result.path("timeline").get(index).path("showWindow").asBoolean()).isTrue();
+            assertThat(result.path("timeline").get(index).path("windowStart").asText()).contains(" 09:00");
+        }
     }}

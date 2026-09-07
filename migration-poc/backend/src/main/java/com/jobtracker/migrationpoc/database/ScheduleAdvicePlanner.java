@@ -20,6 +20,8 @@ final class ScheduleAdvicePlanner {
     private static final DateTimeFormatter FORMAT_SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final long IDEAL_MINUTES = 90;
     private static final long MINIMUM_MINUTES = 60;
+    private static final int WORK_START_HOUR = 9;
+    private static final int WORK_END_HOUR = 22;
     private final ObjectMapper mapper;
 
     ScheduleAdvicePlanner(ObjectMapper mapper) { this.mapper = mapper; }
@@ -71,8 +73,8 @@ final class ScheduleAdvicePlanner {
             if (!item.end.isAfter(windowStart.plusMinutes(MINIMUM_MINUTES - 1))) {
                 conflictItems.add(item); failedFlexible.add(item); conflicts.add(item.label + "：剩余可用时间不足 60 分钟"); continue;
             }
-            Slot slot = findSlot(item, windowStart, item.end, IDEAL_MINUTES, occupied);
-            if (slot == null) slot = findBestShortSlot(item, windowStart, item.end, occupied);
+            Slot slot = findWorkingSlot(item, windowStart, item.end, IDEAL_MINUTES, occupied);
+            if (slot == null) slot = findBestWorkingShortSlot(item, windowStart, item.end, occupied);
             if (slot == null) {
                 conflictItems.add(item); failedFlexible.add(item); conflicts.add(item.label + "：可用时间段内无法安排连续 60 分钟"); continue;
             }
@@ -115,13 +117,14 @@ final class ScheduleAdvicePlanner {
         LocalDateTime firstPossible = maximum(item.start, now);
         var day = firstPossible.toLocalDate();
         while (!day.isAfter(item.end.toLocalDate())) {
-            LocalDateTime dayStart = day.atStartOfDay();
-            LocalDateTime dayEnd = dayStart.plusDays(1);
+            LocalDateTime dayStart = day.atTime(WORK_START_HOUR, 0);
+            LocalDateTime dayEnd = day.atTime(WORK_END_HOUR, 0);
             LocalDateTime cursor = maximum(item.start, firstPossible, dayStart);
             LocalDateTime boundary = minimum(item.end, dayEnd);
             if (boundary.isAfter(cursor.plusMinutes(IDEAL_MINUTES - 1))) {
                 for (Slot other : plans) {
                     if (other == target || other.item.equals(item)) continue;
+                    if (other.item.end != null && other.item.end.isAfter(other.item.start)) continue;
                     if (!other.end.isAfter(cursor)) continue;
                     if (!other.start.isBefore(boundary)) break;
                     LocalDateTime gapEnd = other.start.isBefore(boundary) ? other.start : boundary;
@@ -147,6 +150,34 @@ final class ScheduleAdvicePlanner {
     }
     private String status(Item item, Set<Item> tight, Set<Item> conflicts) { return conflicts.contains(item) ? "conflict" : tight.contains(item) ? "tight" : "normal"; }
 
+    private Slot findWorkingSlot(Item item, LocalDateTime start, LocalDateTime end, long minutes, List<Slot> occupied) {
+        var day = start.toLocalDate();
+        while (!day.isAfter(end.toLocalDate())) {
+            LocalDateTime dailyStart = maximum(start, day.atTime(WORK_START_HOUR, 0));
+            LocalDateTime dailyEnd = minimum(end, day.atTime(WORK_END_HOUR, 0));
+            if (!dailyEnd.isBefore(dailyStart.plusMinutes(minutes))) {
+                Slot slot = findSlot(item, dailyStart, dailyEnd, minutes, occupied);
+                if (slot != null) return slot;
+            }
+            day = day.plusDays(1);
+        }
+        return null;
+    }
+
+    private Slot findBestWorkingShortSlot(Item item, LocalDateTime start, LocalDateTime end, List<Slot> occupied) {
+        Slot best = null;
+        var day = start.toLocalDate();
+        while (!day.isAfter(end.toLocalDate())) {
+            LocalDateTime dailyStart = maximum(start, day.atTime(WORK_START_HOUR, 0));
+            LocalDateTime dailyEnd = minimum(end, day.atTime(WORK_END_HOUR, 0));
+            if (dailyEnd.isAfter(dailyStart)) {
+                Slot candidate = findBestShortSlot(item, dailyStart, dailyEnd, occupied);
+                if (candidate != null && (best == null || Duration.between(candidate.start, candidate.end).toMinutes() > Duration.between(best.start, best.end).toMinutes())) best = candidate;
+            }
+            day = day.plusDays(1);
+        }
+        return best;
+    }
     private Slot findSlot(Item item, LocalDateTime start, LocalDateTime end, long minutes, List<Slot> occupied) {
         LocalDateTime candidate = start;
         for (Slot busy : occupied) {
