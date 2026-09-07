@@ -8,7 +8,7 @@ export type JobApplication = Record<string, unknown> & {
 }
 export type JobEvent = Record<string, unknown> & {
   id: string; applicationId?: string; title?: string; type?: string; date?: string
-  start?: string; end?: string; status?: string; completed?: boolean
+  start?: string; end?: string; status?: string; completed?: boolean; missed?: boolean; abandoned?: boolean
 }
 export type BusinessData = Record<string, unknown> & {
   applications: JobApplication[]; events: JobEvent[]; settings?: Record<string, unknown>

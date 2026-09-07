@@ -17,6 +17,7 @@ type EventItem = {
   position: string
   completed: boolean
   missed: boolean
+  abandoned: boolean
   completedAt: string
   createdAt: string
   updatedAt: string
@@ -49,12 +50,13 @@ const events = computed<EventItem[]>(() => store.events.value.map(item => {
   const application = store.applications.value.find(value => value.id === item.applicationId)
   const startsAt = String(item.startsAt || item.start || item.date || item.at || '')
   const endsAt = String(item.endsAt || item.end || '')
-  const completed = Boolean(item.completed)
+  const abandoned = Boolean(item.abandoned || (!item.completed && application?.status === '已放弃'))
+  const completed = Boolean(item.completed) || abandoned
   const completedAt = String(item.completedAt || '')
   return {
-    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, createdAt:'', updatedAt:'',
+    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, abandoned:false, createdAt:'', updatedAt:'',
     ...item,
-    id:String(item.id), startsAt, endsAt, completed, completedAt,
+    id:String(item.id), startsAt, endsAt, completed, abandoned, completedAt,
     company:String(item.company || application?.company || '未关联公司'),
     position:String(item.position || application?.position || '未关联岗位'),
     recordAt:String(item.recordAt || (completed ? completedAt || endsAt || startsAt : startsAt))
@@ -278,7 +280,7 @@ async function save() {
   }
 }
 
-async function resolve(item: EventItem, action: 'complete' | 'miss' | 'restore') {
+async function resolve(item: EventItem, action: 'complete' | 'miss' | 'abandon' | 'restore') {
   loading.value = true
   error.value = ''
   message.value = ''
@@ -289,7 +291,7 @@ async function resolve(item: EventItem, action: 'complete' | 'miss' | 'restore')
       body: JSON.stringify({ action, expectedUpdatedAt: item.updatedAt })
     })
     if (!result.response.ok) throw new Error(result.body.message || '更新日程状态失败')
-    message.value = action === 'complete' ? '日程已完成' : action === 'miss' ? '日程已标记错过' : '日程已恢复为待完成'
+    message.value = action === 'complete' ? '日程已完成' : action === 'miss' ? '日程已标记错过' : action === 'abandon' ? '日程已放弃' : '日程已恢复为待完成'
     await store.refresh()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '更新日程状态失败'
@@ -340,7 +342,7 @@ async function remove(item: EventItem) {
             <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
-                <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed }]">
+                <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
                   {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.company} · ${entry.event.title || entry.event.type}` : entry.position === 'end' ? `截止 ${entry.event.company} · ${entry.event.title || entry.event.type}` : `${entry.event.company} · ${entry.event.title || entry.event.type}` }}
                 </small>
               </span>
@@ -352,7 +354,7 @@ async function remove(item: EventItem) {
         <aside class="selected-list">
           <h3>{{ selectedDate }} 的日程</h3>
           <div class="selected-scroll">
-            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed }">
+            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
               <div class="event-main">
                 <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
                 <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
@@ -360,10 +362,10 @@ async function remove(item: EventItem) {
                 <span v-if="entry.event.location" class="event-location"><span v-if="locationText(entry.event.location)">{{ locationText(entry.event.location) }}</span><a v-if="locationLink(entry.event.location)" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer">打开链接 ↗</a></span>
               </div>
               <div class="event-actions">
-                <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
+                <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.abandoned ? '已放弃' : entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
                 <button class="secondary compact" @click="edit(entry.event)">编辑</button>
                 <button v-if="entry.event.completed" class="secondary compact" @click="resolve(entry.event, 'restore')">恢复</button>
-                <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
+                <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'abandon')">放弃</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
                 <button class="danger-button compact" @click="remove(entry.event)">删除</button>
               </div>
             </article>

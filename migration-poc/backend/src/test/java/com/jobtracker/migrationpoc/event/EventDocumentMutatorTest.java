@@ -150,6 +150,24 @@ class EventDocumentMutatorTest {
         assertThat(saved.path("settings").path("kept").asBoolean()).isTrue();
     }
 
+    @Test
+    void abandonsAndRestoresAnEventAsATerminalState() throws Exception {
+        var created = mutator.create(document(), input("笔试", "冲突笔试", "2026-09-05 19:00", ""));
+        var abandoned = mutator.resolve(
+            created.documentJson(), created.event().id(), EventDocumentMutator.Resolution.ABANDON,
+            created.event().updatedAt()
+        );
+        assertThat(abandoned.event().completed()).isTrue();
+        assertThat(abandoned.event().missed()).isFalse();
+        assertThat(abandoned.event().abandoned()).isTrue();
+
+        var restored = mutator.resolve(
+            abandoned.documentJson(), abandoned.event().id(), EventDocumentMutator.Resolution.RESTORE,
+            abandoned.event().updatedAt()
+        );
+        assertThat(restored.event().completed()).isFalse();
+        assertThat(restored.event().abandoned()).isFalse();
+    }
     private String document() {
         return """
             {"applications":[{"id":"app-1","company":"Example","position":"Engineer","stage":"已投递",

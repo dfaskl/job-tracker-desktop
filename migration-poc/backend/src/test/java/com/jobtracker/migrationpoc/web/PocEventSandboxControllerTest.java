@@ -59,7 +59,7 @@ class PocEventSandboxControllerTest {
     private EventView event() {
         return new EventView(
             "evt-1", "app-1", "面试", "一面", "2026-09-05 09:00", "2026-09-05 10:00", "线上",
-            "备注", "Example", "Engineer", false, false, "", "2026-09-03 06:30", "2026-09-03 06:30",
+            "备注", "Example", "Engineer", false, false, false, "", "2026-09-03 06:30", "2026-09-03 06:30",
             "2026-09-05 09:00"
         );
     }

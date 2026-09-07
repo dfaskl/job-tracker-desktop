@@ -90,18 +90,28 @@ public class EventDocumentMutator {
             case COMPLETE -> {
                 updated.put("completed", true);
                 updated.put("missed", false);
+                updated.put("abandoned", false);
                 if (hasRange(updated)) updated.put("completedAt", now);
                 else updated.remove("completedAt");
             }
             case MISS -> {
                 updated.put("completed", true);
                 updated.put("missed", true);
+                updated.put("abandoned", false);
+                if (hasRange(updated)) updated.put("completedAt", now);
+                else updated.remove("completedAt");
+            }
+            case ABANDON -> {
+                updated.put("completed", true);
+                updated.put("missed", false);
+                updated.put("abandoned", true);
                 if (hasRange(updated)) updated.put("completedAt", now);
                 else updated.remove("completedAt");
             }
             case RESTORE -> {
                 updated.put("completed", false);
                 updated.put("missed", false);
+                updated.put("abandoned", false);
                 updated.remove("completedAt");
             }
         }
@@ -258,7 +268,7 @@ public class EventDocumentMutator {
             text(event, "id"), text(event, "applicationId"), text(event, "type"), text(event, "title"),
             text(event, "startsAt"), text(event, "endsAt"), text(event, "location"), text(event, "notes"),
             text(event, "company"), text(event, "position"), event.path("completed").asBoolean(false),
-            event.path("missed").asBoolean(false), text(event, "completedAt"), text(event, "createdAt"),
+            event.path("missed").asBoolean(false), event.path("abandoned").asBoolean(false), text(event, "completedAt"), text(event, "createdAt"),
             version(event), recordAt(event)
         );
     }
@@ -347,7 +357,7 @@ public class EventDocumentMutator {
 
     private record BusinessDocument(ObjectNode root, ArrayNode applications, ArrayNode events) {}
 
-    public enum Resolution { COMPLETE, MISS, RESTORE }
+    public enum Resolution { COMPLETE, MISS, ABANDON, RESTORE }
 
     public record EventInput(
         String applicationId,
@@ -372,6 +382,7 @@ public class EventDocumentMutator {
         String position,
         boolean completed,
         boolean missed,
+        boolean abandoned,
         String completedAt,
         String createdAt,
         String updatedAt,

@@ -172,7 +172,7 @@ async function undoDelete(){
 function toInputTime(value:unknown){return String(value||'').replace(' ','T').slice(0,16)}
 function eventDateLabel(item:JobEvent){const value=String(item.completed&&item.completedAt?item.completedAt:item.startsAt||item.start||item.date||'');const match=value.match(/^\d{4}-(\d{2})-(\d{2})/);return match?`${Number(match[1])}月${Number(match[2])}日`:'日期未填'}
 function eventTimeLabel(item:JobEvent){const start=String(item.completed&&item.completedAt?item.completedAt:item.startsAt||item.start||item.date||'');const end=String(item.endsAt||item.end||'');const startTime=start.slice(11,16)||'时间未填';return end&&!item.completed?`${startTime} 至 ${end.slice(0,10)===start.slice(0,10)?end.slice(11,16):end.slice(0,16).replace('T',' ')}`:startTime}
-function eventState(item:JobEvent){return item.missed?'已错过':item.completed?'已完成':'待处理'}
+function eventState(item:JobEvent){return item.abandoned||(!item.completed&&selected.value?.status==='已放弃')?'已放弃':item.missed?'已错过':item.completed?'已完成':'待处理'}
 function eventLink(value:unknown){const text=String(value||'').trim();return /^https?:\/\//i.test(text)?text:''}
 function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdAt||'')}
 async function refreshSelected(){const id=selected.value?.id;await store.refresh();if(id)selected.value=store.applications.value.find(item=>item.id===id)||selected.value}
@@ -191,9 +191,9 @@ async function saveEvent(){
     eventEditor.value=false;editingEvent.value=null;await refreshSelected();message.value=current?'日程已更新':'关联日程已创建'
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存日程失败'}finally{busy.value=false}
 }
-async function resolveEvent(item:JobEvent,action:'complete'|'restore'){
+async function resolveEvent(item:JobEvent,action:'complete'|'abandon'|'restore'){
   busy.value=true;error.value=''
-  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}/resolution`,{method:'POST',body:JSON.stringify({action,expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value=action==='complete'?'日程已完成':'日程已恢复为待处理'}
+  try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}/resolution`,{method:'POST',body:JSON.stringify({action,expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value=action==='complete'?'日程已完成':action==='abandon'?'日程已放弃':'日程已恢复为待处理'}
   catch(cause){error.value=cause instanceof Error?cause.message:'更新日程状态失败'}finally{busy.value=false}
 }
 async function removeEvent(item:JobEvent){
@@ -254,7 +254,7 @@ async function removeEvent(item:JobEvent){
         <div class="event-rail"><i></i></div>
         <div class="event-date"><strong>{{eventDateLabel(item)}}</strong><span>{{eventTimeLabel(item)}}</span></div>
         <div class="event-body"><strong>{{text(selected.company)}} · {{text(item.title||item.type)}}</strong><div class="event-meta"><span>{{text(selected.position)}}</span><a v-if="eventLink(item.location)" :href="eventLink(item.location)" target="_blank" rel="noreferrer">打开链接 ↗</a><span v-else-if="item.location">{{item.location}}</span><b>{{text(item.type,'日程')}}</b><i>{{eventState(item)}}</i></div><p>备注：{{text(item.notes,'暂无备注')}}</p></div>
-        <div v-if="!store.readOnly.value" class="event-row-actions"><button class="secondary" :disabled="busy" @click="openEvent(item)">编辑</button><button class="event-delete" :disabled="busy" @click="removeEvent(item)">删除</button><button :disabled="busy" @click="resolveEvent(item,item.completed?'restore':'complete')">{{item.completed?'恢复':'完成'}}</button></div>
+        <div v-if="!store.readOnly.value" class="event-row-actions"><button class="secondary" :disabled="busy" @click="openEvent(item)">编辑</button><button class="event-delete" :disabled="busy" @click="removeEvent(item)">删除</button><button v-if="item.completed" :disabled="busy" @click="resolveEvent(item,'restore')">恢复</button><template v-else><button :disabled="busy" @click="resolveEvent(item,'complete')">完成</button><button class="abandon" :disabled="busy" @click="resolveEvent(item,'abandon')">放弃</button></template></div>
       </article>
     </div><p v-else class="empty">暂无安排。</p>
     <h3 class="section-heading">状态历史</h3>

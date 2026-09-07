@@ -93,6 +93,23 @@ class ApplicationDocumentMutatorTest {
         );
     }
 
+    @Test
+    void abandoningAnApplicationClosesItsPendingEvents() throws Exception {
+        String source = """
+            {"applications":[{"id":"app-1","company":"新石器","position":"工程师","stage":"笔试",
+            "status":"等待结果","updatedAt":"2026-09-01 10:00","timeline":[]}],
+            "events":[{"id":"event-1","applicationId":"app-1","startsAt":"2026-09-06 19:00",
+            "completed":false,"missed":false,"updatedAt":"2026-09-01 11:00"}]}
+            """;
+        var result = mutator.update(
+            source, "app-1", input("新石器", "工程师", "已结束", "已放弃"), "2026-09-01 10:00"
+        );
+        JsonNode event = mapper.readTree(result.documentJson()).path("events").get(0);
+        assertThat(event.path("completed").asBoolean()).isTrue();
+        assertThat(event.path("missed").asBoolean()).isFalse();
+        assertThat(event.path("abandoned").asBoolean()).isTrue();
+        assertThat(event.path("updatedAt").asText()).isEqualTo("2026-09-03 02:15");
+    }
     private ApplicationDocumentMutator.ApplicationInput input(
         String company, String position, String stage, String status
     ) {

@@ -71,7 +71,17 @@ public class ApplicationDocumentMutator {
             timeline.insert(0, timelineEntry("更新为 " + clean.stage() + " · " + clean.status(), now));
             updated.set("timeline", timeline);
         }
-        document.applications().set(index, updated);
+        if ("已放弃".equals(clean.status())) {
+            for (JsonNode value : document.events()) {
+                if (!(value instanceof ObjectNode event) || !id.equals(text(event, "applicationId"))) continue;
+                if (event.path("completed").asBoolean(false)) continue;
+                event.put("completed", true);
+                event.put("missed", false);
+                event.put("abandoned", true);
+                if (!text(event, "endsAt").isEmpty() || !text(event, "end").isEmpty()) event.put("completedAt", now);
+                event.put("updatedAt", now);
+            }
+        }        document.applications().set(index, updated);
         return mutation(document.root(), updated, document.applications().size());
     }
 
