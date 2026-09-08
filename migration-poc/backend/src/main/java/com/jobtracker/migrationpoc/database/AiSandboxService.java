@@ -1,5 +1,7 @@
 package com.jobtracker.migrationpoc.database;
 
+import com.jobtracker.migrationpoc.observability.RequestTiming;
+
 import com.jobtracker.migrationpoc.ai.AiEndpointPolicy;
 import com.jobtracker.migrationpoc.compat.LegacySecretCrypto;
 import com.jobtracker.migrationpoc.compat.LegacySecretCryptoWriter;
@@ -281,7 +283,7 @@ public class AiSandboxService {
             .header("Authorization", "Bearer " + apiKey)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
             .build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = sendTimed(request, HttpResponse.BodyHandlers.ofInputStream());
         byte[] responseBytes;
         try (InputStream body = response.body()) {
             responseBytes = body.readNBytes(MAX_AI_RESPONSE_BYTES + 1);
@@ -306,7 +308,7 @@ public class AiSandboxService {
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(60))
             .header("Content-Type", "application/json").header("Authorization", "Bearer " + apiKey)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody))).build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = sendTimed(request, HttpResponse.BodyHandlers.ofInputStream());
         byte[] bytes; try (InputStream body = response.body()) { bytes = body.readNBytes(MAX_AI_RESPONSE_BYTES + 1); }
         if (bytes.length > MAX_AI_RESPONSE_BYTES) throw new AiResponseException("AI 响应过大");
         if (response.statusCode() < 200 || response.statusCode() >= 300) throw new AiResponseException("AI 请求失败（" + response.statusCode() + "）");
@@ -324,7 +326,7 @@ public class AiSandboxService {
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(60))
             .header("Content-Type", "application/json").header("Authorization", "Bearer " + apiKey)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody))).build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = sendTimed(request, HttpResponse.BodyHandlers.ofInputStream());
         byte[] bytes; try (InputStream body = response.body()) { bytes = body.readNBytes(MAX_AI_RESPONSE_BYTES + 1); }
         if (bytes.length > MAX_AI_RESPONSE_BYTES) throw new AiResponseException("AI 响应过大");
         if (response.statusCode() < 200 || response.statusCode() >= 300) throw new AiResponseException("AI 请求失败（" + response.statusCode() + "）");
@@ -352,7 +354,7 @@ public class AiSandboxService {
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(60))
             .header("Content-Type", "application/json").header("Authorization", "Bearer " + apiKey)
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody))).build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = sendTimed(request, HttpResponse.BodyHandlers.ofInputStream());
         byte[] responseBytes;
         try (InputStream body = response.body()) { responseBytes = body.readNBytes(MAX_AI_RESPONSE_BYTES + 1); }
         if (responseBytes.length > MAX_AI_RESPONSE_BYTES) throw new AiResponseException("AI 响应过大");
@@ -369,6 +371,15 @@ public class AiSandboxService {
         if (quote.isEmpty()) throw new AiResponseException("模型没有返回每日一句");
         return new DailyQuote(quote, author);
     }
+    private <T> HttpResponse<T> sendTimed(HttpRequest request, HttpResponse.BodyHandler<T> handler) throws Exception {
+        long startedAt = System.nanoTime();
+        try {
+            return httpClient.send(request, handler);
+        } finally {
+            RequestTiming.record("ai", System.nanoTime() - startedAt);
+        }
+    }
+
     JsonNode parseModelJson(String text) throws Exception {
         String clean = text == null ? "" : text.trim()
             .replaceFirst("(?is)^```(?:json)?\\s*", "")

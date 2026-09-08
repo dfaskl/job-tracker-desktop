@@ -1,10 +1,17 @@
 package com.jobtracker.migrationpoc.database;
 
+import com.jobtracker.migrationpoc.observability.RequestTiming;
+
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.sql.CallableStatement;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,7 +30,9 @@ public final class PooledConnections {
         } catch (PoolCreationException exception) {
             throw new SQLException("Unable to initialize PostgreSQL connection pool", exception.getCause());
         }
-        return source.getConnection();
+        long startedAt = System.nanoTime();
+        try { return timed(source.getConnection()); }
+        finally { RequestTiming.record("db", System.nanoTime() - startedAt); }
     }
 
     private static HikariDataSource create(LegacyDatabaseUrl database, Properties properties) {
@@ -47,6 +56,26 @@ public final class PooledConnections {
         }
     }
 
+    private static Connection timed(Connection connection) { return proxy(Connection.class, connection); }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T proxy(Class<T> type, T delegate) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, arguments) -> {
+            boolean sqlExecution = delegate instanceof Statement && method.getName().startsWith("execute");
+            long startedAt = sqlExecution ? System.nanoTime() : 0;
+            try {
+                Object value = method.invoke(delegate, arguments);
+                if (value instanceof CallableStatement statement) return proxy(CallableStatement.class, statement);
+                if (value instanceof PreparedStatement statement) return proxy(PreparedStatement.class, statement);
+                if (value instanceof Statement statement) return proxy(Statement.class, statement);
+                return value;
+            } catch (InvocationTargetException exception) {
+                throw exception.getCause();
+            } finally {
+                if (sqlExecution) RequestTiming.record("sql", System.nanoTime() - startedAt);
+            }
+        });
+    }
     private static final class PoolCreationException extends RuntimeException {
         private PoolCreationException(Throwable cause) { super(cause); }
     }
