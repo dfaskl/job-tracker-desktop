@@ -56,14 +56,19 @@ Windows 主机可执行：
 
 ### 免费实例健康检查
 
-需要从外部机器每 10 分钟访问一次 Render 健康检查时，可在 Linux 上运行：
+在 Windows 电脑上每 10 分钟访问一次 Render 健康检查：
 
-```sh
-chmod +x scripts/keep-render-awake.sh
-nohup ./scripts/keep-render-awake.sh > keep-render-awake.log 2>&1 &
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\keep-render-awake.ps1
 ```
 
-停止脚本可执行 `pkill -f keep-render-awake.sh`。默认访问当前 Render 服务的 `/healthz`；迁移到其他地址后可通过 `HEALTH_URL=https://example.com/healthz` 覆盖。
+需要隐藏窗口在后台运行时：
+
+```powershell
+Start-Process powershell -WindowStyle Hidden -ArgumentList '-ExecutionPolicy Bypass -File "scripts\keep-render-awake.ps1"'
+```
+
+停止后台脚本可在任务管理器中结束对应的 Windows PowerShell 进程。默认访问当前 Render 服务的 `/healthz`，也可以通过 `-HealthUrl` 和 `-IntervalMinutes` 参数覆盖。
 ## 本地构建
 
 要求 Java 21+、Maven 3.9+、Node.js 22+：
