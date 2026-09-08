@@ -290,6 +290,8 @@ public class EventDocumentMutator {
         if (event.path("completed").asBoolean(false)) {
             String completedAt = text(event, "completedAt");
             if (!completedAt.isEmpty()) return completedAt;
+            String updatedAt = text(event, "updatedAt");
+            if (!updatedAt.isEmpty()) return updatedAt;
             String endsAt = text(event, "endsAt");
             if (!endsAt.isEmpty()) return endsAt;
         }
