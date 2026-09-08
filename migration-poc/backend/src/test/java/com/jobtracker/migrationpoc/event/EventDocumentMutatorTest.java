@@ -63,7 +63,7 @@ class EventDocumentMutatorTest {
     }
 
     @Test
-    void keepsPointEventsOnTheirOriginalTimeWhenCompleted() throws Exception {
+    void recordsTheActualCompletionTimeForPointEvents() throws Exception {
         var created = mutator.create(document(), input("面试", "电话面试", "2026-09-05 09:00", ""));
         var completed = mutator.resolve(
             created.documentJson(), created.event().id(), EventDocumentMutator.Resolution.MISS,
@@ -72,8 +72,8 @@ class EventDocumentMutatorTest {
 
         assertThat(completed.event().completed()).isTrue();
         assertThat(completed.event().missed()).isTrue();
-        assertThat(completed.event().completedAt()).isEmpty();
-        assertThat(completed.event().recordAt()).isEqualTo("2026-09-05 09:00");
+        assertThat(completed.event().completedAt()).isEqualTo("2026-09-03 06:30");
+        assertThat(completed.event().recordAt()).isEqualTo("2026-09-03 06:30");
     }
 
     @Test

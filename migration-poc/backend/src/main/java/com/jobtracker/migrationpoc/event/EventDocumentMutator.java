@@ -67,7 +67,6 @@ public class EventDocumentMutator {
         ObjectNode application = application(document.applications(), clean.applicationId());
         ObjectNode updated = previous.deepCopy();
         applyFields(updated, clean, application);
-        if (clean.endsAt().isEmpty()) updated.remove("completedAt");
         updated.put("updatedAt", now());
         document.events().set(index, updated);
         return mutation(document.root(), updated, document.events().size());
@@ -91,22 +90,19 @@ public class EventDocumentMutator {
                 updated.put("completed", true);
                 updated.put("missed", false);
                 updated.put("abandoned", false);
-                if (hasRange(updated)) updated.put("completedAt", now);
-                else updated.remove("completedAt");
+                updated.put("completedAt", now);
             }
             case MISS -> {
                 updated.put("completed", true);
                 updated.put("missed", true);
                 updated.put("abandoned", false);
-                if (hasRange(updated)) updated.put("completedAt", now);
-                else updated.remove("completedAt");
+                updated.put("completedAt", now);
             }
             case ABANDON -> {
                 updated.put("completed", true);
                 updated.put("missed", false);
                 updated.put("abandoned", true);
-                if (hasRange(updated)) updated.put("completedAt", now);
-                else updated.remove("completedAt");
+                updated.put("completedAt", now);
             }
             case RESTORE -> {
                 updated.put("completed", false);
@@ -291,7 +287,7 @@ public class EventDocumentMutator {
     }
 
     private String recordAt(ObjectNode event) {
-        if (hasRange(event) && event.path("completed").asBoolean(false)) {
+        if (event.path("completed").asBoolean(false)) {
             String completedAt = text(event, "completedAt");
             if (!completedAt.isEmpty()) return completedAt;
             String endsAt = text(event, "endsAt");
