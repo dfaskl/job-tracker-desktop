@@ -1,20 +1,12 @@
 @echo off
-setlocal
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop';" ^
-  "$taskName='CareerFlow Keep Awake';" ^
-  "$task=Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue;" ^
-  "if ($null -eq $task) { Write-Host 'CareerFlow keep-awake task does not exist.' -ForegroundColor Yellow; exit 0 };" ^
-  "Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue;" ^
-  "Disable-ScheduledTask -TaskName $taskName | Out-Null;" ^
-  "Write-Host 'CareerFlow keep-awake task is stopped and disabled.' -ForegroundColor Green"
-
+net session >nul 2>&1
+if not %errorlevel%==0 (
+  powershell.exe -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0manage-keep-render-awake.ps1" -Action Disable
 if errorlevel 1 (
-  echo.
-  echo Failed to disable the task. Try right-clicking this file and choosing Run as administrator.
+  echo Failed to disable the task. Try running this file as administrator.
   pause
   exit /b 1
 )
-
-endlocal
