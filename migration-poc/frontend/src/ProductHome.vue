@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
+import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
@@ -118,10 +119,9 @@ function localScheduleAdvice():ScheduleAdvice{
   }finally{adviceLoading.value=false}
 }
 function isEnded(item:JobApplication|undefined){return Boolean(item)&&(item?.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item?.status||'')))}
-function isInterview(item:Record<string,unknown>){return item.type==='面试'||/面试|[一二三四五六七八九]面|HR|电话/i.test(`${item.type||''} ${item.title||''}`)}
 function progressHealth(item:JobApplication){
   if(isEnded(item)||item.stage==='Offer'||item.status==='已通过')return null
-  const related=store.events.value.filter(event=>event.applicationId===item.id&&isInterview(event))
+  const related=store.events.value.filter(event=>event.applicationId===item.id&&isFormalInterview(event))
   if(related.some(event=>!event.completed&&!event.missed&&parseTime(eventDeadline(event))>=Date.now()))return null
   const times=related.filter(event=>event.completed&&!event.missed).map(event=>parseTime(String(event.completedAt||eventDeadline(event)))).filter(Number.isFinite)
   if(!times.length)return null

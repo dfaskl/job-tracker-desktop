@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
@@ -28,7 +29,7 @@ const maxTrend = computed(() => Math.max(1, ...trend.value.map(item => item.coun
 function pad(value: number) { return String(value).padStart(2, '0') }
 function hasInterviewProgress(item: Record<string, unknown>) {
   if (['面试', 'Offer'].includes(String(item.stage || '')) || item.status === '已通过') return true
-  return store.events.value.some(event => event.applicationId === item.id && !event.missed && /面试|[一二三四五六七八九]面|HR面|电话面/.test(String(event.type || '') + ' ' + String(event.title || '')))
+  return store.events.value.some(event => event.applicationId === item.id && !event.missed && isFormalInterview(event))
 }
 function grouped(field: string) {
   const counts = new Map<string, number>()
