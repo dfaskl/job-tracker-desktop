@@ -54,6 +54,16 @@ Windows 主机可执行：
 
 迁移到自有服务器时只需使用左侧的新变量；旧的 `POC_WRITE_ENABLED` 与 `POC_SHARED_DATABASE_WRITE_ENABLED` 已不再需要。
 
+### 免费实例健康检查
+
+需要从外部机器每 10 分钟访问一次 Render 健康检查时，可在 Linux 上运行：
+
+```sh
+chmod +x scripts/keep-render-awake.sh
+nohup ./scripts/keep-render-awake.sh > keep-render-awake.log 2>&1 &
+```
+
+停止脚本可执行 `pkill -f keep-render-awake.sh`。默认访问当前 Render 服务的 `/healthz`；迁移到其他地址后可通过 `HEALTH_URL=https://example.com/healthz` 覆盖。
 ## 本地构建
 
 要求 Java 21+、Maven 3.9+、Node.js 22+：
