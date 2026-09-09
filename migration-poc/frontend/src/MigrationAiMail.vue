@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
+import BaseSelect from './BaseSelect.vue'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
@@ -36,6 +37,7 @@ watch(selectedApplicationId, () => {
   result.company = matched.company
   result.position = matched.position
 })
+watch(timeMode, mode => { if (mode === 'point') result.endsAt = '' })
 
 onMounted(async () => {
   await store.initialize()
@@ -148,12 +150,12 @@ async function saveResult() {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult">
-          <label class="wide application-match"><span>关联已有投递</span><select v-model="selectedApplicationId"><option value="">不关联，新建一条投递</option><optgroup v-if="recommendedApplications.length" label="★ 高匹配推荐"><option v-for="item in recommendedApplications" :key="item.id" :value="item.id">★ {{matchPercent(item)}}%｜{{item.company}} · {{item.position}}</option></optgroup><optgroup v-if="otherApplications.length" label="其他已有投递"><option v-for="item in otherApplications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></optgroup></select><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
+          <label class="wide application-match"><span>关联已有投递</span><BaseSelect v-model="selectedApplicationId" :options="[{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
-          <label><span>通知类型</span><select v-model="result.noticeType"><option v-for="item in noticeTypes" :key="item">{{ item }}</option></select></label>
+          <label><span>通知类型</span><BaseSelect v-model="result.noticeType" :options="noticeTypes" /></label>
           <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
-          <label><span>时间类型</span><select v-model="timeMode" @change="timeMode==='point'&&(result.endsAt='')"><option value="point">时间点</option><option value="range">时间段</option></select></label>
+          <label><span>时间类型</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
           <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>

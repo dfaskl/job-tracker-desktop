@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
+import BaseSelect from './BaseSelect.vue'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
@@ -377,10 +378,10 @@ async function remove(item: EventItem) {
         <form class="event-form edit-modal" @submit.prevent="save">
           <button type="button" class="modal-close" @click="resetForm">×</button>
           <h3 class="wide">编辑日程</h3>
-          <label class="wide"><span>关联岗位</span><select v-model="form.applicationId" disabled><option v-for="item in applications" :key="item.id" :value="item.id">{{item.company}} · {{item.position}}</option></select></label>
-          <label><span>类型</span><select v-model="form.type"><option v-for="item in eventTypes" :key="item">{{item}}</option></select></label>
+          <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>
+          <label><span>类型</span><BaseSelect v-model="form.type" :options="eventTypes" /></label>
           <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>
-          <label><span>时间类型</span><select v-model="form.timeMode"><option value="point">时间点</option><option value="range">时间段</option></select></label>
+          <label><span>时间类型</span><BaseSelect v-model="form.timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
           <label><span>开始时间 *</span><input v-model="form.startsAt" type="datetime-local" required /></label>
           <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" required /></label>
           <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
