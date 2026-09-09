@@ -83,7 +83,7 @@ async function recognize() {
   loading.value = true; error.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
-    Object.assign(result, value, { scheduleTitle: value.scheduleTitle || value.noticeType || '日程', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
+    Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
     timeMode.value = value.endsAt ? 'range' : 'point'

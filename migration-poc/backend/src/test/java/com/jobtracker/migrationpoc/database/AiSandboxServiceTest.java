@@ -68,6 +68,19 @@ class AiSandboxServiceTest {
         assertThat(advice.path("plans").get(0).asText()).isEqualTo("09:00-10:00 甲公司笔试");
         assertThat(advice.path("conflicts").get(0).asText()).isEqualTo("两项安排重叠");
     }
+    @Test
+    void keepsRecognizedScheduleTitleEqualToNoticeType() throws Exception {
+        ApplicationSandboxService sandbox = mock(ApplicationSandboxService.class);
+        when(sandbox.status()).thenReturn(new ApplicationSandboxService.SandboxStatus(true, true, true, "已开启"));
+        AiSandboxService service = service(new MockEnvironment(), sandbox);
+
+        var result = service.recognition(new ObjectMapper().readTree(
+            "{\"noticeType\":\"笔试\",\"scheduleTitle\":\"新石器2027届AICoding后端工程类考试（二）\"}"
+        ));
+
+        assertThat(result.noticeType()).isEqualTo("笔试");
+        assertThat(result.scheduleTitle()).isEqualTo("笔试");
+    }
     private AiSandboxService service(MockEnvironment environment, ApplicationSandboxService sandbox) {
         ObjectMapper mapper = new ObjectMapper();
         LegacySecretCrypto crypto = new LegacySecretCrypto();
