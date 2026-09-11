@@ -201,7 +201,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
     <Teleport to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
-      <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice"><div class="advice-head"><div class="advice-title"><i>✦</i><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div><button class="advice-refresh" :disabled="adviceLoading" @click="generateScheduleAdvice(adviceSignature,0,true)">{{adviceLoading?'生成中…':'重新生成'}}</button></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
+      <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice"><div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span aria-hidden="true">✦</span></button><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
       <div v-if="recentSchedules.length" class="schedule-list">
         <article v-for="(event,index) in recentSchedules" :key="event.id">
           <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
@@ -282,7 +282,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .quote-strip em { color: var(--home-muted); font-style: normal; }
 .quote-trigger:focus-visible,
 .text-link:focus-visible,
-.advice-refresh:focus-visible,
+.advice-trigger:focus-visible,
 .schedule-actions button:focus-visible,
 .confirmation-list button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent, var(--color-primary)) 24%, transparent);
@@ -334,7 +334,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger { animation:none; }
+  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger, .advice-trigger.is-loading, .advice-trigger.is-loading > span { animation:none; }
   .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.55s; }
 }
 @keyframes quote-spark-soft {
@@ -398,26 +398,29 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 .advice-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .advice-title { display: flex; min-width: 0; align-items: center; gap: 12px; }
-.advice-title > i {
+.advice-trigger {
   display: grid;
   width: 36px;
   height: 36px;
+  min-height: 36px;
   flex: 0 0 36px;
+  padding: 0;
   place-items: center;
+  border: 0;
   border-radius: 9px 9px 9px 2px;
   color: #fff;
   background: var(--accent, var(--color-primary));
-  font-style: normal;
+  cursor: pointer;
 }
+.advice-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
+.advice-trigger:disabled { cursor: wait; }
+.advice-trigger.is-loading { animation: advice-refresh-pulse 1.1s ease-in-out infinite; }
+.advice-trigger.is-loading > span { animation: quote-refresh-spin .85s linear infinite; }
 .advice-title > div { display: grid; min-width: 0; gap: 3px; }
 .advice-title strong { font-size: 16px; }
 .advice-title small { color: var(--home-muted); line-height: 1.5; }
-.advice-refresh {
-  flex: 0 0 auto;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 34%, #d7e0e8);
-  color: var(--accent, var(--color-primary));
-  background: var(--home-paper);
+@keyframes advice-refresh-pulse {
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 14%,transparent); }
 }
 .advice-notice { margin: 0; color: #8a5608; font-size: 12px; }
 
