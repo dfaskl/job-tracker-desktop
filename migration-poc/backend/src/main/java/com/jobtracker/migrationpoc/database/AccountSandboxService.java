@@ -44,7 +44,7 @@ public class AccountSandboxService {
         PasswordRecord record=passwords.create(password);
         try(Connection c=open()){
             c.setAutoCommit(false);
-            try(PreparedStatement s=c.prepareStatement("INSERT INTO users(email,password_salt,password_hash) VALUES(?,?,?) RETURNING id,email",Statement.RETURN_GENERATED_KEYS)){
+            try(PreparedStatement s=c.prepareStatement("INSERT INTO users(email,password_salt,password_hash) VALUES(?,?,?) RETURNING id,email")){
                 s.setString(1,clean);s.setString(2,record.salt());s.setString(3,record.hash());
                 try(ResultSet r=s.executeQuery()){r.next();long id=r.getLong(1);String saved=r.getString(2);
                     try(PreparedStatement d=c.prepareStatement("INSERT INTO user_data(user_id,data) VALUES(?,?::jsonb)")){d.setLong(1,id);d.setString(2,"{\"applications\":[],\"events\":[],\"settings\":{}}");d.executeUpdate();}
