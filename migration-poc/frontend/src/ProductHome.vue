@@ -198,7 +198,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <Teleport to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><i aria-hidden="true">✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" aria-label="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
+    <Teleport to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
       <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice"><div class="advice-head"><div class="advice-title"><i>✦</i><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div><button class="advice-refresh" :disabled="adviceLoading" @click="generateScheduleAdvice(adviceSignature,0,true)">{{adviceLoading?'生成中…':'重新生成'}}</button></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
@@ -240,8 +240,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 
 .quote-strip {
-  display: flex;
-  width: min(620px, 100%);
+  display: inline-flex;
+  width: fit-content;
+  max-width: min(880px, 100%);
   min-width: 0;
   align-items: center;
   gap: 11px;
@@ -252,33 +253,34 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   color: var(--home-ink);
   background: rgba(252, 253, 251, .94);
 }
-.quote-strip > i {
+.quote-trigger {
   display: grid;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 27px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
   place-items: center;
+  border: 0;
   border-radius: 50%;
   color: #fff;
   background: var(--accent, var(--color-primary));
-  font-style: normal;
+  cursor: pointer;
 }
-.quote-strip > span { display: grid; min-width: 0; flex: 1; }
+.quote-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
+.quote-trigger:disabled { cursor: wait; }
+.quote-trigger > span { line-height: 1; }
+.quote-copy { display: grid; min-width: 0; max-width: 72ch; flex: 0 1 auto; }
 .quote-strip small { color: var(--accent, var(--color-primary)); font-size: 10px; font-weight: 700; }
 .quote-strip strong {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 12px;
   font-weight: 550;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  white-space: normal;
 }
 .quote-strip em { color: var(--home-muted); font-style: normal; }
-.quote-strip button {
-  padding: 5px 8px;
-  color: var(--accent, var(--color-primary));
-  background: transparent;
-}
-.quote-strip button:focus-visible,
+.quote-trigger:focus-visible,
 .text-link:focus-visible,
 .advice-refresh:focus-visible,
 .schedule-actions button:focus-visible,
@@ -292,7 +294,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 48%, #d7e0e9);
   animation: quote-breathe 1.25s ease-in-out infinite;
 }
-.quote-strip.is-refreshing > button { animation: quote-refresh-spin .85s linear infinite; }
+.quote-strip.is-refreshing > .quote-trigger { animation: quote-refresh-spin .85s linear infinite; }
 .quote-strip.is-refreshed {
   border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 62%, #fff);
   background: color-mix(in srgb, var(--accent, var(--color-primary)) 5%, #fff);
@@ -332,7 +334,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .quote-strip.is-refreshing, .quote-strip.is-refreshing > button { animation:none; }
+  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger { animation:none; }
   .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.55s; }
 }
 @keyframes quote-spark-soft {
