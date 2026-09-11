@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
@@ -161,7 +161,26 @@ function fallbackQuote():Quote{const items=['今天多走一步，明天就多�
 function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteCacheKey())||localStorage.getItem(legacyQuoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;localStorage.setItem(quoteCacheKey(),JSON.stringify(cached));return true}}catch{/* 使用本地内容 */}return false}
 function celebrateQuote(){quoteBurst.value+=1;if(quoteBurstTimer)clearTimeout(quoteBurstTimer);quoteBurstTimer=setTimeout(()=>{quoteBurst.value=0},900)}
-async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value));if(force)celebrateQuote()}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一语生成失败'}finally{quoteLoading.value=false}}
+async function generateQuote(force:boolean){
+  if(!store.user.value||quoteLoading.value)return
+  quoteLoading.value=true
+  error.value=''
+  let refreshed=false
+  try{
+    const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
+    if(!status.callsEnabled){quote.value=fallbackQuote();return}
+    const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})})
+    quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true}
+    localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value))
+    refreshed=true
+  }catch(cause){
+    quote.value=fallbackQuote()
+    error.value=cause instanceof Error?cause.message:'每日一语生成失败'
+  }finally{
+    quoteLoading.value=false
+    if(force&&refreshed){await nextTick();celebrateQuote()}
+  }
+}
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
@@ -281,38 +300,44 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 .quote-sparks { position:absolute; inset:0; z-index:3; overflow:visible; pointer-events:none; }
 .quote-sparks > i {
-  --spark: 0px;
   position:absolute;
   top:50%;
   left:50%;
-  width:7px;
-  height:7px;
+  width:9px;
+  height:9px;
   border-radius:1px;
   background:var(--accent, var(--color-primary));
   clip-path:polygon(50% 0,62% 36%,100% 50%,62% 64%,50% 100%,38% 64%,0 50%,38% 36%);
   opacity:0;
-  animation:quote-spark .78s cubic-bezier(.2,.75,.25,1) forwards;
+  filter:drop-shadow(0 0 3px color-mix(in srgb,var(--accent,var(--color-primary)) 34%,transparent));
+  animation:quote-spark .82s cubic-bezier(.16,.78,.24,1) forwards;
 }
-.quote-sparks > i:nth-child(1){--spark-x:-18px;--spark-y:-14px;left:6%;top:18%;animation-delay:.02s}
-.quote-sparks > i:nth-child(2){--spark-x:-10px;--spark-y:-18px;left:28%;top:8%;animation-delay:.1s}
-.quote-sparks > i:nth-child(3){--spark-x:8px;--spark-y:-19px;left:53%;top:6%;animation-delay:.04s}
-.quote-sparks > i:nth-child(4){--spark-x:17px;--spark-y:-13px;left:88%;top:16%;animation-delay:.12s}
-.quote-sparks > i:nth-child(5){--spark-x:18px;--spark-y:14px;left:92%;top:78%;animation-delay:.05s}
-.quote-sparks > i:nth-child(6){--spark-x:5px;--spark-y:18px;left:62%;top:92%;animation-delay:.14s}
-.quote-sparks > i:nth-child(7){--spark-x:-17px;--spark-y:13px;left:12%;top:82%;animation-delay:.08s}
+.quote-sparks > i:nth-child(even){width:7px;height:7px;background:#e7ad38}
+.quote-sparks > i:nth-child(1){--spark-x:-30px;--spark-y:-24px;left:5%;top:16%;animation-delay:.02s}
+.quote-sparks > i:nth-child(2){--spark-x:-18px;--spark-y:-30px;left:27%;top:5%;animation-delay:.1s}
+.quote-sparks > i:nth-child(3){--spark-x:12px;--spark-y:-32px;left:52%;top:4%;animation-delay:.04s}
+.quote-sparks > i:nth-child(4){--spark-x:29px;--spark-y:-23px;left:90%;top:14%;animation-delay:.12s}
+.quote-sparks > i:nth-child(5){--spark-x:31px;--spark-y:24px;left:94%;top:80%;animation-delay:.05s}
+.quote-sparks > i:nth-child(6){--spark-x:10px;--spark-y:30px;left:63%;top:94%;animation-delay:.14s}
+.quote-sparks > i:nth-child(7){--spark-x:-29px;--spark-y:23px;left:10%;top:84%;animation-delay:.08s}
 @keyframes quote-breathe {
   0%,100% { box-shadow:0 0 0 0 color-mix(in srgb,var(--accent,var(--color-primary)) 6%,transparent); background:rgba(252,253,251,.94); }
   50% { box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); background:color-mix(in srgb,var(--accent,var(--color-primary)) 4%,#fff); }
 }
 @keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
 @keyframes quote-spark {
-  0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(0); }
-  24% { opacity:1; }
-  100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.05) rotate(120deg); }
+  0% { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(0); }
+  26% { opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(35deg); }
+  62% { opacity:.9; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.92) rotate(82deg); }
+  100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .quote-strip.is-refreshing, .quote-strip.is-refreshing > button { animation:none; }
-  .quote-sparks { display:none; }
+  .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.55s; }
+}
+@keyframes quote-spark-soft {
+  0%,100% { opacity:0;transform:translate(-50%,-50%) scale(.7); }
+  45% { opacity:1;transform:translate(-50%,-50%) scale(1); }
 }
 
 .dashboard-panel {
