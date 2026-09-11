@@ -119,3 +119,97 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
   :root { --space-lg: 18px; --space-xl: 24px; }
   #app :is(button, input, textarea, select) { font-size: 16px; }
 }
+/* Career workspace visual system */
+:root {
+  --color-paper: #fcfdfb;
+  --color-canvas: #eef7fc;
+  --color-rail: #d6e9f3;
+  --color-progress: #15805f;
+  --color-deadline: #c8782a;
+  --color-stage: #7652aa;
+  --radius-panel: 14px;
+  --shadow-float: 0 16px 38px rgba(7, 59, 92, .10);
+}
+body {
+  background-color: var(--color-canvas);
+  background-image:
+    linear-gradient(rgba(3,105,161,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(3,105,161,.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+::selection { color: #fff; background: var(--color-primary); }
+#app { min-height: 100vh; }
+#app h2 { letter-spacing: -.025em; }
+#app h3 { letter-spacing: -.015em; }
+#app :is(input, textarea, select) { box-shadow: inset 0 1px 0 rgba(7,59,92,.025); }
+#app :is(input, textarea)::placeholder { color: #8494a7; }
+#app .card {
+  border-width: 1px;
+  border-style: solid;
+  border-top-color: color-mix(in srgb,var(--color-primary) 28%,var(--color-border));
+  background: color-mix(in srgb,var(--color-card) 97%,var(--color-background));
+}
+#app .card > :first-child { margin-top: 0; }
+#app :is(.primary-action, .commit-box button) {
+  border: 1px solid color-mix(in srgb,var(--color-primary) 80%,#062f49);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: 0 5px 14px color-mix(in srgb,var(--color-primary) 18%,transparent);
+}
+#app :is(.primary-action, .commit-box button):not(:disabled):hover { background: color-mix(in srgb,var(--color-primary) 88%,#062f49); }
+#app :is(.feedback.success, .global-operation-toast.success) { border-left: 4px solid var(--color-progress); }
+#app :is(.feedback.danger, .global-operation-toast.danger) { border-left: 4px solid var(--color-destructive); }
+#app :is(.empty-state, .empty) { background: color-mix(in srgb,var(--color-background) 48%,#fff); }
+#app :is(.workspace > .grid, .audit-scroll, .user-scroll, .review-panel, .backup-list) { scrollbar-color: color-mix(in srgb,var(--color-primary) 34%,transparent) transparent; }
+#app :is(.metrics-row, .metrics, .summary-grid) strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-variant-numeric: tabular-nums; }
+#app :is(.mail-grid, .calendar-layout, .settings-grid, .admin-grid, .two-column) { isolation: isolate; }
+#app :is(.mail-grid, .calendar-layout, .settings-grid, .admin-grid) > * { min-width: 0; }
+@keyframes workspace-arrive {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#app .page-content > :not(.access) { animation: workspace-arrive .24s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  #app .page-content > :not(.access) { animation: none; }
+}
+@media (max-width: 820px) {
+  body { background-size: 24px 24px; }
+  #app .card { --card-padding: 16px; }
+}
+/* Page-specific workspace language */
+#app :is(.application-overview,.calendar-overview,.mail-page,.admin-shell) { color:var(--color-foreground); }
+#app :is(.workspace>.grid,.calendar-layout,.mail-grid,.settings-grid,.admin-grid) { scrollbar-color:color-mix(in srgb,var(--color-primary) 35%,#cad7df) transparent; }
+#app :is(.application,.event-chip,.backup-list article,.users-card article) { transition:border-color .18s ease,background-color .18s ease,box-shadow .18s ease; }
+#app :is(.application,.event-chip,.backup-list article,.users-card article):hover { border-color:color-mix(in srgb,var(--color-primary) 42%,var(--color-border)); box-shadow:0 5px 16px rgba(7,59,92,.07); }
+#app :is(.application,.event-chip) { border-radius:10px; }
+#app .application { background-image:linear-gradient(90deg,rgba(255,255,255,.28),transparent 42%); }
+#app :is(.calendar-pane,.month-card) { background:var(--color-paper); }
+#app :is(.calendar-grid,.month-grid) { border-color:var(--color-rail); }
+#app :is(.calendar-grid,.month-grid) .day { background:color-mix(in srgb,var(--color-paper) 96%,var(--color-background)); }
+#app :is(.calendar-grid,.month-grid) .day:hover { background:color-mix(in srgb,var(--color-primary) 5%,#fff); }
+#app :is(.calendar-grid,.month-grid) .day.selected { box-shadow:inset 0 0 0 2px var(--color-primary); }
+#app .mail-toolbar { padding-left:14px; border-left:3px solid var(--color-primary); }
+#app .source-panel { border-top-color:var(--color-primary); }
+#app .review-panel { border-top-color:var(--color-progress); }
+#app .source-panel>textarea { background:linear-gradient(to bottom,transparent 31px,rgba(3,105,161,.055) 32px); background-size:100% 32px; line-height:32px; }
+#app .step { border-radius:50%; font-family:"Fira Code",monospace; }
+#app .settings-grid :is(.theme-card,.data-card,.backup-card,.about-card,.api-card) { box-shadow:0 8px 24px rgba(7,59,92,.055); }
+#app .settings-grid .theme-card { border-top-color:var(--color-stage); }
+#app .settings-grid .data-card { border-top-color:var(--color-primary); }
+#app .settings-grid .backup-card { border-top-color:var(--color-progress); }
+#app .settings-grid .api-card { border-top-color:var(--color-deadline); }
+#app .admin-head { padding-left:14px; border-left:3px solid var(--color-primary); }
+#app .summary-grid article { position:relative; overflow:hidden; border-top-color:var(--color-primary); }
+#app .summary-grid article::after { content:""; position:absolute; right:-18px; bottom:-28px; width:62px; height:62px; border:1px solid color-mix(in srgb,var(--color-primary) 18%,transparent); border-radius:50%; }
+#app :is(.section-kicker,.eyebrow) { letter-spacing:.06em; }
+#app :is(.section-head,.panel-title,.calendar-head) h2,
+#app :is(.section-head,.panel-title,.calendar-head) h3 { text-wrap:balance; }
+#app .feedback { border-left:3px solid currentColor; box-shadow:var(--shadow-sm); }
+@media (prefers-reduced-motion:no-preference) {
+  #app .page-content> :not(.access) { animation:workspace-arrive .28s cubic-bezier(.2,.72,.25,1) both; }
+}
+@keyframes workspace-arrive { from { opacity:.55; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@media(max-width:820px){
+  #app .mail-toolbar,#app .admin-head { padding-left:10px; }
+  #app :is(.application,.event-chip,.backup-list article,.users-card article):hover { box-shadow:none; }
+}

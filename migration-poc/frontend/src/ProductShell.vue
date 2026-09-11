@@ -84,7 +84,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
       <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
-    <main id="main-content" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings', 'admin-page-shell': activePage === 'admin' }">
+    <main id="main-content" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
       <header class="topbar">
         <div><h1 ref="pageHeading" tabindex="-1">{{ current.label }}</h1><p>{{ current.subtitle }}</p></div>
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
@@ -92,7 +92,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
         <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin' }">
+      <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
         <AccountAccess v-if="!store.user.value" />
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
@@ -111,10 +111,11 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
   display: flex;
   width: 232px;
   flex-direction: column;
-  padding: 24px 16px 18px;
+  padding: 22px 16px 18px;
   color: #e0f2fe;
   background: var(--sidebar);
   border-right: 1px solid rgba(255,255,255,.1);
+  box-shadow: 8px 0 28px rgba(4,31,49,.08);
 }
 .brand {
   display: flex;
@@ -131,7 +132,8 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
 .brand div { display: grid; gap: 2px; }
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
 .brand small { color: #bae6fd; font-size: 11px; }
-nav { display: grid; gap: 5px; margin-top: 28px; }
+nav { position: relative; display: grid; gap: 5px; margin-top: 28px; }
+nav::before { content:""; position:absolute; top:18px; bottom:18px; left:22px; width:1px; background:rgba(125,211,252,.18); }
 nav button {
   position: relative;
   display: flex;
@@ -145,7 +147,7 @@ nav button {
   background: transparent;
   text-align: left;
 }
-nav button span { width: 20px; color: #7dd3fc; font-size: 16px; text-align: center; }
+nav button span { position:relative; z-index:1; width: 20px; color: #7dd3fc; font-size: 16px; text-align: center; }
 nav button:hover { color: #fff; background: rgba(255,255,255,.07); }
 nav button.active {
   border-color: rgba(255,255,255,.12);
@@ -173,9 +175,11 @@ nav button.active::before {
   justify-content: space-between;
   gap: 20px;
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-background) 94%, transparent);
+  background: color-mix(in srgb, var(--color-background) 92%, transparent);
   backdrop-filter: blur(16px);
 }
+.topbar > div:first-child { position:relative; padding-left:14px; }
+.topbar > div:first-child::before { content:""; position:absolute; inset:2px auto 2px 0; width:3px; border-radius:99px; background:var(--color-primary); }
 .topbar h1 { margin: 0 0 4px; font-size: 27px; line-height: 1.15; }
 .topbar p { margin: 0; color: var(--color-muted-foreground); line-height: 1.4; }
 .topbar > button {
@@ -186,7 +190,7 @@ nav button.active::before {
 .home-quote-slot { display: flex; min-width: 0; flex: 1; justify-content: center; }
 .application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px; }
 .application-toolbar-slot.active { display: flex; }
-.page-content { width: min(1180px, 100%); margin: 0 auto; }
+.page-content { width: min(1240px, 100%); margin: 0 auto; }
 .page-content.application-content,
 .page-content.calendar-content,
 .page-content.mail-content,
