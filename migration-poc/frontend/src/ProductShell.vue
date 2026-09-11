@@ -284,7 +284,7 @@ nav button.active::before {
   .topbar { min-height: 92px; flex-wrap: wrap; padding: 12px 0; }
   .topbar h1 { font-size: 22px; }
   .topbar p { font-size: 13px; }
-  .home-quote-slot, .application-toolbar-slot { order: 3; width: 100%; flex-basis: 100%; margin: 4px 0; }
+  .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
 }
 @media (max-width: 620px) {
   .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
