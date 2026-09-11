@@ -15,6 +15,7 @@ const quoteKey = 'job_tracker_daily_quote_vue_v2'
 const legacyQuoteKey = 'job_tracker_daily_quote_vue_v1'
 const quote = ref<Quote>(fallbackQuote())
 const quoteLoading = ref(false)
+const quoteBurst = ref(0)
 const message = ref('')
 const error = ref('')
 const busyId = ref('')
@@ -23,6 +24,7 @@ const adviceLoading = ref(false)
 const adviceNotice = ref('')
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
+let quoteBurstTimer: ReturnType<typeof setTimeout> | null = null
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
@@ -158,7 +160,8 @@ function eventDate(event:JobEvent){
 function fallbackQuote():Quote{const items=['今天多走一步，明天就多一个选择。','把注意力放在能推进的下一步上。','每一次认真准备，都在靠近更合适的机会。','慢一点没有关系，只要方向仍在向前。','机会会迟到，但你的积累不会白费。','先完成今天能完成的，再把答案交给时间。','保持行动，好的结果往往在坚持之后出现。'];return {date:today(),quote:items[new Date().getDay()],author:'',generated:false}}
 function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
 function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteCacheKey())||localStorage.getItem(legacyQuoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;localStorage.setItem(quoteCacheKey(),JSON.stringify(cached));return true}}catch{/* 使用本地内容 */}return false}
-async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value));if(force)message.value='已经换了一句'}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一语生成失败'}finally{quoteLoading.value=false}}
+function celebrateQuote(){quoteBurst.value+=1;if(quoteBurstTimer)clearTimeout(quoteBurstTimer);quoteBurstTimer=setTimeout(()=>{quoteBurst.value=0},900)}
+async function generateQuote(force:boolean){if(!store.user.value||quoteLoading.value)return;quoteLoading.value=true;error.value='';try{const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status');if(!status.callsEnabled){quote.value=fallbackQuote();return}const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})});quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true};localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value));if(force)celebrateQuote()}catch(cause){quote.value=fallbackQuote();error.value=cause instanceof Error?cause.message:'每日一语生成失败'}finally{quoteLoading.value=false}}
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
@@ -172,11 +175,11 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" aria-label="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
+    <Teleport to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><i aria-hidden="true">✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" aria-label="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
       <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice"><div class="advice-head"><div class="advice-title"><i>✦</i><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div><button class="advice-refresh" :disabled="adviceLoading" @click="generateScheduleAdvice(adviceSignature,0,true)">{{adviceLoading?'生成中…':'重新生成'}}</button></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
@@ -263,6 +266,53 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .confirmation-list button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent, var(--color-primary)) 24%, transparent);
   outline-offset: 2px;
+}
+
+.quote-strip { position: relative; isolation: isolate; transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
+.quote-strip.is-refreshing {
+  border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 48%, #d7e0e9);
+  animation: quote-breathe 1.25s ease-in-out infinite;
+}
+.quote-strip.is-refreshing > button { animation: quote-refresh-spin .85s linear infinite; }
+.quote-strip.is-refreshed {
+  border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 62%, #fff);
+  background: color-mix(in srgb, var(--accent, var(--color-primary)) 5%, #fff);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--color-primary)) 10%, transparent);
+}
+.quote-sparks { position:absolute; inset:0; z-index:3; overflow:visible; pointer-events:none; }
+.quote-sparks > i {
+  --spark: 0px;
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:7px;
+  height:7px;
+  border-radius:1px;
+  background:var(--accent, var(--color-primary));
+  clip-path:polygon(50% 0,62% 36%,100% 50%,62% 64%,50% 100%,38% 64%,0 50%,38% 36%);
+  opacity:0;
+  animation:quote-spark .78s cubic-bezier(.2,.75,.25,1) forwards;
+}
+.quote-sparks > i:nth-child(1){--spark-x:-18px;--spark-y:-14px;left:6%;top:18%;animation-delay:.02s}
+.quote-sparks > i:nth-child(2){--spark-x:-10px;--spark-y:-18px;left:28%;top:8%;animation-delay:.1s}
+.quote-sparks > i:nth-child(3){--spark-x:8px;--spark-y:-19px;left:53%;top:6%;animation-delay:.04s}
+.quote-sparks > i:nth-child(4){--spark-x:17px;--spark-y:-13px;left:88%;top:16%;animation-delay:.12s}
+.quote-sparks > i:nth-child(5){--spark-x:18px;--spark-y:14px;left:92%;top:78%;animation-delay:.05s}
+.quote-sparks > i:nth-child(6){--spark-x:5px;--spark-y:18px;left:62%;top:92%;animation-delay:.14s}
+.quote-sparks > i:nth-child(7){--spark-x:-17px;--spark-y:13px;left:12%;top:82%;animation-delay:.08s}
+@keyframes quote-breathe {
+  0%,100% { box-shadow:0 0 0 0 color-mix(in srgb,var(--accent,var(--color-primary)) 6%,transparent); background:rgba(252,253,251,.94); }
+  50% { box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); background:color-mix(in srgb,var(--accent,var(--color-primary)) 4%,#fff); }
+}
+@keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
+@keyframes quote-spark {
+  0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(0); }
+  24% { opacity:1; }
+  100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.05) rotate(120deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quote-strip.is-refreshing, .quote-strip.is-refreshing > button { animation:none; }
+  .quote-sparks { display:none; }
 }
 
 .dashboard-panel {
