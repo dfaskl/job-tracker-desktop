@@ -278,7 +278,7 @@ public class AdminSandboxService {
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
             + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
             + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
-            + "(SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id=u.id) AS last_login_at "
+            + "(SELECT MAX(COALESCE(s.last_active_at,s.created_at)) FROM sessions s WHERE s.user_id=u.id) AS last_active_at "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
             + "ORDER BY u.is_admin DESC,u.created_at ASC LIMIT ?";
         List<UserView> users = new ArrayList<>();
@@ -290,7 +290,7 @@ public class AdminSandboxService {
                         String.valueOf(result.getLong("id")), result.getString("email"),
                         result.getBoolean("is_admin"), result.getObject("disabled_at") != null,
                         string(result.getObject("disabled_at")), string(result.getObject("created_at")),
-                        string(result.getObject("last_login_at")), result.getInt("application_count"),
+                        string(result.getObject("last_active_at")), result.getInt("application_count"),
                         result.getInt("event_count"), result.getBoolean("has_api_key")
                     ));
                 }
@@ -482,7 +482,7 @@ public class AdminSandboxService {
                           int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
                           boolean adminEmailConfigured) {}
     public record UserView(String id, String email, boolean isAdmin, boolean disabled, String disabledAt,
-                           String createdAt, String lastLoginAt, int applicationCount, int eventCount,
+                           String createdAt, String lastActiveAt, int applicationCount, int eventCount,
                            boolean hasApiKey) {}
     public record AuditView(String id, String action, String targetEmail, String createdAt) {}
     public record Overview(CurrentAdmin currentUser, Summary summary, List<UserView> users,

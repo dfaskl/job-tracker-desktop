@@ -4,7 +4,7 @@ import BaseSelect from './BaseSelect.vue'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
-type User={id:string;email:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastLoginAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean}
+type User={id:string;email:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean}
 type Audit={id:string;action:string;targetEmail:string;createdAt:string}
 type ApplicationDetail={id:string;company:string;position:string;stage:string;status:string;appliedDate:string;city:string;channel:string;flow:{at:string;title:string}[]}
 type UserDetails={user:{id:string;email:string};applications:ApplicationDetail[];totalApplications:number;truncated:boolean}
@@ -18,7 +18,7 @@ const users=computed(()=>overview.value?.users||[])
 const filteredUsers=computed(()=>{const keyword=query.value.trim().toLowerCase();return users.value.filter(user=>(!keyword||user.email.toLowerCase().includes(keyword))&&(stateFilter.value==='all'||stateFilter.value==='admin'&&user.isAdmin||stateFilter.value==='enabled'&&!user.disabled||stateFilter.value==='disabled'&&user.disabled))})
 const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCount,0))
 const disabledUsers=computed(()=>users.value.filter(user=>user.disabled).length)
-const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastLoginAt)>edge).length})
+const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
 
 onMounted(checkStatus)
@@ -35,7 +35,7 @@ async function revokeSessions(user:User){if(!confirm(`确认让 ${user.email} �
 async function deleteUser(user:User){const confirmEmail=prompt(`删除后无法恢复。请输入 ${user.email} 确认：`,'');if(confirmEmail===null)return;busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmEmail})});if(selected.value?.id===user.id){selected.value=null;detail.value=null}await loadOverview();message.value='用户及其业务数据已删除'}catch(cause){error.value=failure(cause,'删除用户失败')}finally{busyUser.value=''}}
 function failure(cause:unknown,fallback:string){return cause instanceof Error?cause.message:fallback}
 function formatDate(value:string){if(!value)return '从未';const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString('zh-CN',{hour12:false})}
-function relativeDate(value:string){if(!value)return '从未登录';const time=Date.parse(value);if(!Number.isFinite(time))return value;const days=Math.floor((Date.now()-time)/86400000);return days<=0?'今天':days===1?'昨天':`${days} 天前`}
+function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const days=Math.floor((Date.now()-time)/86400000);return days<=0?'今天活跃':days===1?'昨天活跃':`${days} 天前活跃`}
 </script>
 
 <template>
@@ -81,7 +81,7 @@ function relativeDate(value:string){if(!value)return '从未登录';const time=D
             <article v-for="user in filteredUsers" :key="user.id" :class="{disabled:user.disabled}">
               <div class="avatar">{{user.email.slice(0,1).toUpperCase()}}</div>
               <div class="identity"><strong>{{user.email}}</strong><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span></div>
-              <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span>{{relativeDate(user.lastLoginAt)}}</span></div>
+              <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
               <div class="actions"><button class="secondary" :disabled="busyUser===user.id" @click="openDetails(user)">详情</button><template v-if="!user.isAdmin"><button class="secondary" :disabled="busyUser===user.id" @click="revokeSessions(user)">下线</button><button class="secondary" :disabled="busyUser===user.id" @click="setDisabled(user)">{{user.disabled?'启用':'停用'}}</button><button class="danger-button" :disabled="busyUser===user.id" @click="deleteUser(user)">删除</button></template></div>
             </article>
             <p v-if="!filteredUsers.length" class="empty">没有符合条件的用户</p>

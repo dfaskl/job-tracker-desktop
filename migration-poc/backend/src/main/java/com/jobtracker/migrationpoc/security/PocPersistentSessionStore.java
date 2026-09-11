@@ -100,8 +100,9 @@ public class PocPersistentSessionStore {
 
     public Optional<String> verifyEmail(String token) throws Exception {
         if (!isEnabled() || !validToken(token)) return Optional.empty();
-        String sql = "SELECT u.email FROM sessions s JOIN users u ON u.id=s.user_id "
-            + "WHERE s.token_hash=? AND s.expires_at>NOW() AND u.disabled_at IS NULL";
+        String sql = "UPDATE sessions s SET last_active_at=NOW() FROM users u "
+            + "WHERE s.user_id=u.id AND s.token_hash=? AND s.expires_at>NOW() "
+            + "AND u.disabled_at IS NULL RETURNING u.email";
         try (Connection connection = openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, tokenHash(token));
