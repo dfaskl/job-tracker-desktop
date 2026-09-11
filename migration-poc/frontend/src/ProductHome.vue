@@ -662,6 +662,8 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 @media (max-width: 680px) {
   .home-dashboard { gap: 14px; padding-top: 10px; }
   .quote-strip { width: 100%; }
+  .timeline-scroll { margin-inline: -4px; padding-inline: 4px; scroll-snap-type: x proximity; }
+  .timeline-list article { scroll-snap-align: start; }
   .panel-head, .advice-head { align-items: flex-start; }
   .advice-head { flex-direction: column; }
   .schedule-list article { grid-template-columns: 1fr; gap: 12px; }

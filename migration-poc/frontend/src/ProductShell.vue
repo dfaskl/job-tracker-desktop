@@ -215,36 +215,54 @@ nav button.active::before {
   .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
 }
 @media (max-width: 820px) {
+  .product-shell { width: 100%; max-width: 100%; overflow-x: clip; }
   .sidebar {
     position: sticky;
     top: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     width: 100%;
+    max-width: 100vw;
     height: auto;
     padding: 8px 12px 10px;
+    overflow: hidden;
   }
-  .brand { width: auto; }
+  .brand { width: fit-content; max-width: 100%; min-width: 0; }
+  .brand div { min-width: 0; }
+  .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brand small { display: none; }
-  .sidebar-account { position: absolute; top: 8px; right: 12px; width: auto; margin: 0; }
-  .sidebar-account :deep(.signed.compact) { display: flex; width: auto; padding: 5px 7px; }
+  .sidebar-account { position: static; width: auto; min-width: 0; margin: 0; justify-self: end; }
+  .sidebar-account :deep(.signed.compact) { display: flex; width: auto; min-width: 0; padding: 5px 7px; flex-direction: row; }
+  .sidebar-account :deep(.signed.compact > div) { width: auto; }
   .sidebar-account :deep(.signed.compact span) { display: none; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
-  nav { display: flex; margin: 6px -2px 0; overflow-x: auto; scrollbar-width: none; }
+  nav { grid-column: 1 / -1; display: flex; width: 100%; min-width: 0; margin: 6px 0 0; overflow-x: auto; scrollbar-width: none; }
   nav::-webkit-scrollbar { display: none; }
   nav button { width: auto; min-width: max-content; flex: 0 0 auto; padding: 8px 12px; }
   nav button span, nav button.active::before { display: none; }
-  .product-main { margin-left: 0; padding: 0 16px 44px; }
+  .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 0 16px 44px; overflow-x: clip; }
+  .product-main.application-page,
   .product-main.calendar-page,
   .product-main.mail-page-shell,
   .product-main.settings-page-shell,
   .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
+  .page-content { min-width: 0; max-width: 100%; }
   .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
   .topbar { min-height: 92px; flex-wrap: wrap; padding: 12px 0; }
   .topbar h1 { font-size: 22px; }
   .topbar p { font-size: 13px; }
   .home-quote-slot, .application-toolbar-slot { order: 3; width: 100%; flex-basis: 100%; margin: 4px 0; }
 }
-@media (max-width: 520px) {
+@media (max-width: 620px) {
+  nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; overflow: visible; }
+  nav::before { display: none; }
+  nav button { width: 100%; min-width: 0; min-height: 38px; justify-content: center; padding: 7px 4px; font-size: 13px; text-align: center; }
   .topbar > button { display: none; }
+}
+@media (max-width: 520px) {
   .product-main { padding-inline: 12px; }
+}
+@media (max-width: 440px) {
+  .sidebar-account :deep(.signed.compact strong) { display: none; }
 }
 </style>
