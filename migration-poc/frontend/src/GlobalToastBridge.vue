@@ -15,6 +15,8 @@ function showToast(element: HTMLElement) {
   const previous = timers.get(element)
   if (previous) clearTimeout(previous)
   element.dataset.globalToast = 'true'
+  element.setAttribute('role', element.classList.contains('danger') ? 'alert' : 'status')
+  element.setAttribute('aria-live', element.classList.contains('danger') ? 'assertive' : 'polite')
   element.style.removeProperty('display')
   element.classList.add('global-operation-toast')
   timers.set(element, setTimeout(() => {
@@ -63,19 +65,19 @@ onBeforeUnmount(() => observer?.disconnect())
   margin: 0 !important;
   padding: 11px 18px !important;
   transform: translateX(-50%) !important;
-  border: 1px solid #b8dec9 !important;
-  border-radius: 10px !important;
-  color: #17663c !important;
-  background: #f0fbf5 !important;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .16) !important;
+  border: 1px solid color-mix(in srgb,var(--color-success) 35%,white) !important;
+  border-radius: var(--radius-md,8px) !important;
+  color: var(--color-success) !important;
+  background: #f0fdf4 !important;
+  box-shadow: var(--shadow-lg) !important;
   text-align: center !important;
   animation: global-toast-in .18s ease-out !important;
 }
 .global-operation-toast.danger,
 .global-operation-toast.feedback.danger {
-  border-color: #efc1bc !important;
-  color: #a43832 !important;
-  background: #fff3f1 !important;
+  border-color: color-mix(in srgb,var(--color-destructive) 32%,white) !important;
+  color: var(--color-destructive) !important;
+  background: #fef2f2 !important;
 }
 .global-operation-toast button { margin-left: 10px !important; }
 @keyframes global-toast-in {

@@ -196,7 +196,7 @@ function formatDate(value: string) {
     </div>
 
     <p v-if="message" class="success">{{ message }}</p>
-    <p v-if="error" class="danger">{{ error }}</p>
+    <p v-if="error" class="danger" role="alert">{{ error }}</p>
   </section>
 
   <div v-if="linkDetailsOpen" class="link-backdrop" @click.self="linkDetailsOpen=false">
@@ -205,7 +205,7 @@ function formatDate(value: string) {
       <div class="modal-heading"><div><span class="section-kicker">官网库详情</span><h2 id="company-links-title">公司官网库</h2></div><small>共 {{ links.length }} 条 · {{ formatDate(linksUpdatedAt) }}</small></div>
       <div class="link-panel">
         <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary" type="button" :disabled="loading" @click="loadLinks">刷新</button></div>
-        <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
+        <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" aria-label="公司名称" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" aria-label="公司官网链接" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
         <div v-if="filteredLinks.length" class="link-list">
           <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete" @click="removeLink(item)">删除</button></article>
         </div>
@@ -218,41 +218,41 @@ function formatDate(value: string) {
 <style scoped>
 .data-card { display: grid; gap: 18px; }
 .section-head, .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.section-kicker { display: block; margin-bottom: 5px; color: var(--color-primary); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .section-head h2 { margin: 0; }
-.secondary { color: #344054; background: #eef2f8; }
+.secondary { color: var(--color-card-foreground); background: var(--color-muted); }
 .metrics-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.metrics-row div { padding: 14px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
+.metrics-row div { padding: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
 .metrics-row strong { display: block; font-size: 24px; }
-.metrics-row span, .toolbar small, .tool-box small { color: #667085; font-size: 12px; }
+.metrics-row span, .toolbar small, .tool-box small { color: var(--color-muted-foreground); font-size: 12px; }
 .link-panel { display: grid; min-height: 0; gap: 12px; }
 .link-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; padding: 28px; place-items: center; background: rgba(17, 24, 39, .58); }
 .link-modal { position: relative; display: flex; width: min(980px, 100%); max-height: min(820px, calc(100vh - 56px)); min-height: min(620px, calc(100vh - 56px)); flex-direction: column; gap: 18px; padding: 26px; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .28); }
-.modal-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; padding: 0; color: #475467; background: #eef2f6; font-size: 22px; }
+.modal-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; padding: 0; color: var(--color-muted-foreground); background: #eef2f6; font-size: 22px; }
 .modal-heading { display: flex; padding-right: 48px; align-items: flex-end; justify-content: space-between; gap: 18px; }
 .modal-heading h2 { margin: 0; }
-.modal-heading>small { color: #667085; }
+.modal-heading>small { color: var(--color-muted-foreground); }
 .link-modal .link-panel { flex: 1; grid-template-rows: auto auto minmax(0, 1fr); }
 .link-modal .link-list { align-content: start; overflow-y: auto; padding-right: 6px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b9c5d5 transparent; }
-.toolbar label, .tool-box label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
+.toolbar label, .tool-box label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .toolbar label { min-width: min(420px, 100%); }
 .link-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .link-editor { display: grid; grid-template-columns: 1fr 2fr auto; gap: 9px; }
-.link-list article { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 13px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
+.link-list article { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 13px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
 .link-list a { display: grid; flex: 1; gap: 5px; min-width: 0; color: inherit; text-decoration: none; }
-.link-list article:hover { border-color: #4461d8; background: #f4f6ff; }
+.link-list article:hover { border-color: var(--color-primary); background: #f4f6ff; }
 .link-delete { padding: 7px 9px; color: #a52d2d; background: #fceaea; }
-.link-list span { overflow: hidden; color: #667085; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.notice { padding: 16px; border: 1px solid #dbe3f1; border-radius: 8px; background: #f7f9fc; color: #667085; }
+.link-list span { overflow: hidden; color: var(--color-muted-foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.notice { padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: #f7f9fc; color: var(--color-muted-foreground); }
 .data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.tool-box { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; border: 1px solid #e4e9f2; border-radius: 8px; background: #fbfcfe; }
+.tool-box { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
 .tool-box h3 { margin: 0; font-size: 16px; }
 .tool-box p { margin: 0; }
 .tool-box input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 .file-picker { display: grid; justify-items: start; gap: 7px; }
-.file-button { display: inline-flex; min-height: 38px; align-items: center; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 9px; color: #344054; background: #fff; cursor: pointer; }
-.file-picker:focus-within .file-button { border-color: var(--accent,#4461d8); box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent,#4461d8) 13%,transparent); }
-.file-picker small { display: block; width: 100%; overflow: hidden; color: #667085; font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.file-button { display: inline-flex; min-height: 38px; align-items: center; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 9px; color: var(--color-card-foreground); background: #fff; cursor: pointer; }
+.file-picker:focus-within .file-button { border-color: var(--accent,var(--color-primary)); box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent,var(--color-primary)) 13%,transparent); }
+.file-picker small { display: block; width: 100%; overflow: hidden; color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .tool-box > button:last-of-type { width: 100%; margin-top: auto; }
 .danger-zone { border-color: #f0c7c7; background: #fff8f8; }
 .danger-button { color: #fff; background: #b43232; }

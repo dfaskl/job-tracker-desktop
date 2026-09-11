@@ -176,7 +176,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
+    <Teleport to="#home-quote-slot"><section class="quote-strip"><i>✦</i><span><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span><button :disabled="quoteLoading" title="换一句" aria-label="换一句" @click="generateQuote(true)">↻</button></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
       <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice"><div class="advice-head"><div class="advice-title"><i>✦</i><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div><button class="advice-refresh" :disabled="adviceLoading" @click="generateScheduleAdvice(adviceSignature,0,true)">{{adviceLoading?'生成中…':'重新生成'}}</button></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
@@ -198,7 +198,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   </div>
 
   <section v-else-if="store.initialized.value" class="card sign-in-card"><h2>登录后查看你的求职进展</h2><p>使用现有账号即可进入，新旧系统账号及业务数据保持兼容。</p><button @click="emit('navigate','applications')">前往登录</button></section>
-  <p v-if="message" class="feedback success">{{message}}</p><p v-if="error||store.error.value" class="feedback danger">{{error||store.error.value}}</p>
+  <p v-if="message" class="feedback success">{{message}}</p><p v-if="error||store.error.value" class="feedback danger" role="alert">{{error||store.error.value}}</p>
 </template>
 
 <style scoped>
@@ -225,7 +225,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   gap: 11px;
   margin: 0;
   padding: 9px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent, #4461d8) 24%, #d7e0e9);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 24%, #d7e0e9);
   border-radius: 7px;
   color: var(--home-ink);
   background: rgba(252, 253, 251, .94);
@@ -238,11 +238,11 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  background: var(--accent, #4461d8);
+  background: var(--accent, var(--color-primary));
   font-style: normal;
 }
 .quote-strip > span { display: grid; min-width: 0; flex: 1; }
-.quote-strip small { color: var(--accent, #4461d8); font-size: 10px; font-weight: 700; }
+.quote-strip small { color: var(--accent, var(--color-primary)); font-size: 10px; font-weight: 700; }
 .quote-strip strong {
   overflow: hidden;
   font-size: 12px;
@@ -253,7 +253,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .quote-strip em { color: var(--home-muted); font-style: normal; }
 .quote-strip button {
   padding: 5px 8px;
-  color: var(--accent, #4461d8);
+  color: var(--accent, var(--color-primary));
   background: transparent;
 }
 .quote-strip button:focus-visible,
@@ -261,7 +261,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .advice-refresh:focus-visible,
 .schedule-actions button:focus-visible,
 .confirmation-list button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent, #4461d8) 24%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--accent, var(--color-primary)) 24%, transparent);
   outline-offset: 2px;
 }
 
@@ -279,7 +279,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   position: absolute;
   inset: 0 auto 0 0;
   width: 5px;
-  background: linear-gradient(180deg, var(--accent, #4461d8), var(--home-progress) 58%, var(--home-deadline));
+  background: linear-gradient(180deg, var(--accent, var(--color-primary)), var(--home-progress) 58%, var(--home-deadline));
 }
 
 .panel-head,
@@ -298,12 +298,12 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   font-weight: 760;
   letter-spacing: -.035em;
 }
-.panel-head h2 span { color: var(--accent, #4461d8); font-size: 14px; letter-spacing: 0; }
+.panel-head h2 span { color: var(--accent, var(--color-primary)); font-size: 14px; letter-spacing: 0; }
 .panel-head p { max-width: 64ch; margin: 6px 0 0; color: var(--home-muted); }
 .text-link {
   padding: 9px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent, #4461d8) 28%, #d8e0e8);
-  color: var(--accent, #4461d8);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 28%, #d8e0e8);
+  color: var(--accent, var(--color-primary));
   background: transparent;
 }
 
@@ -312,10 +312,10 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   gap: 14px;
   margin-top: 18px;
   padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--accent, #4461d8) 28%, #cfdae4);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 28%, #cfdae4);
   border-radius: 14px;
   background:
-    linear-gradient(115deg, color-mix(in srgb, var(--accent, #4461d8) 8%, #fff), rgba(255,255,255,.92) 42%),
+    linear-gradient(115deg, color-mix(in srgb, var(--accent, var(--color-primary)) 8%, #fff), rgba(255,255,255,.92) 42%),
     repeating-linear-gradient(90deg, transparent 0 79px, rgba(31,67,91,.035) 79px 80px);
   animation: track-reveal .34s cubic-bezier(.2,.7,.2,1) both;
 }
@@ -329,7 +329,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   place-items: center;
   border-radius: 9px 9px 9px 2px;
   color: #fff;
-  background: var(--accent, #4461d8);
+  background: var(--accent, var(--color-primary));
   font-style: normal;
 }
 .advice-title > div { display: grid; min-width: 0; gap: 3px; }
@@ -338,8 +338,8 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .advice-refresh {
   flex: 0 0 auto;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent, #4461d8) 34%, #d7e0e8);
-  color: var(--accent, #4461d8);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 34%, #d7e0e8);
+  color: var(--accent, var(--color-primary));
   background: var(--home-paper);
 }
 .advice-notice { margin: 0; color: #8a5608; font-size: 12px; }
@@ -452,9 +452,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   min-width: 82px;
   gap: 2px;
   padding: 10px 12px;
-  border-left: 4px solid var(--accent, #4461d8);
+  border-left: 4px solid var(--accent, var(--color-primary));
   border-radius: 2px 9px 9px 2px;
-  background: color-mix(in srgb, var(--accent, #4461d8) 7%, #fff);
+  background: color-mix(in srgb, var(--accent, var(--color-primary)) 7%, #fff);
 }
 .date-block em {
   width: max-content;
@@ -466,7 +466,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   font-size: 10px;
   font-style: normal;
 }
-.date-block strong { color: var(--accent, #4461d8); font-size: 16px; white-space: nowrap; }
+.date-block strong { color: var(--accent, var(--color-primary)); font-size: 16px; white-space: nowrap; }
 .date-block small { color: var(--home-muted); }
 .date-range { display: flex; width: max-content; align-items: center; gap: 7px; }
 .date-range > .date-block { min-width: 76px; border-left-color: var(--home-deadline); background: #fff8ee; }
@@ -491,7 +491,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   white-space: nowrap;
 }
 .schedule-copy p { margin: 0; color: var(--home-muted); }
-.schedule-copy a { color: var(--accent, #4461d8); font-weight: 650; text-underline-offset: 3px; }
+.schedule-copy a { color: var(--accent, var(--color-primary)); font-weight: 650; text-underline-offset: 3px; }
 .schedule-copy p b {
   display: inline-block;
   margin-left: 5px;
@@ -516,12 +516,12 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   padding: 4px 9px;
   border-radius: 3px 7px 3px 7px;
   color: #fff;
-  background: var(--accent, #4461d8);
+  background: var(--accent, var(--color-primary));
   font-size: 10px;
   font-style: normal;
 }
 .schedule-actions button { min-width: 60px; }
-.secondary { color: #344054; background: #edf1f5; }
+.secondary { color: var(--color-card-foreground); background: #edf1f5; }
 
 .confirmation-panel {
   padding-top: 22px;

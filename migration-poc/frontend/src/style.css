@@ -1,46 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #172033;
-  background: #f4f7fb;
+  font-family: "Fira Sans", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  color: #0c4a6e;
+  background: #f0f9ff;
   font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --color-primary: #0369a1;
+  --color-on-primary: #fff;
+  --color-secondary: #0ea5e9;
+  --color-accent: #16a34a;
+  --color-background: #f0f9ff;
+  --color-foreground: #0c4a6e;
+  --color-card: #fff;
+  --color-card-foreground: #0c4a6e;
+  --color-muted: #e7eff5;
+  --color-muted-foreground: #475569;
+  --color-border: #bae6fd;
+  --color-border-strong: #7dd3fc;
+  --color-destructive: #dc2626;
+  --color-ring: #0369a1;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(12, 74, 110, .06);
+  --shadow-lg: 0 18px 48px rgba(12, 74, 110, .18);
+  --control-height: 44px;
+  --accent: #0369a1;
+  --sidebar: #073b5c;
+  --sidebar-active: #075985;
 }
+:root[data-theme="purple"] { --accent:#7953ad; --color-primary:#7953ad; --color-ring:#7953ad; --sidebar:#2c203c; --sidebar-active:#49345f; }
+:root[data-theme="orange"] { --accent:#b86b34; --color-primary:#b86b34; --color-ring:#b86b34; --sidebar:#3a271c; --sidebar-active:#5a3925; }
+:root[data-theme="green"] { --accent:#32845c; --color-primary:#32845c; --color-ring:#32845c; --sidebar:#102c20; --sidebar-active:#204735; }
+:root[data-theme="teal"] { --accent:#25858f; --color-primary:#25858f; --color-ring:#25858f; --sidebar:#102d33; --sidebar-active:#1d4b53; }
+:root[data-theme="rose"] { --accent:#ad5272; --color-primary:#ad5272; --color-ring:#ad5272; --sidebar:#3a202d; --sidebar-active:#5a3043; }
+:root[data-theme="slate"] { --accent:#5f6c80; --color-primary:#5f6c80; --color-ring:#5f6c80; --sidebar:#202630; --sidebar-active:#35404e; }
+:root[data-theme="sky"] { --accent:#347fae; --color-primary:#347fae; --color-ring:#347fae; --sidebar:#142b3a; --sidebar-active:#21475e; }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input { font: inherit; }
-main { width: min(880px, calc(100% - 32px)); margin: 0 auto; padding: 72px 0; }
-.hero { margin-bottom: 32px; }
-.eyebrow { color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .14em; }
-h1 { margin: 12px 0 10px; font-size: clamp(34px, 7vw, 58px); line-height: 1.04; }
-h2 { margin-top: 0; font-size: 20px; }
-p { color: #667085; line-height: 1.7; }
-.card { margin-top: 18px; padding: 26px; border: 1px solid #e4e9f2; border-radius: 18px; background: #fff; box-shadow: 0 14px 45px rgba(31, 42, 68, .07); }
-dl { margin: 20px 0 0; }
-dl div { display: flex; justify-content: space-between; gap: 20px; padding: 13px 0; border-top: 1px solid #edf0f5; }
-dt { color: #667085; }
-dd { margin: 0; font-weight: 700; text-align: right; }
-.form-row { display: flex; gap: 12px; margin-top: 18px; }
-input { min-width: 0; flex: 1; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; }
-button { padding: 12px 18px; border: 0; border-radius: 10px; color: #fff; background: #4461d8; font-weight: 700; cursor: pointer; }
+.skip-link { position:fixed; top:8px; left:8px; z-index:1000; padding:10px 14px; border-radius:var(--radius-md); color:#fff; background:var(--color-primary); transform:translateY(-140%); transition:transform .18s ease; }
+.skip-link:focus { transform:translateY(0); }
+[tabindex="-1"]:focus { outline:none; }
+html { min-width: 320px; scroll-padding-top: 120px; }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); }
+button, input, textarea, select { font: inherit; }
+button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
-.success { color: #17804b; }
-.danger { color: #bd3434; }
+a { color: var(--color-primary); text-underline-offset: 3px; }
+p { color: var(--color-muted-foreground); line-height: 1.6; }
+h1, h2, h3 { color: var(--color-foreground); }
+h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-spacing: -.035em; }
 
-@media (max-width: 600px) {
-  main { padding: 42px 0; }
-  .card { padding: 20px; }
-  .form-row { flex-direction: column; }
+#app :is(button, input, textarea, select, a[href], [tabindex]):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
+  outline-offset: 2px;
 }
+#app :is(input, textarea, select) {
+  min-width: 0;
+  min-height: var(--control-height);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-card-foreground);
+  background: var(--color-card);
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+#app :is(input, textarea, select):hover { border-color: var(--color-border-strong); }
+#app :is(input, textarea, select):focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 13%, transparent); }
+#app textarea { min-height: 92px; resize: vertical; }
+#app button {
+  min-height: var(--control-height);
+  border-radius: var(--radius-md);
+  transition: color .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease;
+}
+#app button:not(:disabled):hover { filter: saturate(1.05); }
+#app .card {
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-card-foreground);
+  background: var(--color-card);
+  box-shadow: var(--shadow-sm);
+}
+#app :is(.secondary, .text-button, .text-link) { color: var(--color-primary); background: var(--color-muted); }
+#app :is(.danger, .error) { color: var(--color-destructive); }
+#app .danger-button { color: #fff; background: var(--color-destructive); }
+#app .success { color: var(--color-success); }
+#app .eyebrow, #app .section-kicker { color: var(--color-primary); }
+#app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: rgba(7, 37, 58, .58); backdrop-filter: blur(4px); }
+#app :is(.modal, .detail-modal, .link-modal) { border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); }
+#app :is(.feedback, .global-operation-toast) { font-size: 14px; }
 
-:root { --accent:#4461d8; --sidebar:#17213a; --sidebar-active:#273552; }
-:root[data-theme="purple"] { --accent:#7953ad; --sidebar:#2c203c; --sidebar-active:#49345f; }
-:root[data-theme="orange"] { --accent:#b86b34; --sidebar:#3a271c; --sidebar-active:#5a3925; }
-:root[data-theme="green"] { --accent:#32845c; --sidebar:#102c20; --sidebar-active:#204735; }
-:root[data-theme="teal"] { --accent:#25858f; --sidebar:#102d33; --sidebar-active:#1d4b53; }
-:root[data-theme="rose"] { --accent:#ad5272; --sidebar:#3a202d; --sidebar-active:#5a3043; }
-:root[data-theme="slate"] { --accent:#5f6c80; --sidebar:#202630; --sidebar-active:#35404e; }
-:root[data-theme="sky"] { --accent:#347fae; --sidebar:#142b3a; --sidebar-active:#21475e; }
-:root[data-theme] .topbar>button,:root[data-theme] .primary-action,:root[data-theme] .api-form>button,:root[data-theme] .link-editor>button,:root[data-theme] .tool-box>button:not(.danger-button) { background-color:var(--accent); }
-:root[data-theme] .sidebar { background:var(--sidebar)!important; }
-:root[data-theme] .sidebar nav button:hover,:root[data-theme] .sidebar nav button.active { background:var(--sidebar-active)!important; }
-:root[data-theme] .eyebrow { color:var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media (max-width: 600px) {
+  :root { --space-lg: 18px; --space-xl: 24px; }
+  #app :is(button, input, textarea, select) { font-size: 16px; }
+}

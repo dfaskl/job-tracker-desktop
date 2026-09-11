@@ -336,11 +336,11 @@ async function remove(item: EventItem) {
         <div class="calendar-pane">
           <div class="calendar-head">
             <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
-            <div><button class="secondary compact" :disabled="!canGoPrevious" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" @click="changeMonth(1)">›</button></div>
+            <div><button class="secondary compact" :disabled="!canGoPrevious" aria-label="上一个月" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" aria-label="下一个月" @click="changeMonth(1)">›</button></div>
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
           <div class="calendar-grid">
-            <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" @click="selectDate(cell.key)">
+            <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key === selectedDate" @click="selectDate(cell.key)">
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
                 <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
@@ -375,9 +375,9 @@ async function remove(item: EventItem) {
         </aside>
       </div>
       <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
-        <form class="event-form edit-modal" @submit.prevent="save">
-          <button type="button" class="modal-close" @click="resetForm">×</button>
-          <h3 class="wide">编辑日程</h3>
+        <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
+          <button type="button" class="modal-close" aria-label="关闭" @click="resetForm">×</button>
+          <h3 id="event-editor-title" class="wide">编辑日程</h3>
           <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>
           <label><span>类型</span><BaseSelect v-model="form.type" :options="eventTypes" /></label>
           <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>
@@ -392,33 +392,33 @@ async function remove(item: EventItem) {
     </template>
 
     <p v-else>正在检查日程沙箱…</p>
-    <p v-if="error" class="danger">{{ error }}</p>
+    <p v-if="error" class="danger" role="alert">{{ error }}</p>
   </section>
 </template>
 
 <style scoped>
-.edit-backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.edit-modal{position:relative;width:min(720px,100%);max-height:90vh;overflow:auto;margin:0;padding:24px;border-radius:16px;background:#fff}.edit-modal h3{margin:0}.modal-close{position:absolute;top:10px;right:10px;padding:4px 10px;color:#475467;background:#eef2f8;font-size:20px}.section-head, .calendar-head, .selected-list article, .form-actions, .event-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.edit-backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.edit-modal{position:relative;width:min(720px,100%);max-height:90vh;overflow:auto;margin:0;padding:24px;border-radius:16px;background:#fff}.edit-modal h3{margin:0}.modal-close{position:absolute;top:10px;right:10px;padding:4px 10px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:20px}.section-head, .calendar-head, .selected-list article, .form-actions, .event-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-kicker { display: block; margin-bottom: 5px; color: var(--color-primary); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .section-head h2 { margin-bottom: 0; }
 .mode-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .mode-badge.enabled { color: #167647; background: #e9f8ef; }
 .mode-badge.disabled { color: #7a4d0b; background: #fff3d6; }
-.notice, .empty { display: grid; gap: 7px; padding: 18px; border: 1px solid #dbe3f1; border-radius: 12px; background: #f7f9fc; }
-.notice span { color: #667085; }
+.notice, .empty { display: grid; gap: 7px; padding: 18px; border: 1px solid var(--color-border); border-radius: 12px; background: #f7f9fc; }
+.notice span { color: var(--color-muted-foreground); }
 .event-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 22px 0; }
-.event-form label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
+.event-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .event-form .wide { grid-column: 1 / -1; }
 select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; }
 .form-actions { justify-content: flex-start; }
 .calendar-head { margin: 24px 0 12px; padding-top: 18px; border-top: 1px solid #edf0f5; }
 .calendar-head > div { display: flex; align-items: center; gap: 10px; }
-.calendar-head span { color: #667085; font-size: 13px; }
+.calendar-head span { color: var(--color-muted-foreground); font-size: 13px; }
 .weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-.weekdays b { padding: 8px; color: #667085; font-size: 12px; text-align: center; }
-.day { min-height: 92px; padding: 7px; border: 1px solid #e5e9f1; border-radius: 0; color: #344054; background: #fff; text-align: left; }
+.weekdays b { padding: 8px; color: var(--color-muted-foreground); font-size: 12px; text-align: center; }
+.day { min-height: 92px; padding: 7px; border: 1px solid #e5e9f1; border-radius: 0; color: var(--color-card-foreground); background: #fff; text-align: left; }
 .day.outside { color: #b3bac7; background: #f8fafc; }
-.day.selected { position: relative; z-index: 1; outline: 2px solid #4461d8; }
-.day.today > .day-number { display: inline-grid; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: #4461d8; place-items: center; }
+.day.selected { position: relative; z-index: 1; outline: 2px solid var(--color-primary); }
+.day.today > .day-number { display: inline-grid; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: var(--color-primary); place-items: center; }
 .day > small { --event-color:#4357ad; --event-bg:#edf1ff; display:block; overflow:hidden; margin-top:4px; padding:3px 5px; border-radius:5px; color:var(--event-color); background:var(--event-bg); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .day > small.type-测评 { --event-color:#71602f; --event-bg:#f7edc7; }
 .day > small.type-笔试 { --event-color:#8a5a16; --event-bg:#f8e7ca; }
@@ -428,23 +428,23 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .day > small.completed { --event-color:#7b8491; --event-bg:#e5e7eb; color:#707782; background:#e5e7eb; opacity:.78; text-decoration:line-through; }.day > small.middle.completed { background:#9aa1aa; text-decoration:none; }.day > small.missed { --event-color:#a15a5a; --event-bg:#f3dfdf; }.day > small.middle { height:3px; margin:7px -7px 0; padding:0; border-radius:0; color:transparent; background:var(--event-color); opacity:.55; }
 .day > small.start { border-radius:5px 2px 2px 5px; }
 .day > small.end { border-radius:2px 5px 5px 2px; }
-.day > i { color: #667085; font-size: 10px; }
+.day > i { color: var(--color-muted-foreground); font-size: 10px; }
 .selected-list { margin-top: 20px; }
 .selected-list h3 { font-size: 16px; }
 .selected-list article { align-items: flex-start; padding: 14px 0; border-top: 1px solid #edf0f5; }
 .event-main { display: grid; gap: 4px; }
-.event-main span { color: #667085; font-size: 13px; }
+.event-main span { color: var(--color-muted-foreground); font-size: 13px; }
 .event-actions { justify-content: flex-end; flex-wrap: wrap; }
 .event-actions b { color: #7a4d0b; font-size: 12px; }
 .event-actions b.done { color: #167647; }
 .event-actions b.missed { color: #ad2f2f; }
-.secondary { color: #344054; background: #eef2f8; }.secondary:disabled { cursor:not-allowed; opacity:.35; }
+.secondary { color: var(--color-card-foreground); background: var(--color-muted); }.secondary:disabled { cursor:not-allowed; opacity:.35; }
 .success-button { color: #167647; background: #e9f8ef; }
 .warning-button { color: #8a5608; background: #fff1cf; }
 .danger-button { color: #a52d2d; background: #fceaea; }
 .compact { padding: 8px 11px; }
 
-.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid #dbe3f1;border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{position:absolute;top:6px;left:6px;z-index:2;display:inline-grid;width:24px;height:24px;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;margin-top:24px;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}.selected-list article.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important}.selected-list article.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{display:inline-flex;padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-size:12px;font-weight:700;text-decoration:none}.event-location a:hover{border-color:#7998ce;background:#e9f1ff}
+.calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid var(--color-border);border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{position:absolute;top:6px;left:6px;z-index:2;display:inline-grid;width:24px;height:24px;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;margin-top:24px;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}.selected-list article.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important}.selected-list article.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{display:inline-flex;padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-size:12px;font-weight:700;text-decoration:none}.event-location a:hover{border-color:#7998ce;background:#e9f1ff}
 @media(min-width:821px) and (min-height:620px){.event-sandbox{display:block;height:calc(100vh - 124px);min-height:0;margin-top:12px!important;overflow:hidden}.event-sandbox>.calendar-layout{height:calc(100vh - 178px)!important;min-height:0;max-height:none;margin-top:0}}
 @media (max-width: 720px) {
   .event-form { grid-template-columns: 1fr; }

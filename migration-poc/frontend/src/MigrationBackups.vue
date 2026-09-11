@@ -127,32 +127,32 @@ function formatSize(value: number) {
     </template>
 
     <p v-else>正在读取云端备份…</p>
-    <p v-if="error" class="danger">{{ error }}</p>
+    <p v-if="error" class="danger" role="alert">{{ error }}</p>
   </section>
 </template>
 
 <style scoped>
 .backup-card { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; }
 .section-head, .toolbar, .backup-list button, .restore-panel > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-kicker { display: block; margin-bottom: 5px; color: #4461d8; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.section-kicker { display: block; margin-bottom: 5px; color: var(--color-primary); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .section-head h2 { margin-bottom: 0; }
 .mode-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .mode-badge.enabled { color: #167647; background: #e9f8ef; }
 .mode-badge.disabled { color: #7a4d0b; background: #fff3d6; }
-.notice { display: grid; gap: 7px; padding: 18px; border: 1px solid #dbe3f1; border-radius: 12px; background: #f7f9fc; }
-.notice span { color: #667085; }
+.notice { display: grid; gap: 7px; padding: 18px; border: 1px solid var(--color-border); border-radius: 12px; background: #f7f9fc; }
+.notice span { color: var(--color-muted-foreground); }
 .toolbar { margin: 20px 0 12px; }
 .backup-list { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; gap: 9px; overflow-y: auto; padding-right: 6px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b9c5d5 transparent; }
-.backup-list button { width: 100%; color: #344054; border: 1px solid #e4e9f2; background: #fbfcfe; text-align: left; }
-.backup-list button.selected { border-color: #4461d8; background: #f1f4ff; }
+.backup-list button { width: 100%; color: var(--color-card-foreground); border: 1px solid var(--color-border); background: #fbfcfe; text-align: left; }
+.backup-list button.selected { border-color: var(--color-primary); background: #f1f4ff; }
 .backup-list button > div { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .backup-list button > div:first-child { flex-direction: column; align-items: flex-start; }
-.backup-list span { color: #667085; font-size: 12px; }
+.backup-list span { color: var(--color-muted-foreground); font-size: 12px; }
 .restore-panel { display: grid; gap: 12px; margin-top: 18px; padding: 18px; border: 1px solid #f0c7c7; border-radius: 12px; background: #fff8f8; }
 .restore-panel p { margin: 0; }
-.restore-panel label { display: grid; gap: 7px; color: #475467; font-size: 13px; font-weight: 700; }
+.restore-panel label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .restore-panel > div { justify-content: flex-start; }
-.secondary { color: #344054; background: #eef2f8; }
+.secondary { color: var(--color-card-foreground); background: var(--color-muted); }
 .danger-button { color: #fff; background: #b43232; }
 code { padding: 2px 5px; border-radius: 5px; background: #e9edf5; }
 
