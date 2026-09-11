@@ -33,6 +33,7 @@ const pageComponents: Record<Page, Component> = {
 }
 
 const activePage = ref<Page>('home')
+const mobileMenuOpen = ref(false)
 const pageHeading = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
 const current = computed(() => pages.find((item) => item.id === activePage.value) || pages[0])
@@ -54,29 +55,41 @@ async function createApplication() {
   store.requestNewApplication()
 }
 function navigate(page: Page) {
+  mobileMenuOpen.value = false
   if (activePage.value === page) return
   window.location.hash = page
   activePage.value = page
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') mobileMenuOpen.value = false
+}
+
 onMounted(() => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
+  window.addEventListener('keydown', handleGlobalKeydown)
   void store.initialize()
 })
 watch(activePage, async () => { await nextTick(); pageHeading.value?.focus({ preventScroll: true }) })
-onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
+onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', syncHash)
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <template>
   <div class="product-shell">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
-    <aside class="sidebar">
+    <aside class="sidebar" :class="{ 'menu-open': mobileMenuOpen }">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
         <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职进度本</strong><small>Vue + Java</small></div>
       </button>
-      <nav aria-label="主要导航">
+      <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起页面导航' : '展开页面导航'" aria-controls="primary-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
+        <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+      </button>
+      <nav id="primary-navigation" aria-label="主要导航">
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id }" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
         </button>
@@ -117,6 +130,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
   border-right: 1px solid rgba(255,255,255,.1);
   box-shadow: 8px 0 28px rgba(4,31,49,.08);
 }
+
 .brand {
   display: flex;
   width: 100%;
@@ -132,6 +146,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncHash))
 .brand div { display: grid; gap: 2px; }
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
 .brand small { color: #bae6fd; font-size: 11px; }
+.menu-toggle { display: none; }
 nav { position: relative; display: grid; gap: 5px; margin-top: 28px; }
 nav::before { content:""; position:absolute; top:18px; bottom:18px; left:22px; width:1px; background:rgba(125,211,252,.18); }
 nav button {
@@ -231,14 +246,33 @@ nav button.active::before {
   .brand div { min-width: 0; }
   .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brand small { display: none; }
-  .sidebar-account { position: static; width: auto; min-width: 0; margin: 0; justify-self: end; }
+  .menu-toggle {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    align-self: center;
+    place-content: center;
+    gap: 5px;
+    padding: 0;
+    border: 1px solid rgba(186,230,253,.3);
+    color: #e0f2fe;
+    background: rgba(255,255,255,.06);
+  }
+  .menu-toggle span { display: block; width: 19px; height: 2px; border-radius: 99px; background: currentColor; transition: transform .18s ease, opacity .18s ease; }
+  .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
+  .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .sidebar-account { position: static; display: none; grid-column: 1 / -1; width: 100%; min-width: 0; margin: 6px 0 0; }
+  .menu-open .sidebar-account { display: flex; }
   .sidebar-account :deep(.signed.compact) { display: flex; width: auto; min-width: 0; padding: 5px 7px; flex-direction: row; }
   .sidebar-account :deep(.signed.compact > div) { width: auto; }
   .sidebar-account :deep(.signed.compact span) { display: none; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
-  nav { grid-column: 1 / -1; display: flex; width: 100%; min-width: 0; margin: 6px 0 0; overflow-x: auto; scrollbar-width: none; }
+  nav { grid-column: 1 / -1; display: none; width: 100%; min-width: 0; margin: 8px 0 0; overflow: hidden; }
+  .menu-open nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   nav::-webkit-scrollbar { display: none; }
-  nav button { width: auto; min-width: max-content; flex: 0 0 auto; padding: 8px 12px; }
+  nav button { width: 100%; min-width: 0; min-height: 40px; justify-content: center; padding: 8px 6px; text-align: center; }
   nav button span, nav button.active::before { display: none; }
   .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 0 16px 44px; overflow-x: clip; }
   .product-main.application-page,
@@ -254,15 +288,12 @@ nav button.active::before {
   .home-quote-slot, .application-toolbar-slot { order: 3; width: 100%; flex-basis: 100%; margin: 4px 0; }
 }
 @media (max-width: 620px) {
-  nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; overflow: visible; }
+  .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   nav::before { display: none; }
   nav button { width: 100%; min-width: 0; min-height: 38px; justify-content: center; padding: 7px 4px; font-size: 13px; text-align: center; }
   .topbar > button { display: none; }
 }
 @media (max-width: 520px) {
   .product-main { padding-inline: 12px; }
-}
-@media (max-width: 440px) {
-  .sidebar-account :deep(.signed.compact strong) { display: none; }
 }
 </style>
