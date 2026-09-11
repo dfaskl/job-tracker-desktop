@@ -88,6 +88,7 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
   border-radius: var(--radius-lg);
   color: var(--color-card-foreground);
   background: var(--color-card);
+  padding: var(--card-padding, clamp(16px, 1.25vw, 24px));
   box-shadow: var(--shadow-sm);
 }
 #app :is(.secondary, .text-button, .text-link) { color: var(--color-primary); background: var(--color-muted); }
