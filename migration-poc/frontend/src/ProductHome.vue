@@ -32,6 +32,20 @@ const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map
   id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
   startsAt:eventStart(event), endsAt:String(event.endsAt || event.end || eventStart(event)), updatedAt:String(event.updatedAt || '')
 }))))
+function timelineEventLabel(text: string, eventId?: string) {
+  const event = adviceCandidates.value.find(item => String(item.id) === String(eventId || ''))
+  if (!event) return text
+
+  const start = eventStart(event)
+  const end = String(event.endsAt || event.end || '').trim()
+  const startTime = new Date(start.replace(' ', 'T')).getTime()
+  const endTime = new Date(end.replace(' ', 'T')).getTime()
+  if (!end || !Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) return text
+
+  const match = end.match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
+  if (!match) return text
+  return `${text}（${Number(match[1])}月${Number(match[2])}日 ${match[3]}:${match[4]}前）`
+}
 const adviceTimeline = computed(() => {
   type Label = {text:string;status:'normal'|'tight'|'conflict'}
   type Group = {id:string;date:string;start:string;timeLabel:string;status:'normal'|'tight'|'conflict';labels:Label[]}
@@ -46,9 +60,9 @@ const adviceTimeline = computed(() => {
       const dayEnd=windowEnd.slice(0,10)===entry.date?windowEnd.slice(11,16):'23:59'
       const rangeLabel=sameWindowDay?windowStart.slice(11,16)+'–'+windowEnd.slice(11,16):dayStart+'–'+dayEnd
       const timeLabel=entry.showWindow?rangeLabel:entry.start
-      const group=groups.get(key)
-      if(group){group.labels.push({text:entry.label,status});if(rank[status]>rank[group.status])group.status=status;if(entry.showWindow)group.timeLabel=timeLabel}
-      else groups.set(key,{id:key,date:entry.date,start:entry.start,timeLabel,status,labels:[{text:entry.label,status}]})
+      const group=groups.get(key),entryLabel=timelineEventLabel(entry.label,entry.id)
+      if(group){group.labels.push({text:entryLabel,status});if(rank[status]>rank[group.status])group.status=status;if(entry.showWindow)group.timeLabel=timeLabel}
+      else groups.set(key,{id:key,date:entry.date,start:entry.start,timeLabel,status,labels:[{text:entryLabel,status}]})
     }
     return [...groups.values()].sort((a,b)=>(a.date+' '+a.start).localeCompare(b.date+' '+b.start))
   }
