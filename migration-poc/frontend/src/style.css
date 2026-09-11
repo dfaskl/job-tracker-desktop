@@ -38,13 +38,6 @@
   --sidebar: #073b5c;
   --sidebar-active: #075985;
 }
-:root[data-theme="purple"] { --accent:#7953ad; --color-primary:#7953ad; --color-ring:#7953ad; --sidebar:#2c203c; --sidebar-active:#49345f; }
-:root[data-theme="orange"] { --accent:#b86b34; --color-primary:#b86b34; --color-ring:#b86b34; --sidebar:#3a271c; --sidebar-active:#5a3925; }
-:root[data-theme="green"] { --accent:#32845c; --color-primary:#32845c; --color-ring:#32845c; --sidebar:#102c20; --sidebar-active:#204735; }
-:root[data-theme="teal"] { --accent:#25858f; --color-primary:#25858f; --color-ring:#25858f; --sidebar:#102d33; --sidebar-active:#1d4b53; }
-:root[data-theme="rose"] { --accent:#ad5272; --color-primary:#ad5272; --color-ring:#ad5272; --sidebar:#3a202d; --sidebar-active:#5a3043; }
-:root[data-theme="slate"] { --accent:#5f6c80; --color-primary:#5f6c80; --color-ring:#5f6c80; --sidebar:#202630; --sidebar-active:#35404e; }
-:root[data-theme="sky"] { --accent:#347fae; --color-primary:#347fae; --color-ring:#347fae; --sidebar:#142b3a; --sidebar-active:#21475e; }
 
 * { box-sizing: border-box; }
 .skip-link { position:fixed; top:8px; left:8px; z-index:1000; padding:10px 14px; border-radius:var(--radius-md); color:#fff; background:var(--color-primary); transform:translateY(-140%); transition:transform .18s ease; }
@@ -193,8 +186,7 @@ body {
 #app .review-panel { border-top-color:var(--color-progress); }
 #app .source-panel>textarea { background:linear-gradient(to bottom,transparent 31px,rgba(3,105,161,.055) 32px); background-size:100% 32px; line-height:32px; }
 #app .step { border-radius:50%; font-family:"Fira Code",monospace; }
-#app .settings-grid :is(.theme-card,.data-card,.backup-card,.about-card,.api-card) { box-shadow:0 8px 24px rgba(7,59,92,.055); }
-#app .settings-grid .theme-card { border-top-color:var(--color-stage); }
+#app .settings-grid :is(.data-card,.backup-card,.about-card,.api-card) { box-shadow:0 8px 24px rgba(7,59,92,.055); }
 #app .settings-grid .data-card { border-top-color:var(--color-primary); }
 #app .settings-grid .backup-card { border-top-color:var(--color-progress); }
 #app .settings-grid .api-card { border-top-color:var(--color-deadline); }
