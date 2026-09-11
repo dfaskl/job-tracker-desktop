@@ -26,7 +26,7 @@ let refreshPromise: Promise<void> | null = null
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
 
-function refresh() {
+function refresh(throwOnError = false) {
   if (refreshPromise) return refreshPromise
   loading.value = true
   error.value = ''
@@ -40,9 +40,11 @@ function refresh() {
       if (cause instanceof ApiError && cause.status === 401) {
         user.value = null
         data.value = { applications: [], events: [] }
+        if (throwOnError) throw cause
         return
       }
       error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
+      if (throwOnError) throw cause
     } finally {
       loading.value = false
       initialized.value = true
@@ -60,23 +62,19 @@ async function initialize() {
 async function login(email: string, password: string) {
   clearApiCache()
   error.value = ''
-  const result = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/login', {
+  await api<{ user: User; readOnly: boolean }>('/api/poc/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password })
   })
-  user.value = result.user
-  readOnly.value = result.readOnly
-  await refresh()
+  await refresh(true)
 }
 
 async function register(email: string, password: string, registrationCode: string) {
   clearApiCache()
   error.value = ''
-  const result = await api<{ user: User; readOnly: boolean }>('/api/poc/auth/register', {
+  await api<{ user: User; readOnly: boolean }>('/api/poc/auth/register', {
     method: 'POST', body: JSON.stringify({ email, password, registrationCode })
   })
-  user.value = result.user
-  readOnly.value = result.readOnly
-  await refresh()
+  await refresh(true)
 }
 function requestNewApplication() { newApplicationRequest.value += 1 }
 
