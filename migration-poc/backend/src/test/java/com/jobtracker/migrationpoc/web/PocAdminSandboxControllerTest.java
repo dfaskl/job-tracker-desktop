@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.AdminSandboxService;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.DisabledResult;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.RegistrationCodeResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.SessionResult;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,26 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PocAdminSandboxControllerTest {
+    @Test
+    void updatesRegistrationCodeOnlyForAnAuthenticatedSameOriginRequest() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        AdminSandboxService service = mock(AdminSandboxService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.setRegistrationCode("admin@example.com", "join-2026", false))
+            .thenReturn(new RegistrationCodeResult(true, true));
+        PocAdminSandboxController controller = new PocAdminSandboxController(auth, service);
+
+        var response = controller.registrationCode(
+            "token", new PocAdminSandboxController.RegistrationCodeRequest("join-2026", false),
+            sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new RegistrationCodeResult(true, true));
+        verify(service).setRegistrationCode("admin@example.com", "join-2026", false);
+    }
+
     @Test
     void disablesAUserOnlyForAnAuthenticatedSameOriginRequest() throws Exception {
         PocAuthController auth = mock(PocAuthController.class);

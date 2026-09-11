@@ -1,6 +1,7 @@
 package com.jobtracker.migrationpoc.database;
 
 import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator;
+import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
@@ -62,6 +63,6 @@ class AdminSandboxServiceTest {
         ApplicationSandboxService sandbox = new ApplicationSandboxService(
             environment, mapper, new ApplicationDocumentMutator(mapper)
         );
-        return new AdminSandboxService(environment, mapper, sandbox);
+        return new AdminSandboxService(environment, mapper, sandbox, new LegacyPasswordVerifier());
     }
 }

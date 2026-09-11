@@ -39,9 +39,8 @@ public class AccountSandboxService {
         String clean=normalize(email);
         if(!clean.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))throw new AccountValidationException("请输入有效邮箱");
         if(password==null||password.length()<10||password.length()>128)throw new AccountValidationException("密码长度需为 10–128 位");
-        String requiredCode=environment.getProperty("REGISTRATION_CODE","");
-        if(!requiredCode.isBlank()&&!requiredCode.equals(code))throw new AccountForbiddenException("邀请码不正确");
         if(!registrationOpen())throw new AccountForbiddenException("当前未开放注册");
+        if(!registrationCodeMatches(code))throw new AccountForbiddenException("邀请码不正确");
         PasswordRecord record=passwords.create(password);
         try(Connection c=open()){
             c.setAutoCommit(false);
@@ -53,6 +52,20 @@ public class AccountSandboxService {
                 }
             }catch(SQLException e){c.rollback();if("23505".equals(e.getSQLState()))throw new AccountConflictException("该邮箱已注册");throw e;}catch(Exception e){c.rollback();throw e;}
         }
+    }
+    private boolean registrationCodeMatches(String code)throws Exception{
+        try(Connection c=open();PreparedStatement s=c.prepareStatement(
+            "SELECT value #>> '{}' FROM system_settings WHERE key='registration_code_hash'"
+        );ResultSet r=s.executeQuery()){
+            if(r.next()){
+                String stored=r.getString(1);
+                if(stored==null||stored.isBlank())return true;
+                String[] parts=stored.split(":",2);
+                return parts.length==2&&passwords.verify(code,parts[0],parts[1]);
+            }
+        }
+        String requiredCode=environment.getProperty("REGISTRATION_CODE","");
+        return requiredCode.isBlank()||requiredCode.equals(code);
     }
     private Connection open()throws Exception{
         if(!enabled())throw new AccountDisabledException(sandbox.status().message());

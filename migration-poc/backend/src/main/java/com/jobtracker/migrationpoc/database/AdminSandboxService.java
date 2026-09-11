@@ -1,5 +1,6 @@
 package com.jobtracker.migrationpoc.database;
 
+import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -24,15 +25,18 @@ public class AdminSandboxService {
     private final Environment environment;
     private final ObjectMapper objectMapper;
     private final ApplicationSandboxService applicationSandboxService;
+    private final LegacyPasswordVerifier passwords;
 
     public AdminSandboxService(
         Environment environment,
         ObjectMapper objectMapper,
-        ApplicationSandboxService applicationSandboxService
+        ApplicationSandboxService applicationSandboxService,
+        LegacyPasswordVerifier passwords
     ) {
         this.environment = environment;
         this.objectMapper = objectMapper;
         this.applicationSandboxService = applicationSandboxService;
+        this.passwords = passwords;
     }
 
     public AdminStatus status() {
@@ -57,7 +61,7 @@ public class AdminSandboxService {
                 new Summary(
                     counts.totalUsers(), counts.enabledUsers(), counts.totalApplications(),
                     counts.activeSessions(), counts.configuredApiKeys(), registrationIsOpen(connection),
-                    configured("REGISTRATION_CODE"), configured("ADMIN_EMAIL")
+                    registrationCodeIsEnabled(connection), configured("ADMIN_EMAIL")
                 ),
                 users,
                 counts.totalUsers() > users.size(),
@@ -154,6 +158,37 @@ public class AdminSandboxService {
                 insertAudit(connection, admin.id(), target.id(), target.email(), "revoke-sessions");
                 connection.commit();
                 return new SessionResult(true, revoked);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public RegistrationCodeResult setRegistrationCode(String adminEmail, String code, boolean clear) throws Exception {
+        String clean = code == null ? "" : code.trim();
+        if (!clear && (clean.length() < 4 || clean.length() > 128)) {
+            throw new AdminValidationException("注册码长度需为 4–128 位");
+        }
+        LegacyPasswordVerifier.PasswordRecord record = clear ? null : passwords.create(clean);
+        String stored = clear ? "" : record.salt() + ":" + record.hash();
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO system_settings(key,value,updated_by) "
+                        + "VALUES('registration_code_hash',to_jsonb(CAST(? AS text)),?) "
+                        + "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()"
+                )) {
+                    statement.setString(1, stored);
+                    statement.setLong(2, admin.id());
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), null, "系统注册码",
+                    clear ? "clear-registration-code" : "set-registration-code");
+                connection.commit();
+                return new RegistrationCodeResult(true, !clear);
             } catch (Exception exception) {
                 connection.rollback();
                 throw exception;
@@ -305,6 +340,18 @@ public class AdminSandboxService {
         return !"false".equalsIgnoreCase(environment.getProperty("ALLOW_REGISTRATION", "true"));
     }
 
+    private boolean registrationCodeIsEnabled(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT value #>> '{}' FROM system_settings WHERE key='registration_code_hash'"
+        ); ResultSet result = statement.executeQuery()) {
+            if (result.next()) {
+                String stored = result.getString(1);
+                return stored != null && !stored.isBlank();
+            }
+        }
+        return configured("REGISTRATION_CODE");
+    }
+
     private AdminIdentity requireAdmin(Connection connection, String email) throws Exception {
         String normalizedEmail = normalizeEmail(email);
         String configuredAdminEmail = normalizeEmail(environment.getProperty("ADMIN_EMAIL"));
@@ -447,6 +494,7 @@ public class AdminSandboxService {
     public record UserDetails(DetailUser user, List<AdminApplication> applications,
                               int totalApplications, boolean truncated) {}
     public record RegistrationResult(boolean ok, boolean registrationOpen) {}
+    public record RegistrationCodeResult(boolean ok, boolean registrationCodeEnabled) {}
     public record DisabledResult(boolean ok, boolean disabled) {}
     public record SessionResult(boolean ok, int revoked) {}
     public record DeleteResult(boolean ok) {}

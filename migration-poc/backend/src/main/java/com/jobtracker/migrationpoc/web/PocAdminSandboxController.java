@@ -87,6 +87,25 @@ public class PocAdminSandboxController {
         }
     }
 
+    @PatchMapping("/settings/registration-code")
+    public ResponseEntity<?> registrationCode(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) RegistrationCodeRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null) return error(HttpStatus.BAD_REQUEST, "注册码设置内容不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setRegistrationCode(
+                user.get().email(), body.code(), Boolean.TRUE.equals(body.clear())
+            ));
+        } catch (Exception exception) {
+            return mapException("registration-code", exception);
+        }
+    }
+
     @PatchMapping("/users/{id}")
     public ResponseEntity<?> updateUser(
         @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
@@ -176,6 +195,7 @@ public class PocAdminSandboxController {
     }
 
     public record RegistrationRequest(Boolean enabled) {}
+    public record RegistrationCodeRequest(String code, Boolean clear) {}
     public record UserStateRequest(Boolean disabled) {}
     public record DeleteUserRequest(String confirmEmail) {}
 }
