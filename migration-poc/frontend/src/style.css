@@ -76,7 +76,19 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 }
 #app :is(input, textarea, select):hover { border-color: var(--color-border-strong); }
 #app :is(input, textarea, select):focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 13%, transparent); }
-#app textarea { min-height: 92px; resize: vertical; }
+#app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]) {
+  padding-inline: 14px;
+}
+
+#app textarea {
+  min-height: 92px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+#app select {
+  padding-inline: 14px 40px;
+}
 #app button {
   min-height: var(--control-height);
   border-radius: var(--radius-md);
