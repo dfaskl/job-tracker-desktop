@@ -106,7 +106,6 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
-        <AccountAccess v-if="!store.user.value" />
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
         </KeepAlive>
