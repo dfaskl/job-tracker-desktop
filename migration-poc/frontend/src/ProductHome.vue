@@ -44,7 +44,7 @@ function timelineEventLabel(text: string, eventId?: string) {
 
   const match = end.match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
   if (!match) return text
-  return `${text}（${Number(match[1])}月${Number(match[2])}日 ${match[3]}:${match[4]}前）`
+  return `${text}（${Number(match[1])}.${Number(match[2])} ${match[3]}:${match[4]}前）`
 }
 const adviceTimeline = computed(() => {
   type Label = {text:string;status:'normal'|'tight'|'conflict'}
