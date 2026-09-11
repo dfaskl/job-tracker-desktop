@@ -207,7 +207,7 @@ async function removeEvent(item:JobEvent){
 </script>
 
 <template>
-<Teleport to="#application-toolbar-slot">
+<Teleport defer to="#application-toolbar-slot">
   <div class="application-toolbar-portal">
 
     <div v-if="store.user.value" class="toolbar">
