@@ -139,7 +139,7 @@ function eventDate(event:JobEvent){
   const same=today()===value.slice(0,10),dateText=`${date.getMonth()+1}月${date.getDate()}日`,time=`${pad(date.getHours())}:${pad(date.getMinutes())}`
   const endDateText=range?`${endDate.getMonth()+1}月${endDate.getDate()}日`:''
   const endTime=range?`${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`:''
-  return {tag:same?'今天':range?'时间段':'',date:dateText,time,range,endDate:endDateText,endTime}
+  return {tag:same?'今天':'',date:dateText,time,range,endDate:endDateText,endTime}
 }
 function fallbackQuote():Quote{const items=['今天多走一步，明天就多一个选择。','把注意力放在能推进的下一步上。','每一次认真准备，都在靠近更合适的机会。','慢一点没有关系，只要方向仍在向前。','机会会迟到，但你的积累不会白费。','先完成今天能完成的，再把答案交给时间。','保持行动，好的结果往往在坚持之后出现。'];return {date:today(),quote:items[new Date().getDay()],author:'',generated:false}}
 function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
