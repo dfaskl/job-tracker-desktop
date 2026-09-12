@@ -327,6 +327,8 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   50% { box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); background:color-mix(in srgb,var(--accent,var(--color-primary)) 4%,#fff); }
 }
 @keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
+@keyframes advice-route-flow { to { stroke-dashoffset:-18; } }
+@keyframes advice-node-pulse { 50% { opacity:.35; transform:scale(.72); } }
 @keyframes quote-spark {
   0% { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(0); }
   26% { opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(35deg); }
@@ -335,6 +337,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 @media (prefers-reduced-motion: reduce) {
   .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger > .quote-glyph, .advice-trigger.is-loading > .advice-glyph { animation:none; }
+  .advice-trigger.is-loading > .advice-glyph :is(path,circle) { animation:none; }
   .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.55s; }
 }
 @keyframes quote-spark-soft {
@@ -414,7 +417,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 .advice-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
 .advice-trigger:disabled { cursor: wait; }
-.advice-glyph{display:grid;width:20px;height:20px;place-items:center;transform-origin:center}.advice-glyph svg{width:20px;height:20px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.advice-trigger.is-loading > .advice-glyph svg{display:none}.advice-trigger.is-loading > .advice-glyph::before{content:"✦";line-height:1}.advice-trigger.is-loading > .advice-glyph { animation: quote-refresh-spin .85s linear infinite; }
+.advice-glyph{display:grid;width:20px;height:20px;place-items:center;transform-origin:center}.advice-glyph svg{width:20px;height:20px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.advice-trigger.is-loading > .advice-glyph path{stroke-dasharray:6 3;animation:advice-route-flow .8s linear infinite}.advice-trigger.is-loading > .advice-glyph circle{transform-box:fill-box;transform-origin:center;animation:advice-node-pulse .8s ease-in-out infinite}.advice-trigger.is-loading > .advice-glyph circle:last-of-type{animation-delay:.4s}
 .advice-title > div { display: grid; min-width: 0; gap: 3px; }
 .advice-title strong { font-size: 16px; }
 .advice-title small { color: var(--home-muted); line-height: 1.5; }
