@@ -59,7 +59,7 @@ function navigate(page: Page) {
   if (activePage.value === page) return
   window.location.hash = page
   activePage.value = page
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
 function handleGlobalKeydown(event: KeyboardEvent) {

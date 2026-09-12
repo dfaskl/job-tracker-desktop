@@ -41,8 +41,8 @@
 
 * { box-sizing: border-box; }
 [tabindex="-1"]:focus { outline:none; }
-html { min-width: 320px; scroll-padding-top: 120px; }
-body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); }
+html { min-width: 320px; scroll-padding-top: 120px; overscroll-behavior-y: none; }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); overscroll-behavior-y: none; }
 button, input, textarea, select { font: inherit; }
 button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
