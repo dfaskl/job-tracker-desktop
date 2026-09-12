@@ -213,7 +213,7 @@ async function removeEvent(item:JobEvent){
     <div v-if="store.user.value" class="toolbar">
       <div class="application-filter-stack">
         <div class="application-filter-fields"><input v-model="query" type="search" aria-label="搜索投递记录" placeholder="搜索公司、岗位、地点、渠道或备注"><BaseSelect v-model="stageFilter" :options="['全部',...stageCategories]" align="center" /></div>
-        <div class="application-legend" aria-label="投递卡片颜色说明"><span class="legend-title">卡片颜色</span><span><i class="pending"></i>待参加日程</span><span><i class="interview"></i>有面试进展</span><span><i class="assessment"></i>测评 / 笔试</span><span><i class="applied"></i>仅投递</span><span><i class="stopped"></i>未通过 / 已结束</span><span><i class="offer"></i>Offer / 已通过</span></div>
+        <div class="application-legend" aria-label="投递卡片颜色说明"><span><i class="pending"></i>待参加日程</span><span><i class="interview"></i>有面试进展</span><span><i class="assessment"></i>测评 / 笔试</span><span><i class="applied"></i>仅投递</span><span><i class="stopped"></i>未通过 / 已结束</span><span><i class="offer"></i>Offer / 已通过</span></div>
       </div>
       <aside class="application-heatmap" aria-label="月度投递数量热力图">
         <div class="heatmap-grid"><i v-for="cell in applicationHeatCells" :key="cell.key" :class="[`level-${cell.level}`,{ outside:!cell.inMonth }]" :title="cell.inMonth ? `${cell.key}：${cell.count} 条投递` : ''"></i></div>
