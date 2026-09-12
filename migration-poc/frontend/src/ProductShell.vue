@@ -199,6 +199,7 @@ nav button.active::before {
 .application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
+.page-content.stats-content { display: flow-root; }
 .page-content.application-content,
 .page-content.calendar-content,
 .page-content.mail-content,
