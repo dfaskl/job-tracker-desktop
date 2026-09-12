@@ -214,6 +214,7 @@ nav button.active::before {
 .page-content.settings-content,
 .page-content.admin-content { height: 100vh; }
 .page-content :deep(.card) { margin-top: 18px; }
+.page-content.admin-content :deep(.card) { margin-top: 0; }
 
 @media (max-width: 1200px) {
   .product-main.settings-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
