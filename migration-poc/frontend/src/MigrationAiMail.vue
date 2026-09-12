@@ -6,6 +6,9 @@ import BaseSelect from './BaseSelect.vue'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
+type MailAccount = { id: number; email: string; provider: string; lastSyncedAt: string; lastError: string }
+type CollectedMail = { id: number; sender: string; subject: string; body: string; receivedAt: string; accountEmail: string }
+type Inbox = { accounts: MailAccount[]; messages: CollectedMail[] }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
 const store = useJobTrackerStore()
 const status = ref<AiStatus | null>(null)
@@ -19,6 +22,9 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const selectedApplicationId = ref('')
+const inbox = ref<Inbox>({ accounts: [], messages: [] })
+const syncing = ref(false)
+const selectedMailId = ref<number | null>(null)
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
@@ -41,7 +47,7 @@ watch(timeMode, mode => { if (mode === 'point') result.endsAt = '' })
 
 onMounted(async () => {
   await store.initialize()
-  await checkStatus()
+  await Promise.all([checkStatus(), loadInbox(true)])
 })
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
 function companyKey(value: unknown) { return normalize(value).replace(/股份有限公司|有限责任公司|有限公司|集团|公司$/g, '') }
@@ -78,6 +84,37 @@ async function checkStatus() {
     status.value = await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
   } catch (cause) { error.value = failure(cause, '检查 AI 服务失败') }
   finally { loading.value = false }
+}
+async function loadInbox(sync = false) {
+  syncing.value = sync
+  try {
+    inbox.value = sync
+      ? await api<Inbox>('/api/poc/mail-inbox/sync', { method: 'POST' })
+      : await api<Inbox>('/api/poc/mail-inbox')
+  } catch (cause) {
+    if (!(cause instanceof ApiError && cause.status === 401)) error.value = failure(cause, '读取邮件收集箱失败')
+  } finally { syncing.value = false }
+}
+function selectMail(mail: CollectedMail) {
+  selectedMailId.value = mail.id
+  mailBody.value = [mail.subject ? `主题：${mail.subject}` : '', mail.sender ? `发件人：${mail.sender}` : '', '', mail.body].join('\n').trim()
+  hasResult.value = false
+}
+async function processMail(mail: CollectedMail) {
+  await api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH' })
+  inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
+  if (selectedMailId.value === mail.id) selectedMailId.value = null
+}
+async function deleteMail(mail: CollectedMail) {
+  if (!confirm('从系统收集箱移除这封邮件？邮箱中的原邮件不会被删除。')) return
+  await api(`/api/poc/mail-inbox/messages/${mail.id}`, { method: 'DELETE' })
+  inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
+  if (selectedMailId.value === mail.id) { selectedMailId.value = null; mailBody.value = ''; hasResult.value = false }
+}
+function mailDate(value: string) {
+  if (!value) return '时间未知'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 async function recognize() {
   loading.value = true; error.value = ''; message.value = ''; hasResult.value = false
@@ -140,6 +177,14 @@ async function saveResult() {
 
     <div class="mail-grid">
       <section class="card source-panel">
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.messages.length}} 封 · 点击卡片填入下方正文</small></div></div><button class="secondary sync-button" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取新邮件'}}</button></div>
+        <div v-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
+          <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
+            <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
+            <div class="mail-card-actions"><button class="processed" @click.stop="processMail(mail)">已处理</button><button class="delete-mail" @click.stop="deleteMail(mail)">删除</button></div>
+          </article>
+        </div>
+        <div v-else class="inbox-empty">{{inbox.accounts.length?(syncing?'正在检查新邮件…':'暂无待处理邮件'):'请先在设置页面连接 QQ 或网易邮箱'}}</div>
         <div class="panel-title"><div><span class="step">1</span><h3>粘贴通知正文</h3></div><button class="text-button" :disabled="!mailBody" @click="mailBody = ''">清空</button></div>
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
@@ -194,6 +239,7 @@ async function saveResult() {
 .step { display: grid; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: var(--color-primary); place-items: center; font-size: 13px; font-weight: 800; }
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .source-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
+.inbox-heading,.inbox-heading>div,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:12px;margin-bottom:10px}.inbox-heading>div{gap:10px}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.sync-button{flex:none}.mail-cards{display:grid;max-height:210px;gap:8px;margin-bottom:16px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards article{justify-content:space-between;gap:10px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:6px}.mail-card-actions button{min-height:36px;padding:7px 10px}.processed{color:#176b4b;background:#eaf8f1}.delete-mail{color:#a52d2d;background:#fff0ef}.inbox-empty{margin-bottom:16px;padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}
 .privacy-note { margin-bottom: 14px; color: var(--color-muted-foreground); font-size: 12px; }
 .service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
@@ -207,5 +253,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
+  .inbox-heading{align-items:stretch;flex-direction:column}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-cards article{align-items:stretch;flex-direction:column}.mail-card-actions button{min-height:44px;flex:1}
 }
 </style>

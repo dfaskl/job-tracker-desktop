@@ -63,3 +63,32 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS mail_accounts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  encrypted_password BYTEA NOT NULL,
+  encryption_iv BYTEA NOT NULL,
+  auth_tag BYTEA NOT NULL,
+  last_uid BIGINT NOT NULL DEFAULT 0,
+  last_synced_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id,email)
+);
+CREATE INDEX IF NOT EXISTS mail_accounts_user_idx ON mail_accounts(user_id);
+CREATE TABLE IF NOT EXISTS collected_mails (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id BIGINT NOT NULL REFERENCES mail_accounts(id) ON DELETE CASCADE,
+  message_uid BIGINT NOT NULL,
+  sender TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL,
+  received_at TIMESTAMPTZ,
+  processed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(account_id,message_uid)
+);
+CREATE INDEX IF NOT EXISTS collected_mails_pending_idx ON collected_mails(user_id,processed_at,received_at DESC);
