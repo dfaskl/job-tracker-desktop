@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductAnalytics from './ProductAnalytics.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
@@ -34,9 +34,8 @@ const pageComponents: Record<Page, Component> = {
 
 const activePage = ref<Page>('home')
 const mobileMenuOpen = ref(false)
-const pageHeading = ref<HTMLElement | null>(null)
+const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
-const current = computed(() => pages.find((item) => item.id === activePage.value) || pages[0])
 
 function pageFromHash(): Page {
   const value = window.location.hash.replace(/^#\/?/, '') as Page
@@ -72,7 +71,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   void store.initialize()
 })
-watch(activePage, async () => { await nextTick(); pageHeading.value?.focus({ preventScroll: true }) })
+watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
@@ -96,9 +95,8 @@ onBeforeUnmount(() => {
       <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
-    <main id="main-content" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
-      <header class="topbar">
-        <div><h1 ref="pageHeading" tabindex="-1">{{ current.label }}</h1><p>{{ current.subtitle }}</p></div>
+    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
+      <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
         <button v-if="activePage === 'home' || activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
@@ -183,25 +181,22 @@ nav button.active::before {
   top: 0;
   z-index: 12;
   display: flex;
-  min-height: 104px;
+  min-height: 88px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-background) 92%, transparent);
   backdrop-filter: blur(16px);
 }
-.topbar > div:first-child { position:relative; padding-left:14px; }
-.topbar > div:first-child::before { content:""; position:absolute; inset:2px auto 2px 0; width:3px; border-radius:99px; background:var(--color-primary); }
-.topbar h1 { margin: 0 0 4px; font-size: 27px; line-height: 1.15; }
-.topbar p { margin: 0; color: var(--color-muted-foreground); line-height: 1.4; }
 .topbar > button {
   min-width: 116px;
   color: var(--color-on-primary);
   background: var(--color-primary);
 }
 .home-quote-slot { display: flex; min-width: 0; flex: 1; justify-content: center; }
-.application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px; }
+.application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
 .page-content.application-content,
@@ -216,7 +211,7 @@ nav button.active::before {
 .product-main.admin-page-shell { height: 100vh; overflow: hidden; padding-bottom: 0; }
 .page-content.mail-content,
 .page-content.settings-content,
-.page-content.admin-content { height: calc(100vh - 104px); }
+.page-content.admin-content { height: 100vh; }
 .page-content :deep(.card) { margin-top: 18px; }
 
 @media (max-width: 1200px) {
@@ -280,9 +275,7 @@ nav button.active::before {
   .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
-  .topbar { min-height: 92px; flex-wrap: wrap; padding: 12px 0; }
-  .topbar h1 { font-size: 22px; }
-  .topbar p { font-size: 13px; }
+  .topbar { min-height: 0; flex-wrap: wrap; padding: 12px 0; }
   .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
 }
 @media (max-width: 620px) {
