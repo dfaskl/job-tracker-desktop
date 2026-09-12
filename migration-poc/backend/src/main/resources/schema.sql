@@ -74,9 +74,11 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
   last_uid BIGINT NOT NULL DEFAULT 0,
   last_synced_at TIMESTAMPTZ,
   last_error TEXT NOT NULL DEFAULT '',
+  initialized BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id,email)
 );
+ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS initialized BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS mail_accounts_user_idx ON mail_accounts(user_id);
 CREATE TABLE IF NOT EXISTS collected_mails (
   id BIGSERIAL PRIMARY KEY,
