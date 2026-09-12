@@ -40,8 +40,6 @@
 }
 
 * { box-sizing: border-box; }
-.skip-link { position:fixed; top:8px; left:8px; z-index:1000; padding:10px 14px; border-radius:var(--radius-md); color:#fff; background:var(--color-primary); transform:translateY(-140%); transition:transform .18s ease; }
-.skip-link:focus { transform:translateY(0); }
 [tabindex="-1"]:focus { outline:none; }
 html { min-width: 320px; scroll-padding-top: 120px; }
 body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); }

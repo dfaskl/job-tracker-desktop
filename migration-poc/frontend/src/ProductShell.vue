@@ -81,7 +81,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="product-shell">
-    <a class="skip-link" href="#main-content">跳到主要内容</a>
     <aside class="sidebar" :class="{ 'menu-open': mobileMenuOpen }">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
         <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职进度本</strong><small>Vue + Java</small></div>
