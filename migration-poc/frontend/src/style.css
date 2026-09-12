@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
 
 :root {
   font-family: "Fira Sans", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
@@ -34,6 +34,7 @@
   --shadow-sm: 0 1px 2px rgba(12, 74, 110, .06);
   --shadow-lg: 0 18px 48px rgba(12, 74, 110, .18);
   --control-height: 44px;
+  --font-button: "Nunito", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
   --accent: #0369a1;
   --sidebar: #073b5c;
   --sidebar-active: #075985;
@@ -82,7 +83,11 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 }
 #app button {
   min-height: var(--control-height);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
+  color: var(--color-primary);
+  font-family: var(--font-button);
+  font-weight: 700;
+  letter-spacing: .012em;
   transition: color .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease;
 }
 #app button:not(:disabled):hover { filter: saturate(1.05); }
@@ -94,10 +99,32 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
   padding: var(--card-padding, clamp(16px, 1.25vw, 24px));
   box-shadow: var(--shadow-sm);
 }
-#app :is(.secondary, .text-button, .text-link) { color: var(--color-primary); background: var(--color-muted); }
+#app :is(.secondary, .text-button, .text-link) { color: #075985; background: #e7f1f7; }
 #app :is(.danger, .error) { color: var(--color-destructive); }
 #app .danger-button { color: #fff; background: var(--color-destructive); }
 #app .success { color: var(--color-success); }
+#app :is(.primary-action, .login-submit, .topbar > button, .access form > button, .commit-box button, .ai-button, .quote-trigger, .advice-trigger) { color: #fff; }
+#app button.offer { color: #fff; background: #15803d; }
+#app button.abandon { color: #fff; background: #9a570d; }
+#app button.reject { color: #fff; background: #c92f2a; }
+#app button.danger-button { color: #fff; background: #c92f2a; }
+#app button.success-button { color: #126b3a; background: #e5f6ec; }
+#app button.warning-button { color: #7a4707; background: #fff0cf; }
+#app button:is(.event-delete, .link-delete, .danger-outline) { color: #a52d2d; background: #fff5f4; }
+#app button:is(.close, .modal-close) { color: #40546c; background: #edf3f7; }
+#app button.application,
+#app button.day,
+#app .backup-list button,
+#app button.select-trigger,
+#app button.select-option { color: var(--color-card-foreground); font-family: inherit; letter-spacing: normal; }
+#app button.brand { color: inherit; }
+#app nav button { color: #bae6fd; }
+#app nav button.active,
+#app nav button:hover,
+#app button.menu-toggle { color: #fff; }
+#app button.select-option:hover,
+#app button.select-option.active,
+#app button.select-option.selected { color: var(--color-primary); }
 #app .eyebrow, #app .section-kicker { color: var(--color-primary); }
 #app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: rgba(7, 37, 58, .58); backdrop-filter: blur(4px); }
 #app :is(.modal, .detail-modal, .link-modal) { border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); }
