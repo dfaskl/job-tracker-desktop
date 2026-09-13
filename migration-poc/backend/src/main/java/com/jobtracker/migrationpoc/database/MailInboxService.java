@@ -48,7 +48,7 @@ public class MailInboxService {
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
 
-    @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:300000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:60000}")
+    @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:30000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:30000}")
     public void syncAll(){
         if(encryptionKey().length()<32)return;
         try(Connection c=open();PreparedStatement s=c.prepareStatement("SELECT id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag,last_uid,initialized FROM mail_accounts ORDER BY id");ResultSet r=s.executeQuery()){while(r.next()){try{syncAccount(c,row(r));}catch(Exception ignored){}}}catch(Exception ignored){}
