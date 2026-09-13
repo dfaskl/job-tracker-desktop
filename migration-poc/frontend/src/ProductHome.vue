@@ -337,12 +337,14 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 @media (prefers-reduced-motion: reduce) {
   .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger > .quote-glyph, .advice-trigger.is-loading > .advice-glyph { animation:none; }
+  .quote-strip.is-refreshing { background:color-mix(in srgb,var(--accent,var(--color-primary)) 5%,#fff); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 11%,transparent); }
+  .quote-strip.is-refreshing > .quote-trigger > .quote-glyph { opacity:.58; }
   .advice-trigger.is-loading > .advice-glyph :is(path,circle) { animation:none; }
-  .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.55s; }
+  .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.62s!important;animation-iteration-count:1!important; }
 }
 @keyframes quote-spark-soft {
-  0%,100% { opacity:0;transform:translate(-50%,-50%) scale(.7); }
-  45% { opacity:1;transform:translate(-50%,-50%) scale(1); }
+  0%,100% { opacity:0;transform:translate(-50%,-50%); }
+  45% { opacity:1;transform:translate(-50%,-50%); }
 }
 
 .dashboard-panel {
