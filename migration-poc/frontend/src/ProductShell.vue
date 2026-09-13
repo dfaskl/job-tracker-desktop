@@ -130,10 +130,10 @@ onBeforeUnmount(() => {
   width: 232px;
   flex-direction: column;
   padding: 22px 16px 18px;
-  color: #e0f2fe;
+  color: #effbf7;
   background: var(--sidebar);
   border-right: 1px solid rgba(255,255,255,.1);
-  box-shadow: 8px 0 28px rgba(4,31,49,.08);
+  box-shadow: 8px 0 28px rgba(23,75,79,.10);
 }
 
 .brand {
@@ -150,10 +150,10 @@ onBeforeUnmount(() => {
 .brand > img { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
 .brand div { display: grid; gap: 2px; }
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
-.brand small { color: #bae6fd; font-size: 11px; }
+.brand small { color: #b9e5da; font-size: 11px; }
 .menu-toggle { display: none; }
 nav { position: relative; display: grid; gap: 5px; margin-top: 28px; }
-nav::before { content:""; position:absolute; top:18px; bottom:18px; left:22px; width:1px; background:rgba(125,211,252,.18); }
+nav::before { content:""; position:absolute; top:18px; bottom:18px; left:22px; width:1px; background:rgba(105,195,165,.22); }
 nav button {
   position: relative;
   display: flex;
@@ -163,11 +163,11 @@ nav button {
   gap: 12px;
   padding: 10px 13px;
   border: 1px solid transparent;
-  color: #bae6fd;
+  color: #d5f2eb;
   background: transparent;
   text-align: left;
 }
-nav button span { position:relative; z-index:1; width: 20px; color: #7dd3fc; font-size: 16px; text-align: center; }
+nav button span { position:relative; z-index:1; width: 20px; color: #80d7c2; font-size: 16px; text-align: center; }
 nav button.has-badge { padding-right: 40px; }
 .nav-badge { position: absolute; top: 5px; right: 8px; display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; border: 2px solid var(--sidebar); border-radius: 999px; color: #fff; background: var(--color-destructive); font: 800 10px/1 var(--font-button); letter-spacing: 0; box-shadow: 0 2px 6px rgba(0,0,0,.22); }
 .sr-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
@@ -184,7 +184,7 @@ nav button.active::before {
   bottom: 11px;
   left: -16px;
   width: 4px;
-  background: #38bdf8;
+  background: #f2a65a;
 }
 .sidebar-account { display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 232px; padding: 0 38px 64px; }
@@ -262,8 +262,8 @@ nav button.active::before {
     place-content: center;
     gap: 5px;
     padding: 0;
-    border: 1px solid rgba(186,230,253,.3);
-    color: #e0f2fe;
+    border: 1px solid rgba(213,242,235,.32);
+    color: #effbf7;
     background: rgba(255,255,255,.06);
   }
   .menu-toggle span { display: block; width: 19px; height: 2px; border-radius: 99px; background: currentColor; transition: transform .18s ease, opacity .18s ease; }
