@@ -107,13 +107,7 @@ async function processMail(mail: CollectedMail) {
   await store.refreshPendingMailCount()
   if (selectedMailId.value === mail.id) selectedMailId.value = null
 }
-async function deleteMail(mail: CollectedMail) {
-  if (!confirm('从系统收集箱移除这封邮件？邮箱中的原邮件不会被删除。')) return
-  await api(`/api/poc/mail-inbox/messages/${mail.id}`, { method: 'DELETE' })
-  inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
-  await store.refreshPendingMailCount()
-  if (selectedMailId.value === mail.id) { selectedMailId.value = null; mailBody.value = ''; hasResult.value = false }
-}
+function mailboxUrl(mail: CollectedMail) { return mail.accountEmail.toLowerCase().endsWith('@qq.com') ? 'https://mail.qq.com/' : 'https://mail.163.com/' }
 function mailDate(value: string) {
   if (!value) return '时间未知'
   const date = new Date(value)
@@ -184,7 +178,7 @@ async function saveResult() {
         <div v-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
           <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
             <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-            <div class="mail-card-actions"><button class="processed" @click.stop="processMail(mail)">已处理</button><button class="delete-mail" @click.stop="deleteMail(mail)">删除</button></div>
+            <div class="mail-card-actions"><a class="mailbox-button" :href="mailboxUrl(mail)" target="_blank" rel="noopener noreferrer" @click.stop>打开邮箱 ↗</a><button class="processed" @click.stop="processMail(mail)">已处理</button></div>
           </article>
         </div>
         <div v-else class="inbox-empty">{{inbox.accounts.length?(syncing?'正在检查新邮件…':'暂无待处理邮件'):'请先在设置页面连接 QQ 或网易邮箱'}}</div>
@@ -232,6 +226,7 @@ async function saveResult() {
 .match-badge { color: #4259bd; background: #edf1ff; }
 .text-button { padding: 7px 10px; color: var(--color-card-foreground); background: transparent; }
 .card { margin-top: 0 !important; }
+.panel-title { min-height: 44px; }
 .panel-title h3 { margin: 0; font-size: 17px; }
 .result-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
 .result-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
@@ -241,15 +236,16 @@ async function saveResult() {
 .mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(260px, .82fr) minmax(300px, 1fr) minmax(380px, 1.28fr); gap: 16px; padding-bottom: 18px; }
 .inbox-panel, .compose-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
 .inbox-panel, .compose-panel { display: flex; flex-direction: column; }
-.review-panel { overflow-y: auto; overscroll-behavior: contain; }
+.review-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
 .step { display: grid; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: var(--color-primary); place-items: center; font-size: 13px; font-weight: 800; }
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .compose-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
-.inbox-heading,.inbox-heading>div,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:12px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.sync-button{flex:none}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards article{align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:6px}.mail-card-actions button{min-height:36px;flex:1;padding:7px 10px}.processed{color:#176b4b;background:#eaf8f1}.delete-mail{color:#a52d2d;background:#fff0ef}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}
+.inbox-heading,.inbox-heading>div,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:12px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.sync-button{flex:none}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards article{align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}
 .privacy-note { margin-bottom: 14px; color: var(--color-muted-foreground); font-size: 12px; }
 .service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
 .empty-state { display: grid; min-height: 280px; gap: 8px; padding: 24px; border: 1px dashed #d4dbea; border-radius: 12px; color: var(--color-muted-foreground); background: #fafbfc; place-content: center; text-align: center; }
+.review-panel > .empty-state { min-height: 0; flex: 1 1 auto; margin-top: 18px; }
 .empty-state.small { min-height: 100px; }
 .commit-box { padding: 14px; border-radius: 12px; color: var(--color-muted-foreground); background: #f4f6fb; }
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
