@@ -28,10 +28,10 @@ public class MailInboxService {
     }
 
     public InboxView inbox(String userEmail)throws Exception{
-        try(Connection c=open()){long userId=userId(c,userEmail);List<AccountView> accounts=new ArrayList<>();List<MailView> messages=new ArrayList<>();
+        try(Connection c=open()){c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);c.setReadOnly(true);c.setAutoCommit(false);long userId=userId(c,userEmail);List<AccountView> accounts=new ArrayList<>();List<MailView> messages=new ArrayList<>();
             try(PreparedStatement s=c.prepareStatement("SELECT id,email,provider,last_synced_at,last_error FROM mail_accounts WHERE user_id=? ORDER BY created_at")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){while(r.next())accounts.add(new AccountView(r.getLong(1),r.getString(2),r.getString(3),instant(r.getTimestamp(4)),r.getString(5)));}}
             try(PreparedStatement s=c.prepareStatement("SELECT m.id,m.sender,m.subject,m.body,m.received_at,a.email FROM collected_mails m JOIN mail_accounts a ON a.id=m.account_id WHERE m.user_id=? AND m.processed_at IS NULL ORDER BY m.received_at DESC NULLS LAST,m.id DESC LIMIT 100")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){while(r.next())messages.add(new MailView(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),instant(r.getTimestamp(5)),r.getString(6)));}}
-            return new InboxView(accounts,messages);
+            InboxView view=new InboxView(accounts,messages,pendingCount(c,userId));c.commit();return view;
         }
     }
 
@@ -43,7 +43,6 @@ public class MailInboxService {
         sync(userEmail);return inbox(userEmail).accounts().stream().filter(a->a.email().equals(cleanEmail)).findFirst().orElseThrow();
     }
     public void removeAccount(String email,long id)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("DELETE FROM mail_accounts WHERE id=? AND user_id=?")){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}
-    public long pendingCount(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("SELECT COUNT(*) FROM collected_mails WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));try(ResultSet r=s.executeQuery()){return r.next()?r.getLong(1):0;}}}
     public InboxView sync(String email)throws Exception{try(Connection c=open()){long userId=userId(c,email);for(AccountRow account:accounts(c,userId)){try{syncAccount(c,account);}catch(Exception ignored){}}}return inbox(email);}
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
@@ -101,6 +100,7 @@ public class MailInboxService {
     private String safeDetail(Throwable error){String detail=exceptionText(error).replaceAll("[\\r\\n]+"," ").trim();return detail.isBlank()?error.getClass().getSimpleName():limit(detail,160);}
     private Properties mailProperties(){Properties p=new Properties();p.put("mail.imaps.ssl.enable","true");p.put("mail.imaps.ssl.checkserveridentity","true");p.put("mail.imaps.connectiontimeout","10000");p.put("mail.imaps.timeout","20000");p.put("mail.imaps.writetimeout","20000");return p;}
     private List<AccountRow> accounts(Connection c,long userId)throws Exception{List<AccountRow> list=new ArrayList<>();try(PreparedStatement s=c.prepareStatement("SELECT id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag,last_uid,initialized FROM mail_accounts WHERE user_id=?")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){while(r.next())list.add(row(r));}}return list;}
+    private long pendingCount(Connection c,long userId)throws Exception{try(PreparedStatement s=c.prepareStatement("SELECT COUNT(*) FROM collected_mails WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){return r.next()?r.getLong(1):0;}}}
     private AccountRow row(ResultSet r)throws Exception{return new AccountRow(r.getLong(1),r.getLong(2),r.getString(3),r.getString(4),r.getBytes(5),r.getBytes(6),r.getBytes(7),r.getLong(8),r.getBoolean(9));}
     private Connection open()throws Exception{LegacyDatabaseUrl config=LegacyDatabaseUrl.parse(AppEnvironment.databaseUrl(environment));Properties p=new Properties();if(config.username()!=null)p.setProperty("user",config.username());if(config.password()!=null)p.setProperty("password",config.password());p.setProperty("ApplicationName","job-tracker-mail-inbox");return PooledConnections.open(config,p);}
     private long userId(Connection c,String email)throws Exception{try(PreparedStatement s=c.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL")){s.setString(1,email.trim().toLowerCase(Locale.ROOT));try(ResultSet r=s.executeQuery()){if(r.next())return r.getLong(1);}}throw new ValidationException("账号不可用");}
@@ -108,6 +108,6 @@ public class MailInboxService {
     private String host(String provider){return "qq".equals(provider)?"imap.qq.com":"imap.163.com";}private String required(String value,String name,int max){String clean=value==null?"":value.trim();if(clean.isBlank())throw new ValidationException("请填写"+name);if(clean.length()>max)throw new ValidationException(name+"内容过长");return clean;}
     private String decode(String value){try{return value==null?"(无主题)":MimeUtility.decodeText(value);}catch(Exception e){return value;}}private String addresses(Address[] values){if(values==null)return "";StringBuilder out=new StringBuilder();for(Address value:values){if(!out.isEmpty())out.append(", ");out.append(decode(value.toString()));}return out.toString();}
     private String limit(String value,int max){return value.length()<=max?value:value.substring(0,max);}private String instant(Timestamp value){return value==null?"":value.toInstant().toString();}
-    public record InboxView(List<AccountView> accounts,List<MailView> messages){}public record AccountView(long id,String email,String provider,String lastSyncedAt,String lastError){}public record MailView(long id,String sender,String subject,String body,String receivedAt,String accountEmail){}
+    public record InboxView(List<AccountView> accounts,List<MailView> messages,long pendingCount){}public record AccountView(long id,String email,String provider,String lastSyncedAt,String lastError){}public record MailView(long id,String sender,String subject,String body,String receivedAt,String accountEmail){}
     private record AccountRow(long id,long userId,String email,String provider,byte[] encrypted,byte[] iv,byte[] tag,long lastUid,boolean initialized){}public static class ValidationException extends RuntimeException{public ValidationException(String message){super(message);}}
 }

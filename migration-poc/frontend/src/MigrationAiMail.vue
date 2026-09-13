@@ -6,9 +6,7 @@ import BaseSelect from './BaseSelect.vue'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
-type MailAccount = { id: number; email: string; provider: string; lastSyncedAt: string; lastError: string }
 type CollectedMail = { id: number; sender: string; subject: string; body: string; receivedAt: string; accountEmail: string }
-type Inbox = { accounts: MailAccount[]; messages: CollectedMail[] }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
 const store = useJobTrackerStore()
 const status = ref<AiStatus | null>(null)
@@ -22,7 +20,7 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const selectedApplicationId = ref('')
-const inbox = ref<Inbox>({ accounts: [], messages: [] })
+const inbox = store.mailInbox
 const syncing = ref(false)
 const selectedMailId = ref<number | null>(null)
 
@@ -88,10 +86,7 @@ async function checkStatus() {
 async function loadInbox(sync = false) {
   syncing.value = sync
   try {
-    inbox.value = sync
-      ? await api<Inbox>('/api/poc/mail-inbox/sync', { method: 'POST' })
-      : await api<Inbox>('/api/poc/mail-inbox')
-    await store.refreshPendingMailCount()
+    await store.refreshMailInbox(sync)
   } catch (cause) {
     if (!(cause instanceof ApiError && cause.status === 401)) error.value = failure(cause, '读取邮件收集箱失败')
   } finally { syncing.value = false }
@@ -104,7 +99,8 @@ function selectMail(mail: CollectedMail) {
 async function processMail(mail: CollectedMail) {
   await api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH' })
   inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
-  await store.refreshPendingMailCount()
+  inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - 1)
+  await store.refreshMailInbox()
   if (selectedMailId.value === mail.id) selectedMailId.value = null
 }
 function mailboxUrl(mail: CollectedMail) { return mail.accountEmail.toLowerCase().endsWith('@qq.com') ? 'https://mail.qq.com/' : 'https://mail.163.com/' }
@@ -174,7 +170,7 @@ async function saveResult() {
 
     <div class="mail-grid">
       <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.messages.length}} 封 · 点击卡片填入通知正文</small></div></div><button class="secondary sync-button" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取新邮件'}}</button></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><button class="secondary sync-button" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取新邮件'}}</button></div>
         <div v-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
           <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
             <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>

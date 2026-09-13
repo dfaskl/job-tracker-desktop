@@ -20,10 +20,14 @@ const initialized = ref(false)
 const loading = ref(false)
 const error = ref('')
 const readOnly = ref(true)
-const pendingMailCount = ref(0)
+export type MailAccount = { id: number; email: string; provider: string; lastSyncedAt: string; lastError: string }
+export type CollectedMail = { id: number; sender: string; subject: string; body: string; receivedAt: string; accountEmail: string }
+export type MailInbox = { accounts: MailAccount[]; messages: CollectedMail[]; pendingCount: number }
+const mailInbox = ref<MailInbox>({ accounts: [], messages: [], pendingCount: 0 })
+const pendingMailCount = computed(() => mailInbox.value.pendingCount)
 const newApplicationRequest = ref(0)
 let refreshPromise: Promise<void> | null = null
-let pendingMailCountPromise: Promise<void> | null = null
+let mailInboxPromise: Promise<void> | null = null
 
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
@@ -61,19 +65,19 @@ async function initialize() {
   await refresh()
 }
 
-function refreshPendingMailCount() {
-  if (pendingMailCountPromise) return pendingMailCountPromise
-  pendingMailCountPromise = (async () => {
+function refreshMailInbox(sync = false) {
+  if (mailInboxPromise) return mailInboxPromise
+  mailInboxPromise = (async () => {
     try {
-      const result = await api<{ count: number }>('/api/poc/mail-inbox/pending-count')
-      pendingMailCount.value = Math.max(0, Number(result.count) || 0)
+      const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST' } : {})
+      mailInbox.value = { accounts: result.accounts || [], messages: result.messages || [], pendingCount: Math.max(0, Number(result.pendingCount) || 0) }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 401) pendingMailCount.value = 0
+      if (cause instanceof ApiError && cause.status === 401) mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
     } finally {
-      pendingMailCountPromise = null
+      mailInboxPromise = null
     }
   })()
-  return pendingMailCountPromise
+  return mailInboxPromise
 }
 
 async function login(email: string, password: string) {
@@ -83,7 +87,7 @@ async function login(email: string, password: string) {
     method: 'POST', body: JSON.stringify({ email, password })
   })
   await refresh(true)
-  await refreshPendingMailCount()
+  await refreshMailInbox()
 }
 
 async function register(email: string, password: string, registrationCode: string) {
@@ -93,7 +97,7 @@ async function register(email: string, password: string, registrationCode: strin
     method: 'POST', body: JSON.stringify({ email, password, registrationCode })
   })
   await refresh(true)
-  await refreshPendingMailCount()
+  await refreshMailInbox()
 }
 function requestNewApplication() { newApplicationRequest.value += 1 }
 
@@ -102,10 +106,10 @@ async function logout() {
   clearApiCache()
   user.value = null
   data.value = { applications: [], events: [] }
-  pendingMailCount.value = 0
+  mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
   error.value = ''
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, pendingMailCount, refreshPendingMailCount, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, mailInbox, pendingMailCount, refreshMailInbox, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
 }

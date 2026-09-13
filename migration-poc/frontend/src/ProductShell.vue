@@ -66,22 +66,22 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') mobileMenuOpen.value = false
 }
 
-function refreshMailCountOnFocus() { if (store.user.value) void store.refreshPendingMailCount() }
+function refreshMailInboxOnFocus() { if (store.user.value) void store.refreshMailInbox() }
 
 onMounted(async () => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
   window.addEventListener('keydown', handleGlobalKeydown)
-  window.addEventListener('focus', refreshMailCountOnFocus)
+  window.addEventListener('focus', refreshMailInboxOnFocus)
   await store.initialize()
-  if (store.user.value) await store.refreshPendingMailCount()
-  mailCountTimer = window.setInterval(refreshMailCountOnFocus, 60_000)
+  if (store.user.value) await store.refreshMailInbox()
+  mailCountTimer = window.setInterval(refreshMailInboxOnFocus, 30_000)
 })
 watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
-  window.removeEventListener('focus', refreshMailCountOnFocus)
+  window.removeEventListener('focus', refreshMailInboxOnFocus)
   if (mailCountTimer !== undefined) window.clearInterval(mailCountTimer)
 })
 </script>
