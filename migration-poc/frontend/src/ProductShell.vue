@@ -229,8 +229,8 @@ nav button.active::before {
 .page-content.admin-content :deep(.card) { margin-top: 0; }
 
 @media (max-width: 1200px) {
-  .product-main.settings-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
-  .page-content.settings-content { height: auto; }
+  .product-main.settings-page-shell, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
+  .page-content.settings-content, .page-content.mail-content { height: auto; }
 }
 @media (max-width: 900px) {
   .product-main.mail-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
