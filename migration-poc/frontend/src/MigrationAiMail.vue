@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -23,6 +23,8 @@ const selectedApplicationId = ref('')
 const inbox = store.mailInbox
 const syncing = ref(false)
 const selectedMailId = ref<number | null>(null)
+const previewMail = ref<CollectedMail | null>(null)
+const previewDialog = ref<HTMLDialogElement | null>(null)
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
@@ -102,8 +104,17 @@ async function processMail(mail: CollectedMail) {
   inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - 1)
   await store.refreshMailInbox()
   if (selectedMailId.value === mail.id) selectedMailId.value = null
+  if (previewMail.value?.id === mail.id) closeMailPreview()
 }
-function mailboxUrl(mail: CollectedMail) { return mail.accountEmail.toLowerCase().endsWith('@qq.com') ? 'https://mail.qq.com/' : 'https://mail.163.com/' }
+async function openMailPreview(mail: CollectedMail) {
+  previewMail.value = mail
+  await nextTick()
+  previewDialog.value?.showModal()
+}
+function closeMailPreview() {
+  previewDialog.value?.close()
+  previewMail.value = null
+}
 function mailDate(value: string) {
   if (!value) return '时间未知'
   const date = new Date(value)
@@ -174,7 +185,7 @@ async function saveResult() {
         <div v-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
           <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
             <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-            <div class="mail-card-actions"><a class="mailbox-button" :href="mailboxUrl(mail)" target="_blank" rel="noopener noreferrer" @click.stop>打开邮箱 ↗</a><button class="processed" @click.stop="processMail(mail)">已处理</button></div>
+            <div class="mail-card-actions"><button class="mailbox-button" @click.stop="openMailPreview(mail)">查看原文</button><button class="processed" @click.stop="processMail(mail)">已处理</button></div>
           </article>
         </div>
         <div v-else class="inbox-empty">{{inbox.accounts.length?(syncing?'正在检查新邮件…':'暂无待处理邮件'):'请先在设置页面连接 QQ 或网易邮箱'}}</div>
@@ -209,6 +220,22 @@ async function saveResult() {
     </div>
     <p v-if="message" class="feedback success">{{ message }}</p>
     <p v-if="error" class="feedback danger" role="alert">{{ error }}</p>
+
+    <dialog ref="previewDialog" class="mail-preview" aria-labelledby="mail-preview-title" @close="previewMail = null">
+      <article v-if="previewMail" class="mail-preview-card">
+        <header>
+          <div class="mail-preview-heading"><span class="preview-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><span>邮件原文</span><h2 id="mail-preview-title">{{ previewMail.subject || '（无主题）' }}</h2></div></div>
+          <button class="preview-close" type="button" aria-label="关闭邮件原文" @click="closeMailPreview">×</button>
+        </header>
+        <dl class="mail-preview-meta">
+          <div><dt>发件人</dt><dd>{{ previewMail.sender || '未知发件人' }}</dd></div>
+          <div><dt>收件邮箱</dt><dd>{{ previewMail.accountEmail }}</dd></div>
+          <div><dt>收取时间</dt><dd>{{ mailDate(previewMail.receivedAt) }}</dd></div>
+        </dl>
+        <div class="mail-preview-body" tabindex="0">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div>
+        <footer><small>这里展示系统通过邮箱服务收取并整理后的正文内容。</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" @click="processMail(previewMail)">标记为已处理</button></div></footer>
+      </article>
+    </dialog>
   </section>
 </template>
 
@@ -245,6 +272,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .empty-state.small { min-height: 100px; }
 .commit-box { padding: 14px; border-radius: 12px; color: var(--color-muted-foreground); background: #f4f6fb; }
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
+.mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:#fff;box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:#fff;background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:#f5f9fb;place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:#f7fafc}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid #dce6eb;border-radius:12px;background:#fbfcfc;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid #b9d9c9;border-radius:10px}
 @media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {
@@ -253,5 +281,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
   .inbox-heading{align-items:stretch;flex-direction:column}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
+  .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
 </style>
