@@ -91,6 +91,7 @@ async function loadInbox(sync = false) {
     inbox.value = sync
       ? await api<Inbox>('/api/poc/mail-inbox/sync', { method: 'POST' })
       : await api<Inbox>('/api/poc/mail-inbox')
+    await store.refreshPendingMailCount()
   } catch (cause) {
     if (!(cause instanceof ApiError && cause.status === 401)) error.value = failure(cause, '读取邮件收集箱失败')
   } finally { syncing.value = false }
@@ -103,12 +104,14 @@ function selectMail(mail: CollectedMail) {
 async function processMail(mail: CollectedMail) {
   await api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH' })
   inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
+  await store.refreshPendingMailCount()
   if (selectedMailId.value === mail.id) selectedMailId.value = null
 }
 async function deleteMail(mail: CollectedMail) {
   if (!confirm('从系统收集箱移除这封邮件？邮箱中的原邮件不会被删除。')) return
   await api(`/api/poc/mail-inbox/messages/${mail.id}`, { method: 'DELETE' })
   inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
+  await store.refreshPendingMailCount()
   if (selectedMailId.value === mail.id) { selectedMailId.value = null; mailBody.value = ''; hasResult.value = false }
 }
 function mailDate(value: string) {

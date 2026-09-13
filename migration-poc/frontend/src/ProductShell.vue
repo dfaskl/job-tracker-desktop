@@ -36,6 +36,7 @@ const activePage = ref<Page>('home')
 const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
+let mailCountTimer: number | undefined
 
 function pageFromHash(): Page {
   const value = window.location.hash.replace(/^#\/?/, '') as Page
@@ -65,16 +66,23 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') mobileMenuOpen.value = false
 }
 
-onMounted(() => {
+function refreshMailCountOnFocus() { if (store.user.value) void store.refreshPendingMailCount() }
+
+onMounted(async () => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
   window.addEventListener('keydown', handleGlobalKeydown)
-  void store.initialize()
+  window.addEventListener('focus', refreshMailCountOnFocus)
+  await store.initialize()
+  if (store.user.value) await store.refreshPendingMailCount()
+  mailCountTimer = window.setInterval(refreshMailCountOnFocus, 60_000)
 })
 watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('focus', refreshMailCountOnFocus)
+  if (mailCountTimer !== undefined) window.clearInterval(mailCountTimer)
 })
 </script>
 
@@ -88,10 +96,11 @@ onBeforeUnmount(() => {
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
       <nav id="primary-navigation" aria-label="主要导航">
-        <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id }" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
-          <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
+        <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
+          <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}<b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
       </nav>
+      <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
       <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
@@ -159,6 +168,9 @@ nav button {
   text-align: left;
 }
 nav button span { position:relative; z-index:1; width: 20px; color: #7dd3fc; font-size: 16px; text-align: center; }
+nav button.has-badge { padding-right: 40px; }
+.nav-badge { position: absolute; top: 5px; right: 8px; display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; border: 2px solid var(--sidebar); border-radius: 999px; color: #fff; background: var(--color-destructive); font: 800 10px/1 var(--font-button); letter-spacing: 0; box-shadow: 0 2px 6px rgba(0,0,0,.22); }
+.sr-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 nav button:hover { color: #fff; background: rgba(255,255,255,.07); }
 nav button.active {
   border-color: rgba(255,255,255,.12);
@@ -269,6 +281,8 @@ nav button.active::before {
   nav::-webkit-scrollbar { display: none; }
   nav button { width: 100%; min-width: 0; min-height: 40px; justify-content: center; padding: 8px 6px; text-align: center; }
   nav button span, nav button.active::before { display: none; }
+  nav button.has-badge { padding-right: 26px; }
+  .nav-badge { top: 2px; right: 3px; }
   .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 0 16px 44px; overflow-x: clip; }
   .product-main.application-page,
   .product-main.calendar-page,

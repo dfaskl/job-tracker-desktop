@@ -20,8 +20,10 @@ const initialized = ref(false)
 const loading = ref(false)
 const error = ref('')
 const readOnly = ref(true)
+const pendingMailCount = ref(0)
 const newApplicationRequest = ref(0)
 let refreshPromise: Promise<void> | null = null
+let pendingMailCountPromise: Promise<void> | null = null
 
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
@@ -59,6 +61,21 @@ async function initialize() {
   await refresh()
 }
 
+function refreshPendingMailCount() {
+  if (pendingMailCountPromise) return pendingMailCountPromise
+  pendingMailCountPromise = (async () => {
+    try {
+      const result = await api<{ count: number }>('/api/poc/mail-inbox/pending-count')
+      pendingMailCount.value = Math.max(0, Number(result.count) || 0)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) pendingMailCount.value = 0
+    } finally {
+      pendingMailCountPromise = null
+    }
+  })()
+  return pendingMailCountPromise
+}
+
 async function login(email: string, password: string) {
   clearApiCache()
   error.value = ''
@@ -66,6 +83,7 @@ async function login(email: string, password: string) {
     method: 'POST', body: JSON.stringify({ email, password })
   })
   await refresh(true)
+  await refreshPendingMailCount()
 }
 
 async function register(email: string, password: string, registrationCode: string) {
@@ -75,6 +93,7 @@ async function register(email: string, password: string, registrationCode: strin
     method: 'POST', body: JSON.stringify({ email, password, registrationCode })
   })
   await refresh(true)
+  await refreshPendingMailCount()
 }
 function requestNewApplication() { newApplicationRequest.value += 1 }
 
@@ -83,9 +102,10 @@ async function logout() {
   clearApiCache()
   user.value = null
   data.value = { applications: [], events: [] }
+  pendingMailCount.value = 0
   error.value = ''
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, pendingMailCount, refreshPendingMailCount, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
 }
