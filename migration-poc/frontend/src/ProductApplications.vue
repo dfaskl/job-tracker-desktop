@@ -84,9 +84,10 @@ function interviewParticipationTime(event:JobEvent){
   return event.completed?timeOf(event.completedAt):0
 }
 function health(item:JobApplication){
-  if(String(item.stage)!=='面试')return null
-  const times=store.events.value
-    .filter(event=>event.applicationId===item.id&&isFormalInterview(event)&&!event.missed)
+  if(String(item.stage)!=='面试'||String(item.status)!=='等待结果')return null
+  const interviews=store.events.value.filter(event=>event.applicationId===item.id&&isFormalInterview(event)&&!event.missed)
+  if(interviews.some(event=>!event.completed))return null
+  const times=interviews
     .map(interviewParticipationTime)
     .filter(Boolean)
   if(!times.length)return null
