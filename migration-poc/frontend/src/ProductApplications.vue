@@ -78,11 +78,16 @@ function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未�
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function eventCompletionTime(item:Record<string,unknown>){return String(item.completedAt||item.updatedAt||eventDeadline(item))}
 function eventRecordTime(item:Record<string,unknown>){return String(item.completed?eventCompletionTime(item):item.startsAt||item.start||item.date||'')}
+function interviewParticipationTime(event:JobEvent){
+  const end=String(event.endsAt||event.end||'').trim()
+  if(!end)return timeOf(event.startsAt||event.start||event.date)
+  return event.completed?timeOf(event.completedAt):0
+}
 function health(item:JobApplication){
   if(String(item.stage)!=='面试')return null
   const times=store.events.value
     .filter(event=>event.applicationId===item.id&&isFormalInterview(event)&&!event.missed)
-    .map(event=>timeOf(event.startsAt||event.start||event.date))
+    .map(interviewParticipationTime)
     .filter(Boolean)
   if(!times.length)return null
   const latest=Math.max(...times)
