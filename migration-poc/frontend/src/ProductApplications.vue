@@ -78,7 +78,20 @@ function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未�
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function eventCompletionTime(item:Record<string,unknown>){return String(item.completedAt||item.updatedAt||eventDeadline(item))}
 function eventRecordTime(item:Record<string,unknown>){return String(item.completed?eventCompletionTime(item):item.startsAt||item.start||item.date||'')}
-function health(item:JobApplication){if(['Offer','已结束'].includes(String(item.stage))||['已通过','未通过','已放弃','已结束'].includes(String(item.status)))return null;const related=store.events.value.filter(e=>e.applicationId===item.id&&isFormalInterview(e));if(related.some(e=>!e.completed&&!e.missed&&new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return null;const times=related.filter(e=>e.completed&&!e.missed).map(e=>new Date(eventCompletionTime(e).replace(' ','T')).getTime()).filter(Number.isFinite);if(!times.length)return null;const days=Math.max(0,Math.floor((Date.now()-Math.max(...times))/86400000));return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}}
+function health(item:JobApplication){
+  if(String(item.stage)!=='面试')return null
+  const times=store.events.value
+    .filter(event=>event.applicationId===item.id&&isFormalInterview(event)&&!event.missed)
+    .map(event=>timeOf(event.startsAt||event.start||event.date))
+    .filter(Boolean)
+  if(!times.length)return null
+  const latest=Math.max(...times)
+  const today=new Date(),scheduled=new Date(latest)
+  const todayDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime()
+  const scheduledDate=new Date(scheduled.getFullYear(),scheduled.getMonth(),scheduled.getDate()).getTime()
+  const days=Math.max(0,Math.floor((todayDate-scheduledDate)/86400000))
+  return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}
+}
 function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isFormalInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
 function timeOf(value:unknown){const time=new Date(String(value||'').replace(' ','T')).getTime();return Number.isFinite(time)?time:0}
 function hasInterviewProgress(item:JobApplication){return ['面试','Offer'].includes(String(item.stage))||item.status==='已通过'||store.events.value.some(event=>event.applicationId===item.id&&!event.missed&&(isFormalInterview(event)||event.type==='Offer'))}
