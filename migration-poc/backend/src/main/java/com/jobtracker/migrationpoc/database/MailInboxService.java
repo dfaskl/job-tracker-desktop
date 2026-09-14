@@ -46,6 +46,7 @@ public class MailInboxService {
     public void removeAccount(String email,long id)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("DELETE FROM mail_accounts WHERE id=? AND user_id=?")){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}
     public InboxView sync(String email)throws Exception{try(Connection c=open()){long userId=userId(c,email);for(AccountRow account:accounts(c,userId)){try{syncAccount(c,account);}catch(Exception ignored){}}}return inbox(email);}
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
+    public int processAll(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));return s.executeUpdate();}}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
 
     @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:15000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:15000}")

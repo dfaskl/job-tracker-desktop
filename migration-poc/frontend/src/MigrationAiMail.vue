@@ -22,7 +22,10 @@ const message = ref('')
 const selectedApplicationId = ref('')
 const inbox = store.mailInbox
 const syncing = ref(false)
+const processingAll = ref(false)
 const selectedMailId = ref<number | null>(null)
+const processNotice = ref('')
+let processNoticeTimer = 0
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
 
@@ -105,6 +108,23 @@ async function processMail(mail: CollectedMail) {
   await store.refreshMailInbox()
   if (selectedMailId.value === mail.id) selectedMailId.value = null
   if (previewMail.value?.id === mail.id) closeMailPreview()
+  showProcessNotice('邮件已处理成功')
+}
+function showProcessNotice(value: string) {
+  processNotice.value = value
+  window.clearTimeout(processNoticeTimer)
+  processNoticeTimer = window.setTimeout(() => { processNotice.value = '' }, 2600)
+}
+async function processAllMail() {
+  const count=inbox.value.pendingCount
+  if(!count||!confirm(`确认将当前 ${count} 封待处理邮件全部标记为已处理吗？`))return
+  processingAll.value=true;error.value=''
+  try {
+    const result=await api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH'})
+    selectedMailId.value=null;closeMailPreview();await store.refreshMailInbox()
+    showProcessNotice(`已成功处理 ${Math.max(0,Number(result.processed)||count)} 封邮件`)
+  } catch(cause) { error.value=failure(cause,'批量处理邮件失败') }
+  finally { processingAll.value=false }
 }
 async function openMailPreview(mail: CollectedMail) {
   previewMail.value = mail
@@ -181,7 +201,7 @@ async function saveResult() {
 
     <div class="mail-grid">
       <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><button class="secondary sync-button" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取新邮件'}}</button></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" :disabled="processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'处理中…':'一键处理全部'}}</button><button class="secondary sync-button" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取新邮件'}}</button></div></div>
         <div v-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
           <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
             <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
@@ -220,6 +240,7 @@ async function saveResult() {
     </div>
     <p v-if="message" class="feedback success">{{ message }}</p>
     <p v-if="error" class="feedback danger" role="alert">{{ error }}</p>
+    <Transition name="process-notice"><div v-if="processNotice" class="process-notice" role="status"><span aria-hidden="true">✓</span>{{processNotice}}</div></Transition>
 
     <dialog ref="previewDialog" class="mail-preview" aria-labelledby="mail-preview-title" @close="previewMail = null">
       <article v-if="previewMail" class="mail-preview-card">
@@ -263,7 +284,7 @@ async function saveResult() {
 .step { display: grid; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: var(--color-primary); place-items: center; font-size: 13px; font-weight: 800; }
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .compose-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
-.inbox-heading,.inbox-heading>div,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:12px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.sync-button{flex:none}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards article{align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}
+.inbox-heading,.inbox-heading>div,.inbox-actions,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:12px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.inbox-actions{flex:none;gap:8px}.sync-button,.process-all-button{flex:none}.process-all-button{color:#176b4b;background:#eaf8f1;border-color:#b9d9c9}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards article{align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}
 .privacy-note { margin-bottom: 14px; color: var(--color-muted-foreground); font-size: 12px; }
 .service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
@@ -272,6 +293,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .empty-state.small { min-height: 100px; }
 .commit-box { padding: 14px; border-radius: 12px; color: var(--color-muted-foreground); background: #f4f6fb; }
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
+.process-notice{position:fixed;z-index:1200;top:22px;left:50%;display:flex;align-items:center;gap:9px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid #a9d7c0;border-radius:12px;color:#145c43;background:#f0fbf5;box-shadow:0 12px 32px rgba(14,75,55,.18);font-family:var(--font-button);font-weight:700;transform:translateX(-50%)}.process-notice span{display:grid;width:22px;height:22px;border-radius:50%;color:#fff;background:#26956b;place-items:center}.process-notice-enter-active,.process-notice-leave-active{transition:opacity .18s ease,transform .18s ease}.process-notice-enter-from,.process-notice-leave-to{opacity:0;transform:translate(-50%,-8px)}
 .mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:#fff;box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:#fff;background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:#f5f9fb;place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:#f7fafc}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid #dce6eb;border-radius:12px;background:#fbfcfc;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid #b9d9c9;border-radius:10px}
 @media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
@@ -280,7 +302,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
-  .inbox-heading{align-items:stretch;flex-direction:column}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
+  .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:1fr 1fr}.sync-button,.process-all-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
 </style>
