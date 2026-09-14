@@ -36,7 +36,7 @@ const activePage = ref<Page>('home')
 const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
-let mailCountTimer: number | undefined
+let workspaceRefreshTimer: number | undefined
 
 function pageFromHash(): Page {
   const value = window.location.hash.replace(/^#\/?/, '') as Page
@@ -66,23 +66,27 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') mobileMenuOpen.value = false
 }
 
-function refreshMailInboxOnFocus() { if (store.user.value) void store.refreshMailInbox() }
+function refreshWorkspaceData(syncMail = false) {
+  if (!store.user.value) return
+  void Promise.all([store.refresh(), store.refreshMailInbox(syncMail)])
+}
+function handleWindowFocus() { refreshWorkspaceData(true) }
 
 onMounted(async () => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
   window.addEventListener('keydown', handleGlobalKeydown)
-  window.addEventListener('focus', refreshMailInboxOnFocus)
+  window.addEventListener('focus', handleWindowFocus)
   await store.initialize()
-  if (store.user.value) await store.refreshMailInbox()
-  mailCountTimer = window.setInterval(refreshMailInboxOnFocus, 30_000)
+  if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
+  workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
 })
 watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
-  window.removeEventListener('focus', refreshMailInboxOnFocus)
-  if (mailCountTimer !== undefined) window.clearInterval(mailCountTimer)
+  window.removeEventListener('focus', handleWindowFocus)
+  if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
 })
 </script>
 
