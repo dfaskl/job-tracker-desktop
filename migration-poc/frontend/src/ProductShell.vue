@@ -243,8 +243,10 @@ nav button.active::before {
 @media (max-width: 820px) {
   .product-shell { width: 100%; max-width: 100%; overflow-x: clip; }
   .sidebar {
-    position: sticky;
+    position: fixed;
+    inset: 0 0 auto 0;
     top: 0;
+    z-index: 30;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     width: 100%;
@@ -287,7 +289,7 @@ nav button.active::before {
   nav button span, nav button.active::before { display: none; }
   nav button.has-badge { padding-right: 26px; }
   .nav-badge { top: 2px; right: 3px; }
-  .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 0 16px 44px; overflow-x: clip; }
+  .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 70px 16px 44px; overflow-x: clip; }
   .product-main.application-page,
   .product-main.calendar-page,
   .product-main.mail-page-shell,
@@ -295,14 +297,14 @@ nav button.active::before {
   .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
-  .topbar { min-height: 0; flex-wrap: wrap; padding: 12px 0; }
+  .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 12px 0; }
   .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
 }
 @media (max-width: 620px) {
   .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   nav::before { display: none; }
   nav button { width: 100%; min-width: 0; min-height: 38px; justify-content: center; padding: 7px 4px; font-size: 13px; text-align: center; }
-  .topbar > button { display: none; }
+  .topbar > button { order: 4; display: block; width: 100%; min-width: 0; min-height: 44px; }
 }
 @media (max-width: 520px) {
   .product-main { padding-inline: 12px; }
