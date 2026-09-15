@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AiSandboxService {
     private static final Set<String> NOTICE_TYPES = Set.of("测评", "笔试", "面试", "Offer", "未通过", "其他");
-    private static final Set<String> CHANNELS = Set.of("官网", "Boss直聘", "实习僧", "牛客", "猎聘", "智联招聘", "前程无忧", "校园招聘平台", "内推", "其他");
+    private static final Set<String> CHANNELS = Set.of("官网", "Boss直聘", "实习僧", "牛客", "猎聘", "智联招聘", "前程无忧", "国聘", "校园招聘平台", "内推", "其他");
     private static final Set<String> STAGES = Set.of("已投递", "测评", "笔试", "面试", "Offer", "已结束");
     private static final Set<String> STATUSES = Set.of("等待结果", "已通过", "未通过", "已放弃", "已结束");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
