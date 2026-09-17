@@ -8,36 +8,43 @@ import { useJobTrackerStore } from './jobTrackerStore'
 const store = useJobTrackerStore()
 const ready = ref(false)
 const allowedPages = new Set(['home', 'applications', 'calendar', 'mail', 'stats', 'settings', 'admin'])
-const requestedPage = ref(readRequestedPage())
+const requestedRoute = ref(readRequestedRoute())
 
-function readPageFromHash() {
-  const value = window.location.hash.replace(/^#\/?/, '')
-  return allowedPages.has(value) ? value : 'home'
+function readRouteFromHash() {
+  return window.location.hash.replace(/^#\/?/, '') || 'home'
 }
 
-function readRequestedPage() {
-  const fromHash = readPageFromHash()
+function pageFromRoute(route: string) {
+  return route.split('?')[0]
+}
+
+function readRequestedRoute() {
+  const route = readRouteFromHash()
+  const page = pageFromRoute(route)
   const fromSession = window.sessionStorage.getItem('job-tracker-requested-page') || ''
-  return window.location.hash.includes('login') && allowedPages.has(fromSession) ? fromSession : fromHash
+  const sessionPage = pageFromRoute(fromSession)
+  if (page === 'login' && allowedPages.has(sessionPage)) return fromSession
+  return allowedPages.has(page) ? route : 'home'
 }
 
-function replaceHash(page: string) {
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/${page}`)
+function replaceHash(route: string) {
+  window.history.replaceState(null, '', window.location.pathname + window.location.search + '#/' + route)
 }
 
 function enforceAuthRoute() {
   if (!ready.value) return
-  const value = window.location.hash.replace(/^#\/?/, '')
+  const route = readRouteFromHash()
+  const page = pageFromRoute(route)
   if (!store.user.value) {
-    if (allowedPages.has(value)) {
-      requestedPage.value = value
-      window.sessionStorage.setItem('job-tracker-requested-page', value)
+    if (allowedPages.has(page)) {
+      requestedRoute.value = route
+      window.sessionStorage.setItem('job-tracker-requested-page', route)
     }
-    if (value !== 'login') replaceHash('login')
+    if (page !== 'login') replaceHash('login')
     return
   }
-  if (value === 'login' || !allowedPages.has(value)) {
-    replaceHash(requestedPage.value || 'home')
+  if (page === 'login' || !allowedPages.has(page)) {
+    replaceHash(requestedRoute.value || 'home')
     window.sessionStorage.removeItem('job-tracker-requested-page')
   }
 }
