@@ -13,13 +13,13 @@ import { useJobTrackerStore } from './jobTrackerStore'
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
 
 const pages: { id: Page; label: string; icon: string; subtitle: string }[] = [
-  { id: 'home', label: '首页', icon: '⌂', subtitle: '掌握每一次机会的进展' },
-  { id: 'applications', label: '投递记录', icon: '▣', subtitle: '管理岗位、状态与完整流程' },
-  { id: 'calendar', label: '日程', icon: '□', subtitle: '跟进笔试、面试与 Offer 安排' },
-  { id: 'mail', label: '邮件识别', icon: '✦', subtitle: '从通知邮件中提取关键信息' },
-  { id: 'stats', label: '统计', icon: '◫', subtitle: '查看投递阶段与渠道分布' },
-  { id: 'settings', label: '设置', icon: '⚙', subtitle: '管理会话、备份和运行配置' },
-  { id: 'admin', label: '管理员', icon: '◇', subtitle: '管理账号、权限与注册策略' }
+  { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5z', subtitle: '掌握每一次机会的进展' },
+  { id: 'applications', label: '投递记录', icon: 'M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Zm2 5h8M8 13h8M8 17h5', subtitle: '管理岗位、状态与完整流程' },
+  { id: 'calendar', label: '日程', icon: 'M5 5h14a2 2 0 0 1 2 2v12H3V7a2 2 0 0 1 2-2Zm2-2v4m10-4v4M3 10h18M7 14h3m4 0h3m-10 3h3', subtitle: '跟进笔试、面试与 Offer 安排' },
+  { id: 'mail', label: '邮件识别', icon: 'M4 6h16v12H4zM4 7l8 6 8-6m-4-4v3m-1.5-1.5h3', subtitle: '从通知邮件中提取关键信息' },
+  { id: 'stats', label: '统计', icon: 'M4 20V10m5 10V4m6 16v-7m5 7V7', subtitle: '查看投递阶段与渠道分布' },
+  { id: 'settings', label: '设置', icon: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.5 1.5m-9 9L6 18m12 0-1.5-1.5m-9-9L6 6', subtitle: '管理会话、备份和运行配置' },
+  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6zM9 12l2 2 4-4', subtitle: '管理账号、权限与注册策略' }
 ]
 
 const pageComponents: Record<Page, Component> = {
@@ -109,8 +109,9 @@ onBeforeUnmount(() => {
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
       <nav id="primary-navigation" aria-label="主要导航">
+        <p class="nav-caption">工作台</p>
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
-          <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}<b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong><small>{{ item.subtitle }}</small></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
@@ -142,64 +143,107 @@ onBeforeUnmount(() => {
   display: flex;
   width: 232px;
   flex-direction: column;
-  padding: 22px 16px 18px;
+  padding: 20px 14px 18px;
   color: #effbf7;
-  background: var(--sidebar);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(73,205,181,.18), transparent 26%),
+    linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 92%, #123e45), var(--sidebar));
   border-right: 1px solid rgba(255,255,255,.1);
-  box-shadow: 8px 0 28px rgba(23,75,79,.10);
+  box-shadow: 10px 0 34px rgba(16,61,65,.13);
+  overflow: hidden;
+}
+.sidebar::after {
+  content: "";
+  position: absolute;
+  right: -90px;
+  bottom: 12%;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(128,215,194,.12);
+  border-radius: 50%;
+  box-shadow: 0 0 0 34px rgba(128,215,194,.035), 0 0 0 68px rgba(128,215,194,.025);
+  pointer-events: none;
 }
 
 .brand {
+  position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
   min-height: 52px;
   align-items: center;
   gap: 11px;
-  padding: 7px 8px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 13px;
   color: inherit;
   background: transparent;
   text-align: left;
+  transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
 }
-.brand > img { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
+.brand:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.055); }
+.brand > img { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 11px; box-shadow: 0 7px 18px rgba(0,0,0,.16); transition: transform .24s cubic-bezier(.2,.8,.2,1); }
+.brand:hover > img { transform: rotate(-4deg) scale(1.04); }
 .brand div { display: grid; gap: 2px; }
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
 .brand small { color: #b9e5da; font-size: 11px; }
 .menu-toggle { display: none; }
-nav { position: relative; display: grid; gap: 5px; margin-top: 28px; }
-nav::before { content:""; position:absolute; top:18px; bottom:18px; left:22px; width:1px; background:rgba(105,195,165,.22); }
+nav { position: relative; z-index: 1; display: grid; min-height: 0; gap: 6px; margin-top: 28px; overflow-y: auto; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
+nav::-webkit-scrollbar { display: none; }
+.nav-caption { margin: 0 10px 6px; color: rgba(213,242,235,.58); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 nav button {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 46px;
+  min-height: 52px;
   align-items: center;
-  gap: 12px;
-  padding: 10px 13px;
+  gap: 11px;
+  padding: 8px 10px;
+  overflow: hidden;
   border: 1px solid transparent;
+  border-radius: 13px;
   color: #d5f2eb;
   background: transparent;
   text-align: left;
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s cubic-bezier(.2,.8,.2,1);
 }
-nav button span { position:relative; z-index:1; width: 20px; color: #80d7c2; font-size: 16px; text-align: center; }
+.nav-icon { position: relative; z-index: 1; display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid rgba(128,215,194,.14); border-radius: 10px; color: #8fdfcc; background: rgba(255,255,255,.045); transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
+.nav-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav-copy { position: relative; z-index: 1; display: grid; min-width: 0; flex: 1; gap: 1px; }
+.nav-copy strong { font-size: 13px; line-height: 1.35; }
+.nav-copy small { overflow: hidden; color: rgba(213,242,235,.56); font-size: 10px; font-weight: 500; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; transition: color .2s ease; }
+.nav-arrow { position: relative; z-index: 1; flex: none; color: rgba(213,242,235,.36); font-size: 21px; line-height: 1; transform: translateX(-3px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
 nav button.has-badge { padding-right: 40px; }
+nav button.has-badge .nav-arrow { display: none; }
 .nav-badge { position: absolute; top: 5px; right: 8px; display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; border: 2px solid var(--sidebar); border-radius: 999px; color: #fff; background: var(--color-destructive); font: 800 10px/1 var(--font-button); letter-spacing: 0; box-shadow: 0 2px 6px rgba(0,0,0,.22); }
 .sr-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-nav button:hover { color: #fff; background: rgba(255,255,255,.07); }
+nav button:hover { transform: translateX(3px); color: #fff; background: rgba(255,255,255,.075); }
+nav button:hover .nav-icon { transform: scale(1.05); color: #baf5e7; border-color: rgba(186,245,231,.24); background: rgba(255,255,255,.08); }
+nav button:hover .nav-copy small { color: rgba(239,251,247,.75); }
+nav button:hover .nav-arrow { transform: translateX(0); opacity: 1; }
 nav button.active {
-  border-color: rgba(255,255,255,.12);
+  border-color: rgba(186,245,231,.18);
   color: #fff;
-  background: var(--sidebar-active);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--sidebar-active) 86%, #46bfa7), var(--sidebar-active));
+  box-shadow: 0 9px 20px rgba(1,39,42,.18), inset 0 1px rgba(255,255,255,.08);
 }
 nav button.active::before {
   content: "";
   position: absolute;
-  top: 11px;
-  bottom: 11px;
-  left: -16px;
-  width: 4px;
-  background: #f2a65a;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 99px 99px 0;
+  background: #ffc274;
+  box-shadow: 0 0 14px rgba(255,194,116,.55);
 }
-.sidebar-account { display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
+nav button.active .nav-icon { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.08); }
+nav button.active .nav-copy small { color: rgba(255,255,255,.72); }
+nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
+.sidebar :is(button,a):focus-visible { outline: 3px solid rgba(255,194,116,.72); outline-offset: 2px; }
+.sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
+@keyframes nav-group-in { from { transform: translateX(-7px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 232px; padding: 0 38px 64px; }
 .topbar {
   position: sticky;
@@ -263,7 +307,9 @@ nav button.active::before {
     height: auto;
     padding: 8px 12px 10px;
     overflow: hidden;
+    transition: box-shadow .24s ease;
   }
+  .sidebar::after { display: none; }
   .brand { width: fit-content; max-width: 100%; min-width: 0; }
   .brand div { min-width: 0; }
   .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -285,17 +331,21 @@ nav button.active::before {
   .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
   .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  .sidebar-account { position: static; display: none; grid-column: 1 / -1; width: 100%; min-width: 0; margin: 6px 0 0; }
-  .menu-open .sidebar-account { display: flex; }
+  .sidebar-account { position: static; grid-column: 1 / -1; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height .25s ease, margin .25s ease, opacity .2s ease, transform .25s ease; }
+  .menu-open .sidebar-account { max-height: 72px; margin-top: 6px; opacity: 1; transform: translateY(0); }
   .sidebar-account :deep(.signed.compact) { display: flex; width: auto; min-width: 0; padding: 5px 7px; flex-direction: row; }
   .sidebar-account :deep(.signed.compact > div) { width: auto; }
   .sidebar-account :deep(.signed.compact span) { display: none; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
-  nav { grid-column: 1 / -1; display: none; width: 100%; min-width: 0; margin: 8px 0 0; overflow: hidden; }
-  .menu-open nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
+  .menu-open nav { max-height: 240px; margin-top: 8px; opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .nav-caption { display: none; }
   nav::-webkit-scrollbar { display: none; }
-  nav button { width: 100%; min-width: 0; min-height: 40px; justify-content: center; padding: 8px 6px; text-align: center; }
-  nav button span, nav button.active::before { display: none; }
+  nav button { width: 100%; min-width: 0; min-height: 44px; justify-content: center; padding: 7px 5px; border-radius: 10px; text-align: center; animation: none; }
+  nav button:hover { transform: translateY(-1px); }
+  .nav-icon, .nav-copy small, .nav-arrow, nav button.active::before { display: none; }
+  .nav-copy { display: block; flex: 0 1 auto; }
+  .nav-copy strong { font-size: 12px; }
   nav button.has-badge { padding-right: 26px; }
   .nav-badge { top: 2px; right: 3px; }
   .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 70px 16px 44px; overflow-x: clip; }
@@ -310,12 +360,14 @@ nav button.active::before {
   .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
 }
 @media (max-width: 620px) {
-  .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  nav::before { display: none; }
+  nav, .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   nav button { width: 100%; min-width: 0; min-height: 38px; justify-content: center; padding: 7px 4px; font-size: 13px; text-align: center; }
   .topbar > button { order: 4; display: block; width: 100%; min-width: 0; min-height: 44px; }
 }
 @media (max-width: 520px) {
   .product-main { padding-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar *, .sidebar *::before, .sidebar *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
 }
 </style>
