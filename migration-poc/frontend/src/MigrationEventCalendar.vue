@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
+import { useCalendarEventCapacity } from './useCalendarEventCapacity'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
@@ -43,6 +44,7 @@ const eventColors = [
   ['#c34f5a','#fde6e9'], ['#347f9d','#e0f1f7'], ['#66752e','#edf2d8'], ['#a04f91','#f7e4f3']
 ] as const
 const store = useJobTrackerStore()
+const { calendarGrid, hiddenCalendarEntryCount, recalculateCalendarCapacity, visibleCalendarEntries } = useCalendarEventCapacity()
 const sandbox: SandboxStatus = { enabled:true, configured:true, isolated:false, message:'可写数据源' }
 const applications = computed<ApplicationOption[]>(() => store.applications.value.map(item => ({
   id:String(item.id), company:String(item.company || ''), position:String(item.position || ''), appliedDate:String(item.appliedDate || '')
@@ -106,6 +108,8 @@ const cells = computed<CalendarCell[]>(() => {
   })
 })
 
+
+watch(cells, () => nextTick(recalculateCalendarCapacity), { flush: 'post' })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function dateKey(date: Date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` }
@@ -214,9 +218,9 @@ function allocateEventLanes(items: EventItem[]) {
 function calendarEventsOn(key: string): CalendarEvent[] {
   return eventsByDate.value.get(key) || []
 }
-function visibleEvents(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane < 3) }
-function hiddenEventCount(entries: CalendarEvent[]) { return entries.filter(entry => entry.lane >= 3).length }
-function eventStyle(entry: CalendarEvent) { const color=eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String(entry.lane + 1) } }
+
+
+function eventStyle(entry: CalendarEvent, displayIndex?: number) { const color=eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String((displayIndex ?? entry.lane) + 1) } }
 
 function changeMonth(offset: number) {
   month.value = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
@@ -339,15 +343,15 @@ async function remove(item: EventItem) {
             <div><button class="secondary compact" :disabled="!canGoPrevious" aria-label="上一个月" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" aria-label="下一个月" @click="changeMonth(1)">›</button></div>
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
-          <div class="calendar-grid">
-            <button v-for="cell in cells" :key="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key === selectedDate" @click="selectDate(cell.key)">
+          <div ref="calendarGrid" class="calendar-grid">
+            <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key === selectedDate" @click="selectDate(cell.key)">
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
-                <small v-for="entry in visibleEvents(cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
+                <small v-for="(entry,index) in visibleCalendarEntries(cell.key,cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry,index)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
                   {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.company} · ${entry.event.title || entry.event.type}` : entry.position === 'end' ? `截止 ${entry.event.company} · ${entry.event.title || entry.event.type}` : `${entry.event.company} · ${entry.event.title || entry.event.type}` }}
                 </small>
               </span>
-              <i v-if="hiddenEventCount(cell.events)">+{{ hiddenEventCount(cell.events) }}</i>
+              <i v-if="hiddenCalendarEntryCount(cell.key,cell.events)" class="event-overflow">+{{ hiddenCalendarEntryCount(cell.key,cell.events) }}</i>
             </button>
           </div>
         </div>
@@ -467,4 +471,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .selected-list article { flex-direction: column; }
   .event-actions { justify-content: flex-start; }
 }
+</style>
+<style scoped>
+.day-events{--calendar-event-row-height:20px;min-height:0;grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height)}@media(max-width:720px){.day-events{--calendar-event-row-height:9px;row-gap:2px}}
 </style>

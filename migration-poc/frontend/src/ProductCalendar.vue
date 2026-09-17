@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useJobTrackerStore, type JobEvent } from './jobTrackerStore'
+import { useCalendarEventCapacity } from './useCalendarEventCapacity'
 
 const store = useJobTrackerStore()
+const { calendarGrid, hiddenCalendarEntryCount, recalculateCalendarCapacity, visibleCalendarEntries } = useCalendarEventCapacity()
 const cursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const selectedDate = ref(key(new Date()))
 const monthTitle = computed(() => `${cursor.value.getFullYear()}年${cursor.value.getMonth() + 1}月`)
@@ -36,6 +38,7 @@ const cells = computed(() => {
     return { key: dateKey, day: date.getDate(), current: date.getMonth() === first.getMonth(), events: calendarEventsOn(dateKey) }
   })
 })
+watch(cells, () => nextTick(recalculateCalendarCapacity), { flush: 'post' })
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function firstOfMonth(date: Date) { return new Date(date.getFullYear(),date.getMonth(),1) }
@@ -100,9 +103,7 @@ function allocateEventColors(events: JobEvent[]) {
 }function calendarEventsOn(dateKey: string): CalendarEntry[] {
   return normalized.value.filter(event => datesFor(event).includes(dateKey)).map(event => ({ event, position: calendarPosition(event, dateKey), lane: eventLanes.value.get(String(event.id)) || 0, color: eventColorAssignments.value.get(String(event.id)) ?? stableColor(event) }))
 }
-function eventStyle(entry: CalendarEntry) { const color = eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String(entry.lane+1) } }
-function visibleCalendarEvents(events: CalendarEntry[]) { return events.filter(entry => entry.lane < 3) }
-function hiddenCalendarEventCount(events: CalendarEntry[]) { return events.filter(entry => entry.lane >= 3).length }
+function eventStyle(entry: CalendarEntry, displayIndex?: number) { const color = eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String((displayIndex ?? entry.lane)+1) } }
 function move(offset: number) { cursor.value = clampMonth(new Date(cursor.value.getFullYear(), cursor.value.getMonth() + offset, 1)) }
 function eventName(event: JobEvent) { return value(event, 'title', 'type') || '未命名安排' }
 function eventCompany(event: JobEvent) {
@@ -117,9 +118,9 @@ function eventCompany(event: JobEvent) {
       <section class="card month-card">
         <div class="calendar-head"><button class="secondary" :disabled="!canGoPrevious" aria-label="上一个月" @click="move(-1)">‹</button><strong>{{ monthTitle }}</strong><button class="secondary" :disabled="!canGoNext" aria-label="下一个月" @click="move(1)">›</button></div>
         <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</b></div>
-        <div class="month-grid">
-          <button v-for="cell in cells" :key="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key===selectedDate" @click="selectedDate=cell.key">
-            <span class="day-number">{{ cell.day }}</span><span class="day-events"><i v-for="entry in visibleCalendarEvents(cell.events)" :key="entry.event.id + '-' + entry.position" :class="[entry.position,{ completed:Boolean(entry.event.completed) }]" :style="eventStyle(entry)"><template v-if="entry.position==='start'">开始 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='end'">截止 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='point'">{{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template></i></span><small v-if="hiddenCalendarEventCount(cell.events)">+{{ hiddenCalendarEventCount(cell.events) }}</small>
+        <div ref="calendarGrid" class="month-grid">
+          <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key===selectedDate" @click="selectedDate=cell.key">
+            <span class="day-number">{{ cell.day }}</span><span class="day-events"><i v-for="(entry,index) in visibleCalendarEntries(cell.key,cell.events)" :key="entry.event.id + '-' + entry.position" :class="[entry.position,{ completed:Boolean(entry.event.completed) }]" :style="eventStyle(entry,index)"><template v-if="entry.position==='start'">开始 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='end'">截止 {{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template><template v-else-if="entry.position==='point'">{{ eventCompany(entry.event) }} · {{ eventName(entry.event) }}</template></i></span><small v-if="hiddenCalendarEntryCount(cell.key,cell.events)" class="event-overflow">+{{ hiddenCalendarEntryCount(cell.key,cell.events) }}</small>
           </button>
         </div>
       </section>
@@ -131,4 +132,7 @@ function eventCompany(event: JobEvent) {
 
 <style scoped>
 .overdue-alert{display:flex;justify-content:space-between;gap:12px;margin-top:22px;padding:14px 18px;border:1px solid #f4c7c7;border-radius:12px;color:#982d2d;background:#fff1f1}.calendar-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:18px}.calendar-head{display:flex;align-items:center;justify-content:space-between}.weekdays,.month-grid{display:grid;grid-template-columns:repeat(7,1fr)}.weekdays b{padding:12px 4px;color:var(--color-muted-foreground);font-size:12px;text-align:center}.day{min-height:88px;padding:7px;border:1px solid var(--color-border);border-radius:0;color:var(--color-card-foreground);background:#fff;text-align:left}.day.muted{color:#b3bac7;background:#f8fafc}.day.selected{position:relative;z-index:1;outline:2px solid var(--color-primary)}.day.today>.day-number{display:grid;width:23px;height:23px;place-items:center;border-radius:50%;color:#fff;background:var(--color-primary)}.day-events{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,23px);align-content:start}.day-events>i{display:block;align-self:center;overflow:hidden;padding:4px 6px;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:11px;line-height:14px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}.day-events>i.start{margin-right:-7px;border-radius:4px 0 0 4px}.day-events>i.middle{height:4px;margin:0 -7px;padding:0;border-radius:0;color:transparent;background:var(--event-color);opacity:.65}.day-events>i.end{margin-left:-7px;border-radius:0 4px 4px 0}.day-events>i.completed{color:#747b86;background:#e5e7eb;text-decoration:line-through}.day small{color:var(--color-muted-foreground)}.selected-card h2{margin-top:0}.selected-card article{display:grid;gap:5px;padding:13px 0;border-top:1px solid #edf0f5}.selected-card span{color:var(--color-muted-foreground);font-size:12px}.selected-card article.completed{color:#747b86;background:#f3f4f6}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-weight:700;text-decoration:none}.upcoming article{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:13px 0;border-top:1px solid #edf0f5}.upcoming div{display:grid;gap:4px}.upcoming time{color:var(--color-primary);font-weight:700}@media(min-width:851px) and (min-height:620px){.calendar-overview{height:calc(100vh - 20px);min-height:0;overflow:hidden}.calendar-overview>.calendar-layout{height:100%;min-height:0}.calendar-layout>.card{height:calc(100% - 22px);min-height:0;overflow:hidden}.month-card{display:flex;flex-direction:column}.month-card>.calendar-head,.month-card>.weekdays{flex:0 0 auto}.month-card>.month-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.month-card .day{position:relative;min-height:0;padding:34px 7px 7px}.month-card .day-number{position:absolute;top:7px;left:7px;display:grid;width:23px;height:23px;place-items:center}.selected-card{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-card>h2{position:sticky;top:0;z-index:2;padding-bottom:12px;background:#fff}}@media(max-width:850px){.calendar-layout{grid-template-columns:1fr}.day{min-height:62px}.day i{height:5px;padding:0;font-size:0}.upcoming article{grid-template-columns:1fr}.overdue-alert{flex-direction:column}}
+</style>
+<style scoped>
+.day{position:relative;display:flex;align-items:stretch;overflow:hidden;flex-direction:column;padding-top:30px}.day-number{position:absolute;top:7px;left:7px;display:grid;width:23px;height:23px;place-items:center}.day-events{--calendar-event-row-height:23px;display:grid;width:100%;min-height:0;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height);align-content:start}.day .event-overflow{position:absolute;right:6px;bottom:4px;color:var(--color-muted-foreground);font-size:11px;line-height:15px}@media(max-width:850px){.day{padding:27px 4px 4px}.day-number{top:4px;left:4px;width:20px;height:20px;font-size:11px}.day-events{--calendar-event-row-height:9px;row-gap:2px}.day-events>i{height:5px;padding:0;border-radius:99px;color:transparent;font-size:0;line-height:0}.day-events>i.start,.day-events>i.end{margin-inline:0;border-radius:99px}.day-events>i.middle{height:5px;margin-inline:-4px}.day .event-overflow{right:3px;bottom:2px;font-size:10px;line-height:11px}}
 </style>
