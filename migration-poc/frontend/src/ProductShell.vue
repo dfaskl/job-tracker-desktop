@@ -38,13 +38,17 @@ const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
 let workspaceRefreshTimer: number | undefined
 
-function pageFromHash(): Page {
-  const value = window.location.hash.replace(/^#\/?/, '') as Page
-  return pages.some((item) => item.id === value) ? value : 'home'
+function routeFromHash() {
+  const [pageValue, query = ''] = window.location.hash.replace(/^#\/?/, '').split('?')
+  const page = pages.some((item) => item.id === pageValue) ? (pageValue as Page) : 'home'
+  const applicationId = page === 'applications' ? new URLSearchParams(query).get('application') || '' : ''
+  return { page, applicationId }
 }
 
 function syncHash() {
-  activePage.value = pageFromHash()
+  const route = routeFromHash()
+  activePage.value = route.page
+  if (route.applicationId) store.requestApplicationDetail(route.applicationId)
 }
 
 async function createApplication() {
@@ -54,10 +58,14 @@ async function createApplication() {
   }
   store.requestNewApplication()
 }
-function navigate(page: Page) {
+function navigate(page: Page, applicationId?: string) {
   mobileMenuOpen.value = false
-  if (activePage.value === page) return
-  window.location.hash = page
+  const targetHash = page === 'applications' && applicationId ? 'applications?application=' + encodeURIComponent(applicationId) : page
+  if (window.location.hash.replace(/^#\/?/, '') === targetHash) {
+    if (applicationId) store.requestApplicationDetail(applicationId)
+    return
+  }
+  window.location.hash = targetHash
   activePage.value = page
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
@@ -79,6 +87,7 @@ onMounted(async () => {
   window.addEventListener('focus', handleWindowFocus)
   await store.initialize()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
+  syncHash()
   workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
 })
 watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })

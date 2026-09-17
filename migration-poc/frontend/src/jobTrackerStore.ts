@@ -26,6 +26,7 @@ export type MailInbox = { accounts: MailAccount[]; messages: CollectedMail[]; pe
 const mailInbox = ref<MailInbox>({ accounts: [], messages: [], pendingCount: 0 })
 const pendingMailCount = computed(() => mailInbox.value.pendingCount)
 const newApplicationRequest = ref(0)
+const applicationDetailRequest = ref({ applicationId: '', sequence: 0 })
 let refreshPromise: Promise<void> | null = null
 let mailInboxPromise: Promise<void> | null = null
 
@@ -100,6 +101,11 @@ async function register(email: string, password: string, registrationCode: strin
   await refreshMailInbox()
 }
 function requestNewApplication() { newApplicationRequest.value += 1 }
+function requestApplicationDetail(applicationId: string) {
+  const normalizedId = String(applicationId || '').trim()
+  if (!normalizedId) return
+  applicationDetailRequest.value = { applicationId: normalizedId, sequence: applicationDetailRequest.value.sequence + 1 }
+}
 
 async function logout() {
   await api('/api/poc/auth/logout', { method: 'POST' })
@@ -107,9 +113,10 @@ async function logout() {
   user.value = null
   data.value = { applications: [], events: [] }
   mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
+  applicationDetailRequest.value = { applicationId: '', sequence: applicationDetailRequest.value.sequence + 1 }
   error.value = ''
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, mailInbox, pendingMailCount, refreshMailInbox, newApplicationRequest, requestNewApplication, initialize, refresh, login, register, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, mailInbox, pendingMailCount, refreshMailInbox, newApplicationRequest, requestNewApplication, applicationDetailRequest, requestApplicationDetail, initialize, refresh, login, register, logout }
 }

@@ -9,7 +9,7 @@ type AiStatus = { callsEnabled: boolean; message: string }
 type Quote = { date: string; quote: string; author: string; generated: boolean }
 type TimelineEntry = { id:string; label:string; date:string; start:string; end:string; status:'normal'|'tight'|'conflict'; flexible:boolean; showWindow:boolean; windowStart?:string; windowEnd?:string }
 type ScheduleAdvice = { summary: string; plans: string[]; timeline?: TimelineEntry[]; warnings?: string[]; conflicts: string[] }
-const emit = defineEmits<{ navigate: [page: Page] }>()
+const emit = defineEmits<{ navigate: [page: Page, applicationId?: string] }>()
 const store = useJobTrackerStore()
 const quoteKey = 'job_tracker_daily_quote_vue_v2'
 const legacyQuoteKey = 'job_tracker_daily_quote_vue_v1'
@@ -145,6 +145,7 @@ function progressHealth(item:JobApplication){
   return {days,label:days<=3?'进展正常':days<10?'等待较久':'等待确认'}
 }
 function appFor(event:JobEvent){return store.applications.value.find(item=>item.id===event.applicationId)}
+function openApplicationDetail(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id))}
 function eventCompany(event:JobEvent){return String(event.company||appFor(event)?.company||'未填写公司')}
 function eventPosition(event:JobEvent){return String(event.position||appFor(event)?.position||'未填写岗位')}
 function eventDate(event:JobEvent){
@@ -206,7 +207,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
         <article v-for="(event,index) in recentSchedules" :key="event.id">
           <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
           <div class="schedule-copy"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}} <a v-if="String(event.location||'').startsWith('http')" :href="String(event.location)" target="_blank" rel="noreferrer">· 打开链接 ↗</a> <b>{{event.type||'其他'}}</b></p><small>备注：{{event.notes||'暂无备注'}}</small></div>
-          <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary" @click="emit('navigate','calendar')">编辑</button><button :disabled="busyId===event.id||store.readOnly.value" @click="completeEvent(event)">完成</button></div>
+          <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary" @click="openApplicationDetail(event)">编辑</button><button :disabled="busyId===event.id||store.readOnly.value" @click="completeEvent(event)">完成</button></div>
         </article>
       </div>
       <div v-else class="empty">暂无待完成日程。</div>

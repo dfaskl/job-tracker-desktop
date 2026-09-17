@@ -29,6 +29,17 @@ const eventTypes = ['测评','笔试','面试','Offer','其他']
 const form = reactive(emptyApplication())
 const eventForm = reactive({ type:'面试', title:'', startsAt:'', endsAt:'', location:'', notes:'' })
 watch(store.newApplicationRequest, () => { if (!store.readOnly.value) openCreate() })
+watch(store.applicationDetailRequest, request => {
+  if (!request.applicationId) return
+  const application = store.applications.value.find(item => item.id === request.applicationId)
+  if (!application) return
+  query.value = ''
+  stageFilter.value = '全部'
+  selected.value = application
+  editing.value = false
+  eventEditor.value = false
+  editingEvent.value = null
+}, { immediate: true })
 
 const filtered = computed(() => {
   const keyword=query.value.trim().toLowerCase()
