@@ -1,4 +1,4 @@
-import { trackedFetch } from './requestActivity'
+import { trackedJsonFetch } from './requestActivity'
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -12,9 +12,8 @@ export async function api<T>(url: string, init: ApiRequestInit = {}): Promise<T>
   const { blockPage, ...requestInit } = init
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-  const response = await trackedFetch(url, { cache: 'no-store', credentials: 'same-origin', ...requestInit, headers }, blockPage)
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw new ApiError(body.message || `请求失败（${response.status}）`, response.status)
+  const { response, body } = await trackedJsonFetch<Record<string, unknown>>(url, { cache: 'no-store', credentials: 'same-origin', ...requestInit, headers }, blockPage)
+  if (!response.ok) throw new ApiError(String(body.message || `请求失败（${response.status}）`), response.status)
   return body as T
 }
 

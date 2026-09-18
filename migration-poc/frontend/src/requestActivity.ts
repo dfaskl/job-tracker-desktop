@@ -35,11 +35,11 @@ function requestMethod(input: RequestInfo | URL, init?: RequestInit) {
   return input instanceof Request ? input.method.toUpperCase() : 'GET'
 }
 
-export async function trackedFetch(
+export async function trackedJsonFetch<T = Record<string, unknown>>(
   input: RequestInfo | URL,
   init: RequestInit = {},
   blockPage?: boolean
-) {
+): Promise<{ response: Response; body: T }> {
   const method = requestMethod(input, init)
   const writesData = !['GET', 'HEAD', 'OPTIONS'].includes(method)
   const startsMutationSession = blockPage ?? writesData
@@ -52,7 +52,9 @@ export async function trackedFetch(
   }
 
   try {
-    return await fetch(input, init)
+    const response = await fetch(input, init)
+    const body = await response.json().catch(() => ({})) as T
+    return { response, body }
   } finally {
     if (participatesInSession) {
       activeBlockingRequests = Math.max(0, activeBlockingRequests - 1)

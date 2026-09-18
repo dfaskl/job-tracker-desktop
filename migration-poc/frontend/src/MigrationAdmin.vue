@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import BaseSelect from './BaseSelect.vue'
-import { trackedFetch } from './requestActivity'
+import { trackedJsonFetch } from './requestActivity'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
@@ -23,7 +23,7 @@ const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.v
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
 
 onMounted(checkStatus)
-async function requestJson(url:string,init?:RequestInit){const response=await trackedFetch(url,{cache:'no-store',...init});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.message||'操作失败');return body}
+async function requestJson(url:string,init?:RequestInit){const{response,body}=await trackedJsonFetch<Record<string,any>>(url,{cache:'no-store',...init});if(!response.ok)throw new Error(body.message||'操作失败');return body}
 async function checkStatus(){loading.value=true;error.value='';try{status.value=await requestJson('/api/poc/admin-sandbox/status') as AdminStatus;if(status.value.enabled)await loadOverview()}catch(cause){error.value=failure(cause,'管理员服务检查失败')}finally{loading.value=false}}
 async function loadOverview(){overview.value=await requestJson('/api/poc/admin-sandbox/overview') as Overview}
 async function refresh(){loading.value=true;error.value='';try{await loadOverview();message.value='管理员数据已刷新'}catch(cause){error.value=failure(cause,'刷新失败')}finally{loading.value=false}}
