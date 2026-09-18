@@ -66,7 +66,7 @@ async function initialize() {
   await refresh()
 }
 
-function refreshMailInbox(sync = false, blockPage = sync) {
+function refreshMailInbox(sync = false, blockPage = false) {
   if (mailInboxPromise) return mailInboxPromise
   mailInboxPromise = (async () => {
     try {
