@@ -210,7 +210,7 @@ nav button {
 .nav-icon { position: relative; z-index: 1; display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid rgba(128,215,194,.14); border-radius: 10px; color: #8fdfcc; background: rgba(255,255,255,.045); transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
 .nav-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .nav-copy { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; align-items: center; }
-.nav-copy strong { font-family: "ZCOOL XiaoWei", "STKaiti", "KaiTi", "Noto Serif SC", serif; font-size: 17px; font-weight: 400; line-height: 1.25; letter-spacing: .055em; text-shadow: 0 1px 10px rgba(143,223,204,.12); }
+.nav-copy strong { font-family: "Noto Serif SC", "STKaiti", "KaiTi", serif; font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: .045em; text-shadow: 0 1px 10px rgba(143,223,204,.16); }
 .nav-arrow { position: relative; z-index: 1; flex: none; color: rgba(213,242,235,.36); font-size: 21px; line-height: 1; transform: translateX(-3px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
 nav button.has-badge { padding-right: 40px; }
 nav button.has-badge .nav-arrow { display: none; }
@@ -342,7 +342,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   nav button:hover { transform: translateY(-1px); }
   .nav-icon, .nav-arrow, nav button.active::before { display: none; }
   .nav-copy { display: block; flex: 0 1 auto; }
-  .nav-copy strong { font-size: 15px; letter-spacing: .04em; }
+  .nav-copy strong { font-size: 16px; letter-spacing: .035em; }
   nav button.has-badge { padding-right: 26px; }
   .nav-badge { top: 2px; right: 3px; }
   .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 70px 16px 44px; overflow-x: clip; }
