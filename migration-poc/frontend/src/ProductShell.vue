@@ -147,10 +147,27 @@ onBeforeUnmount(() => {
   color: #effbf7;
   background:
     radial-gradient(circle at 12% 8%, rgba(73,205,181,.18), transparent 26%),
+    radial-gradient(circle at 1px 1px, rgba(184,239,226,.08) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    repeating-linear-gradient(132deg, transparent 0 47px, rgba(143,223,204,.035) 48px, transparent 49px 96px),
     linear-gradient(180deg, color-mix(in srgb, var(--sidebar) 92%, #123e45), var(--sidebar));
   border-right: 1px solid rgba(255,255,255,.1);
   box-shadow: 10px 0 34px rgba(16,61,65,.13);
   overflow: hidden;
+}
+.sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 76px 8px 104px 22px;
+  background:
+    radial-gradient(circle at 13% 9%, rgba(255,194,116,.58) 0 2px, transparent 3px),
+    radial-gradient(circle at 79% 29%, rgba(143,223,204,.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 27% 56%, rgba(143,223,204,.42) 0 2px, transparent 3px),
+    radial-gradient(circle at 86% 82%, rgba(255,194,116,.46) 0 2px, transparent 3px),
+    linear-gradient(150deg, transparent 0 18%, rgba(143,223,204,.09) 18.2% 18.55%, transparent 18.75% 47%, rgba(143,223,204,.075) 47.2% 47.5%, transparent 47.7% 73%, rgba(143,223,204,.08) 73.2% 73.5%, transparent 73.7%);
+  opacity: .72;
+  mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
+  pointer-events: none;
 }
 .sidebar::after {
   content: "";
@@ -188,14 +205,14 @@ onBeforeUnmount(() => {
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
 .brand small { color: #b9e5da; font-size: 11px; }
 .menu-toggle { display: none; }
-nav { position: relative; z-index: 1; display: grid; min-height: 0; gap: 6px; margin-top: 28px; overflow-y: auto; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
+nav { position: relative; z-index: 1; display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: space-evenly; gap: clamp(6px,.75vh,10px); margin: 14px 0 12px; overflow-y: auto; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
 nav::-webkit-scrollbar { display: none; }
 .nav-caption { margin: 0 10px 6px; color: rgba(213,242,235,.58); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 nav button {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 52px;
+  min-height: clamp(52px,6.4vh,66px);
   align-items: center;
   gap: 11px;
   padding: 8px 10px;
@@ -239,7 +256,7 @@ nav button.active::before {
 nav button.active .nav-icon { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.08); }
 nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .sidebar :is(button,a):focus-visible { outline: 3px solid rgba(255,194,116,.72); outline-offset: 2px; }
-.sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
+.sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; flex: none; align-items: center; justify-content: center; }
 @keyframes nav-group-in { from { transform: translateX(-7px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 232px; padding: 0 38px 64px; }
 .topbar {
@@ -306,7 +323,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
     overflow: hidden;
     transition: box-shadow .24s ease;
   }
-  .sidebar::after { display: none; }
+  .sidebar::before, .sidebar::after { display: none; }
   .brand { width: fit-content; max-width: 100%; min-width: 0; }
   .brand div { min-width: 0; }
   .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -334,7 +351,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .sidebar-account :deep(.signed.compact > div) { width: auto; }
   .sidebar-account :deep(.signed.compact span) { display: none; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
-  nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
+  nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; flex: none; align-content: stretch; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
   .menu-open nav { max-height: 240px; margin-top: 8px; opacity: 1; transform: translateY(0); pointer-events: auto; }
   .nav-caption { display: none; }
   nav::-webkit-scrollbar { display: none; }
