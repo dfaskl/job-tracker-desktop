@@ -124,7 +124,5 @@ onBeforeUnmount(() => {
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
 @keyframes loader-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes loader-breathe{50%{transform:scale(1.06)}}
-@keyframes loader-soft-pulse{0%,100%{opacity:.42}50%{opacity:1}}
-@keyframes loader-icon-glow{0%,100%{filter:drop-shadow(0 5px 8px rgba(20,93,91,.12))}50%{filter:drop-shadow(0 8px 15px rgba(20,93,91,.34))}}
-@media(prefers-reduced-motion:reduce){.session-loading img{animation:none}.loader-orbit{transform:none!important;animation:loader-soft-pulse 1.35s ease-in-out infinite!important}.orbit-accent{animation-delay:.42s!important}.submission-loader img{transform:none!important;animation:loader-icon-glow 1.7s ease-in-out infinite!important}}
+@media(prefers-reduced-motion:reduce){.session-loading img{animation:none}.loader-orbit{animation:loader-spin 2.1s linear infinite!important}.orbit-accent{animation:loader-spin 2.8s linear infinite reverse!important}.submission-loader img{animation:none!important}}
 </style>
