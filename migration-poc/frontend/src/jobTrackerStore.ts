@@ -66,11 +66,11 @@ async function initialize() {
   await refresh()
 }
 
-function refreshMailInbox(sync = false) {
+function refreshMailInbox(sync = false, blockPage = sync) {
   if (mailInboxPromise) return mailInboxPromise
   mailInboxPromise = (async () => {
     try {
-      const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST' } : {})
+      const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST', blockPage } : {})
       mailInbox.value = { accounts: result.accounts || [], messages: result.messages || [], pendingCount: Math.max(0, Number(result.pendingCount) || 0) }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }

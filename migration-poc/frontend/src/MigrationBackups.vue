@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
+import { trackedFetch } from './requestActivity'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type BackupItem = {
@@ -25,7 +26,7 @@ const error = ref('')
 onMounted(checkSandbox)
 
 async function requestJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, { cache: 'no-store', ...init })
+  const response = await trackedFetch(url, { cache: 'no-store', ...init })
   const body = await response.json().catch(() => ({}))
   return { response, body }
 }
