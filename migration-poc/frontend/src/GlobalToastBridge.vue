@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { pageMutationBusy } from './requestActivity'
 
 const timers = new WeakMap<Element, ReturnType<typeof setTimeout>>()
+const pendingToasts = new Set<HTMLElement>()
 let observer: MutationObserver | null = null
+let releaseToastTimer: number | undefined
 
 function isToast(element: Element): element is HTMLElement {
   return element instanceof HTMLElement
-    && element.dataset.globalToast !== 'true'
+    && !['true', 'pending'].includes(element.dataset.globalToast || '')
     && element.matches('p.success, p.danger, .feedback')
 }
 
 function showToast(element: HTMLElement) {
   if (!element.textContent?.trim()) return
+  pendingToasts.delete(element)
   const previous = timers.get(element)
   if (previous) clearTimeout(previous)
   element.dataset.globalToast = 'true'
@@ -25,29 +29,79 @@ function showToast(element: HTMLElement) {
   }, 3000))
 }
 
-function inspect(node: Node) {
-  if (node instanceof Element) {
-    if (isToast(node)) showToast(node)
-    node.querySelectorAll('p.success, p.danger, .feedback').forEach(item => {
-      if (isToast(item)) showToast(item)
-    })
-  }
-  const parent = node.parentElement
-  if (parent?.dataset.globalToast === 'true') {
-    parent.dataset.globalToast = 'false'
-    showToast(parent)
+function queueToast(element: HTMLElement) {
+  if (!element.textContent?.trim()) return
+  const previous = timers.get(element)
+  if (previous) clearTimeout(previous)
+  timers.delete(element)
+  element.dataset.globalToast = 'pending'
+  element.classList.remove('global-operation-toast')
+  element.style.setProperty('display', 'none', 'important')
+  pendingToasts.add(element)
+}
+
+function presentToast(element: HTMLElement) {
+  if (pageMutationBusy.value) queueToast(element)
+  else showToast(element)
+}
+
+function flushPendingToasts() {
+  releaseToastTimer = undefined
+  if (pageMutationBusy.value) return
+  for (const element of [...pendingToasts]) {
+    if (element.isConnected) showToast(element)
+    else pendingToasts.delete(element)
   }
 }
 
+function dismissVisibleToasts() {
+  document.querySelectorAll<HTMLElement>('.global-operation-toast').forEach(element => {
+    const timer = timers.get(element)
+    if (timer) clearTimeout(timer)
+    timers.delete(element)
+    element.dataset.globalToast = 'false'
+    element.classList.remove('global-operation-toast')
+    element.style.setProperty('display', 'none', 'important')
+  })
+}
+
+function inspect(node: Node) {
+  if (node instanceof Element) {
+    if (isToast(node)) presentToast(node)
+    node.querySelectorAll('p.success, p.danger, .feedback').forEach(item => {
+      if (isToast(item)) presentToast(item)
+    })
+  }
+  const parent = node.parentElement
+  if (parent && ['true', 'pending'].includes(parent.dataset.globalToast || '')) {
+    parent.dataset.globalToast = 'false'
+    presentToast(parent)
+  }
+}
+
+watch(pageMutationBusy, busy => {
+  if (releaseToastTimer !== undefined) window.clearTimeout(releaseToastTimer)
+  releaseToastTimer = undefined
+  if (busy) {
+    dismissVisibleToasts()
+    return
+  }
+  if (!busy && pendingToasts.size) releaseToastTimer = window.setTimeout(flushPendingToasts, 230)
+})
+
 onMounted(() => {
   document.querySelectorAll('p.success, p.danger, .feedback').forEach(item => {
-    if (isToast(item)) showToast(item)
+    if (isToast(item)) presentToast(item)
   })
   observer = new MutationObserver(records => records.forEach(record => inspect(record.target)))
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 })
 
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  if (releaseToastTimer !== undefined) window.clearTimeout(releaseToastTimer)
+  pendingToasts.clear()
+})
 </script>
 
 <template></template>
