@@ -97,8 +97,8 @@ onBeforeUnmount(() => {
         <span class="loader-orbit orbit-accent"></span>
         <img src="/favicon.svg" alt="">
       </div>
-      <strong>正在提交修改</strong>
-      <span>正在同步最新数据，请稍候</span>
+      <strong>正在处理</strong>
+      <span>请稍候，完成后将自动更新</span>
     </div>
   </div>
 </template>
