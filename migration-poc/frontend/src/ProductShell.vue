@@ -109,7 +109,6 @@ onBeforeUnmount(() => {
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
       <nav id="primary-navigation" aria-label="主要导航">
-        <p class="nav-caption">工作台</p>
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
@@ -207,7 +206,6 @@ onBeforeUnmount(() => {
 .menu-toggle { display: none; }
 nav { position: relative; z-index: 1; display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: space-evenly; gap: clamp(6px,.75vh,10px); margin: 14px 0 12px; overflow-y: auto; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
 nav::-webkit-scrollbar { display: none; }
-.nav-caption { margin: 0 10px 6px; color: rgba(213,242,235,.58); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 nav button {
   position: relative;
   display: flex;
@@ -353,7 +351,6 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .sidebar-account :deep(.signed.compact button) { width: auto; }
   nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; flex: none; align-content: stretch; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
   .menu-open nav { max-height: 240px; margin-top: 8px; opacity: 1; transform: translateY(0); pointer-events: auto; }
-  .nav-caption { display: none; }
   nav::-webkit-scrollbar { display: none; }
   nav button { width: 100%; min-width: 0; min-height: 44px; justify-content: center; padding: 7px 5px; border-radius: 10px; text-align: center; animation: none; }
   nav button:hover { transform: translateY(-1px); }
