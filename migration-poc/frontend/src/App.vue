@@ -117,15 +117,20 @@ onBeforeUnmount(() => {
 .submission-loader{position:relative;display:grid;width:116px;height:116px;place-items:center}
 .submission-loader::before{content:"";position:absolute;inset:13px;border-radius:50%;background:rgba(255,255,255,.8);box-shadow:0 10px 30px rgba(25,110,107,.16),inset 0 0 0 1px rgba(44,159,145,.12)}
 .submission-loader img{position:relative;width:54px;height:54px;border-radius:15px;filter:drop-shadow(0 7px 10px rgba(20,93,91,.2));animation:loader-breathe 1.5s ease-in-out infinite}
-.loader-orbit{position:absolute;inset:2px;border:4px solid transparent;border-radius:50%;animation:loader-spin 1.15s linear infinite}
-.orbit-primary{border-top-color:#168e89;border-right-color:rgba(22,142,137,.3)}
-.orbit-accent{inset:10px;border-width:3px;border-bottom-color:#f0a24b;border-left-color:rgba(240,162,75,.28);animation-direction:reverse;animation-duration:1.7s}
+.loader-orbit{position:absolute;inset:2px;display:block;border:4px solid transparent;border-radius:50%;transform-origin:50% 50%;will-change:transform;animation:loader-spin 1.05s linear infinite}
+.loader-orbit::after{content:"";position:absolute;width:10px;height:10px;border:2px solid rgba(255,255,255,.88);border-radius:50%;box-shadow:0 0 0 4px rgba(22,142,137,.12),0 0 14px currentColor}
+.orbit-primary{color:#168e89;border-top-color:#168e89;border-right-color:rgba(22,142,137,.32)}
+.orbit-primary::after{top:-6px;left:50%;background:#168e89;transform:translateX(-50%)}
+.orbit-accent{inset:10px;color:#f0a24b;border-width:3px;border-bottom-color:#f0a24b;border-left-color:rgba(240,162,75,.3);animation-direction:reverse;animation-duration:1.55s}
+.orbit-accent::after{right:4px;bottom:-4px;width:8px;height:8px;background:#f0a24b}
 .submission-shield-enter-active,.submission-shield-leave-active{transition:opacity .2s ease}
 .submission-shield-enter-active .mutation-progress,.submission-shield-leave-active .mutation-progress{transition:transform .24s cubic-bezier(.2,.8,.2,1),opacity .18s ease}
 .submission-shield-enter-from,.submission-shield-leave-to{opacity:0}
 .submission-shield-enter-from .mutation-progress,.submission-shield-leave-to .mutation-progress{transform:scale(.96);opacity:0}
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
-@keyframes loader-spin{to{transform:rotate(360deg)}}
+@keyframes loader-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes loader-breathe{50%{transform:scale(1.06)}}
-@media(prefers-reduced-motion:reduce){.session-loading img,.loader-orbit,.submission-loader img{animation:none}.submission-shield-enter-active,.submission-shield-leave-active,.submission-shield-enter-active .mutation-progress,.submission-shield-leave-active .mutation-progress{transition-duration:.01ms}}
+@keyframes loader-soft-pulse{0%,100%{opacity:.42}50%{opacity:1}}
+@keyframes loader-icon-glow{0%,100%{filter:drop-shadow(0 5px 8px rgba(20,93,91,.12))}50%{filter:drop-shadow(0 8px 15px rgba(20,93,91,.34))}}
+@media(prefers-reduced-motion:reduce){.session-loading img{animation:none}.loader-orbit{transform:none!important;animation:loader-soft-pulse 1.35s ease-in-out infinite!important}.orbit-accent{animation-delay:.42s!important}.submission-loader img{transform:none!important;animation:loader-icon-glow 1.7s ease-in-out infinite!important}.submission-shield-enter-active,.submission-shield-leave-active,.submission-shield-enter-active .mutation-progress,.submission-shield-leave-active .mutation-progress{transition-duration:.01ms}}
 </style>
