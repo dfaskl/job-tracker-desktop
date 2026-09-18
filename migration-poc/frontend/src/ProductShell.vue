@@ -12,14 +12,14 @@ import { useJobTrackerStore } from './jobTrackerStore'
 
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
 
-const pages: { id: Page; label: string; icon: string; subtitle: string }[] = [
-  { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5z', subtitle: '掌握每一次机会的进展' },
-  { id: 'applications', label: '投递记录', icon: 'M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Zm2 5h8M8 13h8M8 17h5', subtitle: '管理岗位、状态与完整流程' },
-  { id: 'calendar', label: '日程', icon: 'M5 5h14a2 2 0 0 1 2 2v12H3V7a2 2 0 0 1 2-2Zm2-2v4m10-4v4M3 10h18M7 14h3m4 0h3m-10 3h3', subtitle: '跟进笔试、面试与 Offer 安排' },
-  { id: 'mail', label: '邮件识别', icon: 'M4 6h16v12H4zM4 7l8 6 8-6m-4-4v3m-1.5-1.5h3', subtitle: '从通知邮件中提取关键信息' },
-  { id: 'stats', label: '统计', icon: 'M4 20V10m5 10V4m6 16v-7m5 7V7', subtitle: '查看投递阶段与渠道分布' },
-  { id: 'settings', label: '设置', icon: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.5 1.5m-9 9L6 18m12 0-1.5-1.5m-9-9L6 6', subtitle: '管理会话、备份和运行配置' },
-  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6zM9 12l2 2 4-4', subtitle: '管理账号、权限与注册策略' }
+const pages: { id: Page; label: string; icon: string }[] = [
+  { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5z' },
+  { id: 'applications', label: '投递记录', icon: 'M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Zm2 5h8M8 13h8M8 17h5' },
+  { id: 'calendar', label: '日程', icon: 'M5 5h14a2 2 0 0 1 2 2v12H3V7a2 2 0 0 1 2-2Zm2-2v4m10-4v4M3 10h18M7 14h3m4 0h3m-10 3h3' },
+  { id: 'mail', label: '邮件识别', icon: 'M4 6h16v12H4zM4 7l8 6 8-6m-4-4v3m-1.5-1.5h3' },
+  { id: 'stats', label: '统计', icon: 'M4 20V10m5 10V4m6 16v-7m5 7V7' },
+  { id: 'settings', label: '设置', icon: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.5 1.5m-9 9L6 18m12 0-1.5-1.5m-9-9L6 6' },
+  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6zM9 12l2 2 4-4' }
 ]
 
 const pageComponents: Record<Page, Component> = {
@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
       <nav id="primary-navigation" aria-label="主要导航">
         <p class="nav-caption">工作台</p>
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
-          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong><small>{{ item.subtitle }}</small></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
@@ -209,9 +209,8 @@ nav button {
 }
 .nav-icon { position: relative; z-index: 1; display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid rgba(128,215,194,.14); border-radius: 10px; color: #8fdfcc; background: rgba(255,255,255,.045); transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
 .nav-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.nav-copy { position: relative; z-index: 1; display: grid; min-width: 0; flex: 1; gap: 1px; }
-.nav-copy strong { font-size: 13px; line-height: 1.35; }
-.nav-copy small { overflow: hidden; color: rgba(213,242,235,.56); font-size: 10px; font-weight: 500; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; transition: color .2s ease; }
+.nav-copy { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; align-items: center; }
+.nav-copy strong { font-family: "ZCOOL XiaoWei", "STKaiti", "KaiTi", "Noto Serif SC", serif; font-size: 17px; font-weight: 400; line-height: 1.25; letter-spacing: .055em; text-shadow: 0 1px 10px rgba(143,223,204,.12); }
 .nav-arrow { position: relative; z-index: 1; flex: none; color: rgba(213,242,235,.36); font-size: 21px; line-height: 1; transform: translateX(-3px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
 nav button.has-badge { padding-right: 40px; }
 nav button.has-badge .nav-arrow { display: none; }
@@ -219,7 +218,6 @@ nav button.has-badge .nav-arrow { display: none; }
 .sr-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 nav button:hover { transform: translateX(3px); color: #fff; background: rgba(255,255,255,.075); }
 nav button:hover .nav-icon { transform: scale(1.05); color: #baf5e7; border-color: rgba(186,245,231,.24); background: rgba(255,255,255,.08); }
-nav button:hover .nav-copy small { color: rgba(239,251,247,.75); }
 nav button:hover .nav-arrow { transform: translateX(0); opacity: 1; }
 nav button.active {
   border-color: rgba(186,245,231,.18);
@@ -239,7 +237,6 @@ nav button.active::before {
   box-shadow: 0 0 14px rgba(255,194,116,.55);
 }
 nav button.active .nav-icon { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.08); }
-nav button.active .nav-copy small { color: rgba(255,255,255,.72); }
 nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .sidebar :is(button,a):focus-visible { outline: 3px solid rgba(255,194,116,.72); outline-offset: 2px; }
 .sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; margin-top: auto; align-items: center; justify-content: center; }
@@ -343,9 +340,9 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   nav::-webkit-scrollbar { display: none; }
   nav button { width: 100%; min-width: 0; min-height: 44px; justify-content: center; padding: 7px 5px; border-radius: 10px; text-align: center; animation: none; }
   nav button:hover { transform: translateY(-1px); }
-  .nav-icon, .nav-copy small, .nav-arrow, nav button.active::before { display: none; }
+  .nav-icon, .nav-arrow, nav button.active::before { display: none; }
   .nav-copy { display: block; flex: 0 1 auto; }
-  .nav-copy strong { font-size: 12px; }
+  .nav-copy strong { font-size: 15px; letter-spacing: .04em; }
   nav button.has-badge { padding-right: 26px; }
   .nav-badge { top: 2px; right: 3px; }
   .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 70px 16px 44px; overflow-x: clip; }
