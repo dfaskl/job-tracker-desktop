@@ -3,11 +3,7 @@ import { readonly, ref } from 'vue'
 const blocking = ref(false)
 let activeBlockingRequests = 0
 let mutationSessionOpen = false
-let visibleSince = 0
 let releaseTimer: number | undefined
-
-const quietPeriodMs = 140
-const minimumVisibleMs = 420
 
 export const pageMutationBusy = readonly(blocking)
 
@@ -20,22 +16,18 @@ function clearReleaseTimer() {
 function openMutationSession() {
   clearReleaseTimer()
   mutationSessionOpen = true
-  if (!blocking.value) {
-    visibleSince = Date.now()
-    blocking.value = true
-  }
+  blocking.value = true
 }
 
 function scheduleMutationSessionClose() {
   if (activeBlockingRequests > 0) return
   clearReleaseTimer()
-  const minimumRemaining = Math.max(0, minimumVisibleMs - (Date.now() - visibleSince))
   releaseTimer = window.setTimeout(() => {
     releaseTimer = undefined
     if (activeBlockingRequests > 0) return
     mutationSessionOpen = false
     blocking.value = false
-  }, Math.max(quietPeriodMs, minimumRemaining))
+  }, 0)
 }
 
 function requestMethod(input: RequestInfo | URL, init?: RequestInit) {

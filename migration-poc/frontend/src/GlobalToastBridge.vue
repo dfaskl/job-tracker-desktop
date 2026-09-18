@@ -5,7 +5,6 @@ import { pageMutationBusy } from './requestActivity'
 const timers = new WeakMap<Element, ReturnType<typeof setTimeout>>()
 const pendingToasts = new Set<HTMLElement>()
 let observer: MutationObserver | null = null
-let releaseToastTimer: number | undefined
 
 function isToast(element: Element): element is HTMLElement {
   return element instanceof HTMLElement
@@ -46,7 +45,6 @@ function presentToast(element: HTMLElement) {
 }
 
 function flushPendingToasts() {
-  releaseToastTimer = undefined
   if (pageMutationBusy.value) return
   for (const element of [...pendingToasts]) {
     if (element.isConnected) showToast(element)
@@ -80,13 +78,11 @@ function inspect(node: Node) {
 }
 
 watch(pageMutationBusy, busy => {
-  if (releaseToastTimer !== undefined) window.clearTimeout(releaseToastTimer)
-  releaseToastTimer = undefined
   if (busy) {
     dismissVisibleToasts()
     return
   }
-  if (!busy && pendingToasts.size) releaseToastTimer = window.setTimeout(flushPendingToasts, 230)
+  if (pendingToasts.size) flushPendingToasts()
 })
 
 onMounted(() => {
@@ -99,7 +95,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  if (releaseToastTimer !== undefined) window.clearTimeout(releaseToastTimer)
   pendingToasts.clear()
 })
 </script>

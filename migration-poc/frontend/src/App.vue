@@ -90,19 +90,17 @@ onBeforeUnmount(() => {
     <LoginPage v-else />
     <GlobalToastBridge />
   </div>
-  <Transition name="submission-shield">
-    <div v-if="pageMutationBusy" ref="mutationOverlay" class="mutation-shield" role="status" aria-live="assertive" aria-atomic="true" tabindex="-1">
-      <div class="mutation-progress">
-        <div class="submission-loader" aria-hidden="true">
-          <span class="loader-orbit orbit-primary"></span>
-          <span class="loader-orbit orbit-accent"></span>
-          <img src="/favicon.svg" alt="">
-        </div>
-        <strong>正在提交修改</strong>
-        <span>正在同步最新数据，请稍候</span>
+  <div v-if="pageMutationBusy" ref="mutationOverlay" class="mutation-shield" role="status" aria-live="assertive" aria-atomic="true" tabindex="-1">
+    <div class="mutation-progress">
+      <div class="submission-loader" aria-hidden="true">
+        <span class="loader-orbit orbit-primary"></span>
+        <span class="loader-orbit orbit-accent"></span>
+        <img src="/favicon.svg" alt="">
       </div>
+      <strong>正在提交修改</strong>
+      <span>正在同步最新数据，请稍候</span>
     </div>
-  </Transition>
+  </div>
 </template>
 
 <style scoped>
@@ -123,14 +121,10 @@ onBeforeUnmount(() => {
 .orbit-primary::after{top:-6px;left:50%;background:#168e89;transform:translateX(-50%)}
 .orbit-accent{inset:10px;color:#f0a24b;border-width:3px;border-bottom-color:#f0a24b;border-left-color:rgba(240,162,75,.3);animation-direction:reverse;animation-duration:1.55s}
 .orbit-accent::after{right:4px;bottom:-4px;width:8px;height:8px;background:#f0a24b}
-.submission-shield-enter-active,.submission-shield-leave-active{transition:opacity .2s ease}
-.submission-shield-enter-active .mutation-progress,.submission-shield-leave-active .mutation-progress{transition:transform .24s cubic-bezier(.2,.8,.2,1),opacity .18s ease}
-.submission-shield-enter-from,.submission-shield-leave-to{opacity:0}
-.submission-shield-enter-from .mutation-progress,.submission-shield-leave-to .mutation-progress{transform:scale(.96);opacity:0}
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
 @keyframes loader-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes loader-breathe{50%{transform:scale(1.06)}}
 @keyframes loader-soft-pulse{0%,100%{opacity:.42}50%{opacity:1}}
 @keyframes loader-icon-glow{0%,100%{filter:drop-shadow(0 5px 8px rgba(20,93,91,.12))}50%{filter:drop-shadow(0 8px 15px rgba(20,93,91,.34))}}
-@media(prefers-reduced-motion:reduce){.session-loading img{animation:none}.loader-orbit{transform:none!important;animation:loader-soft-pulse 1.35s ease-in-out infinite!important}.orbit-accent{animation-delay:.42s!important}.submission-loader img{transform:none!important;animation:loader-icon-glow 1.7s ease-in-out infinite!important}.submission-shield-enter-active,.submission-shield-leave-active,.submission-shield-enter-active .mutation-progress,.submission-shield-leave-active .mutation-progress{transition-duration:.01ms}}
+@media(prefers-reduced-motion:reduce){.session-loading img{animation:none}.loader-orbit{transform:none!important;animation:loader-soft-pulse 1.35s ease-in-out infinite!important}.orbit-accent{animation-delay:.42s!important}.submission-loader img{transform:none!important;animation:loader-icon-glow 1.7s ease-in-out infinite!important}}
 </style>
