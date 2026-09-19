@@ -5,10 +5,16 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +27,8 @@ import java.util.Properties;
 public class AdminSandboxService {
     private static final int MAX_USERS = 500;
     private static final int MAX_APPLICATIONS = 500;
+    private static final DateTimeFormatter EVENT_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final ZoneId SHANGHAI = ZoneId.of("Asia/Shanghai");
 
     private final Environment environment;
     private final ObjectMapper objectMapper;
@@ -216,6 +224,109 @@ public class AdminSandboxService {
                 connection.rollback();
                 throw exception;
             }
+        }
+    }
+
+    public CompletedRangeMigrationResult migrateCompletedRanges(String adminEmail, String confirmation) throws Exception {
+        if (!"迁移旧日程".equals(confirmation)) {
+            throw new AdminValidationException("请输入“迁移旧日程”确认操作");
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                List<UserDataRow> rows = new ArrayList<>();
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT user_id,data::text FROM user_data ORDER BY user_id FOR UPDATE"
+                ); ResultSet result = statement.executeQuery()) {
+                    while (result.next()) rows.add(new UserDataRow(result.getLong(1), result.getString(2)));
+                }
+                int changedUsers = 0;
+                int migratedEvents = 0;
+                int skippedEvents = 0;
+                String migratedAt = LocalDateTime.now(SHANGHAI).format(EVENT_TIME);
+                for (UserDataRow row : rows) {
+                    DocumentMigration migration = migrateCompletedRangesDocument(row.json(), migratedAt);
+                    migratedEvents += migration.migratedEvents();
+                    skippedEvents += migration.skippedEvents();
+                    if (migration.migratedEvents() == 0) continue;
+                    insertMigrationBackup(connection, row.userId(), row.json());
+                    try (PreparedStatement update = connection.prepareStatement(
+                        "UPDATE user_data SET data=?::jsonb,updated_at=NOW() WHERE user_id=?"
+                    )) {
+                        update.setString(1, migration.json());
+                        update.setLong(2, row.userId());
+                        update.executeUpdate();
+                    }
+                    changedUsers++;
+                }
+                insertAudit(connection, admin.id(), null, "全部用户", "migrate-completed-ranges");
+                connection.commit();
+                return new CompletedRangeMigrationResult(true, rows.size(), changedUsers, migratedEvents, skippedEvents);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    DocumentMigration migrateCompletedRangesDocument(String json, String migratedAt) throws Exception {
+        JsonNode parsed = objectMapper.readTree(json == null || json.isBlank()
+            ? "{\"applications\":[],\"events\":[]}" : json);
+        if (!(parsed instanceof ObjectNode root) || !(root.path("events") instanceof ArrayNode events)) {
+            throw new AdminValidationException("用户业务数据结构不兼容");
+        }
+        int migrated = 0;
+        int skipped = 0;
+        for (JsonNode value : events) {
+            if (!(value instanceof ObjectNode event)) continue;
+            if (!event.path("completed").asBoolean(false)
+                || event.path("missed").asBoolean(false)
+                || event.path("abandoned").asBoolean(false)
+                || text(event, "endsAt", 40).isBlank()) continue;
+            String startsAt = text(event, "startsAt", 40);
+            String endsAt = text(event, "endsAt", 40);
+            String completedAt = text(event, "completedAt", 40);
+            String localCompletion = legacyUtcToShanghai(completedAt);
+            if (startsAt.isBlank() || localCompletion.isBlank()) {
+                skipped++;
+                continue;
+            }
+            event.put("completionOriginalStartsAt", startsAt);
+            event.put("completionOriginalEndsAt", endsAt);
+            event.put("startsAt", localCompletion);
+            event.put("completedAt", localCompletion);
+            event.put("updatedAt", migratedAt);
+            event.remove("endsAt");
+            migrated++;
+        }
+        return new DocumentMigration(objectMapper.writeValueAsString(root), migrated, skipped);
+    }
+
+    private String legacyUtcToShanghai(String value) {
+        if (value == null || value.isBlank()) return "";
+        try {
+            return LocalDateTime.parse(value, EVENT_TIME).plusHours(8).format(EVENT_TIME);
+        } catch (DateTimeParseException exception) {
+            return "";
+        }
+    }
+
+    private void insertMigrationBackup(Connection connection, long userId, String json) throws Exception {
+        try (PreparedStatement makeRoom = connection.prepareStatement(
+            "DELETE FROM data_backups WHERE user_id=? AND id IN "
+                + "(SELECT id FROM data_backups WHERE user_id=? ORDER BY created_at DESC,id DESC OFFSET 29)"
+        )) {
+            makeRoom.setLong(1, userId);
+            makeRoom.setLong(2, userId);
+            makeRoom.executeUpdate();
+        }
+        try (PreparedStatement backup = connection.prepareStatement(
+            "INSERT INTO data_backups(user_id,data,reason) VALUES(?,?::jsonb,'admin-completed-range-migration')"
+        )) {
+            backup.setLong(1, userId);
+            backup.setString(2, json);
+            backup.executeUpdate();
         }
     }
 
@@ -473,6 +584,7 @@ public class AdminSandboxService {
     private record AdminIdentity(long id, String email) {}
     private record TargetUser(long id, String email, boolean admin) {}
     private record UserDocument(long id, String email, String json) {}
+    private record UserDataRow(long userId, String json) {}
     private record SummaryCounts(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
                                  int configuredApiKeys) {}
 
@@ -498,6 +610,9 @@ public class AdminSandboxService {
     public record DisabledResult(boolean ok, boolean disabled) {}
     public record SessionResult(boolean ok, int revoked) {}
     public record DeleteResult(boolean ok) {}
+    public record CompletedRangeMigrationResult(boolean ok, int scannedUsers, int changedUsers,
+                                                 int migratedEvents, int skippedEvents) {}
+    record DocumentMigration(String json, int migratedEvents, int skippedEvents) {}
 
     public static class AdminDisabledException extends RuntimeException {
         public AdminDisabledException(String message) { super(message); }

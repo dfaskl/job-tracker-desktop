@@ -1,6 +1,7 @@
 package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.AdminSandboxService;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.CompletedRangeMigrationResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.DisabledResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.RegistrationCodeResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.SessionResult;
@@ -100,6 +101,25 @@ class PocAdminSandboxControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verifyNoInteractions(auth, service);
+    }
+
+    @Test
+    void migratesCompletedRangesOnlyAfterTypedConfirmation() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        AdminSandboxService service = mock(AdminSandboxService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        var result = new CompletedRangeMigrationResult(true, 3, 2, 4, 1);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.migrateCompletedRanges("admin@example.com", "迁移旧日程")).thenReturn(result);
+        PocAdminSandboxController controller = new PocAdminSandboxController(auth, service);
+
+        var response = controller.migrateCompletedRanges(
+            "token", new PocAdminSandboxController.MigrationRequest("迁移旧日程"), sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(result);
+        verify(service).migrateCompletedRanges("admin@example.com", "迁移旧日程");
     }
 
     private MockHttpServletRequest sameOriginRequest() {

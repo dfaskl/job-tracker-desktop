@@ -4,6 +4,7 @@ import com.jobtracker.migrationpoc.application.ApplicationDocumentMutator;
 import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +57,38 @@ class AdminSandboxServiceTest {
             .extracting(AdminSandboxService.FlowStep::title)
             .containsExactly("已投递", "进入筛选", "面试 · 一面 · 通过");
         assertThat(details.toString()).doesNotContain("must-not-be-returned");
+    }
+
+    @Test
+    void migratesOnlyCompletedLegacyRangesAndReportsAmbiguousRecords() throws Exception {
+        AdminSandboxService service = service(new MockEnvironment());
+        String document = """
+            {"applications":[],"events":[
+              {"id":"done","completed":true,"startsAt":"2026-09-16 17:49","endsAt":"2026-09-19 14:00","completedAt":"2026-09-19 03:46"},
+              {"id":"missing","completed":true,"startsAt":"2026-09-10 10:00","endsAt":"2026-09-11 10:00"},
+              {"id":"missed","completed":true,"missed":true,"startsAt":"2026-09-12 10:00","endsAt":"2026-09-13 10:00","completedAt":"2026-09-13 01:00"},
+              {"id":"pending","completed":false,"startsAt":"2026-09-20 10:00","endsAt":"2026-09-21 10:00"}
+            ]}
+            """;
+
+        var migration = service.migrateCompletedRangesDocument(document, "2026-09-19 12:00");
+        JsonNode events = new ObjectMapper().readTree(migration.json()).path("events");
+        JsonNode migrated = events.get(0);
+
+        assertThat(migration.migratedEvents()).isEqualTo(1);
+        assertThat(migration.skippedEvents()).isEqualTo(1);
+        assertThat(migrated.path("startsAt").asText()).isEqualTo("2026-09-19 11:46");
+        assertThat(migrated.path("completedAt").asText()).isEqualTo("2026-09-19 11:46");
+        assertThat(migrated.path("completionOriginalStartsAt").asText()).isEqualTo("2026-09-16 17:49");
+        assertThat(migrated.path("completionOriginalEndsAt").asText()).isEqualTo("2026-09-19 14:00");
+        assertThat(migrated.path("updatedAt").asText()).isEqualTo("2026-09-19 12:00");
+        assertThat(migrated.has("endsAt")).isFalse();
+        assertThat(events.get(1).path("endsAt").asText()).isEqualTo("2026-09-11 10:00");
+        assertThat(events.get(2).path("endsAt").asText()).isEqualTo("2026-09-13 10:00");
+        assertThat(events.get(3).path("endsAt").asText()).isEqualTo("2026-09-21 10:00");
+        var repeated = service.migrateCompletedRangesDocument(migration.json(), "2026-09-19 12:05");
+        assertThat(repeated.migratedEvents()).isZero();
+        assertThat(repeated.skippedEvents()).isEqualTo(1);
     }
 
     private AdminSandboxService service(MockEnvironment environment) {
