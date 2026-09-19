@@ -160,25 +160,6 @@ public class PocAdminSandboxController {
         }
     }
 
-    @PostMapping("/maintenance/migrate-completed-ranges")
-    public ResponseEntity<?> migrateCompletedRanges(
-        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
-        @RequestBody(required = false) MigrationRequest body,
-        HttpServletRequest request
-    ) {
-        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
-        if (body == null || !"迁移旧日程".equals(body.confirmation())) {
-            return error(HttpStatus.BAD_REQUEST, "请输入“迁移旧日程”确认操作");
-        }
-        try {
-            Optional<LegacyUser> user = authController.authenticatedUser(token);
-            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            return ok(adminService.migrateCompletedRanges(user.get().email(), body.confirmation()));
-        } catch (Exception exception) {
-            return mapException("migrate-completed-ranges", exception);
-        }
-    }
-
     private ResponseEntity<?> mapException(String operation, Exception exception) {
         if (exception instanceof AdminForbiddenException) return error(HttpStatus.FORBIDDEN, exception.getMessage());
         if (exception instanceof AdminNotFoundException) return error(HttpStatus.NOT_FOUND, exception.getMessage());
@@ -218,5 +199,4 @@ public class PocAdminSandboxController {
     public record RegistrationCodeRequest(String code, Boolean clear) {}
     public record UserStateRequest(Boolean disabled) {}
     public record DeleteUserRequest(String confirmEmail) {}
-    public record MigrationRequest(String confirmation) {}
 }
