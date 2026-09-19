@@ -63,7 +63,7 @@ const events = computed<EventItem[]>(() => store.events.value.map(item => {
     id:String(item.id), startsAt, endsAt, completed, abandoned, completedAt,
     company:String(item.company || application?.company || '未关联公司'),
     position:String(item.position || application?.position || '未关联岗位'),
-    recordAt:String(item.recordAt || (completed ? completedAt || endsAt || startsAt : startsAt))
+    recordAt:startsAt
   } as EventItem
 }))
 const month = ref(firstOfMonth(new Date()))
@@ -144,7 +144,7 @@ function emptyForm(): EventForm {
 function toInputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function toApiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
 function formatTime(value: string) { return value ? value.replace('T', ' ') : '未设置' }
-function displayAt(event: EventItem) { return event.completed && event.completedAt ? event.completedAt : (event.recordAt || event.startsAt) }
+function displayAt(event: EventItem) { return event.startsAt || event.recordAt }
 function locationLink(value: string) { return String(value || '').match(/https?:\/\/[^\s]+/i)?.[0] || '' }
 function locationText(value: string) { const link=locationLink(value); return String(value || '').replace(link,'').replace(/^[\s·,，;；:：-]+|[\s·,，;；:：-]+$/g,'') }
 
@@ -165,7 +165,7 @@ function datesBetween(start: string, end: string) {
 }
 
 function buildCalendarEntries(event: EventItem): Array<{ key: string; position: CalendarEvent['position'] }> {
-  if (event.endsAt && !event.completed) {
+  if (event.endsAt) {
     const dates = datesBetween(event.startsAt.slice(0, 10), event.endsAt.slice(0, 10))
     return dates.map((key, index) => ({
       key,
@@ -362,7 +362,7 @@ async function remove(item: EventItem) {
               <div class="event-main">
                 <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
                 <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
-                <span>{{ entry.event.endsAt && !entry.event.completed ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.recordAt) }}</span>
+                <span>{{ entry.event.endsAt ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.startsAt || entry.event.recordAt) }}</span>
                 <span v-if="entry.event.location" class="event-location"><span v-if="locationText(entry.event.location)">{{ locationText(entry.event.location) }}</span><a v-if="locationLink(entry.event.location)" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer">打开链接 ↗</a></span>
               </div>
               <div class="event-actions">

@@ -88,7 +88,8 @@ function moveApplicationHeatMonth(offset:number){applicationHeatMonth.value=clam
 function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item.status||'')))return '已结束';return ['测评','笔试','面试','Offer'].includes(String(item.stage||''))?String(item.stage):'仅投递'}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function eventCompletionTime(item:Record<string,unknown>){return String(item.completedAt||item.updatedAt||eventDeadline(item))}
-function eventRecordTime(item:Record<string,unknown>){return String(item.completed?eventCompletionTime(item):item.startsAt||item.start||item.date||'')}
+function eventOccurrenceTime(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||item.at||'')}
+function eventRecordTime(item:Record<string,unknown>){return eventOccurrenceTime(item)}
 function interviewParticipationTime(event:JobEvent){
   const end=String(event.endsAt||event.end||'').trim()
   if(!end)return timeOf(event.startsAt||event.start||event.date)
@@ -118,7 +119,7 @@ function nextUpcomingTime(item:JobApplication){if(stageCategory(item)==='已结�
 function latestProgressTime(item:JobApplication){const timeline=Array.isArray(item.timeline)?item.timeline as Record<string,unknown>[]:[];const timelineTimes=timeline.filter(entry=>!entry.eventId&&entry.title!=='创建投递记录').map(entry=>entry.at);const completedTimes=store.events.value.filter(event=>event.applicationId===item.id&&event.completed&&!event.missed).map(event=>eventCompletionTime(event));const times=[item.appliedDate,...timelineTimes,...completedTimes].map(timeOf).filter(Boolean);return times.length?Math.max(...times):0}
 function compareApplications(a:JobApplication,b:JobApplication){const aEnded=stageCategory(a)==='已结束',bEnded=stageCategory(b)==='已结束';if(aEnded!==bEnded)return aEnded?1:-1;if(aEnded&&bEnded)return timeOf(b.updatedAt||b.createdAt)-timeOf(a.updatedAt||a.createdAt);const aUpcoming=nextUpcomingTime(a),bUpcoming=nextUpcomingTime(b),aHas=Number.isFinite(aUpcoming),bHas=Number.isFinite(bUpcoming);if(aHas!==bHas)return aHas?-1:1;if(aHas&&bHas&&aUpcoming!==bUpcoming)return aUpcoming-bUpcoming;const aTier=progressTier(a),bTier=progressTier(b);if(aTier!==bTier)return aTier-bTier;return latestProgressTime(b)-latestProgressTime(a)}
 function flowVisual(label:unknown,type:unknown=''){const value=`${type||''} ${label||''}`;if(/未通过|错过|放弃/.test(value))return{style:'failed',icon:'×'};if(/Offer|录用|通过/.test(value))return{style:'offer',icon:'★'};if(value.includes('测评'))return{style:'assessment',icon:'◇'};if(value.includes('笔试'))return{style:'test',icon:'✎'};if(/面试|[一二三四五六七八九]面|HR/.test(value))return{style:'interview',icon:'◎'};if(value.includes('电话'))return{style:'phone',icon:'☎'};if(value.includes('等待'))return{style:'waiting',icon:'◷'};if(value.includes('投递'))return{style:'applied',icon:'↗'};return{style:'other',icon:'＋'}}
-function eventFlowDate(item:Record<string,unknown>){const start=String(item.startsAt||item.start||item.date||''),end=String(item.endsAt||item.end||'');return end&&!item.completed?`${start.slice(0,10)} 至 ${end.slice(0,10)}`:String(item.completed?eventCompletionTime(item):start).slice(0,10)}
+function eventFlowDate(item:Record<string,unknown>){const start=eventOccurrenceTime(item),end=String(item.endsAt||item.end||'');return end?`${start.slice(0,10)} 至 ${end.slice(0,10)}`:start.slice(0,10)}
 function flow(item:JobApplication){
   const events=store.events.value.filter(e=>e.applicationId===item.id).slice().sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
   const applied=flowVisual('已投递')
@@ -202,8 +203,8 @@ async function undoDelete(){
   }catch(cause){error.value=cause instanceof Error?cause.message:'撤销失败'}finally{busy.value=false}
 }
 function toInputTime(value:unknown){return String(value||'').replace(' ','T').slice(0,16)}
-function eventDateLabel(item:JobEvent){const value=String(item.completed?eventCompletionTime(item):item.startsAt||item.start||item.date||'');const match=value.match(/^\d{4}-(\d{2})-(\d{2})/);return match?`${Number(match[1])}月${Number(match[2])}日`:'日期未填'}
-function eventTimeLabel(item:JobEvent){const start=String(item.completed?eventCompletionTime(item):item.startsAt||item.start||item.date||'');const end=String(item.endsAt||item.end||'');const startTime=start.slice(11,16)||'时间未填';return end&&!item.completed?`${startTime} 至 ${end.slice(0,10)===start.slice(0,10)?end.slice(11,16):end.slice(0,16).replace('T',' ')}`:startTime}
+function eventDateLabel(item:JobEvent){const value=eventOccurrenceTime(item);const match=value.match(/^\d{4}-(\d{2})-(\d{2})/);return match?`${Number(match[1])}月${Number(match[2])}日`:'日期未填'}
+function eventTimeLabel(item:JobEvent){const start=eventOccurrenceTime(item),end=String(item.endsAt||item.end||'');const startTime=start.slice(11,16)||'时间未填';return end?`${startTime} 至 ${end.slice(0,10)===start.slice(0,10)?end.slice(11,16):end.slice(0,16).replace('T',' ')}`:startTime}
 function eventState(item:JobEvent){return item.abandoned||(!item.completed&&selected.value?.status==='已放弃')?'已放弃':item.missed?'已错过':item.completed?'已完成':'待处理'}
 function eventLink(value:unknown){const text=String(value||'').trim();return /^https?:\/\//i.test(text)?text:''}
 function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdAt||'')}
