@@ -17,12 +17,14 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class MailInboxService {
     private final Environment environment;
     private final LegacySecretCrypto crypto;
     private final LegacySecretCryptoWriter cryptoWriter;
+    private final Set<Long> syncingAccounts=ConcurrentHashMap.newKeySet();
 
     public MailInboxService(Environment environment, LegacySecretCrypto crypto, LegacySecretCryptoWriter cryptoWriter) {
         this.environment=environment; this.crypto=crypto; this.cryptoWriter=cryptoWriter;
@@ -44,7 +46,10 @@ public class MailInboxService {
         sync(userEmail);return inbox(userEmail).accounts().stream().filter(a->a.email().equals(cleanEmail)).findFirst().orElseThrow();
     }
     public void removeAccount(String email,long id)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("DELETE FROM mail_accounts WHERE id=? AND user_id=?")){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}
-    public InboxView sync(String email)throws Exception{try(Connection c=open()){long userId=userId(c,email);for(AccountRow account:accounts(c,userId)){try{syncAccount(c,account);}catch(Exception ignored){}}}return inbox(email);}
+    public InboxView sync(String email)throws Exception{
+        for(AccountRow account:accounts(email)){try{syncAccount(account);}catch(Exception ignored){}}
+        return inbox(email);
+    }
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
     public int processAll(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));return s.executeUpdate();}}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
@@ -52,22 +57,43 @@ public class MailInboxService {
     @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:15000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:15000}")
     public void syncAll(){
         if(encryptionKey().length()<32)return;
-        try(Connection c=open();PreparedStatement s=c.prepareStatement("SELECT id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag,last_uid,initialized,collect_after FROM mail_accounts ORDER BY id");ResultSet r=s.executeQuery()){while(r.next()){try{syncAccount(c,row(r));}catch(Exception ignored){}}}catch(Exception ignored){}
+        try{for(AccountRow account:accounts()){try{syncAccount(account);}catch(Exception ignored){}}}catch(Exception ignored){}
     }
 
     private void updateMessage(String email,long id,boolean delete)throws Exception{try(Connection c=open()){String sql=delete?"DELETE FROM collected_mails WHERE id=? AND user_id=?":"UPDATE collected_mails SET processed_at=NOW() WHERE id=? AND user_id=?";try(PreparedStatement s=c.prepareStatement(sql)){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}}
-    private void syncAccount(Connection c,AccountRow account)throws Exception{
-        String password=crypto.decrypt(encryptionKey(),account.encrypted(),account.iv(),account.tag());long newest=account.lastUid();
+    private void syncAccount(AccountRow account)throws Exception{
+        if(!syncingAccounts.add(account.id()))return;
+        try{
+            SyncResult result=fetch(account);
+            persist(account,result);
+        }catch(Exception e){persistError(account.id(),connectionFailure(account.provider(),e));throw e;
+        }finally{syncingAccounts.remove(account.id());}
+    }
+    private SyncResult fetch(AccountRow account)throws Exception{
+        String password=crypto.decrypt(encryptionKey(),account.encrypted(),account.iv(),account.tag());long newest=account.lastUid();List<FetchedMail> fetched=new ArrayList<>();
         try(Store store=connect(account.email(),account.provider(),password)){Folder folder=store.getFolder("INBOX");folder.open(Folder.READ_ONLY);
             try{UIDFolder uidFolder=(UIDFolder)folder;long latestUid=folder.getMessageCount()>0?uidFolder.getUID(folder.getMessage(folder.getMessageCount())):0;
-                if(!account.initialized()){try(PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_uid=?,last_synced_at=NOW(),last_error='',initialized=TRUE WHERE id=?")){s.setLong(1,latestUid);s.setLong(2,account.id());s.executeUpdate();}return;}
+                if(!account.initialized())return new SyncResult(latestUid,List.of());
                 long start=account.lastUid()+1;Message[] mails=uidFolder.getMessagesByUID(start,UIDFolder.LASTUID);
                 for(Message mail:mails){long uid=uidFolder.getUID(mail);if(uid<=0)continue;newest=Math.max(newest,uid);java.util.Date date=mail.getReceivedDate()!=null?mail.getReceivedDate():mail.getSentDate();if(date==null||!date.toInstant().isAfter(account.collectAfter()))continue;String body=extract(mail).trim();if(body.isBlank())continue;
-                    try(PreparedStatement s=c.prepareStatement("INSERT INTO collected_mails(user_id,account_id,message_uid,sender,subject,body,received_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,message_uid) DO NOTHING")){s.setLong(1,account.userId());s.setLong(2,account.id());s.setLong(3,uid);s.setString(4,addresses(mail.getFrom()));s.setString(5,decode(mail.getSubject()));s.setString(6,limit(body,100000));s.setTimestamp(7,Timestamp.from(date.toInstant()));s.executeUpdate();}
+                    fetched.add(new FetchedMail(uid,addresses(mail.getFrom()),decode(mail.getSubject()),limit(body,100000),date.toInstant()));
                 }
             }finally{folder.close(false);}
-            try(PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_uid=?,last_synced_at=NOW(),last_error='' WHERE id=?")){s.setLong(1,newest);s.setLong(2,account.id());s.executeUpdate();}
-        }catch(Exception e){String message=connectionFailure(account.provider(),e);try(PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_error=? WHERE id=?")){s.setString(1,message);s.setLong(2,account.id());s.executeUpdate();}throw e;}
+        }
+        return new SyncResult(newest,List.copyOf(fetched));
+    }
+    private void persist(AccountRow account,SyncResult result)throws Exception{
+        try(Connection c=open()){
+            c.setAutoCommit(false);
+            try{
+                for(FetchedMail mail:result.mails())try(PreparedStatement s=c.prepareStatement("INSERT INTO collected_mails(user_id,account_id,message_uid,sender,subject,body,received_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,message_uid) DO NOTHING")){s.setLong(1,account.userId());s.setLong(2,account.id());s.setLong(3,mail.uid());s.setString(4,mail.sender());s.setString(5,mail.subject());s.setString(6,mail.body());s.setTimestamp(7,Timestamp.from(mail.receivedAt()));s.executeUpdate();}
+                try(PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_uid=?,last_synced_at=NOW(),last_error='',initialized=TRUE WHERE id=?")){s.setLong(1,result.newestUid());s.setLong(2,account.id());s.executeUpdate();}
+                c.commit();
+            }catch(Exception e){c.rollback();throw e;}
+        }
+    }
+    private void persistError(long accountId,String message){
+        try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_error=? WHERE id=?")){s.setString(1,message);s.setLong(2,accountId);s.executeUpdate();}catch(Exception ignored){}
     }
     private String extract(Part part)throws Exception{
         if(part.isMimeType("text/html")){var document=Jsoup.parse(String.valueOf(part.getContent()));StringBuilder out=new StringBuilder(document.text());document.select("a[href]").forEach(link->{String href=link.attr("href");if(!href.isBlank())out.append("\n").append(link.text().isBlank()?"链接":link.text()).append("：").append(href);});return out.toString();}
@@ -101,6 +127,8 @@ public class MailInboxService {
     private boolean hasCause(Throwable error,Class<? extends Throwable> type){for(Throwable current=error;current!=null;current=current.getCause())if(type.isInstance(current))return true;return false;}
     private String safeDetail(Throwable error){String detail=exceptionText(error).replaceAll("[\\r\\n]+"," ").trim();return detail.isBlank()?error.getClass().getSimpleName():limit(detail,160);}
     private Properties mailProperties(){Properties p=new Properties();p.put("mail.imaps.ssl.enable","true");p.put("mail.imaps.ssl.checkserveridentity","true");p.put("mail.imaps.connectiontimeout","10000");p.put("mail.imaps.timeout","20000");p.put("mail.imaps.writetimeout","20000");return p;}
+    private List<AccountRow> accounts(String email)throws Exception{try(Connection c=open()){return accounts(c,userId(c,email));}}
+    private List<AccountRow> accounts()throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("SELECT id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag,last_uid,initialized,collect_after FROM mail_accounts ORDER BY id");ResultSet r=s.executeQuery()){List<AccountRow> list=new ArrayList<>();while(r.next())list.add(row(r));return list;}}
     private List<AccountRow> accounts(Connection c,long userId)throws Exception{List<AccountRow> list=new ArrayList<>();try(PreparedStatement s=c.prepareStatement("SELECT id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag,last_uid,initialized,collect_after FROM mail_accounts WHERE user_id=?")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){while(r.next())list.add(row(r));}}return list;}
     private long pendingCount(Connection c,long userId)throws Exception{try(PreparedStatement s=c.prepareStatement("SELECT COUNT(*) FROM collected_mails WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId);try(ResultSet r=s.executeQuery()){return r.next()?r.getLong(1):0;}}}
     private AccountRow row(ResultSet r)throws Exception{return new AccountRow(r.getLong(1),r.getLong(2),r.getString(3),r.getString(4),r.getBytes(5),r.getBytes(6),r.getBytes(7),r.getLong(8),r.getBoolean(9),r.getTimestamp(10).toInstant());}
@@ -111,5 +139,8 @@ public class MailInboxService {
     private String decode(String value){try{return value==null?"(无主题)":MimeUtility.decodeText(value);}catch(Exception e){return value;}}private String addresses(Address[] values){if(values==null)return "";StringBuilder out=new StringBuilder();for(Address value:values){if(!out.isEmpty())out.append(", ");out.append(decode(value.toString()));}return out.toString();}
     private String limit(String value,int max){return value.length()<=max?value:value.substring(0,max);}private String instant(Timestamp value){return value==null?"":value.toInstant().toString();}
     public record InboxView(List<AccountView> accounts,List<MailView> messages,long pendingCount){}public record AccountView(long id,String email,String provider,String lastSyncedAt,String lastError){}public record MailView(long id,String sender,String subject,String body,String receivedAt,String accountEmail){}
-    private record AccountRow(long id,long userId,String email,String provider,byte[] encrypted,byte[] iv,byte[] tag,long lastUid,boolean initialized,Instant collectAfter){}public static class ValidationException extends RuntimeException{public ValidationException(String message){super(message);}}
+    private record AccountRow(long id,long userId,String email,String provider,byte[] encrypted,byte[] iv,byte[] tag,long lastUid,boolean initialized,Instant collectAfter){}
+    private record FetchedMail(long uid,String sender,String subject,String body,Instant receivedAt){}
+    private record SyncResult(long newestUid,List<FetchedMail> mails){}
+    public static class ValidationException extends RuntimeException{public ValidationException(String message){super(message);}}
 }

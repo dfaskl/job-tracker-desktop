@@ -76,7 +76,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 
 function refreshWorkspaceData(syncMail = false) {
   if (!store.user.value) return
-  void Promise.all([store.refresh(), store.refreshMailInbox(syncMail, false)])
+  void Promise.all([store.refresh(false, false), store.refreshMailInbox(syncMail, false)])
 }
 function handleWindowFocus() { refreshWorkspaceData(true) }
 

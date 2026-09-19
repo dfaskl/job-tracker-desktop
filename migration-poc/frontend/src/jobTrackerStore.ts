@@ -33,24 +33,25 @@ let mailInboxPromise: Promise<void> | null = null
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
 
-function refresh(throwOnError = false) {
+function refresh(throwOnError = false, reportError = true) {
   if (refreshPromise) return refreshPromise
   loading.value = true
-  error.value = ''
   refreshPromise = (async () => {
     try {
       const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
       user.value = result.user
       data.value = result.data || { applications: [], events: [] }
       readOnly.value = result.readOnly
+      error.value = ''
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         user.value = null
         data.value = { applications: [], events: [] }
+        error.value = ''
         if (throwOnError) throw cause
         return
       }
-      error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
+      if (reportError) error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
       if (throwOnError) throw cause
     } finally {
       loading.value = false
