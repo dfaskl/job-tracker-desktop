@@ -202,7 +202,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
-      <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice" :aria-busy="adviceLoading"><div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议</strong><small aria-live="polite"><span v-if="adviceLoading" class="advice-loading-dots" aria-hidden="true"><i></i><i></i><i></i></span>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
+      <section v-if="adviceLoading || scheduleAdvice || (adviceCandidates.length>1 && adviceNotice)" class="schedule-advice" :aria-busy="adviceLoading"><div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议</strong><small aria-live="polite">{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div></div><p v-if="adviceNotice && !adviceLoading" class="advice-notice">{{adviceNotice}}</p><template v-if="scheduleAdvice"><aside v-if="scheduleAdvice.plans?.length" class="advice-timeline" aria-label="日程时间轴"><strong>时间轴</strong><div class="timeline-scroll"><div class="timeline-list"><article v-for="item in adviceTimeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="label in item.labels" :key="label.text" :class="label.status">{{label.text}}</em></span></article></div></div></aside><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template></section>
       <div v-if="recentSchedules.length" class="schedule-list">
         <article v-for="(event,index) in recentSchedules" :key="event.id">
           <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
@@ -328,8 +328,8 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   50% { box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); background:color-mix(in srgb,var(--accent,var(--color-primary)) 4%,#fff); }
 }
 @keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
-@keyframes advice-route-flow { to { stroke-dashoffset:-18; } }
-@keyframes advice-node-pulse { 50% { opacity:.35; transform:scale(.72); } }
+@keyframes advice-icon-blink { 0%,100% { opacity:1; transform:scale(1); filter:drop-shadow(0 0 0 transparent); } 50% { opacity:.28; transform:scale(.88); filter:drop-shadow(0 0 7px rgba(255,255,255,.68)); } }
+@keyframes advice-icon-fade { 0%,100% { opacity:1; } 50% { opacity:.35; } }
 @keyframes quote-spark {
   0% { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(0); }
   26% { opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(35deg); }
@@ -337,10 +337,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger > .quote-glyph, .advice-trigger.is-loading > .advice-glyph { animation:none; }
+  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger > .quote-glyph { animation:none; }
   .quote-strip.is-refreshing { background:color-mix(in srgb,var(--accent,var(--color-primary)) 5%,#fff); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 11%,transparent); }
   .quote-strip.is-refreshing > .quote-trigger > .quote-glyph { opacity:.58; }
-  .advice-trigger.is-loading > .advice-glyph :is(path,circle) { animation:none; }
   .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.62s!important;animation-iteration-count:1!important; }
 }
 @keyframes quote-spark-soft {
@@ -420,11 +419,10 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 .advice-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
 .advice-trigger:disabled { cursor: wait; }
-.advice-glyph{display:grid;width:20px;height:20px;place-items:center;transform-origin:center}.advice-glyph svg{width:20px;height:20px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.advice-trigger.is-loading > .advice-glyph path{stroke-dasharray:6 3;animation:advice-route-flow .8s linear infinite}.advice-trigger.is-loading > .advice-glyph circle{transform-box:fill-box;transform-origin:center;animation:advice-node-pulse .8s ease-in-out infinite}.advice-trigger.is-loading > .advice-glyph circle:last-of-type{animation-delay:.4s}
+.advice-glyph{display:grid;width:20px;height:20px;place-items:center;transform-origin:center}.advice-glyph svg{width:20px;height:20px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.advice-trigger.is-loading > .advice-glyph{animation:advice-icon-blink .78s ease-in-out infinite}
 .advice-title > div { display: grid; min-width: 0; gap: 3px; }
 .advice-title strong { font-size: 16px; }
-.advice-title small { display:flex;align-items:center;gap:7px;color:var(--home-muted);line-height:1.5; }
-.advice-loading-dots{display:inline-flex;align-items:center;gap:3px;flex:none}.advice-loading-dots i{width:5px;height:5px;border-radius:50%;background:var(--accent,var(--color-primary));animation:advice-dot-wave .9s ease-in-out infinite}.advice-loading-dots i:nth-child(2){animation-delay:.15s}.advice-loading-dots i:nth-child(3){animation-delay:.3s}
+.advice-title small { color:var(--home-muted);line-height:1.5; }
 .advice-notice { margin: 0; color: #8a5608; font-size: 12px; }
 
 .advice-timeline {
@@ -653,10 +651,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   from { opacity: 0; transform: translateY(8px) scale(.995); }
   to { opacity: 1; transform: none; }
 }
-@keyframes advice-dot-wave { 0%,100%{opacity:.3;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
 @media (prefers-reduced-motion: reduce) {
   .schedule-advice { animation: none; }
-  .advice-loading-dots i { animation: none; opacity: .72; }
+  .advice-trigger.is-loading > .advice-glyph { animation:advice-icon-fade 1.6s ease-in-out infinite!important; }
 }
 @media (max-width: 900px) {
   .dashboard-panel { padding: 21px 18px; border-radius: 15px; }
