@@ -41,7 +41,7 @@ class EventDocumentMutatorTest {
     }
 
     @Test
-    void completesAndRestoresARangeUsingTheActualCompletionTime() throws Exception {
+    void collapsesACompletedRangeToTheCompletionTimeAndRestoresTheOriginalRange() throws Exception {
         var created = mutator.create(document(), input("测评", "在线测评", "2026-09-01 09:00", "2026-09-10 18:00"));
         var completed = mutator.resolve(
             created.documentJson(), created.event().id(), EventDocumentMutator.Resolution.COMPLETE,
@@ -52,6 +52,11 @@ class EventDocumentMutatorTest {
         assertThat(completed.event().missed()).isFalse();
         assertThat(completed.event().completedAt()).isEqualTo("2026-09-03 06:30");
         assertThat(completed.event().recordAt()).isEqualTo("2026-09-03 06:30");
+        assertThat(completed.event().startsAt()).isEqualTo("2026-09-03 06:30");
+        assertThat(completed.event().endsAt()).isEmpty();
+        JsonNode completedJson = mapper.readTree(completed.documentJson()).path("events").get(0);
+        assertThat(completedJson.path("completionOriginalStartsAt").asText()).isEqualTo("2026-09-01 09:00");
+        assertThat(completedJson.path("completionOriginalEndsAt").asText()).isEqualTo("2026-09-10 18:00");
 
         var restored = mutator.resolve(
             completed.documentJson(), completed.event().id(), EventDocumentMutator.Resolution.RESTORE,
@@ -60,6 +65,11 @@ class EventDocumentMutatorTest {
         assertThat(restored.event().completed()).isFalse();
         assertThat(restored.event().completedAt()).isEmpty();
         assertThat(restored.event().recordAt()).isEqualTo("2026-09-01 09:00");
+        assertThat(restored.event().startsAt()).isEqualTo("2026-09-01 09:00");
+        assertThat(restored.event().endsAt()).isEqualTo("2026-09-10 18:00");
+        JsonNode restoredJson = mapper.readTree(restored.documentJson()).path("events").get(0);
+        assertThat(restoredJson.has("completionOriginalStartsAt")).isFalse();
+        assertThat(restoredJson.has("completionOriginalEndsAt")).isFalse();
     }
 
     @Test

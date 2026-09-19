@@ -9,6 +9,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ public class EventDocumentMutator {
 
     @Autowired
     public EventDocumentMutator(ObjectMapper objectMapper) {
-        this(objectMapper, Clock.systemUTC());
+        this(objectMapper, Clock.system(ZoneId.of("Asia/Shanghai")));
     }
 
     EventDocumentMutator(ObjectMapper objectMapper, Clock clock) {
@@ -91,6 +92,7 @@ public class EventDocumentMutator {
                 updated.put("missed", false);
                 updated.put("abandoned", false);
                 updated.put("completedAt", now);
+                collapseCompletedRange(updated, now);
             }
             case MISS -> {
                 updated.put("completed", true);
@@ -109,11 +111,30 @@ public class EventDocumentMutator {
                 updated.put("missed", false);
                 updated.put("abandoned", false);
                 updated.remove("completedAt");
+                restoreCompletedRange(updated);
             }
         }
         updated.put("updatedAt", now);
         document.events().set(index, updated);
         return mutation(document.root(), updated, document.events().size());
+    }
+
+    private void collapseCompletedRange(ObjectNode event, String completedAt) {
+        String endsAt = text(event, "endsAt");
+        if (endsAt.isEmpty()) return;
+        event.put("completionOriginalStartsAt", text(event, "startsAt"));
+        event.put("completionOriginalEndsAt", endsAt);
+        event.put("startsAt", completedAt);
+        event.remove("endsAt");
+    }
+
+    private void restoreCompletedRange(ObjectNode event) {
+        String startsAt = text(event, "completionOriginalStartsAt");
+        String endsAt = text(event, "completionOriginalEndsAt");
+        if (!startsAt.isEmpty()) event.put("startsAt", startsAt);
+        if (!endsAt.isEmpty()) event.put("endsAt", endsAt);
+        event.remove("completionOriginalStartsAt");
+        event.remove("completionOriginalEndsAt");
     }
 
     public Mutation delete(String json, String id, String expectedUpdatedAt) throws Exception {
