@@ -7,20 +7,22 @@ import AccountManagement from './AccountManagement.vue'
 </script>
 <template>
   <div class="settings-grid">
-    <AccountManagement />
-    <MailAccountSettings />
-    <ProductPreferences />
-    <ProductDataManagement />
-    <MigrationBackups />
+    <div class="settings-column settings-column-left">
+      <AccountManagement />
+      <MailAccountSettings />
+      <ProductPreferences />
+    </div>
+    <div class="settings-column settings-column-middle"><ProductDataManagement /></div>
+    <div class="settings-column settings-column-right"><MigrationBackups /></div>
   </div>
 </template>
 <style scoped>
-.settings-grid{display:grid;min-height:100%;grid-template-columns:minmax(380px,.95fr) minmax(440px,1.12fr) minmax(380px,1fr);grid-template-rows:auto auto auto;grid-template-areas:"account official backup" "mail official backup" "api official backup";align-items:stretch;gap:16px;padding:16px 0 18px;box-sizing:border-box}
-.settings-grid :deep(.preferences-layout){display:contents}
+.settings-grid{display:grid;min-height:100%;grid-template-columns:minmax(380px,.95fr) minmax(440px,1.12fr) minmax(380px,1fr);align-items:stretch;gap:16px;padding:16px 0 18px;box-sizing:border-box}
+.settings-column{display:flex;min-width:0;min-height:0;flex-direction:column;gap:16px}
 .settings-grid :deep(.card){min-width:0;min-height:0;margin:0!important}
-.settings-grid :deep(.data-card){grid-area:official;align-content:start;overflow-y:auto}
+.settings-grid :deep(.data-card){align-content:start;overflow-y:auto}
 .settings-grid :deep(.data-grid){grid-template-columns:1fr}
-.settings-grid :deep(.backup-card){grid-area:backup}
-@media(max-width:1600px){.settings-grid{height:auto;grid-template-columns:minmax(380px,.9fr) minmax(480px,1.1fr);grid-template-rows:auto;grid-template-areas:"account official" "mail official" "api official" "backup backup";overflow:visible}.settings-grid :deep(.data-card){overflow:visible}.settings-grid :deep(.backup-card){max-height:720px}}
-@media(max-width:1100px){.settings-grid{grid-template-columns:1fr;grid-template-areas:"account" "mail" "api" "official" "backup"}}
+.settings-column-right :deep(.backup-card){flex:1}
+@media(max-width:1600px){.settings-grid{height:auto;grid-template-columns:minmax(380px,.9fr) minmax(480px,1.1fr);overflow:visible}.settings-column-right{grid-column:1/-1}.settings-grid :deep(.data-card){overflow:visible}.settings-grid :deep(.backup-card){max-height:720px}}
+@media(max-width:1100px){.settings-grid{grid-template-columns:1fr}.settings-column-right{grid-column:auto}}
 </style>
