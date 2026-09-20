@@ -110,25 +110,34 @@ onBeforeUnmount(() => {
         <span class="journey-beacon"></span>
         <span class="journey-logo"><img src="/favicon.svg" alt=""></span>
         <span class="dog-runner">
-          <svg class="running-dog" viewBox="0 0 72 48" focusable="false">
-            <g class="dog-tail"><path class="tail-outline" d="M18 20C9 20 4 13 8 7c3-5 11-3 12 2 1 4-3 7-7 4" /><path class="tail-fur" d="M18 20C9 20 4 13 8 7c3-5 11-3 12 2 1 4-3 7-7 4" /></g>
-            <g class="dog-leg leg-rear-far"><path class="leg-far" d="M22 27c0 6-2 10-5 14 1 4 7 4 9 0l3-13Z" /></g>
-            <g class="dog-leg leg-front-far"><path class="leg-far" d="M46 27c0 6-1 10-3 14 2 4 8 3 9-1l1-13Z" /></g>
-            <g class="dog-leg leg-rear-near"><path class="leg-near" d="M28 28c1 6 0 10-2 14 2 4 8 3 9-1l-1-13Z" /></g>
-            <g class="dog-leg leg-front-near"><path class="leg-near" d="M51 27c1 6 2 10 1 14 3 4 9 2 9-2l-4-13Z" /></g>
-            <path class="dog-body" d="M17 15c3-5 8-3 11-6 4-4 9 1 13-1 5-2 11 1 12 6 5 1 7 6 4 10 2 5-2 9-7 8-4 4-10 1-14 3-5 1-8-3-12-2-5 0-6-4-7-7-4-4-2-11 2-14Z" />
-            <path class="dog-belly" d="M20 27c8 4 22 5 31 0-2 7-9 6-14 8-7 1-14-1-17-8Z" />
-            <path class="dog-fur-mark" d="m24 13 3 4 3-5 4 4 4-5 4 4" />
-            <path class="dog-head" d="M49 11c1-5 6-3 9-5 5-3 11 1 10 7 5 3 4 9 0 12-2 6-11 7-17 3-6-3-6-12-2-17Z" />
-            <path class="dog-ear ear-back" d="M52 11c-4-6 1-10 6-6l1 9Z" />
-            <path class="dog-ear ear-front" d="M61 8c3-5 8-2 7 3l-4 6Z" />
-            <path class="dog-face-tuft" d="m53 10 3 2 2-4 3 4 3-3 2 4" />
-            <ellipse class="dog-muzzle" cx="65" cy="21" rx="6" ry="4.5" />
-            <circle class="dog-eye" cx="61" cy="15" r="1.5" />
-            <circle class="dog-nose" cx="70" cy="20" r="1.8" />
-            <path class="dog-mouth" d="M68 23c-2 2-4 2-6 0" />
-            <path class="dog-collar" d="M50 13c3 4 4 9 2 14" />
-            <path class="dog-tag" d="M52 23l4 3-4 3-3-3Z" />
+          <svg class="running-dog" viewBox="0 0 84 56" focusable="false" aria-hidden="true">
+            <g class="dog-tail">
+              <path class="tail-outline" d="M21 29C9 31 3 23 8 15c4-7 14-6 17 1 2 5-2 9-8 8" />
+              <path class="tail-fur" d="M21 29C9 31 3 23 8 15c4-7 14-6 17 1 2 5-2 9-8 8" />
+            </g>
+            <g class="dog-leg gait-a leg-rear-far"><path class="leg-far" d="M27 34c0 6-3 10-6 14-1 2 1 4 4 4h5c2 0 3-2 2-4l2-13Z" /></g>
+            <g class="dog-leg gait-b leg-front-far"><path class="leg-far" d="M52 34c1 6-1 11-3 15-1 2 1 3 3 3h5c3 0 4-2 2-4l-1-14Z" /></g>
+            <g class="dog-leg gait-b leg-rear-near"><path class="leg-near" d="M34 35c1 6 0 11-2 15-1 2 1 4 4 4h5c3 0 4-2 2-4l-2-15Z" /></g>
+            <g class="dog-leg gait-a leg-front-near"><path class="leg-near" d="M58 34c2 6 2 11 1 15 0 3 2 4 5 4h4c3 0 4-3 1-5l-4-15Z" /></g>
+            <path class="dog-body" d="M18 25c1-7 8-11 15-10 5-5 12-2 16-1 7-1 14 3 16 9 5 3 6 9 2 14-3 5-10 5-15 4-5 4-12 3-16 1-6 2-13-1-16-5-4-3-5-8-2-12Z" />
+            <path class="dog-cream dog-belly" d="M24 35c9 4 22 6 34 1-3 7-10 8-16 8-8 1-15-2-18-9Z" />
+            <path class="dog-body-tuft" d="m27 19 4 4 4-6 5 5 5-6 5 5" />
+            <path class="dog-chest" d="M55 25c-2 4-3 9-1 15l-5-2-2 5-4-4-4 3c2-9 5-15 10-18Z" />
+            <path class="dog-head" d="M49 12c2-7 9-10 15-7 7-3 15 1 16 8 5 3 5 10 1 14 1 7-7 12-14 11-8 2-17-3-18-11-4-4-4-11 0-15Z" />
+            <path class="dog-ear ear-back" d="M52 13c-7-7-1-14 6-10 3 2 4 6 3 11Z" />
+            <path class="dog-ear ear-front" d="M70 8c5-5 12-1 10 5-1 5-5 9-9 11l-4-9Z" />
+            <path class="dog-blaze" d="M61 6c5-2 9 0 11 3l-4 5 3 6-4 7-5-3-4-9Z" />
+            <path class="dog-face-tuft" d="m55 9 4 2 3-5 4 5 4-3 2 5" />
+            <ellipse class="dog-eye eye-back" cx="62" cy="18" rx="3.2" ry="4" />
+            <ellipse class="dog-eye eye-front" cx="72" cy="18" rx="3.7" ry="4.5" />
+            <circle class="dog-eye-glint" cx="63" cy="16.7" r="1" />
+            <circle class="dog-eye-glint" cx="73" cy="16.5" r="1.1" />
+            <path class="dog-cream dog-muzzle" d="M60 24c2-4 7-5 10-2 4-2 10 0 10 5 0 5-6 8-11 6-5 2-11-1-9-9Z" />
+            <path class="dog-nose" d="M76 22c4-1 6 2 3 5l-3 2-3-3c-1-2 1-4 3-4Z" />
+            <path class="dog-mouth" d="M76 28c-1 4-7 5-10 1" />
+            <path class="dog-tongue" d="M70 31c2 0 4-1 5-2 0 4-1 6-3 6s-3-2-2-4Z" />
+            <path class="dog-collar" d="M51 29c5 4 12 6 19 5" />
+            <path class="dog-tag" d="M61 34c4 0 5 3 3 6-2 2-5 1-6-2-1-2 1-4 3-4Z" />
           </svg>
         </span>
       </div>
@@ -158,15 +167,15 @@ onBeforeUnmount(() => {
 .journey-logo{position:absolute;top:0;left:50%;z-index:3;display:grid;width:60px;height:60px;place-items:center;border:1px solid rgba(255,255,255,.9);border-radius:19px;background:rgba(255,255,255,.83);box-shadow:0 13px 30px rgba(20,93,91,.2),inset 0 1px 0 rgba(255,255,255,.95);animation:logo-float 1.8s ease-in-out infinite}
 .journey-logo::after{content:"";position:absolute;right:8px;bottom:7px;width:8px;height:8px;border-radius:50%;background:#f0a24b;box-shadow:0 0 0 4px rgba(240,162,75,.15),0 0 12px rgba(240,162,75,.62);animation:logo-signal 1.8s ease-in-out infinite}
 .journey-logo img{width:48px;height:48px;border-radius:14px;filter:drop-shadow(0 6px 9px rgba(20,93,91,.16))}
-.dog-runner{position:absolute;top:88px;left:50%;z-index:4;display:block;width:72px;height:48px;pointer-events:none;filter:drop-shadow(0 5px 5px rgba(82,51,28,.22));animation:dog-run 4.8s ease-in-out infinite}
-.dog-runner::after{content:"";position:absolute;right:5px;bottom:0;width:48px;height:5px;border-radius:50%;background:rgba(82,51,28,.15);filter:blur(1px);animation:dog-shadow .32s ease-in-out infinite alternate}
-.running-dog{display:block;width:100%;height:100%;overflow:visible;animation:dog-bob .34s ease-in-out infinite alternate}
-.dog-tail{transform-box:fill-box;transform-origin:right center;animation:dog-tail-wag .3s ease-in-out infinite alternate}.tail-outline,.tail-fur{fill:none;stroke-linecap:round;stroke-linejoin:round}.tail-outline{stroke:#774728;stroke-width:8}.tail-fur{stroke:#e5a45f;stroke-width:5.5}
-.dog-leg{transform-box:fill-box;transform-origin:top center;animation:dog-legs .32s cubic-bezier(.45,.05,.55,.95) infinite alternate}.leg-rear-near,.leg-front-far{animation-direction:alternate-reverse}.leg-far,.leg-near{stroke:#794a2d;stroke-width:1.2;stroke-linejoin:round}.leg-far{fill:#bf7b44}.leg-near{fill:#e1a15f}
-.dog-body{fill:#dfa05e;stroke:#774728;stroke-width:1.5;stroke-linejoin:round}.dog-belly{fill:#f8d8aa;opacity:.92}.dog-fur-mark{fill:none;stroke:#f7d6a8;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.dog-head{fill:#e7a765;stroke:#774728;stroke-width:1.5;stroke-linejoin:round}.dog-ear{stroke:#6e4227;stroke-width:1.2;stroke-linejoin:round}.ear-back{fill:#a9673b}.ear-front{fill:#bc7742}.dog-face-tuft{fill:none;stroke:#f6d09c;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.dog-muzzle{fill:#ffe2b8}.dog-eye,.dog-nose{fill:#173f43}.dog-mouth{fill:none;stroke:#74452c;stroke-width:1.2;stroke-linecap:round}
-.dog-collar{fill:none;stroke:#168e89;stroke-width:3;stroke-linecap:round}.dog-tag{fill:#f4b14f;stroke:#fff2cf;stroke-width:1}
+.dog-runner{position:absolute;top:84px;left:50%;z-index:4;display:block;width:84px;height:56px;pointer-events:none;filter:drop-shadow(0 5px 5px rgba(82,51,28,.22));animation:dog-run 4.8s ease-in-out infinite;will-change:transform}
+.dog-runner::after{content:"";position:absolute;right:5px;bottom:0;width:54px;height:5px;border-radius:50%;background:rgba(82,51,28,.15);filter:blur(1px);animation:dog-shadow .34s ease-in-out infinite alternate}
+.running-dog{display:block;width:100%;height:100%;overflow:visible;animation:dog-bob .34s ease-in-out infinite alternate;will-change:transform}
+.dog-tail{transform-box:view-box;transform-origin:21px 29px;animation:dog-tail-wag .28s ease-in-out infinite alternate;will-change:transform}.tail-outline,.tail-fur{fill:none;stroke-linecap:round;stroke-linejoin:round}.tail-outline{stroke:#8e5b36;stroke-width:10}.tail-fur{stroke:#e9bd78;stroke-width:7}
+.dog-leg{transform-box:view-box;will-change:transform}.gait-a{animation:dog-gait-a .48s linear infinite}.gait-b{animation:dog-gait-b .48s linear infinite}.leg-rear-far{transform-origin:29px 34px}.leg-front-far{transform-origin:55px 34px}.leg-rear-near{transform-origin:36px 35px}.leg-front-near{transform-origin:61px 34px}.leg-far,.leg-near{stroke:#8b5735;stroke-width:1.25;stroke-linejoin:round}.leg-far{fill:#c98b53}.leg-near{fill:#edbd7a}
+.dog-body,.dog-head{fill:#edbd7a;stroke:#8b5735;stroke-width:1.5;stroke-linejoin:round}.dog-cream{fill:#fff0ce}.dog-body-tuft,.dog-face-tuft{fill:none;stroke:#fff1d2;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}.dog-chest{fill:#fff2d4;stroke:#dba76b;stroke-width:.8;stroke-linejoin:round}
+.dog-ear{stroke:#8b5735;stroke-width:1.25;stroke-linejoin:round}.ear-back{fill:#c88750}.ear-front{fill:#d89a5e}.dog-blaze{fill:#fff4d9;opacity:.98}
+.dog-eye{fill:#2f201b;stroke:#130e0d;stroke-width:.7}.dog-eye-glint{fill:#fff}.dog-muzzle{stroke:#d8a46e;stroke-width:.65}.dog-nose{fill:#2a1d1d}.dog-mouth{fill:none;stroke:#6d3d31;stroke-width:1.25;stroke-linecap:round}.dog-tongue{fill:#ec7b85;stroke:#8d4b4e;stroke-width:.65}
+.dog-collar{fill:none;stroke:#b84537;stroke-width:3.5;stroke-linecap:round}.dog-tag{fill:#e5a238;stroke:#fff2c9;stroke-width:.8}
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
 @keyframes route-draw{0%{stroke-dashoffset:1;opacity:.25}72%{stroke-dashoffset:0;opacity:1}88%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.18}}
 @keyframes beacon-travel{0%{offset-distance:0%;opacity:0;transform:scale(.65)}10%{opacity:1}72%{offset-distance:100%;opacity:1;transform:scale(1)}88%{offset-distance:100%;opacity:1;transform:scale(1.18)}100%{offset-distance:100%;opacity:0;transform:scale(.65)}}
@@ -176,8 +185,9 @@ onBeforeUnmount(() => {
 @keyframes dog-run{0%{transform:translateX(-96px) scaleX(1)}47%{transform:translateX(24px) scaleX(1)}50%{transform:translateX(24px) scaleX(-1)}97%{transform:translateX(-96px) scaleX(-1)}100%{transform:translateX(-96px) scaleX(1)}}
 @keyframes dog-bob{to{transform:translateY(-4px) rotate(-2deg)}}
 @keyframes dog-shadow{to{transform:scaleX(.62);opacity:.45}}
-@keyframes dog-tail-wag{from{transform:rotate(38deg)}to{transform:rotate(-42deg)}}
-@keyframes dog-legs{from{transform:rotate(36deg) translateY(1px)}to{transform:rotate(-38deg) translateY(-1px)}}
+@keyframes dog-tail-wag{from{transform:rotate(34deg)}to{transform:rotate(-38deg)}}
+@keyframes dog-gait-a{0%,100%{transform:rotate(38deg) translateY(0)}25%{transform:rotate(0) translateY(-2px)}50%{transform:rotate(-42deg) translateY(0)}75%{transform:rotate(0) translateY(2px)}}
+@keyframes dog-gait-b{0%,100%{transform:rotate(-42deg) translateY(0)}25%{transform:rotate(0) translateY(2px)}50%{transform:rotate(38deg) translateY(0)}75%{transform:rotate(0) translateY(-2px)}}
 @keyframes route-draw-soft{0%{stroke-dashoffset:1;opacity:.42}78%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.42}}
 @keyframes beacon-travel-soft{0%{offset-distance:0%;opacity:0}12%,84%{opacity:.92}88%{offset-distance:100%;opacity:.92}100%{offset-distance:100%;opacity:0}}
 @keyframes route-node-soft{0%,100%{opacity:.42}50%{opacity:1}}
