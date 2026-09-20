@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { api, ApiError, clearApiCache } from './api'
 
-export type User = { id: string; email: string }
+export type User = { id: string; email: string; displayName?: string }
 export type JobApplication = Record<string, unknown> & {
   id: string; company?: string; position?: string; city?: string; channel?: string
   appliedDate?: string; stage?: string; status?: string; updatedAt?: string
@@ -102,6 +102,7 @@ async function register(email: string, password: string, registrationCode: strin
   await refreshMailInbox()
 }
 function requestNewApplication() { newApplicationRequest.value += 1 }
+function setUser(value: User) { user.value = value }
 function requestApplicationDetail(applicationId: string) {
   const normalizedId = String(applicationId || '').trim()
   if (!normalizedId) return
@@ -119,5 +120,5 @@ async function logout() {
 }
 
 export function useJobTrackerStore() {
-  return { user, data, applications, events, initialized, loading, error, readOnly, mailInbox, pendingMailCount, refreshMailInbox, newApplicationRequest, requestNewApplication, applicationDetailRequest, requestApplicationDetail, initialize, refresh, login, register, logout }
+  return { user, data, applications, events, initialized, loading, error, readOnly, mailInbox, pendingMailCount, refreshMailInbox, newApplicationRequest, requestNewApplication, applicationDetailRequest, requestApplicationDetail, setUser, initialize, refresh, login, register, logout }
 }

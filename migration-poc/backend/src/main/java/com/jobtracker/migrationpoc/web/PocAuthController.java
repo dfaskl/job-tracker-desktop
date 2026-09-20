@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -169,6 +170,43 @@ public class PocAuthController {
             .body(Map.of("ok", true));
     }
 
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(
+        @CookieValue(value = COOKIE_NAME, required = false) String token,
+        @RequestBody ProfileRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (!sandboxAccountsEnabled()) return error(HttpStatus.SERVICE_UNAVAILABLE, "账户管理暂不可用");
+        try {
+            Optional<LegacyUser> authenticated = authenticatedUser(token);
+            if (authenticated.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            LegacyUser updated = accountSandboxService.updateDisplayName(authenticated.get().email(), body == null ? null : body.displayName());
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("user", publicUser(updated), "message", "昵称已更新"));
+        } catch (AccountSandboxService.AccountValidationException e) { return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (AccountSandboxService.AccountForbiddenException e) { return error(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (Exception e) { LOGGER.warn("POC profile update failed", e); return error(HttpStatus.SERVICE_UNAVAILABLE, "账户信息暂时无法更新"); }
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<?> changePassword(
+        @CookieValue(value = COOKIE_NAME, required = false) String token,
+        @RequestBody PasswordChangeRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (!sandboxAccountsEnabled()) return error(HttpStatus.SERVICE_UNAVAILABLE, "账户管理暂不可用");
+        try {
+            Optional<LegacyUser> authenticated = authenticatedUser(token);
+            if (authenticated.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            accountSandboxService.changePassword(authenticated.get().email(), body == null ? null : body.currentPassword(), body == null ? null : body.newPassword());
+            if (persistentSessionEnabled()) persistentSessionStore.revokeOtherSessions(authenticated.get().email(), token);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("ok", true, "message", "密码已更新"));
+        } catch (AccountSandboxService.AccountValidationException e) { return error(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (AccountSandboxService.AccountForbiddenException e) { return error(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (Exception e) { LOGGER.warn("POC password update failed", e); return error(HttpStatus.SERVICE_UNAVAILABLE, "密码暂时无法更新"); }
+    }
+
     Optional<LegacyUser> authenticatedUser(String token) throws Exception {
         if (persistentSessionEnabled()) {
             Optional<String> email = persistentSessionStore.verifyEmail(token);
@@ -196,7 +234,7 @@ public class PocAuthController {
     }
 
     private Map<String, Object> publicUser(LegacyUser user) {
-        return Map.of("id", String.valueOf(user.id()), "email", user.email());
+        return Map.of("id", String.valueOf(user.id()), "email", user.email(), "displayName", user.displayName());
     }
 
     private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
@@ -264,4 +302,6 @@ public class PocAuthController {
 
     public record LoginRequest(String email, String password) {}
     public record RegisterRequest(String email, String password, String registrationCode) {}
+    public record ProfileRequest(String displayName) {}
+    public record PasswordChangeRequest(String currentPassword, String newPassword) {}
 }

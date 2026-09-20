@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.compat.LegacyPasswordVerifier;
 import com.jobtracker.migrationpoc.database.LegacyReadService;
+import com.jobtracker.migrationpoc.database.AccountSandboxService;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import com.jobtracker.migrationpoc.security.PocSessionManager;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PocAuthControllerTest {
@@ -77,6 +79,43 @@ class PocAuthControllerTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void updatesTheAuthenticatedUsersDisplayName() throws Exception {
+        LegacyReadService legacy = mock(LegacyReadService.class);
+        AccountSandboxService accounts = mock(AccountSandboxService.class);
+        LegacyUser current = new LegacyUser(7, "person@example.com", SALT, HASH, false, "person");
+        LegacyUser updated = new LegacyUser(7, "person@example.com", SALT, HASH, false, "小明");
+        when(accounts.enabled()).thenReturn(true);
+        when(accounts.findById(7)).thenReturn(Optional.of(current));
+        when(accounts.updateDisplayName("person@example.com", "小明")).thenReturn(updated);
+        PocSessionManager sessions = new PocSessionManager(new MockEnvironment()
+            .withProperty("POC_SESSION_SECRET", "0123456789abcdef0123456789abcdef"));
+        PocAuthController controller = new PocAuthController(legacy, new LegacyPasswordVerifier(), sessions, null, accounts);
+
+        var response = controller.updateProfile(sessions.issue(7), new PocAuthController.ProfileRequest("小明"), secureRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().toString()).contains("displayName=小明");
+    }
+
+    @Test
+    void changesTheAuthenticatedUsersPassword() throws Exception {
+        LegacyReadService legacy = mock(LegacyReadService.class);
+        AccountSandboxService accounts = mock(AccountSandboxService.class);
+        LegacyUser current = new LegacyUser(7, "person@example.com", SALT, HASH, false, "person");
+        when(accounts.enabled()).thenReturn(true);
+        when(accounts.findById(7)).thenReturn(Optional.of(current));
+        PocSessionManager sessions = new PocSessionManager(new MockEnvironment()
+            .withProperty("POC_SESSION_SECRET", "0123456789abcdef0123456789abcdef"));
+        PocAuthController controller = new PocAuthController(legacy, new LegacyPasswordVerifier(), sessions, null, accounts);
+
+        var response = controller.changePassword(sessions.issue(7),
+            new PocAuthController.PasswordChangeRequest("old-password", "new-password-123"), secureRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(accounts).changePassword("person@example.com", "old-password", "new-password-123");
     }
 
     private MockHttpServletRequest secureRequest() {

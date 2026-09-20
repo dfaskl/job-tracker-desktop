@@ -35,7 +35,7 @@ public class LegacyReadService {
     }
 
     public Optional<LegacyUser> findUserByEmail(String email) throws Exception {
-        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled FROM users WHERE email=?";
+        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled,display_name FROM users WHERE email=?";
         try (Connection connection = openReadOnlyConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, email);
@@ -46,7 +46,7 @@ public class LegacyReadService {
     }
 
     public Optional<LegacyUser> findUserById(long userId) throws Exception {
-        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled FROM users WHERE id=?";
+        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled,display_name FROM users WHERE id=?";
         try (Connection connection = openReadOnlyConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, userId);
@@ -168,7 +168,8 @@ public class LegacyReadService {
             result.getString("email"),
             result.getString("password_salt"),
             result.getString("password_hash"),
-            result.getBoolean("disabled")
+            result.getBoolean("disabled"),
+            result.getString("display_name")
         );
     }
 
@@ -191,7 +192,17 @@ public class LegacyReadService {
         return value.startsWith("http://") || value.startsWith("https://");
     }
 
-    public record LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled) {}
+    public record LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled, String displayName) {
+        public LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled) {
+            this(id, email, passwordSalt, passwordHash, disabled, defaultDisplayName(email));
+        }
+
+        private static String defaultDisplayName(String email) {
+            if (email == null || email.isBlank()) return "未命名用户";
+            int separator = email.indexOf('@');
+            return separator > 0 ? email.substring(0, separator) : email;
+        }
+    }
 
     public record CompanyLink(String company, String url) {}
     public record CompanyLinks(List<CompanyLink> items, String updatedAt) {}

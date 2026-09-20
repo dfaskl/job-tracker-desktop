@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
         <button v-if="activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
+      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
         </KeepAlive>
@@ -281,6 +281,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
 .page-content.stats-content { display: flow-root; }
+.page-content.home-content,
 .page-content.application-content,
 .page-content.calendar-content,
 .page-content.mail-content,
@@ -296,6 +297,8 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .page-content.admin-content { height: 100vh; }
 .page-content :deep(.card) { margin-top: 18px; }
 .page-content.admin-content :deep(.card) { margin-top: 0; }
+.product-main.settings-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
+.page-content.settings-content { height: auto; }
 
 @media (max-width: 1200px) {
   .product-main.settings-page-shell, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }

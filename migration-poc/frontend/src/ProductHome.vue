@@ -12,7 +12,7 @@ type ScheduleAdvice = { summary: string; plans: string[]; timeline?: TimelineEnt
 type TimelineLabel = { text:string; status:'normal'|'tight'|'conflict' }
 type TimelineGroup = { id:string; date:string; start:string; timeLabel:string; status:'normal'|'tight'|'conflict'; labels:TimelineLabel[] }
 type SharedTimelineEvent = Record<string,unknown> & { id:string; type:string; title:string; startsAt:string; endsAt:string; company:string }
-type SharedTimelineUser = { email:string; events:SharedTimelineEvent[] }
+type SharedTimelineUser = { email:string; displayName:string; events:SharedTimelineEvent[] }
 type HomeTimelineUser = { email:string; name:string; current:boolean; timeline:TimelineGroup[]; count:number }
 const emit = defineEmits<{ navigate: [page: Page, applicationId?: string] }>()
 const store = useJobTrackerStore()
@@ -101,12 +101,13 @@ function timelineFromEvents(events:Record<string,unknown>[]) {
 const selfTimeline = computed(() => adviceTimeline.value.length ? adviceTimeline.value : timelineFromEvents(upcomingItems.value))
 const timelineUsers = computed<HomeTimelineUser[]>(() => {
   const currentEmail = String(store.user.value?.email || '').toLowerCase()
-  const self = { email:String(store.user.value?.email || ''), name:'我的日程', current:true, timeline:selfTimeline.value, count:upcomingItems.value.length }
+  const selfEmail = String(store.user.value?.email || '')
+  const self = { email:selfEmail, name:displayName(store.user.value?.displayName,selfEmail), current:true, timeline:selfTimeline.value, count:upcomingItems.value.length }
   const others = sharedTimelines.value
     .filter(user => String(user.email || '').toLowerCase() !== currentEmail)
     .map(user => {
       const events = user.events || []
-      return { email:user.email, name:timelineUserName(user.email), current:false, timeline:timelineFromEvents(events), count:events.length }
+      return { email:user.email, name:displayName(user.displayName,user.email), current:false, timeline:timelineFromEvents(events), count:events.length }
     })
     .filter(user => user.timeline.length > 0)
   return [self, ...others]
@@ -126,7 +127,7 @@ function today(){return localText().slice(0,10)}
 function eventStart(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||'')}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
-function timelineUserName(email:string){return String(email||'').split('@')[0]||'未命名用户'}
+function displayName(name:string|undefined,email:string){return String(name||'').trim()||String(email||'').split('@')[0]||'未命名用户'}
 function timelineUserInitial(user:HomeTimelineUser){return (user.current?'我':user.name.slice(0,1)).toUpperCase()}
 async function loadSharedTimelines(){
   if(!store.user.value||sharedTimelinesLoading.value)return
@@ -454,7 +455,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 
 .schedule-workspace {
   display: grid;
-  grid-template-columns: minmax(0, .92fr) minmax(0, 1.25fr);
+  grid-template-columns: minmax(520px, 1.08fr) minmax(620px, 1.2fr);
   gap: 18px;
   margin-top: 18px;
   align-items: start;

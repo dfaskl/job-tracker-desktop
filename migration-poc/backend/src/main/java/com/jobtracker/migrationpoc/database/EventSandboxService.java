@@ -138,7 +138,7 @@ public class EventSandboxService {
     }
 
     public List<UserTimeline> findTimelines(String currentEmail) throws Exception {
-        String sql = "SELECT u.id,u.email,d.data::text FROM users u JOIN user_data d ON d.user_id=u.id "
+        String sql = "SELECT u.id,u.email,u.display_name,d.data::text FROM users u JOIN user_data d ON d.user_id=u.id "
             + "WHERE u.disabled_at IS NULL "
             + "ORDER BY CASE WHEN lower(u.email)=? THEN 0 ELSE 1 END,lower(u.email) LIMIT ?";
         try (Connection connection = openConnection();
@@ -156,7 +156,7 @@ public class EventSandboxService {
                             ))
                             .sorted(Comparator.comparing(SharedEvent::startsAt).thenComparing(SharedEvent::id))
                             .toList();
-                        if (!events.isEmpty()) timelines.add(new UserTimeline(result.getString("email"), events));
+                        if (!events.isEmpty()) timelines.add(new UserTimeline(result.getString("email"), result.getString("display_name"), events));
                     } catch (Exception exception) {
                         LOGGER.warn("Skipping invalid shared timeline for user {}", result.getLong("id"), exception);
                     }
@@ -208,7 +208,7 @@ public class EventSandboxService {
         String company
     ) {}
 
-    public record UserTimeline(String email, List<SharedEvent> events) {}
+    public record UserTimeline(String email, String displayName, List<SharedEvent> events) {}
 
     public static class SandboxDisabledException extends RuntimeException {
         public SandboxDisabledException(String message) { super(message); }

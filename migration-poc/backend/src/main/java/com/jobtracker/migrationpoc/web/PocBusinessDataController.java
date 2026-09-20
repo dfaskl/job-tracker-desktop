@@ -52,7 +52,7 @@ public class PocBusinessDataController {
                 ? Optional.of(backupSandboxService.businessData(user.get().email()))
                 : legacyReadService.findBusinessData(user.get().id());
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new BusinessDataResponse(
-                Map.of("id", String.valueOf(user.get().id()), "email", user.get().email()),
+                Map.of("id", String.valueOf(user.get().id()), "email", user.get().email(), "displayName", user.get().displayName()),
                 data.isPresent(), data.orElse(null), !sandbox, sandbox ? "测试数据库" : "生产数据库（只读）"
             ));
         } catch (Exception exception) {

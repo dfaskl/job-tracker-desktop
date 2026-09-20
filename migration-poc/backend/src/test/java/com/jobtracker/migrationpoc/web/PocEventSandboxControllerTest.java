@@ -25,7 +25,7 @@ class PocEventSandboxControllerTest {
         PocAuthController auth = mock(PocAuthController.class);
         EventSandboxService sandbox = mock(EventSandboxService.class);
         LegacyUser user = new LegacyUser(7, "person@example.com", "salt", "hash", false);
-        var timelines = List.of(new UserTimeline("person@example.com", List.of(
+        var timelines = List.of(new UserTimeline("person@example.com", "小明", List.of(
             new SharedEvent("evt-1", "面试", "一面", "2026-09-21 10:00", "", "Example")
         )));
         when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));

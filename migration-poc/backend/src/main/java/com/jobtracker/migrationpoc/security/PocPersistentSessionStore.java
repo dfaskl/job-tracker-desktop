@@ -123,6 +123,18 @@ public class PocPersistentSessionStore {
         }
     }
 
+    public void revokeOtherSessions(String email, String currentToken) throws Exception {
+        if (!isEnabled() || email == null || email.isBlank()) return;
+        String sql = validToken(currentToken)
+            ? "DELETE FROM sessions WHERE user_id=(SELECT id FROM users WHERE lower(email)=?) AND token_hash<>?"
+            : "DELETE FROM sessions WHERE user_id=(SELECT id FROM users WHERE lower(email)=?)";
+        try (Connection connection = openConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, email.trim().toLowerCase(Locale.ROOT));
+            if (validToken(currentToken)) statement.setString(2, tokenHash(currentToken));
+            statement.executeUpdate();
+        }
+    }
+
     static String tokenHash(String token) {
         try {
             return HexFormat.of().formatHex(
