@@ -8,11 +8,28 @@ import { pageMutationBusy } from './requestActivity'
 
 const store = useJobTrackerStore()
 const ready = ref(false)
+const puppyReady = ref(false)
 const mutationOverlay = ref<HTMLElement | null>(null)
 const allowedPages = new Set(['home', 'applications', 'calendar', 'mail', 'stats', 'settings', 'admin'])
 const requestedRoute = ref(readRequestedRoute())
 let focusBeforeMutation: HTMLElement | null = null
 let documentOverflowBeforeMutation = ''
+const puppySpriteUrl = '/puppy-run-sprite.webp'
+
+function preloadPuppySprite() {
+  const image = new Image()
+  image.decoding = 'async'
+  const reveal = () => { puppyReady.value = true }
+  image.src = puppySpriteUrl
+  if (typeof image.decode === 'function') {
+    void image.decode().then(reveal).catch(() => {
+      if (image.complete && image.naturalWidth > 0) reveal()
+      else image.addEventListener('load', reveal, { once: true })
+    })
+  } else image.addEventListener('load', reveal, { once: true })
+}
+
+preloadPuppySprite()
 
 function readRouteFromHash() {
   return window.location.hash.replace(/^#\/?/, '') || 'home'
@@ -109,7 +126,7 @@ onBeforeUnmount(() => {
         </svg>
         <span class="journey-beacon"></span>
         <span class="journey-logo"><img src="/favicon.svg" alt=""></span>
-        <span class="dog-runner">
+        <span class="dog-runner" :class="{'is-ready':puppyReady}">
           <span class="puppy-sprite"></span>
         </span>
       </div>
@@ -139,9 +156,10 @@ onBeforeUnmount(() => {
 .journey-logo{position:absolute;top:0;left:50%;z-index:3;display:grid;width:60px;height:60px;place-items:center;border:1px solid rgba(255,255,255,.9);border-radius:19px;background:rgba(255,255,255,.83);box-shadow:0 13px 30px rgba(20,93,91,.2),inset 0 1px 0 rgba(255,255,255,.95);animation:logo-float 1.8s ease-in-out infinite}
 .journey-logo::after{content:"";position:absolute;right:8px;bottom:7px;width:8px;height:8px;border-radius:50%;background:#f0a24b;box-shadow:0 0 0 4px rgba(240,162,75,.15),0 0 12px rgba(240,162,75,.62);animation:logo-signal 1.8s ease-in-out infinite}
 .journey-logo img{width:48px;height:48px;border-radius:14px;filter:drop-shadow(0 6px 9px rgba(20,93,91,.16))}
-.dog-runner{position:absolute;top:72px;left:50%;z-index:4;display:block;width:60px;height:80px;pointer-events:none;filter:drop-shadow(0 5px 5px rgba(82,51,28,.2));animation:dog-run 4.8s ease-in-out infinite;will-change:transform}
+.dog-runner{position:absolute;top:72px;left:50%;z-index:4;display:block;width:60px;height:80px;pointer-events:none;visibility:hidden;opacity:0;filter:drop-shadow(0 5px 5px rgba(82,51,28,.2));animation:dog-run 4.8s ease-in-out infinite;transition:opacity .12s ease;will-change:transform}
+.dog-runner.is-ready{visibility:visible;opacity:1}
 .dog-runner::after{content:"";position:absolute;right:5px;bottom:0;width:48px;height:5px;border-radius:50%;background:rgba(82,51,28,.14);filter:blur(1px);animation:dog-shadow .34s ease-in-out infinite alternate}
-.puppy-sprite{display:block;width:100%;height:100%;background:url('/puppy-run-sprite.png') 0 0/400% 100% no-repeat;animation:puppy-frames .64s steps(1,end) infinite,dog-bob .34s ease-in-out infinite alternate;will-change:transform,background-position}
+.puppy-sprite{display:block;width:100%;height:100%;background:url('/puppy-run-sprite.webp') 0 0/400% 100% no-repeat;animation:puppy-frames .64s steps(1,end) infinite,dog-bob .34s ease-in-out infinite alternate;will-change:transform,background-position}
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
 @keyframes route-draw{0%{stroke-dashoffset:1;opacity:.25}72%{stroke-dashoffset:0;opacity:1}88%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.18}}
 @keyframes beacon-travel{0%{offset-distance:0%;opacity:0;transform:scale(.65)}10%{opacity:1}72%{offset-distance:100%;opacity:1;transform:scale(1)}88%{offset-distance:100%;opacity:1;transform:scale(1.18)}100%{offset-distance:100%;opacity:0;transform:scale(.65)}}
