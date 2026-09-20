@@ -3,6 +3,7 @@ package com.jobtracker.migrationpoc.web;
 import com.jobtracker.migrationpoc.database.EventSandboxService;
 import com.jobtracker.migrationpoc.database.EventSandboxService.SandboxDataNotFoundException;
 import com.jobtracker.migrationpoc.database.EventSandboxService.SandboxDisabledException;
+import com.jobtracker.migrationpoc.database.EventSandboxService.UserTimeline;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.ConflictException;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.EventInput;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -61,6 +63,20 @@ public class PocEventSandboxController {
             ));
         } catch (Exception exception) {
             return mapException("read", exception);
+        }
+    }
+
+    @GetMapping("/timelines")
+    public ResponseEntity<?> timelines(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token
+    ) {
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new TimelinesResponse(sandboxService.findTimelines(user.get().email())));
+        } catch (Exception exception) {
+            return mapException("read-timelines", exception);
         }
     }
 
@@ -207,5 +223,6 @@ public class PocEventSandboxController {
     public record ResolutionRequest(String action, String expectedUpdatedAt) {}
     public record DeleteRequest(String expectedUpdatedAt) {}
     public record EventsResponse(Object events, Object applications, int total, boolean truncated, boolean sandbox) {}
+    public record TimelinesResponse(List<UserTimeline> users) {}
     public record MutationResponse(EventView event, int total, boolean sandbox) {}
 }

@@ -1,6 +1,8 @@
 package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.EventSandboxService;
+import com.jobtracker.migrationpoc.database.EventSandboxService.SharedEvent;
+import com.jobtracker.migrationpoc.database.EventSandboxService.UserTimeline;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.EventView;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.Mutation;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,6 +20,25 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PocEventSandboxControllerTest {
+    @Test
+    void returnsSharedTimelinesForAuthenticatedUsers() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        EventSandboxService sandbox = mock(EventSandboxService.class);
+        LegacyUser user = new LegacyUser(7, "person@example.com", "salt", "hash", false);
+        var timelines = List.of(new UserTimeline("person@example.com", List.of(
+            new SharedEvent("evt-1", "面试", "一面", "2026-09-21 10:00", "", "Example")
+        )));
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));
+        when(sandbox.findTimelines("person@example.com")).thenReturn(timelines);
+        var controller = new PocEventSandboxController(auth, sandbox);
+
+        var response = controller.timelines("token");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var body = (PocEventSandboxController.TimelinesResponse) response.getBody();
+        assertThat(body.users()).isEqualTo(timelines);
+    }
+
     @Test
     void createsAnEventOnlyForTheAuthenticatedSandboxUser() throws Exception {
         PocAuthController auth = mock(PocAuthController.class);

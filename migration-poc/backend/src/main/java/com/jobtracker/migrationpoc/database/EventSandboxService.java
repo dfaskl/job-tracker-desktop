@@ -5,18 +5,25 @@ import com.jobtracker.migrationpoc.event.EventDocumentMutator.EventInput;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.EventPage;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.Mutation;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.Resolution;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 
 @Component
 public class EventSandboxService {
     private static final int MAX_EVENTS = 1_000;
+    private static final int MAX_TIMELINE_USERS = 200;
+    private static final Logger LOGGER = LoggerFactory.getLogger(EventSandboxService.class);
 
     private final Environment environment;
     private final ApplicationSandboxService applicationSandboxService;
@@ -130,6 +137,35 @@ public class EventSandboxService {
         }
     }
 
+    public List<UserTimeline> findTimelines(String currentEmail) throws Exception {
+        String sql = "SELECT u.id,u.email,d.data::text FROM users u JOIN user_data d ON d.user_id=u.id "
+            + "WHERE u.disabled_at IS NULL "
+            + "ORDER BY CASE WHEN lower(u.email)=? THEN 0 ELSE 1 END,lower(u.email) LIMIT ?";
+        try (Connection connection = openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, normalizeEmail(currentEmail));
+            statement.setInt(2, MAX_TIMELINE_USERS);
+            List<UserTimeline> timelines = new ArrayList<>();
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    try {
+                        List<SharedEvent> events = mutator.page(result.getString("data"), MAX_EVENTS).events().stream()
+                            .filter(event -> !event.completed() && !event.missed() && !event.abandoned())
+                            .map(event -> new SharedEvent(
+                                event.id(), event.type(), event.title(), event.startsAt(), event.endsAt(), event.company()
+                            ))
+                            .sorted(Comparator.comparing(SharedEvent::startsAt).thenComparing(SharedEvent::id))
+                            .toList();
+                        if (!events.isEmpty()) timelines.add(new UserTimeline(result.getString("email"), events));
+                    } catch (Exception exception) {
+                        LOGGER.warn("Skipping invalid shared timeline for user {}", result.getLong("id"), exception);
+                    }
+                }
+            }
+            return List.copyOf(timelines);
+        }
+    }
+
     private void pruneBackups(Connection connection, long userId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
             "DELETE FROM data_backups WHERE user_id=? AND id NOT IN "
@@ -162,6 +198,17 @@ public class EventSandboxService {
     }
 
     private record UserDocument(long userId, String json) {}
+
+    public record SharedEvent(
+        String id,
+        String type,
+        String title,
+        String startsAt,
+        String endsAt,
+        String company
+    ) {}
+
+    public record UserTimeline(String email, List<SharedEvent> events) {}
 
     public static class SandboxDisabledException extends RuntimeException {
         public SandboxDisabledException(String message) { super(message); }
