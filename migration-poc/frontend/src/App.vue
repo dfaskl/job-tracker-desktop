@@ -109,15 +109,20 @@ onBeforeUnmount(() => {
         </svg>
         <span class="journey-beacon"></span>
         <span class="journey-logo"><img src="/favicon.svg" alt=""></span>
-        <span class="sprite-flight">
-          <svg class="winged-sprite" viewBox="0 0 40 40" focusable="false">
-            <path class="sprite-wing wing-left" d="M16 19C10 18 5 14 6 9c5 0 9 3 12 8Z" />
-            <path class="sprite-wing wing-right" d="M24 19c6-1 11-5 10-10-5 0-9 3-12 8Z" />
-            <circle class="sprite-head" cx="20" cy="12" r="4.2" />
-            <path class="sprite-hair" d="M16 12c0-5 8-6 8.4-.5-2.5-1.8-5.6-2.2-8.4.5Z" />
-            <path class="sprite-body" d="M16.2 18.2c2.4-1.6 5.2-1.6 7.6 0l2.5 10.3c-3.8 2.2-8.8 2.2-12.6 0Z" />
-            <path class="sprite-limb" d="m16 20-5 5m13-5 5 4m-11 5-2 6m6-6 2 6" />
-            <circle class="sprite-light" cx="29.5" cy="7.5" r="2" />
+        <span class="dog-runner">
+          <svg class="running-dog" viewBox="0 0 50 34" focusable="false">
+            <path class="dog-tail" d="M12 16C6 16 4 12 6 8" />
+            <path class="dog-body" d="M11 13c4-5 18-5 23 0l1 9c-7 4-18 4-25-1Z" />
+            <path class="dog-spot" d="M18 10c4-1 7 0 8 4-2 3-6 4-9 2Z" />
+            <path class="dog-neck" d="m31 13 4 2-1 8-4 1Z" />
+            <path class="dog-head" d="M34 8c6-3 12 1 11 8 0 5-5 8-11 5-3-4-3-9 0-13Z" />
+            <path class="dog-ear" d="M35 8c-1-5 5-6 7-2l-2 6Z" />
+            <ellipse class="dog-muzzle" cx="43" cy="17" rx="5" ry="3.5" />
+            <circle class="dog-eye" cx="40" cy="12.5" r="1.2" />
+            <circle class="dog-nose" cx="47" cy="16" r="1.5" />
+            <path class="dog-collar" d="M33 10c2 2 3 7 1 11" />
+            <path class="dog-leg leg-back" d="m16 22-3 8m7-7 2 7" />
+            <path class="dog-leg leg-front" d="m30 22-2 8m5-8 4 7" />
           </svg>
         </span>
       </div>
@@ -147,33 +152,35 @@ onBeforeUnmount(() => {
 .journey-logo{position:absolute;top:0;left:50%;z-index:3;display:grid;width:60px;height:60px;place-items:center;border:1px solid rgba(255,255,255,.9);border-radius:19px;background:rgba(255,255,255,.83);box-shadow:0 13px 30px rgba(20,93,91,.2),inset 0 1px 0 rgba(255,255,255,.95);animation:logo-float 1.8s ease-in-out infinite}
 .journey-logo::after{content:"";position:absolute;right:8px;bottom:7px;width:8px;height:8px;border-radius:50%;background:#f0a24b;box-shadow:0 0 0 4px rgba(240,162,75,.15),0 0 12px rgba(240,162,75,.62);animation:logo-signal 1.8s ease-in-out infinite}
 .journey-logo img{width:48px;height:48px;border-radius:14px;filter:drop-shadow(0 6px 9px rgba(20,93,91,.16))}
-.sprite-flight{position:absolute;top:30px;left:50%;z-index:4;display:block;width:36px;height:36px;pointer-events:none;filter:drop-shadow(0 5px 6px rgba(14,91,91,.24));animation:sprite-flight 3.8s cubic-bezier(.45,.05,.55,.95) infinite}
-.sprite-flight::before,.sprite-flight::after{content:"";position:absolute;top:23px;left:5px;width:4px;height:4px;border-radius:50%;background:#f0b45f;box-shadow:0 0 8px rgba(240,162,75,.8);animation:sprite-dust .9s ease-out infinite}
-.sprite-flight::after{top:29px;left:11px;width:3px;height:3px;animation-delay:.3s}
-.winged-sprite{display:block;width:100%;height:100%;overflow:visible}
-.sprite-wing{fill:rgba(220,251,247,.9);stroke:#4fb9ad;stroke-width:1.25;stroke-linejoin:round;transform-box:fill-box;animation:wing-flap .34s ease-in-out infinite alternate}
-.wing-left{transform-origin:right center}.wing-right{transform-origin:left center;animation-delay:-.17s}
-.sprite-head{fill:#ffd9ae;stroke:#9b673d;stroke-width:1}
-.sprite-hair{fill:#255d60}
-.sprite-body{fill:#168e89;stroke:#0e6967;stroke-width:1.2;stroke-linejoin:round}
-.sprite-limb{fill:none;stroke:#875934;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.sprite-light{fill:#ffd064;stroke:#fff7cf;stroke-width:1.5;filter:drop-shadow(0 0 4px #f0a24b);animation:sprite-light 1s ease-in-out infinite alternate}
+.dog-runner{position:absolute;top:77px;left:50%;z-index:4;display:block;width:50px;height:34px;pointer-events:none;filter:drop-shadow(0 4px 4px rgba(14,91,91,.2));animation:dog-run 4.4s ease-in-out infinite}
+.dog-runner::after{content:"";position:absolute;right:5px;bottom:0;width:32px;height:4px;border-radius:50%;background:rgba(20,93,91,.13);filter:blur(1px);animation:dog-shadow .34s ease-in-out infinite alternate}
+.running-dog{display:block;width:100%;height:100%;overflow:visible;animation:dog-bob .34s ease-in-out infinite alternate}
+.dog-tail,.dog-leg{fill:none;stroke:#0e6967;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transform-box:fill-box}
+.dog-tail{transform-origin:right center;animation:dog-tail-wag .28s ease-in-out infinite alternate}
+.dog-body,.dog-neck{fill:#54b8aa;stroke:#0e6967;stroke-width:1.3;stroke-linejoin:round}
+.dog-spot{fill:#effaf7;opacity:.9}
+.dog-head{fill:#f1ad5d;stroke:#8b5b31;stroke-width:1.2;stroke-linejoin:round}
+.dog-ear{fill:#8b5b31;stroke:#6c4728;stroke-width:1}
+.dog-muzzle{fill:#ffe0b4}.dog-eye,.dog-nose{fill:#173f43}
+.dog-collar{fill:none;stroke:#fff3dc;stroke-width:2.2;stroke-linecap:round}
+.dog-leg{transform-origin:top center;animation:dog-legs .34s ease-in-out infinite alternate}.leg-front{animation-direction:alternate-reverse}
 @keyframes session-pulse{50%{transform:translateY(-3px);opacity:.72}}
 @keyframes route-draw{0%{stroke-dashoffset:1;opacity:.25}72%{stroke-dashoffset:0;opacity:1}88%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.18}}
 @keyframes beacon-travel{0%{offset-distance:0%;opacity:0;transform:scale(.65)}10%{opacity:1}72%{offset-distance:100%;opacity:1;transform:scale(1)}88%{offset-distance:100%;opacity:1;transform:scale(1.18)}100%{offset-distance:100%;opacity:0;transform:scale(.65)}}
 @keyframes route-node-pulse{0%,34%,100%{transform:scale(.82);opacity:.38}54%,78%{transform:scale(1.18);opacity:1}}
 @keyframes logo-float{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-6px)}}
 @keyframes logo-signal{0%,100%{transform:scale(.72);opacity:.55}50%{transform:scale(1.12);opacity:1}}
-@keyframes sprite-flight{0%{z-index:2;transform:translate(-82px,24px) rotate(-18deg) scale(.74);opacity:.72}22%{z-index:2;transform:translate(-53px,-31px) rotate(13deg) scale(.88);opacity:.86}46%{z-index:2;transform:translate(20px,-38px) rotate(20deg) scale(.82);opacity:.76}51%{z-index:5;transform:translate(42px,-24px) rotate(8deg) scale(.94);opacity:.92}73%{z-index:5;transform:translate(55px,24px) rotate(-17deg) scale(1.06);opacity:1}88%{z-index:5;transform:translate(-12px,42px) rotate(-25deg) scale(.96);opacity:.94}100%{z-index:2;transform:translate(-82px,24px) rotate(-18deg) scale(.74);opacity:.72}}
-@keyframes wing-flap{from{transform:rotate(22deg) scaleX(.86)}to{transform:rotate(-18deg) scaleX(1.08)}}
-@keyframes sprite-light{to{transform:scale(1.35);opacity:.65}}
-@keyframes sprite-dust{0%{transform:translate(0,0) scale(1);opacity:.8}100%{transform:translate(-10px,9px) scale(.25);opacity:0}}
+@keyframes dog-run{0%{transform:translateX(-92px) scaleX(1)}47%{transform:translateX(42px) scaleX(1)}50%{transform:translateX(42px) scaleX(-1)}97%{transform:translateX(-92px) scaleX(-1)}100%{transform:translateX(-92px) scaleX(1)}}
+@keyframes dog-bob{to{transform:translateY(-3px) rotate(-1.5deg)}}
+@keyframes dog-shadow{to{transform:scaleX(.72);opacity:.55}}
+@keyframes dog-tail-wag{from{transform:rotate(16deg)}to{transform:rotate(-24deg)}}
+@keyframes dog-legs{from{transform:rotate(24deg)}to{transform:rotate(-25deg)}}
 @keyframes route-draw-soft{0%{stroke-dashoffset:1;opacity:.42}78%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.42}}
 @keyframes beacon-travel-soft{0%{offset-distance:0%;opacity:0}12%,84%{opacity:.92}88%{offset-distance:100%;opacity:.92}100%{offset-distance:100%;opacity:0}}
 @keyframes route-node-soft{0%,100%{opacity:.42}50%{opacity:1}}
 @keyframes logo-float-soft{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-2px)}}
 @keyframes logo-signal-soft{0%,100%{opacity:.48}50%{opacity:1}}
-@keyframes sprite-flight-soft{0%,100%{transform:translate(-62px,12px) rotate(-7deg) scale(.86);opacity:.82}25%{transform:translate(-33px,-18px) rotate(5deg) scale(.9);opacity:.9}50%{transform:translate(30px,-17px) rotate(7deg) scale(.9);opacity:.9}75%{transform:translate(42px,17px) rotate(-5deg) scale(.94);opacity:.96}}
+@keyframes dog-run-soft{0%{transform:translateX(-72px) scaleX(1)}47%{transform:translateX(22px) scaleX(1)}50%{transform:translateX(22px) scaleX(-1)}97%{transform:translateX(-72px) scaleX(-1)}100%{transform:translateX(-72px) scaleX(1)}}
 @media(prefers-reduced-motion:reduce){
   .session-loading img{animation:none}
   .route-drawn{animation:route-draw-soft 3.6s ease-in-out infinite!important}
@@ -181,8 +188,7 @@ onBeforeUnmount(() => {
   .journey-beacon{animation:beacon-travel-soft 3.6s linear infinite!important}
   .journey-logo{animation:logo-float-soft 2.8s ease-in-out infinite!important}
   .journey-logo::after{animation:logo-signal-soft 2.8s ease-in-out infinite!important}
-  .sprite-flight{animation:sprite-flight-soft 5.6s ease-in-out infinite!important}
-  .sprite-wing{animation-duration:.72s!important}
-  .sprite-flight::before,.sprite-flight::after{animation-duration:1.8s!important}
+  .dog-runner{animation:dog-run-soft 7.2s ease-in-out infinite!important}
+  .running-dog,.dog-runner::after,.dog-tail,.dog-leg{animation-duration:.72s!important}
 }
 </style>
