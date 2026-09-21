@@ -35,7 +35,7 @@ const interviewRecords = computed(() => store.applications.value
       .filter(event => event.applicationId === item.id && !event.missed && isFormalInterview(event))
       .sort((a,b) => interviewTime(b).localeCompare(interviewTime(a)))
     const ended = item.stage === '已结束' || ['未通过','已放弃','已结束'].includes(String(item.status || ''))
-    return { item, related, ended, latest:related[0] ? interviewTime(related[0]) : '' }
+    return { item, related, ended, latest:related[0] ? interviewTime(related[0]) : '', flow:compactFlow(item) }
   })
   .sort((a,b) => Number(a.ended) - Number(b.ended) || b.latest.localeCompare(a.latest) || String(a.item.company || '').localeCompare(String(b.item.company || ''),'zh-CN')))
 
@@ -45,6 +45,62 @@ function displayDate(value: string) {
   if (!value) return '时间未记录'
   const date = new Date(value.replace(' ','T'))
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})
+}
+function timeOf(value: unknown) {
+  const time = new Date(String(value || '').replace(' ', 'T')).getTime()
+  return Number.isFinite(time) ? time : 0
+}
+function eventDeadline(item: Record<string, unknown>) { return String(item.endsAt || item.end || item.startsAt || item.start || item.date || '') }
+function eventOccurrenceTime(item: Record<string, unknown>) { return String(item.startsAt || item.start || item.date || item.at || '') }
+function compactDate(value: unknown) {
+  const source = String(value || '')
+  const match = source.match(/\d{4}-(\d{2})-(\d{2})/)
+  return match ? `${Number(match[1])}/${Number(match[2])}` : source || '未记录'
+}
+function compactFlowVisual(label: unknown, type: unknown = '') {
+  const value = `${type || ''} ${label || ''}`
+  if (/未通过|错过|放弃|已结束/.test(value)) return { style: 'failed', icon: '×' }
+  if (/Offer|录用|已通过/.test(value)) return { style: 'offer', icon: '★' }
+  if (value.includes('测评')) return { style: 'assessment', icon: '◇' }
+  if (value.includes('笔试')) return { style: 'test', icon: '✎' }
+  if (/面试|[一二三四五六七八九]面|HR/.test(value)) return { style: 'interview', icon: '◎' }
+  if (value.includes('电话')) return { style: 'phone', icon: '☎' }
+  if (value.includes('等待')) return { style: 'waiting', icon: '◷' }
+  if (value.includes('投递')) return { style: 'applied', icon: '↗' }
+  return { style: 'other', icon: '＋' }
+}
+function compactEventDate(event: Record<string, unknown>) {
+  const start = compactDate(eventOccurrenceTime(event))
+  const end = String(event.endsAt || event.end || '')
+  return end ? `${start}–${compactDate(end)}` : start
+}
+function compactFlow(item: Record<string, unknown>) {
+  const events = store.events.value
+    .filter(event => event.applicationId === item.id)
+    .slice()
+    .sort((a, b) => eventDeadline(a).localeCompare(eventDeadline(b)))
+  const applied = compactFlowVisual('已投递')
+  const nodes = [{ label: '已投递', at: compactDate(item.appliedDate), kind: events.length || item.stage !== '已投递' ? 'done' : 'current', ...applied }]
+  events.forEach(event => {
+    const deadline = timeOf(eventDeadline(event))
+    const kind = event.missed ? 'failed' : event.completed ? 'done' : deadline > Date.now() ? 'upcoming' : 'current'
+    const label = String(event.title || event.type || '日程')
+    nodes.push({ label, at: compactEventDate(event), kind, ...compactFlowVisual(label, event.type) })
+  })
+  const last = nodes[nodes.length - 1]
+  const latest = events[events.length - 1]
+  const latestPending = latest && !latest.completed && !latest.missed
+  const terminal = ['未通过', '已放弃', '已结束'].includes(String(item.status || ''))
+  const offer = item.stage === 'Offer' || item.status === '已通过'
+  const enteredInterview = hasInterviewProgress(item)
+  let statusLabel = offer ? 'Offer' : terminal ? String(item.status) : String(item.status || '')
+  if (statusLabel === '等待结果' && !enteredInterview) statusLabel = ''
+  if (statusLabel && statusLabel !== last.label && !(statusLabel === '等待结果' && latestPending)) {
+    nodes.push({ label: statusLabel, at: '当前', kind: offer ? 'success' : terminal ? 'failed' : 'current', ...compactFlowVisual(statusLabel) })
+  } else if (!events.length && item.stage !== '已投递') {
+    nodes.push({ label: String(item.stage), at: '当前', kind: 'current', ...compactFlowVisual(item.stage, item.stage) })
+  }
+  return nodes
 }
 function hasInterviewProgress(item: Record<string, unknown>) {
   if (['面试', 'Offer'].includes(String(item.stage || '')) || item.status === '已通过') return true
@@ -91,7 +147,9 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
         <article v-for="record in interviewRecords" :key="record.item.id" :class="record.ended?'is-ended':'is-active'">
           <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.ended?'已结束':'正在推进'}}</span></div>
           <p>{{record.item.position||'未填写岗位'}}</p>
-          <dl><div><dt>当前阶段</dt><dd>{{record.item.stage||'未设置'}}</dd></div><div><dt>当前状态</dt><dd>{{record.item.status||'未设置'}}</dd></div></dl>
+          <div class="compact-flow" :style="{'--flow-count':record.flow.length}" role="list" :aria-label="`${record.item.company||'该投递'}的投递流程`">
+            <span v-for="(node,index) in record.flow" :key="`${node.label}-${index}`" class="compact-node" :class="[node.kind,`flow-${node.style}`]" role="listitem" :title="`${node.label} ${node.at}`"><i aria-hidden="true">{{node.icon}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span>
+          </div>
           <footer><span>{{record.related.length?`${record.related.length} 场正式面试`:'阶段记录显示已进入面试'}}</span><time>{{record.latest?`最近：${displayDate(record.latest)}`:'面试时间未记录'}}</time></footer>
         </article>
       </div>
@@ -129,7 +187,7 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .trend i { display:block; width:min(34px,72%); border-radius:4px 4px 0 0; background:var(--color-primary); box-shadow:inset 0 1px 0 rgba(255,255,255,.35); }
 .trend b { position:absolute; top:0; color:var(--color-muted-foreground); font:600 11px "Fira Code",monospace; }
 .trend small { color:var(--color-muted-foreground); font-size:11px; }
-.interview-panel{display:flex;height:var(--analytics-main-height,auto);min-width:0;min-height:0;margin:0;padding:18px;flex-direction:column;overflow:hidden}.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{display:grid;gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{border-color:#a9d7bd;border-left-color:#278759;background:#eaf7ef}.interview-list article.is-ended{border-color:#e2b8b4;border-left-color:#bd4942;background:#fbeceb}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.interview-list dl{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0}.interview-list dl>div{display:grid;gap:2px;padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.58)}.interview-list dt{color:#718079;font-size:10px}.interview-list dd{margin:0;color:#34443d;font-size:11px;font-weight:700}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
+.interview-panel{display:flex;height:var(--analytics-main-height,auto);min-width:0;min-height:0;margin:0;padding:18px;flex-direction:column;overflow:hidden}.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{--record-bg:#fff;display:grid;gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.compact-flow{display:grid;grid-template-columns:repeat(var(--flow-count),minmax(56px,1fr));min-width:max(100%,calc(var(--flow-count) * 62px));align-items:start;margin:2px 0;padding:4px 1px 3px;overflow-x:auto;scrollbar-width:none}.compact-flow::-webkit-scrollbar{display:none}.compact-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid;min-width:56px;justify-items:center;text-align:center}.compact-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 11px);top:11px;width:calc(100% - 22px);height:2px;background:color-mix(in srgb,var(--node-color) 24%,#dce3df)}.compact-node>i{position:relative;z-index:1;display:grid;width:23px;height:23px;place-items:center;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:8px;color:var(--node-color);background:var(--node-soft);font:800 12px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 3px var(--record-bg)}.compact-node>b{max-width:64px;margin-top:5px;overflow:hidden;color:var(--node-color);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.compact-node>small{margin-top:1px;color:#718079;font-size:9px;white-space:nowrap}.compact-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:12px;height:12px;place-items:center;border:2px solid var(--record-bg);border-radius:50%;color:#fff;background:var(--node-color);font-size:8px}.compact-node.current>i,.compact-node.upcoming>i{box-shadow:0 0 0 3px var(--record-bg),0 0 0 5px color-mix(in srgb,var(--node-color) 14%,transparent)}.compact-node.upcoming>i{border-style:dashed}.compact-node.failed>i,.compact-node.success>i{color:#fff;background:var(--node-color)}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
 @media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(290px,.55fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
 @media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
 @media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.bar-row{grid-template-columns:72px 1fr 30px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
