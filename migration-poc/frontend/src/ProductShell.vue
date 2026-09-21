@@ -286,7 +286,8 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .page-content.calendar-content,
 .page-content.mail-content,
 .page-content.settings-content,
-.page-content.admin-content { width: 100%; max-width: none; }
+.page-content.admin-content,
+.page-content.stats-content { width: 100%; max-width: none; }
 .product-main.application-page,
 .product-main.calendar-page,
 .product-main.mail-page-shell,
