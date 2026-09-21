@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
 
@@ -56,13 +56,16 @@ function grouped(field: string) {
   return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
 }
 
-onMounted(() => {
-  if (!analyticsMain.value) return
+watch(analyticsMain, element => {
+  mainResizeObserver?.disconnect()
+  mainResizeObserver = undefined
+  analyticsMainHeight.value = 0
+  if (!element) return
   mainResizeObserver = new ResizeObserver(([entry]) => {
     analyticsMainHeight.value = Math.ceil(entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height)
   })
-  mainResizeObserver.observe(analyticsMain.value)
-})
+  mainResizeObserver.observe(element)
+}, { flush: 'post' })
 onBeforeUnmount(() => mainResizeObserver?.disconnect())
 </script>
 
@@ -84,7 +87,7 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
     </main>
     <aside class="interview-panel card" aria-labelledby="interview-records-title">
       <header><div><span>只读概览</span><h2 id="interview-records-title">面试投递记录</h2><p>展示所有进入过正式面试环节的投递</p></div><b>{{interviewRecords.length}} 条</b></header>
-      <div v-if="interviewRecords.length" class="interview-list">
+      <div v-if="interviewRecords.length" class="interview-list" tabindex="0" aria-label="面试投递记录，可上下滚动">
         <article v-for="record in interviewRecords" :key="record.item.id" :class="record.ended?'is-ended':'is-active'">
           <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.ended?'已结束':'正在推进'}}</span></div>
           <p>{{record.item.position||'未填写岗位'}}</p>
