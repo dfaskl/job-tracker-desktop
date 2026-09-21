@@ -137,20 +137,28 @@ public class EventSandboxService {
         }
     }
 
-    public List<UserTimeline> findTimelines(String currentEmail) throws Exception {
-        String sql = "SELECT u.id,u.email,u.display_name,d.data::text FROM users u JOIN user_data d ON d.user_id=u.id "
-            + "WHERE u.disabled_at IS NULL "
-            + "ORDER BY CASE WHEN lower(u.email)=? THEN 0 ELSE 1 END,lower(u.email) LIMIT ?";
+    public SharedTimelines findTimelines(String currentEmail) throws Exception {
+        String sql = "SELECT member.id,member.email,member.display_name,d.data::text,viewer.group_id,g.name AS group_name "
+            + "FROM users viewer JOIN users member ON ((viewer.group_id IS NOT NULL AND member.group_id=viewer.group_id) "
+            + "OR (viewer.group_id IS NULL AND member.id=viewer.id)) "
+            + "JOIN user_data d ON d.user_id=member.id LEFT JOIN interview_groups g ON g.id=viewer.group_id "
+            + "WHERE lower(viewer.email)=? AND viewer.disabled_at IS NULL AND member.disabled_at IS NULL "
+            + "ORDER BY CASE WHEN member.id=viewer.id THEN 0 ELSE 1 END,lower(member.email) LIMIT ?";
         try (Connection connection = openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, normalizeEmail(currentEmail));
             statement.setInt(2, MAX_TIMELINE_USERS);
             List<UserTimeline> timelines = new ArrayList<>();
+            String groupId = "";
+            String groupName = "";
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
+                    groupId = result.getObject("group_id") == null ? "" : String.valueOf(result.getLong("group_id"));
+                    groupName = result.getString("group_name") == null ? "" : result.getString("group_name");
                     try {
                         List<SharedEvent> events = mutator.page(result.getString("data"), MAX_EVENTS).events().stream()
                             .filter(event -> !event.completed() && !event.missed() && !event.abandoned())
+                            .filter(event -> isPointEvent(event.startsAt(), event.endsAt()))
                             .map(event -> new SharedEvent(
                                 event.id(), event.type(), event.title(), event.startsAt(), event.endsAt(), event.company()
                             ))
@@ -162,8 +170,12 @@ public class EventSandboxService {
                     }
                 }
             }
-            return List.copyOf(timelines);
+            return new SharedTimelines(groupId, groupName, List.copyOf(timelines));
         }
+    }
+
+    static boolean isPointEvent(String startsAt, String endsAt) {
+        return endsAt == null || endsAt.isBlank() || endsAt.trim().equals(startsAt == null ? "" : startsAt.trim());
     }
 
     private void pruneBackups(Connection connection, long userId) throws Exception {
@@ -209,6 +221,7 @@ public class EventSandboxService {
     ) {}
 
     public record UserTimeline(String email, String displayName, List<SharedEvent> events) {}
+    public record SharedTimelines(String groupId, String groupName, List<UserTimeline> users) {}
 
     public static class SandboxDisabledException extends RuntimeException {
         public SandboxDisabledException(String message) { super(message); }

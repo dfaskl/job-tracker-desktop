@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.EventSandboxService;
 import com.jobtracker.migrationpoc.database.EventSandboxService.SharedEvent;
+import com.jobtracker.migrationpoc.database.EventSandboxService.SharedTimelines;
 import com.jobtracker.migrationpoc.database.EventSandboxService.UserTimeline;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import com.jobtracker.migrationpoc.event.EventDocumentMutator.EventView;
@@ -25,9 +26,10 @@ class PocEventSandboxControllerTest {
         PocAuthController auth = mock(PocAuthController.class);
         EventSandboxService sandbox = mock(EventSandboxService.class);
         LegacyUser user = new LegacyUser(7, "person@example.com", "salt", "hash", false);
-        var timelines = List.of(new UserTimeline("person@example.com", "小明", List.of(
+        var users = List.of(new UserTimeline("person@example.com", "小明", List.of(
             new SharedEvent("evt-1", "面试", "一面", "2026-09-21 10:00", "", "Example")
         )));
+        var timelines = new SharedTimelines("3", "第一面试室", users);
         when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));
         when(sandbox.findTimelines("person@example.com")).thenReturn(timelines);
         var controller = new PocEventSandboxController(auth, sandbox);
@@ -35,8 +37,9 @@ class PocEventSandboxControllerTest {
         var response = controller.timelines("token");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        var body = (PocEventSandboxController.TimelinesResponse) response.getBody();
-        assertThat(body.users()).isEqualTo(timelines);
+        var body = (SharedTimelines) response.getBody();
+        assertThat(body.users()).isEqualTo(users);
+        assertThat(body.groupName()).isEqualTo("第一面试室");
     }
 
     @Test

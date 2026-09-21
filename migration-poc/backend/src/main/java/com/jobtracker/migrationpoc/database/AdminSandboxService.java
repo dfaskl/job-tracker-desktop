@@ -63,6 +63,7 @@ public class AdminSandboxService {
                     counts.activeSessions(), counts.configuredApiKeys(), registrationIsOpen(connection),
                     registrationCodeIsEnabled(connection), configured("ADMIN_EMAIL")
                 ),
+                groups(connection),
                 users,
                 counts.totalUsers() > users.size(),
                 audit(connection)
@@ -219,6 +220,105 @@ public class AdminSandboxService {
         }
     }
 
+    public GroupResult createGroup(String adminEmail, String name) throws Exception {
+        String cleanName = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        if (cleanName.isBlank() || cleanName.length() > 40) {
+            throw new AdminValidationException("小组名称需为 1–40 个字符");
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                try (PreparedStatement duplicate = connection.prepareStatement(
+                    "SELECT 1 FROM interview_groups WHERE lower(name)=lower(?)"
+                )) {
+                    duplicate.setString(1, cleanName);
+                    try (ResultSet result = duplicate.executeQuery()) {
+                        if (result.next()) throw new AdminValidationException("已存在同名小组");
+                    }
+                }
+                long id;
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO interview_groups(name) VALUES(?) RETURNING id"
+                )) {
+                    statement.setString(1, cleanName);
+                    try (ResultSet result = statement.executeQuery()) {
+                        result.next();
+                        id = result.getLong(1);
+                    }
+                }
+                insertAudit(connection, admin.id(), null, "日程小组：" + cleanName, "create-interview-group");
+                connection.commit();
+                return new GroupResult(true, String.valueOf(id));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public GroupResult deleteGroup(String adminEmail, long groupId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                String name;
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT name FROM interview_groups WHERE id=? FOR UPDATE"
+                )) {
+                    statement.setLong(1, groupId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) throw new AdminNotFoundException("小组不存在");
+                        name = result.getString(1);
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM interview_groups WHERE id=?")) {
+                    statement.setLong(1, groupId);
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), null, "日程小组：" + name, "delete-interview-group");
+                connection.commit();
+                return new GroupResult(true, String.valueOf(groupId));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public GroupAssignmentResult assignGroup(String adminEmail, long targetId, Long groupId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                if (groupId != null) {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                        "SELECT name FROM interview_groups WHERE id=?"
+                    )) {
+                        statement.setLong(1, groupId);
+                        try (ResultSet result = statement.executeQuery()) {
+                            if (!result.next()) throw new AdminNotFoundException("小组不存在");
+                        }
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement("UPDATE users SET group_id=? WHERE id=?")) {
+                    if (groupId == null) statement.setNull(1, java.sql.Types.BIGINT);
+                    else statement.setLong(1, groupId);
+                    statement.setLong(2, target.id());
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(),
+                    groupId == null ? "remove-interview-group" : "assign-interview-group");
+                connection.commit();
+                return new GroupAssignmentResult(true, groupId == null ? "" : String.valueOf(groupId));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
     UserDetails mapDetails(long userId, String email, String json) throws Exception {
         JsonNode root = objectMapper.readTree(json == null || json.isBlank()
             ? "{\"applications\":[],\"events\":[]}" : json);
@@ -274,12 +374,13 @@ public class AdminSandboxService {
     }
 
     private List<UserView> users(Connection connection) throws Exception {
-        String sql = "SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,"
+        String sql = "SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,"
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
             + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
             + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
             + "(SELECT MAX(COALESCE(s.last_active_at,s.created_at)) FROM sessions s WHERE s.user_id=u.id) AS last_active_at "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
+            + "LEFT JOIN interview_groups g ON g.id=u.group_id "
             + "ORDER BY u.is_admin DESC,u.created_at ASC LIMIT ?";
         List<UserView> users = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -291,12 +392,27 @@ public class AdminSandboxService {
                         result.getBoolean("is_admin"), result.getObject("disabled_at") != null,
                         string(result.getObject("disabled_at")), string(result.getObject("created_at")),
                         string(result.getObject("last_active_at")), result.getInt("application_count"),
-                        result.getInt("event_count"), result.getBoolean("has_api_key")
+                        result.getInt("event_count"), result.getBoolean("has_api_key"),
+                        string(result.getObject("group_id")), string(result.getObject("group_name"))
                     ));
                 }
             }
         }
         return List.copyOf(users);
+    }
+
+    private List<GroupView> groups(Connection connection) throws Exception {
+        List<GroupView> groups = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT g.id,g.name,COUNT(u.id) AS member_count FROM interview_groups g "
+                + "LEFT JOIN users u ON u.group_id=g.id GROUP BY g.id,g.name ORDER BY lower(g.name),g.id"
+        ); ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                groups.add(new GroupView(String.valueOf(result.getLong("id")), result.getString("name"),
+                    result.getInt("member_count")));
+            }
+        }
+        return List.copyOf(groups);
     }
 
     private SummaryCounts summaryCounts(Connection connection) throws Exception {
@@ -483,9 +599,10 @@ public class AdminSandboxService {
                           boolean adminEmailConfigured) {}
     public record UserView(String id, String email, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
-                           boolean hasApiKey) {}
+                           boolean hasApiKey, String groupId, String groupName) {}
+    public record GroupView(String id, String name, int memberCount) {}
     public record AuditView(String id, String action, String targetEmail, String createdAt) {}
-    public record Overview(CurrentAdmin currentUser, Summary summary, List<UserView> users,
+    public record Overview(CurrentAdmin currentUser, Summary summary, List<GroupView> groups, List<UserView> users,
                            boolean usersTruncated, List<AuditView> audit) {}
     public record FlowStep(String at, String title) {}
     public record AdminApplication(String id, String company, String position, String stage, String status,
@@ -498,6 +615,8 @@ public class AdminSandboxService {
     public record DisabledResult(boolean ok, boolean disabled) {}
     public record SessionResult(boolean ok, int revoked) {}
     public record DeleteResult(boolean ok) {}
+    public record GroupResult(boolean ok, String groupId) {}
+    public record GroupAssignmentResult(boolean ok, String groupId) {}
 
     public static class AdminDisabledException extends RuntimeException {
         public AdminDisabledException(String message) { super(message); }

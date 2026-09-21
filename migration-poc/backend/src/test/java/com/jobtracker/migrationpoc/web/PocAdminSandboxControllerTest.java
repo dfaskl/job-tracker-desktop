@@ -4,6 +4,8 @@ import com.jobtracker.migrationpoc.database.AdminSandboxService;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.DisabledResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.RegistrationCodeResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.SessionResult;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.GroupAssignmentResult;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.GroupResult;
 import com.jobtracker.migrationpoc.database.LegacyReadService.LegacyUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,25 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class PocAdminSandboxControllerTest {
+    @Test
+    void createsAndAssignsInterviewGroupsForAuthenticatedAdmins() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        AdminSandboxService service = mock(AdminSandboxService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.createGroup("admin@example.com", "第一面试室")).thenReturn(new GroupResult(true, "4"));
+        when(service.assignGroup("admin@example.com", 9, 4L)).thenReturn(new GroupAssignmentResult(true, "4"));
+        PocAdminSandboxController controller = new PocAdminSandboxController(auth, service);
+
+        var created = controller.createGroup("token", new PocAdminSandboxController.GroupRequest("第一面试室"), sameOriginRequest());
+        var assigned = controller.assignGroup("token", 9, new PocAdminSandboxController.GroupAssignmentRequest(4L), sameOriginRequest());
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(assigned.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(service).createGroup("admin@example.com", "第一面试室");
+        verify(service).assignGroup("admin@example.com", 9, 4L);
+    }
+
     @Test
     void updatesRegistrationCodeOnlyForAnAuthenticatedSameOriginRequest() throws Exception {
         PocAuthController auth = mock(PocAuthController.class);

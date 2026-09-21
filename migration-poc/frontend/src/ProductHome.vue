@@ -13,7 +13,7 @@ type TimelineLabel = { text:string; status:'normal'|'tight'|'conflict' }
 type TimelineGroup = { id:string; date:string; start:string; timeLabel:string; status:'normal'|'tight'|'conflict'; labels:TimelineLabel[] }
 type SharedTimelineEvent = Record<string,unknown> & { id:string; type:string; title:string; startsAt:string; endsAt:string; company:string }
 type SharedTimelineUser = { email:string; displayName:string; events:SharedTimelineEvent[] }
-type HomeTimelineUser = { email:string; name:string; current:boolean; timeline:TimelineGroup[]; count:number }
+type TeamTimelineEntry = { id:string;email:string;name:string;color:string;date:string;start:string;label:string }
 const emit = defineEmits<{ navigate: [page: Page, applicationId?: string] }>()
 const store = useJobTrackerStore()
 const quoteKey = 'job_tracker_daily_quote_vue_v2'
@@ -28,6 +28,7 @@ const scheduleAdvice = ref<ScheduleAdvice | null>(null)
 const adviceLoading = ref(false)
 const adviceNotice = ref('')
 const sharedTimelines = ref<SharedTimelineUser[]>([])
+const sharedGroupName = ref('')
 const sharedTimelinesLoading = ref(false)
 const sharedTimelinesNotice = ref('')
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
@@ -98,20 +99,15 @@ function timelineFromEvents(events:Record<string,unknown>[]) {
   }
   return [...groups.values()].sort((a,b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`))
 }
-const selfTimeline = computed(() => adviceTimeline.value.length ? adviceTimeline.value : timelineFromEvents(upcomingItems.value))
-const timelineUsers = computed<HomeTimelineUser[]>(() => {
-  const currentEmail = String(store.user.value?.email || '').toLowerCase()
-  const selfEmail = String(store.user.value?.email || '')
-  const self = { email:selfEmail, name:displayName(store.user.value?.displayName,selfEmail), current:true, timeline:selfTimeline.value, count:upcomingItems.value.length }
-  const others = sharedTimelines.value
-    .filter(user => String(user.email || '').toLowerCase() !== currentEmail)
-    .map(user => {
-      const events = user.events || []
-      return { email:user.email, name:displayName(user.displayName,user.email), current:false, timeline:timelineFromEvents(events), count:events.length }
-    })
-    .filter(user => user.timeline.length > 0)
-  return [self, ...others]
-})
+const memberColors=['#168c9e','#3e77c5','#d07832','#8662b8','#c84f64','#4f8b45','#b360a8','#697a2c']
+const timelineMembers=computed(()=>sharedTimelines.value.map((user,index)=>({
+  ...user,name:displayName(user.displayName,user.email),color:memberColors[index%memberColors.length]
+})).filter(user=>user.events?.length))
+const teamTimeline=computed<TeamTimelineEntry[]>(()=>timelineMembers.value.flatMap(user=>(user.events||[]).map(event=>({
+  id:`${user.email}:${event.id}`,email:user.email,name:user.name,color:user.color,
+  date:eventStart(event).slice(0,10),start:eventStart(event).slice(11,16),
+  label:`${String(event.company||'未填写公司')} · ${String(event.title||event.type||'未命名日程')}`
+}))).filter(item=>item.date&&item.start).sort((a,b)=>`${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`)))
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
 
@@ -128,12 +124,11 @@ function eventStart(item:Record<string,unknown>){return String(item.startsAt||it
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
 function displayName(name:string|undefined,email:string){return String(name||'').trim()||String(email||'').split('@')[0]||'未命名用户'}
-function timelineUserInitial(user:HomeTimelineUser){return (user.current?'我':user.name.slice(0,1)).toUpperCase()}
 async function loadSharedTimelines(){
   if(!store.user.value||sharedTimelinesLoading.value)return
   sharedTimelinesLoading.value=true;sharedTimelinesNotice.value=''
-  try{const result=await api<{users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines',{blockPage:false});sharedTimelines.value=Array.isArray(result.users)?result.users:[]}
-  catch{sharedTimelines.value=[];sharedTimelinesNotice.value='其他用户的时间轴暂时无法加载'}
+  try{const result=await api<{groupId:string;groupName:string;users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines',{blockPage:false});sharedTimelines.value=Array.isArray(result.users)?result.users:[];sharedGroupName.value=String(result.groupName||'')}
+  catch{sharedTimelines.value=[];sharedGroupName.value='';sharedTimelinesNotice.value='小组时间轴暂时无法加载'}
   finally{sharedTimelinesLoading.value=false}
 }
 function adviceCacheKey(){return 'job_tracker_schedule_advice_v12_'+String(store.user.value?.email||'guest').toLowerCase()}
@@ -249,20 +244,22 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
-      <div class="schedule-workspace">
-        <section class="timeline-column" aria-labelledby="team-timeline-title">
-          <div class="column-heading"><div><strong id="team-timeline-title">日程时间轴</strong><small>自己置顶，其他仅展示有日程的用户</small></div><span v-if="timelineUsers.length>1">{{timelineUsers.length}} 人</span></div>
-          <article v-for="user in timelineUsers" :key="user.current?'current':user.email" class="timeline-user-card" :class="{'is-self':user.current}">
-            <header class="timeline-user-head"><span class="user-avatar" aria-hidden="true">{{timelineUserInitial(user)}}</span><div><strong>{{user.name}}</strong><small>{{user.email}}</small></div><b>{{user.count}} 项</b><button v-if="user.current&&adviceCandidates.length>1" class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button></header>
-            <div v-if="user.current&&(adviceLoading||scheduleAdvice)" class="compact-advice" aria-live="polite"><strong>安排建议</strong><span>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</span></div>
-            <p v-if="user.current&&adviceNotice&&!adviceLoading" class="advice-notice">{{adviceNotice}}</p>
-            <div v-if="user.timeline.length" class="timeline-scroll"><div class="timeline-list"><article v-for="item in user.timeline" :key="item.id" :class="item.status"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b v-if="item.start">{{item.timeLabel}}</b><em v-for="(label,labelIndex) in item.labels" :key="label.text+labelIndex" :class="label.status">{{label.text}}</em></span></article></div></div>
-            <div v-else class="timeline-empty">暂无待完成日程</div>
-            <template v-if="user.current&&scheduleAdvice"><div v-if="scheduleAdvice.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div><div v-if="scheduleAdvice.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div></template>
-          </article>
-          <div v-if="sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载其他用户的日程…</span></div>
-          <p v-else-if="sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>
-        </section>
+      <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
+        <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
+        <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
+        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :style="{'--member-color':item.color}"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
+        <div v-else-if="sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载小组日程…</span></div>
+        <p v-else-if="sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>
+        <div v-else class="timeline-empty">当前小组暂无待完成的时间点日程</div>
+      </section>
+
+      <section v-if="adviceLoading||scheduleAdvice" class="schedule-advice" aria-live="polite">
+        <div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':scheduleAdvice?.summary}}</small></div></div></div>
+        <p v-if="adviceNotice&&!adviceLoading" class="advice-notice">{{adviceNotice}}</p>
+        <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
+        <div v-if="scheduleAdvice?.conflicts?.length" class="advice-conflicts"><strong>时间冲突</strong><span v-for="item in scheduleAdvice.conflicts" :key="item">{{item}}</span></div>
+      </section>
+
         <section class="details-column" aria-labelledby="my-schedule-title">
           <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
           <div v-if="recentSchedules.length" class="schedule-list">
@@ -274,7 +271,6 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
           </div>
           <div v-else class="empty">暂无待完成日程。</div>
         </section>
-      </div>
     </section>
 
     <section class="dashboard-panel confirmation-panel">
@@ -475,6 +471,16 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
     linear-gradient(145deg, color-mix(in srgb,var(--accent,var(--color-primary)) 5%,#fff), rgba(255,255,255,.9) 44%),
     repeating-linear-gradient(90deg, transparent 0 71px, rgba(31,67,91,.025) 71px 72px);
 }
+.team-timeline { margin-top: 18px; }
+.member-legend { display:flex; flex-wrap:wrap; gap:8px 14px; padding:10px 12px; border:1px solid #e0e7eb; border-radius:10px; background:rgba(255,255,255,.7); }
+.member-legend > span { display:flex; min-width:0; align-items:center; gap:6px; color:var(--home-muted); font-size:11px; }
+.member-legend i { width:10px; height:10px; flex:0 0 10px; border:2px solid #fff; border-radius:50%; background:var(--member-color); box-shadow:0 0 0 1px var(--member-color); }
+.member-legend b { max-width:180px; overflow:hidden; color:var(--home-ink); text-overflow:ellipsis; white-space:nowrap; }
+.member-legend small { color:var(--home-muted); }
+.team-timeline-list article i,
+.team-timeline-list article:nth-child(n) i { background:var(--member-color); box-shadow:0 0 0 2px color-mix(in srgb,var(--member-color) 50%,#fff); }
+.team-timeline-list em { display:grid; gap:1px; max-width:210px; border-color:color-mix(in srgb,var(--member-color) 25%,#dce4e9); background:color-mix(in srgb,var(--member-color) 8%,#fff); }
+.team-timeline-list em strong { overflow:hidden; color:var(--member-color); font-size:10px; text-overflow:ellipsis; }
 .column-heading,
 .timeline-user-head {
   display: flex;
@@ -539,7 +545,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .timeline-loading,
 .timeline-notice { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 10px; color: var(--home-muted); font-size: 11px; }
 .timeline-loading > i { width: 14px; height: 14px; border: 2px solid #c8dcd6; border-top-color: var(--accent,var(--color-primary)); border-radius: 50%; animation: timeline-spin .8s linear infinite; }
-.details-column { padding-bottom: 5px; }
+.details-column { margin-top:18px; padding-bottom: 5px; }
 .details-column .schedule-list { margin-top: 10px; }
 
 .schedule-advice {

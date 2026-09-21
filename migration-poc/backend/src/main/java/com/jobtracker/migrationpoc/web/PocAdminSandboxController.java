@@ -140,6 +140,58 @@ public class PocAdminSandboxController {
             return mapException("revoke-sessions", exception);
         }
     }
+
+    @PostMapping("/groups")
+    public ResponseEntity<?> createGroup(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) GroupRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.name() == null) return error(HttpStatus.BAD_REQUEST, "请输入小组名称");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.createGroup(user.get().email(), body.name()));
+        } catch (Exception exception) {
+            return mapException("create-group", exception);
+        }
+    }
+
+    @DeleteMapping("/groups/{id}")
+    public ResponseEntity<?> deleteGroup(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.deleteGroup(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("delete-group", exception);
+        }
+    }
+
+    @PatchMapping("/users/{id}/group")
+    public ResponseEntity<?> assignGroup(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) GroupAssignmentRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null) return error(HttpStatus.BAD_REQUEST, "小组设置内容不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.assignGroup(user.get().email(), id, body.groupId()));
+        } catch (Exception exception) {
+            return mapException("assign-group", exception);
+        }
+    }
+
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(
         @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
@@ -198,5 +250,7 @@ public class PocAdminSandboxController {
     public record RegistrationRequest(Boolean enabled) {}
     public record RegistrationCodeRequest(String code, Boolean clear) {}
     public record UserStateRequest(Boolean disabled) {}
+    public record GroupRequest(String name) {}
+    public record GroupAssignmentRequest(Long groupId) {}
     public record DeleteUserRequest(String confirmEmail) {}
 }
