@@ -2,6 +2,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
+import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { trackedJsonFetch } from './requestActivity'
 import { useCalendarEventCapacity } from './useCalendarEventCapacity'
 
@@ -381,6 +382,7 @@ async function remove(item: EventItem) {
         <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
           <button type="button" class="modal-close" aria-label="关闭" @click="resetForm">×</button>
           <h3 id="event-editor-title" class="wide">编辑日程</h3>
+          <ScheduleTimeModeNotice class="wide" :mode="form.timeMode" />
           <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>
           <label><span>类型</span><BaseSelect v-model="form.type" :options="eventTypes" /></label>
           <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>

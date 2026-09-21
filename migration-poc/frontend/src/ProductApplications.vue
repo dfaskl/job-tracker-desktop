@@ -4,6 +4,7 @@ import { api, apiCached } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
+import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 
 const store = useJobTrackerStore()
 const query = ref('')
@@ -27,7 +28,8 @@ const statuses = ['等待结果','已通过','未通过','已放弃','已结束'
 const channels = ['官网','Boss直聘','实习僧','牛客','猎聘','智联招聘','前程无忧','国聘','校园招聘平台','内推','其他']
 const eventTypes = ['测评','笔试','面试','Offer','其他']
 const form = reactive(emptyApplication())
-const eventForm = reactive({ type:'面试', title:'', startsAt:'', endsAt:'', location:'', notes:'' })
+const eventForm = reactive<{type:string;title:string;timeMode:'point'|'range';startsAt:string;endsAt:string;location:string;notes:string}>({ type:'面试', title:'', timeMode:'point', startsAt:'', endsAt:'', location:'', notes:'' })
+watch(()=>eventForm.timeMode,mode=>{if(mode==='point')eventForm.endsAt=''})
 watch(store.newApplicationRequest, () => { if (!store.readOnly.value) openCreate() })
 watch(store.applicationDetailRequest, request => {
   if (!request.applicationId) return
@@ -211,8 +213,8 @@ function eventVersion(item:JobEvent){return String(item.updatedAt||item.createdA
 async function refreshSelected(){const id=selected.value?.id;await store.refresh();if(id)selected.value=store.applications.value.find(item=>item.id===id)||selected.value}
 function openEvent(item?:JobEvent){
   editingEvent.value=item||null
-  if(item){Object.assign(eventForm,{type:item.type||'面试',title:item.title||'',startsAt:toInputTime(item.startsAt||item.start||item.date),endsAt:toInputTime(item.endsAt||item.end),location:item.location||'',notes:item.notes||''})}
-  else{const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);tomorrow.setHours(9,0,0,0);Object.assign(eventForm,{type:'面试',title:'',startsAt:localParts(tomorrow),endsAt:'',location:'',notes:''})}
+  if(item){Object.assign(eventForm,{type:item.type||'面试',title:item.title||'',timeMode:item.endsAt||item.end?'range':'point',startsAt:toInputTime(item.startsAt||item.start||item.date),endsAt:toInputTime(item.endsAt||item.end),location:item.location||'',notes:item.notes||''})}
+  else{const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);tomorrow.setHours(9,0,0,0);Object.assign(eventForm,{type:'面试',title:'',timeMode:'point',startsAt:localParts(tomorrow),endsAt:'',location:'',notes:''})}
   eventEditor.value=true
 }
 async function saveEvent(){
@@ -220,7 +222,9 @@ async function saveEvent(){
   busy.value=true;error.value=''
   try{
     const current=editingEvent.value
-    await api(current?`/api/poc/event-sandbox/events/${encodeURIComponent(current.id)}`:'/api/poc/event-sandbox/events',{method:current?'PUT':'POST',body:JSON.stringify({applicationId:selected.value.id,...eventForm,startsAt:eventForm.startsAt.replace('T',' '),endsAt:eventForm.endsAt.replace('T',' '),expectedUpdatedAt:current?eventVersion(current):''})})
+    if(eventForm.timeMode==='range'&&!eventForm.endsAt){error.value='时间段日程必须填写结束时间';return}
+    if(eventForm.timeMode==='range'&&new Date(eventForm.endsAt).getTime()<=new Date(eventForm.startsAt).getTime()){error.value='结束时间必须晚于开始时间';return}
+    await api(current?`/api/poc/event-sandbox/events/${encodeURIComponent(current.id)}`:'/api/poc/event-sandbox/events',{method:current?'PUT':'POST',body:JSON.stringify({applicationId:selected.value.id,type:eventForm.type,title:eventForm.title,startsAt:eventForm.startsAt.replace('T',' '),endsAt:eventForm.timeMode==='range'?eventForm.endsAt.replace('T',' '):'',location:eventForm.location,notes:eventForm.notes,expectedUpdatedAt:current?eventVersion(current):''})})
     eventEditor.value=false;editingEvent.value=null;await refreshSelected();message.value=current?'日程已更新':'关联日程已创建'
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存日程失败'}finally{busy.value=false}
 }
@@ -298,7 +302,7 @@ async function removeEvent(item:JobEvent){
 <label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段</span><BaseSelect v-model="form.stage" :options="stages" /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" rows="4"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
 
 <div v-if="eventEditor&&selected" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="schedule-editor-title" @submit.prevent="saveEvent"><button type="button" class="close" aria-label="关闭" @click="closeEditors">×</button><h2 id="schedule-editor-title">{{editingEvent?'编辑日程':'新增关联日程'}}</h2>
-<label><span>类型</span><BaseSelect v-model="eventForm.type" :options="eventTypes" /></label><label><span>名称 *</span><input v-model="eventForm.title" required placeholder="如：一面"></label><label><span>开始时间 *</span><input v-model="eventForm.startsAt" type="datetime-local" required></label><label><span>结束时间</span><input v-model="eventForm.endsAt" type="datetime-local"></label><label class="wide"><span>地点 / 链接</span><input v-model="eventForm.location"></label><label class="wide"><span>备注</span><textarea v-model="eventForm.notes" rows="3"></textarea></label><div class="actions wide"><button :disabled="busy">{{editingEvent?'保存日程':'创建日程'}}</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+<ScheduleTimeModeNotice class="wide" :mode="eventForm.timeMode" /><label><span>类型</span><BaseSelect v-model="eventForm.type" :options="eventTypes" /></label><label><span>名称 *</span><input v-model="eventForm.title" required placeholder="如：一面"></label><label><span>时间类型</span><BaseSelect v-model="eventForm.timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label><label><span>{{eventForm.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="eventForm.startsAt" type="datetime-local" required></label><label v-if="eventForm.timeMode==='range'"><span>结束时间 *</span><input v-model="eventForm.endsAt" type="datetime-local" :min="eventForm.startsAt" required></label><label class="wide"><span>地点 / 链接</span><input v-model="eventForm.location"></label><label class="wide"><span>备注</span><textarea v-model="eventForm.notes" rows="3"></textarea></label><div class="actions wide"><button :disabled="busy">{{editingEvent?'保存日程':'创建日程'}}</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
 </template>
 
 <style scoped>
