@@ -107,7 +107,7 @@ function formatSize(value: number) {
     </div>
 
     <template v-else-if="sandbox?.enabled">
-      <div class="toolbar"><strong>最近 {{ backups.length }} 份备份</strong><button class="secondary" :disabled="loading" @click="checkSandbox">刷新列表</button></div>
+      <div class="toolbar"><strong>最近 {{ backups.length }} 份备份</strong><button class="secondary icon-button" type="button" :disabled="loading" aria-label="刷新备份列表" title="刷新列表" @click="checkSandbox"><AppIcon name="refresh" /></button></div>
       <div v-if="backups.length" class="backup-list">
         <button v-for="item in backups" :key="item.id" type="button" :class="{ selected: selected?.id === item.id }" @click="choose(item)">
           <div><strong>#{{ item.id }} · {{ item.reason || 'auto' }}</strong><span>{{ formatDate(item.createdAt) }}</span></div>

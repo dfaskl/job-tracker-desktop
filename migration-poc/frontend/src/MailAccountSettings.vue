@@ -21,7 +21,7 @@ function closeFromBackdrop(event:MouseEvent){if(event.target===helpDialog.value)
 <section class="card mail-account-card">
   <div class="section-head">
     <div><span>邮件接入</span><h2>邮件收集箱</h2></div>
-    <button type="button" class="help-trigger" aria-label="查看邮箱接入帮助" title="邮箱接入帮助" @click="openHelp">?</button>
+    <button type="button" class="help-trigger icon-button" aria-label="查看邮箱接入帮助" title="邮箱接入帮助" @click="openHelp"><AppIcon name="info" /></button>
   </div>
   <p>开启邮箱的 IMAP 服务后，使用客户端授权码连接。系统不会保存邮箱登录密码。</p>
   <form class="connect-form" @submit.prevent="save">
@@ -31,13 +31,13 @@ function closeFromBackdrop(event:MouseEvent){if(event.target===helpDialog.value)
     <button :disabled="loading">{{loading?'正在验证…':'连接邮箱'}}</button>
   </form>
   <div v-if="accounts.length" class="account-list">
-    <article v-for="account in accounts" :key="account.id"><div><strong>{{account.email}}</strong><small :class="{bad:account.lastError}">{{account.lastError||`上次同步：${date(account.lastSyncedAt)}`}}</small></div><button class="danger-outline" :disabled="loading" @click="remove(account)">移除</button></article>
+    <article v-for="account in accounts" :key="account.id"><div><strong>{{account.email}}</strong><small :class="{bad:account.lastError}">{{account.lastError||`上次同步：${date(account.lastSyncedAt)}`}}</small></div><button class="danger-outline icon-button" type="button" :disabled="loading" :aria-label="`移除邮箱 ${account.email}`" title="移除邮箱" @click="remove(account)"><AppIcon name="trash" /></button></article>
   </div>
   <p v-if="message" class="success">{{message}}</p><p v-if="error" class="danger" role="alert">{{error}}</p>
 
   <dialog ref="helpDialog" class="mail-help-dialog" aria-labelledby="mail-help-title" @click="closeFromBackdrop">
     <div class="dialog-content">
-      <button type="button" class="modal-close" aria-label="关闭邮箱接入帮助" @click="closeHelp">×</button>
+      <button type="button" class="modal-close icon-button" aria-label="关闭邮箱接入帮助" title="关闭" @click="closeHelp"><AppIcon name="close" /></button>
       <header><span>接入指南</span><h2 id="mail-help-title">获取客户端授权码</h2><p>授权码是邮箱为第三方应用生成的专用密码，不是邮箱登录密码。网页入口名称可能随邮箱版本略有变化。</p></header>
       <div class="provider-guides">
         <article>

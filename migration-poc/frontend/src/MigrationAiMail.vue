@@ -202,13 +202,13 @@ async function saveResult() {
 
     <div class="mail-grid">
       <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'处理中…':'全部处理'}}</button><button class="secondary sync-button" title="立即收取新邮件" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)">{{syncing?'收取中…':'收取'}}</button></div></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
         <div class="mail-list-region" :aria-busy="syncing">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
           <div v-else-if="inbox.messages.length" class="mail-cards" aria-label="待处理邮件">
             <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
               <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-              <div class="mail-card-actions"><button class="mailbox-button" @click.stop="openMailPreview(mail)">查看原文</button><button class="processed" @click.stop="processMail(mail)">已处理</button></div>
+              <div class="mail-card-actions"><button class="mailbox-button icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click.stop="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
             </article>
           </div>
           <div v-else class="inbox-empty">{{inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
@@ -216,7 +216,7 @@ async function saveResult() {
       </section>
 
       <section class="card compose-panel">
-        <div class="panel-title"><div><span class="step">1</span><h3>粘贴通知正文</h3></div><button class="text-button" :disabled="!mailBody" @click="mailBody = ''">清空</button></div>
+        <div class="panel-title"><div><span class="step">1</span><h3>粘贴通知正文</h3></div><button class="text-button icon-button compact-icon" type="button" :disabled="!mailBody" aria-label="清空通知正文" title="清空正文" @click="mailBody = ''"><AppIcon name="broom" /></button></div>
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
         <div v-if="status && !status.callsEnabled" class="service-unavailable">{{ status.message || '邮件识别服务当前不可用' }}</div>
@@ -251,7 +251,7 @@ async function saveResult() {
       <article v-if="previewMail" class="mail-preview-card">
         <header>
           <div class="mail-preview-heading"><span class="preview-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><span>邮件原文</span><h2 id="mail-preview-title">{{ previewMail.subject || '（无主题）' }}</h2></div></div>
-          <button class="preview-close" type="button" aria-label="关闭邮件原文" @click="closeMailPreview">×</button>
+          <button class="preview-close icon-button" type="button" aria-label="关闭邮件原文" title="关闭" @click="closeMailPreview"><AppIcon name="close" /></button>
         </header>
         <dl class="mail-preview-meta">
           <div><dt>发件人</dt><dd>{{ previewMail.sender || '未知发件人' }}</dd></div>

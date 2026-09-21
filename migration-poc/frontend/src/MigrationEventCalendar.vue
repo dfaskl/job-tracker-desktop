@@ -340,7 +340,7 @@ async function remove(item: EventItem) {
         <div class="calendar-pane">
           <div class="calendar-head">
             <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
-            <div><button class="secondary compact" :disabled="!canGoPrevious" aria-label="上一个月" @click="changeMonth(-1)">‹</button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact" :disabled="!canGoNext" aria-label="下一个月" @click="changeMonth(1)">›</button></div>
+            <div><button class="secondary compact icon-button compact-icon" :disabled="!canGoPrevious" aria-label="上一个月" title="上一个月" @click="changeMonth(-1)"><AppIcon name="chevron-left" /></button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact icon-button compact-icon" :disabled="!canGoNext" aria-label="下一个月" title="下一个月" @click="changeMonth(1)"><AppIcon name="chevron-right" /></button></div>
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
           <div ref="calendarGrid" class="calendar-grid">
@@ -368,10 +368,10 @@ async function remove(item: EventItem) {
               </div>
               <div class="event-actions">
                 <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.abandoned ? '已放弃' : entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
-                <button class="secondary compact" @click="edit(entry.event)">编辑</button>
-                <button v-if="entry.event.completed" class="secondary compact" @click="resolve(entry.event, 'restore')">恢复</button>
-                <template v-else><button class="success-button compact" @click="resolve(entry.event, 'complete')">完成</button><button class="warning-button compact" @click="resolve(entry.event, 'abandon')">放弃</button><button class="warning-button compact" @click="resolve(entry.event, 'miss')">错过</button></template>
-                <button class="danger-button compact" @click="remove(entry.event)">删除</button>
+                <button class="secondary compact icon-button compact-icon" aria-label="编辑日程" title="编辑" @click="edit(entry.event)"><AppIcon name="edit" :size="16" /></button>
+                <button v-if="entry.event.completed" class="secondary compact icon-button compact-icon" aria-label="恢复日程" title="恢复" @click="resolve(entry.event, 'restore')"><AppIcon name="undo" :size="16" /></button>
+                <template v-else><button class="success-button compact icon-button compact-icon" aria-label="完成日程" title="完成" @click="resolve(entry.event, 'complete')"><AppIcon name="check" :size="16" /></button><button class="warning-button compact icon-button compact-icon" aria-label="放弃日程" title="放弃" @click="resolve(entry.event, 'abandon')"><AppIcon name="ban" :size="16" /></button><button class="warning-button compact icon-button compact-icon" aria-label="标记日程为错过" title="错过" @click="resolve(entry.event, 'miss')"><AppIcon name="clock-x" :size="16" /></button></template>
+                <button class="danger-button compact icon-button compact-icon" aria-label="删除日程" title="删除" @click="remove(entry.event)"><AppIcon name="trash" :size="16" /></button>
               </div>
             </article>
             <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
@@ -380,7 +380,7 @@ async function remove(item: EventItem) {
       </div>
       <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
         <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
-          <button type="button" class="modal-close" aria-label="关闭" @click="resetForm">×</button>
+          <button type="button" class="modal-close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="resetForm"><AppIcon name="close" /></button>
           <h3 id="event-editor-title" class="wide">编辑日程</h3>
           <ScheduleTimeModeNotice class="wide" :mode="form.timeMode" />
           <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>

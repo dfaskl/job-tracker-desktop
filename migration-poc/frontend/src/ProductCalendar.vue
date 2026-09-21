@@ -116,7 +116,7 @@ function eventCompany(event: JobEvent) {
     <div v-if="overdue.length" class="overdue-alert"><strong>{{ overdue.length }} 项日程已过期</strong><span>请在启用隔离写入后标记为完成或错过。</span></div>
     <div class="calendar-layout">
       <section class="card month-card">
-        <div class="calendar-head"><button class="secondary" :disabled="!canGoPrevious" aria-label="上一个月" @click="move(-1)">‹</button><strong>{{ monthTitle }}</strong><button class="secondary" :disabled="!canGoNext" aria-label="下一个月" @click="move(1)">›</button></div>
+        <div class="calendar-head"><button class="secondary icon-button" type="button" :disabled="!canGoPrevious" aria-label="上一个月" title="上一个月" @click="move(-1)"><AppIcon name="chevron-left" /></button><strong>{{ monthTitle }}</strong><button class="secondary icon-button" type="button" :disabled="!canGoNext" aria-label="下一个月" title="下一个月" @click="move(1)"><AppIcon name="chevron-right" /></button></div>
         <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</b></div>
         <div ref="calendarGrid" class="month-grid">
           <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" :class="['day',{muted:!cell.current,selected:cell.key===selectedDate,today:cell.key===key(new Date())}]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key===selectedDate" @click="selectedDate=cell.key">

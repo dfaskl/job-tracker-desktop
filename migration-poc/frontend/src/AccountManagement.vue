@@ -83,11 +83,11 @@ function resetPasswordForm() {
 
   <dialog ref="passwordDialog" class="password-dialog" aria-labelledby="password-dialog-title" @click="closePasswordFromBackdrop" @cancel="handlePasswordCancel">
     <div class="password-dialog-content">
-      <button type="button" class="modal-close" :disabled="savingPassword" aria-label="关闭修改密码窗口" @click="closePasswordDialog">×</button>
+      <button type="button" class="modal-close icon-button" :disabled="savingPassword" aria-label="关闭修改密码窗口" title="关闭" @click="closePasswordDialog"><AppIcon name="close" /></button>
       <header><span>账户安全</span><h2 id="password-dialog-title">修改密码</h2><p>请输入当前密码，并设置一个至少 10 位的新密码。</p></header>
       <form class="account-form password-form" @submit.prevent="changePassword">
-        <label><span>当前密码</span><span class="password-field"><input ref="currentPasswordInput" v-model="password.current" :type="showCurrent?'text':'password'" autocomplete="current-password" required><button type="button" class="visibility" :aria-label="showCurrent?'隐藏当前密码':'显示当前密码'" @click="showCurrent=!showCurrent">{{showCurrent?'隐藏':'显示'}}</button></span></label>
-        <label><span>新密码</span><span class="password-field"><input v-model="password.next" :type="showNext?'text':'password'" minlength="10" maxlength="128" autocomplete="new-password" required placeholder="至少 10 位"><button type="button" class="visibility" :aria-label="showNext?'隐藏新密码':'显示新密码'" @click="showNext=!showNext">{{showNext?'隐藏':'显示'}}</button></span></label>
+        <label><span>当前密码</span><span class="password-field"><input ref="currentPasswordInput" v-model="password.current" :type="showCurrent?'text':'password'" autocomplete="current-password" required><button type="button" class="visibility icon-button compact-icon" :aria-label="showCurrent?'隐藏当前密码':'显示当前密码'" :title="showCurrent?'隐藏密码':'显示密码'" @click="showCurrent=!showCurrent"><AppIcon :name="showCurrent?'eye-off':'eye'" /></button></span></label>
+        <label><span>新密码</span><span class="password-field"><input v-model="password.next" :type="showNext?'text':'password'" minlength="10" maxlength="128" autocomplete="new-password" required placeholder="至少 10 位"><button type="button" class="visibility icon-button compact-icon" :aria-label="showNext?'隐藏新密码':'显示新密码'" :title="showNext?'隐藏密码':'显示密码'" @click="showNext=!showNext"><AppIcon :name="showNext?'eye-off':'eye'" /></button></span></label>
         <label><span>确认新密码</span><input v-model="password.confirm" :type="showNext?'text':'password'" minlength="10" maxlength="128" autocomplete="new-password" required></label>
         <p v-if="passwordError" class="danger" role="alert">{{passwordError}}</p>
         <div class="dialog-actions"><button type="button" class="secondary" :disabled="savingPassword" @click="closePasswordDialog">取消</button><button class="password-submit" :disabled="savingPassword">{{ savingPassword ? '正在更新…' : '确认修改' }}</button></div>

@@ -201,13 +201,13 @@ function formatDate(value: string) {
 
   <div v-if="linkDetailsOpen" class="link-backdrop" @click.self="linkDetailsOpen=false">
     <section class="link-modal" role="dialog" aria-modal="true" aria-labelledby="company-links-title">
-      <button type="button" class="modal-close" aria-label="关闭" @click="linkDetailsOpen=false">×</button>
+      <button type="button" class="modal-close icon-button" aria-label="关闭公司官网库" title="关闭" @click="linkDetailsOpen=false"><AppIcon name="close" /></button>
       <div class="modal-heading"><div><span class="section-kicker">官网库详情</span><h2 id="company-links-title">公司官网库</h2></div><small>共 {{ links.length }} 条 · {{ formatDate(linksUpdatedAt) }}</small></div>
       <div class="link-panel">
-        <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary" type="button" :disabled="loading" @click="loadLinks">刷新</button></div>
+        <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary icon-button" type="button" :disabled="loading" aria-label="刷新公司官网库" title="刷新列表" @click="loadLinks"><AppIcon name="refresh" /></button></div>
         <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" aria-label="公司名称" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" aria-label="公司官网链接" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
         <div v-if="filteredLinks.length" class="link-list">
-          <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete" @click="removeLink(item)">删除</button></article>
+          <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete icon-button compact-icon" type="button" :aria-label="`删除 ${item.company} 的官网链接`" title="删除链接" @click="removeLink(item)"><AppIcon name="trash" /></button></article>
         </div>
         <div v-else class="notice">{{ linkQuery ? '没有匹配的公司官网。' : '当前账号没有可展示的公司链接。' }}</div>
       </div>
