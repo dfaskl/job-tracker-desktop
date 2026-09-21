@@ -32,13 +32,19 @@ const sharedTimelines = ref<SharedTimelineUser[]>([])
 const sharedGroupName = ref('')
 const sharedTimelinesLoading = ref(false)
 const sharedTimelinesNotice = ref('')
+const nowTime = ref(Date.now())
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 let quoteBurstTimer: ReturnType<typeof setTimeout> | null = null
+let overdueClock: ReturnType<typeof setInterval> | null = null
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
 const recentSchedules = computed(() => upcomingItems.value)
+const overdueSchedules = computed(() => recentSchedules.value.filter(event => {
+  const deadline=parseTime(eventDeadline(event))
+  return Number.isFinite(deadline)&&deadline<nowTime.value
+}))
 const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
   id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
@@ -127,6 +133,7 @@ const staleApplications = computed(() => store.applications.value.map(item => ({
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
 
 onMounted(async () => {
+  overdueClock=setInterval(()=>{nowTime.value=Date.now()},30000)
   await store.initialize()
   void loadSharedTimelines()
   const cached = loadCachedQuote()
@@ -138,6 +145,7 @@ function today(){return localText().slice(0,10)}
 function eventStart(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||'')}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
+function deadlineText(event:JobEvent){const value=eventDeadline(event),date=new Date(value.replace(' ','T'));return Number.isNaN(date.getTime())?value:`${date.getMonth()+1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`}
 function teamConflictTime(item:TeamTimelineEntry){const match=item.date.match(/^\d{4}-(\d{2})-(\d{2})$/);return match?`${Number(match[1])}月${Number(match[2])}日 ${item.start}`:`${item.date} ${item.start}`}
 function displayName(name:string|undefined,email:string){return String(name||'').trim()||String(email||'').split('@')[0]||'未命名用户'}
 async function loadSharedTimelines(){
@@ -253,17 +261,21 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
+onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer);if(overdueClock)clearInterval(overdueClock)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
+      <section v-if="overdueSchedules.length" class="overdue-alert" role="alert" aria-live="polite">
+        <span class="warning-triangle warning-triangle-large" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span>
+        <div><strong>{{overdueSchedules.length}} 个日程已超过设置时间仍未完成</strong><span v-for="event in overdueSchedules.slice(0,3)" :key="event.id">{{deadlineText(event)}}　{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</span><small v-if="overdueSchedules.length>3">另有 {{overdueSchedules.length-3}} 个逾期日程，请前往日程页面处理。</small></div>
+      </section>
       <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
-        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span><small v-if="item.conflict" class="team-conflict-badge">冲突</small></article></div></div>
+        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
         <div v-if="teamConflicts.length" class="team-conflict-alert" role="alert"><strong>小组日程冲突</strong><span v-for="item in teamConflicts" :key="item.id">{{item.text}}</span></div>
         <div v-if="!teamTimeline.length&&sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载小组日程…</span></div>
         <p v-else-if="!teamTimeline.length&&sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>
@@ -439,6 +451,16 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   width: 5px;
   background: linear-gradient(180deg, var(--accent, var(--color-primary)), var(--home-progress) 58%, var(--home-deadline));
 }
+.overdue-alert { display:flex; align-items:flex-start; gap:14px; margin:14px 0 16px; padding:14px 16px; border:1px solid #e89a95; border-left:5px solid #bd332d; border-radius:12px; color:#812722; background:linear-gradient(100deg,#fff0ee,#fff8f7); box-shadow:0 8px 22px rgba(160,45,39,.1); }
+.overdue-alert > div { display:grid; min-width:0; gap:4px; line-height:1.5; }
+.overdue-alert strong { color:#9d2f29; font-size:14px; }
+.overdue-alert span,.overdue-alert small { overflow-wrap:anywhere; color:#713632; font-size:11px; }
+.overdue-alert div > span::before { content:"• "; font-weight:800; }
+.overdue-alert > .warning-triangle { color:#c43e37; }
+.warning-triangle { display:inline-flex; color:#c43e37; }
+.warning-triangle svg { display:block; width:100%; height:100%; overflow:visible; fill:currentColor; filter:drop-shadow(0 2px 3px rgba(142,34,29,.25)); }
+.warning-triangle .warning-mark { fill:none; stroke:#fff; stroke-width:2.4; stroke-linecap:round; }
+.warning-triangle-large { width:28px; height:26px; flex:0 0 28px; margin-top:1px; }
 
 .panel-head,
 .schedule-actions,
@@ -497,7 +519,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 .team-timeline-list article:nth-child(n) i { background:var(--member-color); box-shadow:0 0 0 2px color-mix(in srgb,var(--member-color) 50%,#fff); }
 .team-timeline-list article em { display:grid; gap:1px; max-width:210px; border-color:color-mix(in srgb,var(--member-color) 52%,#dce4e9); color:color-mix(in srgb,var(--member-color) 58%,#263d42); background:color-mix(in srgb,var(--member-color) 24%,#fff); box-shadow:0 2px 7px color-mix(in srgb,var(--member-color) 12%,transparent); }
 .team-timeline-list article em strong { overflow:hidden; color:var(--member-color); font-size:10px; text-overflow:ellipsis; }
-.team-conflict-badge { position:absolute; z-index:2; top:-8px; right:4px; padding:2px 5px; border:2px solid #fff; border-radius:999px; color:#fff; background:#c4413b; font-size:9px; font-weight:800; line-height:1.2; box-shadow:0 2px 7px rgba(153,42,36,.22); }
+.team-timeline-list .team-node-warning { position:absolute; z-index:3; top:10px; left:calc(50% + 5px); display:block; width:14px; height:13px; padding:0; }
 .team-conflict-alert { display:grid; gap:5px; padding:10px 12px; border-left:4px solid #c4413b; border-radius:8px; color:#922f2a; background:#fff0ee; font-size:11px; line-height:1.55; }
 .team-conflict-alert strong { font-size:12px; }
 .team-conflict-alert span::before { content:"• "; }
