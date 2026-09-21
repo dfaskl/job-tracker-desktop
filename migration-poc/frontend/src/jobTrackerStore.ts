@@ -33,9 +33,9 @@ let mailInboxPromise: Promise<void> | null = null
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
 
-function refresh(throwOnError = false, reportError = true) {
+function refresh(throwOnError = false, reportError = true, blockPage = true) {
   if (refreshPromise) return refreshPromise
-  loading.value = true
+  if (blockPage) loading.value = true
   refreshPromise = (async () => {
     try {
       const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
@@ -54,7 +54,7 @@ function refresh(throwOnError = false, reportError = true) {
       if (reportError) error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
       if (throwOnError) throw cause
     } finally {
-      loading.value = false
+      if (blockPage) loading.value = false
       initialized.value = true
       refreshPromise = null
     }
