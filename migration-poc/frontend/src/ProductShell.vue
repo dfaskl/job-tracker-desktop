@@ -305,13 +305,13 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .sidebar {
     width: 76px;
     padding: 20px 10px 18px;
-    transition: width .56s cubic-bezier(.22,1,.36,1), box-shadow .42s ease;
+    transition: width .82s cubic-bezier(.22,1,.36,1), box-shadow .58s ease;
   }
   .sidebar:hover,
   .sidebar:focus-within { width: 232px; box-shadow: 10px 0 34px rgba(16,61,65,.19); }
   .product-main {
     margin-left: 76px;
-    transition: margin-left .56s cubic-bezier(.22,1,.36,1);
+    transition: margin-left .82s cubic-bezier(.22,1,.36,1);
   }
   .product-shell:has(.sidebar:hover) .product-main,
   .product-shell:has(.sidebar:focus-within) .product-main { margin-left: 232px; }
@@ -320,7 +320,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .brand div {
     opacity: 0;
     transform: translateX(-10px);
-    transition: opacity .26s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
+    transition: opacity .38s ease .16s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
     white-space: nowrap;
   }
   .sidebar:hover .brand div,
@@ -331,11 +331,11 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .nav-copy {
     opacity: 0;
     transform: translateX(-10px);
-    transition: opacity .24s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
+    transition: opacity .36s ease .18s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
     visibility: hidden;
     white-space: nowrap;
   }
-  .nav-arrow { opacity: 0; transform: translateX(-7px); transition: opacity .24s ease .12s, transform .42s cubic-bezier(.22,1,.36,1) .08s; }
+  .nav-arrow { opacity: 0; transform: translateX(-7px); transition: opacity .36s ease .2s, transform .62s cubic-bezier(.22,1,.36,1) .12s; }
   .sidebar:hover .nav-copy,
   .sidebar:focus-within .nav-copy { opacity: 1; transform: translateX(0); visibility: visible; }
   .sidebar:hover .nav-arrow,
@@ -346,7 +346,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
     transform: translateX(-10px);
     visibility: hidden;
     pointer-events: none;
-    transition: opacity .24s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
+    transition: opacity .36s ease .18s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
   }
   .sidebar:hover .sidebar-account,
   .sidebar:focus-within .sidebar-account {
