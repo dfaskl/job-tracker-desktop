@@ -304,69 +304,55 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 @media (min-width: 821px) {
   .sidebar {
     width: 76px;
-    padding: 16px 10px;
-    transition: width .32s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease;
+    padding: 20px 10px 18px;
+    transition: width .56s cubic-bezier(.22,1,.36,1), box-shadow .42s ease;
   }
   .sidebar:hover,
   .sidebar:focus-within { width: 232px; box-shadow: 10px 0 34px rgba(16,61,65,.19); }
   .product-main {
     margin-left: 76px;
-    transition: margin-left .32s cubic-bezier(.2,.8,.2,1);
+    transition: margin-left .56s cubic-bezier(.22,1,.36,1);
   }
   .product-shell:has(.sidebar:hover) .product-main,
   .product-shell:has(.sidebar:focus-within) .product-main { margin-left: 232px; }
-  .brand { justify-content: center; padding-inline: 7px; }
+  /* Keep the brand and every nav icon on a fixed horizontal rail. */
+  .brand { justify-content: flex-start; padding-inline: 9px; }
   .brand div {
-    width: 0;
-    max-width: 0;
-    overflow: hidden;
     opacity: 0;
-    transform: translateX(-7px);
-    transition: max-width .24s ease, opacity .18s ease, transform .24s ease;
+    transform: translateX(-10px);
+    transition: opacity .26s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
     white-space: nowrap;
   }
-  .sidebar:hover .brand,
-  .sidebar:focus-within .brand { justify-content: flex-start; padding-inline: 9px; }
   .sidebar:hover .brand div,
-  .sidebar:focus-within .brand div { width: auto; max-width: 150px; opacity: 1; transform: translateX(0); }
-  nav { margin-top: 14px; }
-  nav button { justify-content: center; gap: 0; padding-inline: 7px; }
+  .sidebar:focus-within .brand div { opacity: 1; transform: translateX(0); }
+  /* A top-anchored grid makes item Y positions independent from account visibility. */
+  nav { align-content: start; gap: clamp(16px, 2.5vh, 26px); margin: 14px 0 12px; }
+  nav button { justify-content: flex-start; gap: 11px; padding-inline: 10px; }
   .nav-copy {
-    width: 0;
-    max-width: 0;
-    flex: 0 0 0;
-    overflow: hidden;
     opacity: 0;
-    transform: translateX(-7px);
-    transition: max-width .24s ease, opacity .16s ease, transform .24s ease;
+    transform: translateX(-10px);
+    transition: opacity .24s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
+    visibility: hidden;
     white-space: nowrap;
   }
-  .nav-arrow { width: 0; overflow: hidden; }
-  nav button.has-badge { padding-right: 7px; }
-  .nav-badge { top: 4px; right: 5px; }
-  .sidebar:hover nav button,
-  .sidebar:focus-within nav button { justify-content: flex-start; gap: 11px; padding-inline: 10px; }
+  .nav-arrow { opacity: 0; transform: translateX(-7px); transition: opacity .24s ease .12s, transform .42s cubic-bezier(.22,1,.36,1) .08s; }
   .sidebar:hover .nav-copy,
-  .sidebar:focus-within .nav-copy { width: auto; max-width: 150px; flex: 1 1 auto; opacity: 1; transform: translateX(0); }
+  .sidebar:focus-within .nav-copy { opacity: 1; transform: translateX(0); visibility: visible; }
   .sidebar:hover .nav-arrow,
-  .sidebar:focus-within .nav-arrow { width: auto; overflow: visible; }
-  .sidebar:hover nav button.has-badge,
-  .sidebar:focus-within nav button.has-badge { padding-right: 40px; }
-  .sidebar:hover .nav-badge,
-  .sidebar:focus-within .nav-badge { right: 8px; }
+  .sidebar:focus-within .nav-arrow { opacity: .72; transform: translateX(0); }
+  /* Retain the account area's footprint so it never redistributes nav rows. */
   .sidebar-account {
-    max-height: 0;
-    overflow: hidden;
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(-10px);
+    visibility: hidden;
     pointer-events: none;
-    transition: max-height .25s ease, opacity .16s ease, transform .25s ease;
+    transition: opacity .24s ease .1s, transform .42s cubic-bezier(.22,1,.36,1) .06s;
   }
   .sidebar:hover .sidebar-account,
   .sidebar:focus-within .sidebar-account {
-    max-height: 150px;
     opacity: 1;
     transform: translateX(0);
+    visibility: visible;
     pointer-events: auto;
   }
 }
