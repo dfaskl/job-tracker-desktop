@@ -663,11 +663,11 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   width: max-content;
   min-width: 112px;
   flex: 0 0 auto;
-  grid-template-rows: 18px 18px auto;
+  grid-template-rows: 13px 18px auto;
   justify-items: center;
   padding: 0 9px;
 }
-.timeline-list time { color: var(--home-muted); font-size: 10px; }
+.timeline-list time { color: var(--home-muted); font-size: 10px; line-height: 13px; }
 .timeline-list i {
   z-index: 1;
   width: 12px;
