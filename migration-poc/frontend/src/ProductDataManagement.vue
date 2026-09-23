@@ -15,6 +15,9 @@ const linkQuery = ref('')
 const linkDetailsOpen = ref(false)
 const newCompany = ref('')
 const newUrl = ref('')
+const editingLink = ref<CompanyLink | null>(null)
+const editingCompany = ref('')
+const editingUrl = ref('')
 const sandbox = ref<SandboxStatus | null>(null)
 const clearConfirmation = ref('')
 const importFileName = ref('')
@@ -28,6 +31,12 @@ const filteredLinks = computed(() => {
   if (!q) return links.value
   return links.value.filter((item) => item.company.toLowerCase().includes(q) || item.url.toLowerCase().includes(q))
 })
+
+const exactNewLink = computed(() => {
+  const company = normalizeCompany(newCompany.value)
+  return company ? links.value.find(item => normalizeCompany(item.company) === company) || null : null
+})
+const similarNewLinks = computed(() => findSimilarCompanies(newCompany.value).filter(item => item !== exactNewLink.value))
 
 const exportName = computed(() => {
   const email = store.user.value?.email.replace(/[^a-z0-9._-]+/gi, '_') || 'job-tracker'
@@ -65,15 +74,76 @@ async function saveLinks(next: CompanyLink[]) {
   try {
     const result = await api<CompanyLinkResponse>('/api/poc/company-links', { method: 'POST', body: JSON.stringify({ items: next }) })
     links.value = result.items || []; linksUpdatedAt.value = result.updatedAt || ''; message.value = '公司官网库已保存'
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存公司链接失败' }
+    return true
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存公司链接失败'; return false }
   finally { loading.value = false }
 }
 async function addLink() {
   const company = newCompany.value.trim(), url = newUrl.value.trim()
   if (!company || !/^https?:\/\//i.test(url)) { error.value = '请填写公司名称和以 http:// 或 https:// 开头的网址'; return }
-  const next = links.value.filter(item => item.company.trim().toLowerCase() !== company.toLowerCase())
-  await saveLinks([...next, { company, url }].sort((a,b)=>a.company.localeCompare(b.company,'zh-CN')))
-  newCompany.value = ''; newUrl.value = ''
+  if (links.value.some(item => normalizeCompany(item.company) === normalizeCompany(company))) {
+    error.value = `“${company}”已存在，请在下方列表中编辑原记录`
+    return
+  }
+  const similar = findSimilarCompanies(company)
+  if (similar.length && !confirm(`检测到可能相似的公司：${similar.map(item => `“${item.company}”`).join('、')}。仍要新增“${company}”吗？`)) return
+  if (await saveLinks([...links.value, { company, url }].sort((a,b)=>a.company.localeCompare(b.company,'zh-CN')))) {
+    newCompany.value = ''; newUrl.value = ''
+  }
+}
+function normalizeCompany(value: string) {
+  return value.toLowerCase().replace(/[\s·•・()（）\[\]【】._-]+/g, '').replace(/(股份)?有限公司$|有限责任公司$|集团$|公司$/g, '')
+}
+function editDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= left.length; i += 1) {
+    let diagonal = previous[0]
+    previous[0] = i
+    for (let j = 1; j <= right.length; j += 1) {
+      const above = previous[j]
+      previous[j] = Math.min(previous[j] + 1, previous[j - 1] + 1, diagonal + (left[i - 1] === right[j - 1] ? 0 : 1))
+      diagonal = above
+    }
+  }
+  return previous[right.length]
+}
+function companySimilarity(left: string, right: string) {
+  const a = normalizeCompany(left), b = normalizeCompany(right)
+  if (!a || !b) return 0
+  if (a === b) return 1
+  if (Math.min(a.length, b.length) >= 2 && (a.includes(b) || b.includes(a))) return .82
+  return 1 - editDistance(a, b) / Math.max(a.length, b.length)
+}
+function findSimilarCompanies(company: string, excluded?: CompanyLink) {
+  const normalized = normalizeCompany(company)
+  if (normalized.length < 2) return []
+  return links.value
+    .filter(item => item !== excluded && companySimilarity(company, item.company) >= .58)
+    .sort((left, right) => companySimilarity(company, right.company) - companySimilarity(company, left.company))
+    .slice(0, 5)
+}
+function startEdit(item: CompanyLink) {
+  editingLink.value = item
+  editingCompany.value = item.company
+  editingUrl.value = item.url
+  error.value = ''
+}
+function cancelEdit() {
+  editingLink.value = null
+  editingCompany.value = ''
+  editingUrl.value = ''
+}
+async function saveEdit() {
+  const current = editingLink.value
+  const company = editingCompany.value.trim(), url = editingUrl.value.trim()
+  if (!current) return
+  if (!company || !/^https?:\/\//i.test(url)) { error.value = '请填写公司名称和以 http:// 或 https:// 开头的网址'; return }
+  if (links.value.some(item => item !== current && normalizeCompany(item.company) === normalizeCompany(company))) {
+    error.value = `“${company}”已存在，不能保存为重复公司`
+    return
+  }
+  const next = links.value.map(item => item === current ? { company, url } : item).sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))
+  if (await saveLinks(next)) cancelEdit()
 }
 async function removeLink(item: CompanyLink) {
   if (confirm(`确认删除“${item.company}”的官网链接吗？`)) await saveLinks(links.value.filter(value => value !== item))
@@ -205,9 +275,22 @@ function formatDate(value: string) {
       <div class="modal-heading"><div><span class="section-kicker">官网库详情</span><h2 id="company-links-title">公司官网库</h2></div><small>共 {{ links.length }} 条 · {{ formatDate(linksUpdatedAt) }}</small></div>
       <div class="link-panel">
         <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary icon-button" type="button" :disabled="loading" aria-label="刷新公司官网库" title="刷新列表" @click="loadLinks"><AppIcon name="refresh" /></button></div>
-        <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink"><input v-model="newCompany" aria-label="公司名称" placeholder="公司名称" required maxlength="120" /><input v-model="newUrl" type="url" aria-label="公司官网链接" placeholder="https://careers.example.com" required /><button :disabled="loading">添加 / 更新</button></form>
+        <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink">
+          <label><span>新增公司名称</span><input v-model="newCompany" placeholder="例如：蔚来" required maxlength="120" :aria-describedby="exactNewLink?'company-duplicate-warning':similarNewLinks.length?'company-similar-warning':undefined" /></label>
+          <label><span>公司官网网址</span><input v-model="newUrl" type="url" placeholder="https://careers.example.com" required /></label>
+          <button :disabled="loading||Boolean(exactNewLink)">新增公司</button>
+          <div v-if="exactNewLink" id="company-duplicate-warning" class="similar-warning duplicate-warning" role="alert"><AppIcon name="info" :size="16" /><span>已存在同名公司“<b>{{ exactNewLink.company }}</b>”，请在下方列表中编辑原记录。</span></div>
+          <div v-else-if="similarNewLinks.length" id="company-similar-warning" class="similar-warning" role="status"><AppIcon name="info" :size="16" /><span>可能已存在相似公司：<b v-for="(item,index) in similarNewLinks" :key="item.company">{{ index ? '、' : '' }}{{ item.company }}</b>。请先核对，提交时会再次确认。</span></div>
+        </form>
         <div v-if="filteredLinks.length" class="link-list">
-          <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`"><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><button v-if="sandbox?.enabled" class="link-delete icon-button compact-icon" type="button" :aria-label="`删除 ${item.company} 的官网链接`" title="删除链接" @click="removeLink(item)"><AppIcon name="trash" /></button></article>
+          <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`" :class="{editing:editingLink===item}">
+            <form v-if="editingLink===item" class="inline-link-editor" @submit.prevent="saveEdit">
+              <label><span>公司名称</span><input v-model="editingCompany" required maxlength="120" /></label>
+              <label><span>官网网址</span><input v-model="editingUrl" type="url" required /></label>
+              <div><button type="button" class="secondary" :disabled="loading" @click="cancelEdit">取消</button><button :disabled="loading">保存修改</button></div>
+            </form>
+            <template v-else><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><div v-if="sandbox?.enabled" class="link-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`编辑 ${item.company} 的官网信息`" title="编辑公司" @click="startEdit(item)"><AppIcon name="edit" /></button><button class="link-delete icon-button compact-icon" type="button" :aria-label="`删除 ${item.company} 的官网链接`" title="删除链接" @click="removeLink(item)"><AppIcon name="trash" /></button></div></template>
+          </article>
         </div>
         <div v-else class="notice">{{ linkQuery ? '没有匹配的公司官网。' : '当前账号没有可展示的公司链接。' }}</div>
       </div>
@@ -237,8 +320,11 @@ function formatDate(value: string) {
 .toolbar label, .tool-box label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .toolbar label { min-width: min(420px, 100%); }
 .link-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.link-editor { display: grid; grid-template-columns: 1fr 2fr auto; gap: 9px; }
+.link-editor { display: grid; grid-template-columns: 1fr 2fr auto; align-items:end; gap: 9px; padding:12px; border:1px solid var(--color-border); border-radius:10px; background:#f8fbfd; }
+.link-editor label,.inline-link-editor label{display:grid;gap:6px;min-width:0;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.link-editor label input,.inline-link-editor label input{width:100%}.link-editor>button{min-height:42px}.similar-warning{display:flex;grid-column:1/-1;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid #e7c77d;border-radius:8px;color:#78510d;background:#fff8e7;font-size:12px;line-height:1.5}.similar-warning svg{flex:none;margin-top:1px}.similar-warning b{color:inherit}
+.duplicate-warning{border-color:#efb4ae;color:#96332d;background:#fff2f0}
 .link-list article { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 13px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
+.link-list article.editing{grid-column:1/-1;border-color:color-mix(in srgb,var(--color-primary) 45%,var(--color-border));background:#f5fbfb}.link-actions{display:flex;flex:none;gap:8px}.inline-link-editor{display:grid;width:100%;grid-template-columns:1fr 2fr auto;align-items:end;gap:9px}.inline-link-editor>div{display:flex;gap:8px}.inline-link-editor>div button{white-space:nowrap}
 .link-list a { display: grid; flex: 1; gap: 5px; min-width: 0; color: inherit; text-decoration: none; }
 .link-list article:hover { border-color: var(--color-primary); background: #f4f6ff; }
 .link-delete { padding: 7px 9px; color: #a52d2d; background: #fceaea; }
@@ -258,7 +344,8 @@ function formatDate(value: string) {
 .danger-button { color: #fff; background: #b43232; }
 
 @media (max-width: 900px) {
-  .data-grid, .link-list, .link-editor { grid-template-columns: 1fr; }
+  .data-grid, .link-list, .link-editor, .inline-link-editor { grid-template-columns: 1fr; }
+  .inline-link-editor>div{justify-content:flex-end}
   .link-modal { min-height: calc(100vh - 32px); }
 }
 
