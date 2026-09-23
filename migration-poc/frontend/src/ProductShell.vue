@@ -13,13 +13,13 @@ import { useJobTrackerStore } from './jobTrackerStore'
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
 
 const pages: { id: Page; label: string; icon: string }[] = [
-  { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5z' },
-  { id: 'applications', label: '投递记录', icon: 'M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Zm2 5h8M8 13h8M8 17h5' },
-  { id: 'calendar', label: '日程', icon: 'M5 5h14a2 2 0 0 1 2 2v12H3V7a2 2 0 0 1 2-2Zm2-2v4m10-4v4M3 10h18M7 14h3m4 0h3m-10 3h3' },
-  { id: 'mail', label: '邮件识别', icon: 'M4 6h16v12H4zM4 7l8 6 8-6m-4-4v3m-1.5-1.5h3' },
-  { id: 'stats', label: '统计', icon: 'M4 20V10m5 10V4m6 16v-7m5 7V7' },
-  { id: 'settings', label: '设置', icon: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.5 1.5m-9 9L6 18m12 0-1.5-1.5m-9-9L6 6' },
-  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6zM9 12l2 2 4-4' }
+  { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6H9.5v6H5a1.5 1.5 0 0 1-1.5-1.5Z' },
+  { id: 'applications', label: '投递记录', icon: 'M9 4h6M9 3h6v3H9ZM7 5H5v16h14V5h-2M8 12l2 2 4-4M8 18h8' },
+  { id: 'calendar', label: '日程', icon: 'M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2ZM8 2v4m8-4v4M3 9h18M7 13h3m4 0h3m-10 4h3m4 0h3' },
+  { id: 'mail', label: '邮件识别', icon: 'M3 5h14v12H3ZM3 6l7 6 7-6M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm2.2 5.2L22 21' },
+  { id: 'stats', label: '统计', icon: 'M4 4v16h16M7 16l4-5 3 3 5-7M16 7h3v3' },
+  { id: 'settings', label: '设置', icon: 'M4 6h6m4 0h6M10 3v6M4 12h10m4 0h2M14 9v6M4 18h3m4 0h9M7 15v6' },
+  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2' }
 ]
 
 const pageComponents: Record<Page, Component> = {
@@ -236,7 +236,7 @@ nav button {
   transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s cubic-bezier(.2,.8,.2,1);
 }
 .nav-icon { position: relative; z-index: 1; display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid rgba(128,215,194,.14); border-radius: 10px; color: #8fdfcc; background: rgba(255,255,255,.045); transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
-.nav-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .nav-copy { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; align-items: center; }
 .nav-copy strong { font-family: "Noto Serif SC", "STKaiti", "KaiTi", serif; font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: .045em; text-shadow: 0 1px 10px rgba(143,223,204,.16); }
 .nav-arrow { position: relative; z-index: 1; flex: none; color: rgba(213,242,235,.36); font-size: 21px; line-height: 1; transform: translateX(-3px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
@@ -317,68 +317,6 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .page-content.admin-content :deep(.card) { margin-top: 0; }
 .product-main.settings-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
 .page-content.settings-content { height: auto; }
-
-@media (min-width: 821px) {
-  .sidebar {
-    width: 76px;
-    padding: 20px 10px 18px;
-    transition: width .82s cubic-bezier(.22,1,.36,1), box-shadow .58s ease;
-  }
-  .sidebar:hover,
-  .sidebar:focus-within { width: 232px; box-shadow: 10px 0 34px rgba(16,61,65,.19); }
-  .product-main {
-    margin-left: 76px;
-  }
-  /* Keep the brand and every nav icon on a fixed horizontal rail. */
-  .brand { justify-content: flex-start; padding-inline: 9px; }
-  .brand div {
-    opacity: 0;
-    transform: translateX(-10px);
-    transition: opacity .38s ease .16s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
-    white-space: nowrap;
-  }
-  .sidebar:hover .brand div,
-  .sidebar:focus-within .brand div { opacity: 1; transform: translateX(0); }
-  /* A top-anchored grid makes item Y positions independent from account visibility. */
-  nav { align-content: start; gap: clamp(16px, 2.5vh, 26px); margin: 14px 0 12px; }
-  nav button { justify-content: flex-start; gap: 11px; padding-inline: 10px; }
-  .nav-copy {
-    opacity: 0;
-    transform: translateX(-10px);
-    transition: opacity .36s ease .18s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
-    visibility: hidden;
-    white-space: nowrap;
-  }
-  .nav-arrow { opacity: 0; transform: translateX(-7px); transition: opacity .36s ease .2s, transform .62s cubic-bezier(.22,1,.36,1) .12s; }
-  .sidebar:hover .nav-copy,
-  .sidebar:focus-within .nav-copy { opacity: 1; transform: translateX(0); visibility: visible; }
-  .sidebar:hover .nav-arrow,
-  .sidebar:focus-within .nav-arrow { opacity: .72; transform: translateX(0); }
-  .theme-toggle { width:100%; }
-  .theme-toggle-copy {
-    opacity:0;
-    transform:translateX(-10px);
-    visibility:hidden;
-    transition:opacity .36s ease .18s,transform .62s cubic-bezier(.22,1,.36,1) .1s;
-  }
-  .sidebar:hover .theme-toggle-copy,
-  .sidebar:focus-within .theme-toggle-copy { opacity:1; transform:translateX(0); visibility:visible; }
-  /* Retain the account area's footprint so it never redistributes nav rows. */
-  .sidebar-account {
-    opacity: 0;
-    transform: translateX(-10px);
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity .36s ease .18s, transform .62s cubic-bezier(.22,1,.36,1) .1s;
-  }
-  .sidebar:hover .sidebar-account,
-  .sidebar:focus-within .sidebar-account {
-    opacity: 1;
-    transform: translateX(0);
-    visibility: visible;
-    pointer-events: auto;
-  }
-}
 
 @media (max-width: 1200px) {
   .product-main.settings-page-shell, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
