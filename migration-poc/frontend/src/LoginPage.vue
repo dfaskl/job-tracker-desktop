@@ -33,7 +33,6 @@ const illustrationState = computed(() => ({
 }))
 
 function trackPointer(event: PointerEvent) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   pointerX.value = Math.max(-1, Math.min(1, event.clientX / window.innerWidth * 2 - 1))
   pointerY.value = Math.max(-1, Math.min(1, event.clientY / window.innerHeight * 2 - 1))
 }
@@ -130,5 +129,5 @@ async function switchMode() {
 @keyframes login-blink{0%,47%,51%,100%{transform:scaleY(1)}49%{transform:scaleY(.12)}}
 @media(max-width:980px){.login-page{grid-template-columns:1fr}.login-story{display:none}.login-entry{min-height:100dvh;height:auto;padding:92px 24px 44px}.mobile-brand{display:flex;justify-content:center;margin-bottom:46px}.mobile-brand>span{background:#f5f5f4}.tech-badge{top:18px;right:18px}.entry-heading{margin-bottom:34px}}
 @media(max-width:480px){.login-entry{padding-inline:18px}.entry-heading h2{font-size:28px}.mobile-brand{margin-bottom:38px}.mobile-brand strong{font-size:17px}.tech-badge span{display:none}.tech-badge{padding:9px}.entry-inner form{gap:18px}}
-@media(prefers-reduced-motion:reduce){.character-stage,.creature,.face,.two-eyes b,.login-submit>span{transition:none}.creature,.two-eyes i,.mouth{animation:none}}
+@media(prefers-reduced-motion:reduce){.character-stage,.creature,.face,.two-eyes b,.login-submit>span{transition-duration:.01ms!important}.creature{animation-name:creature-float-reduced!important;animation-duration:6s!important;animation-iteration-count:infinite!important;animation-timing-function:ease-in-out!important}.two-eyes i{animation:none!important}.mouth{animation-duration:.01ms!important}@keyframes creature-float-reduced{0%,100%{translate:0 0}50%{translate:0 -5px}}}
 </style>
