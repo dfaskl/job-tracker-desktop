@@ -313,6 +313,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .page-content.admin-content { height: 100vh; }
 .page-content :deep(.card) { margin-top: 18px; }
 .page-content.admin-content :deep(.card) { margin-top: 0; }
+.page-content.stats-content :deep(.analytics-layout > .interview-panel.card) { margin-top: 0; }
 .product-main.settings-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
 .page-content.settings-content { height: auto; }
 
