@@ -121,9 +121,11 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
     <div v-else-if="loading" class="card loading-panel">正在读取管理员数据…</div>
     <p v-if="message" class="success feedback" role="status">{{message}}</p><p v-if="error" class="danger feedback" role="alert">{{error}}</p>
 
+    <Teleport to="body">
     <div v-if="selected" class="modal-backdrop" @click.self="selected=null">
       <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-detail-title"><button class="modal-close icon-button" aria-label="关闭用户详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button><header><div class="avatar large">{{selected.email.slice(0,1).toUpperCase()}}</div><div><span>用户详情</span><h2 id="admin-user-detail-title">{{selected.email}}</h2><p>{{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
     </div>
+    </Teleport>
   </section>
 </template>
 

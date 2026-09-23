@@ -378,6 +378,7 @@ async function remove(item: EventItem) {
           </div>
         </aside>
       </div>
+      <Teleport to="body">
       <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
         <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
           <button type="button" class="modal-close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="resetForm"><AppIcon name="close" /></button>
@@ -394,6 +395,7 @@ async function remove(item: EventItem) {
           <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="resetForm">取消</button></div>
         </form>
       </div>
+      </Teleport>
     </template>
 
     <p v-else>正在检查日程沙箱…</p>

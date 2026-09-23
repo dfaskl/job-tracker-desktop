@@ -269,6 +269,7 @@ function formatDate(value: string) {
     <p v-if="error" class="danger" role="alert">{{ error }}</p>
   </section>
 
+  <Teleport to="body">
   <div v-if="linkDetailsOpen" class="link-backdrop" @click.self="linkDetailsOpen=false">
     <section class="link-modal" role="dialog" aria-modal="true" aria-labelledby="company-links-title">
       <button type="button" class="modal-close icon-button" aria-label="关闭公司官网库" title="关闭" @click="linkDetailsOpen=false"><AppIcon name="close" /></button>
@@ -296,6 +297,7 @@ function formatDate(value: string) {
       </div>
     </section>
   </div>
+  </Teleport>
 </template>
 
 <style scoped>

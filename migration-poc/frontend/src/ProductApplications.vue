@@ -269,6 +269,7 @@ async function removeEvent(item:JobEvent){
 </section>
 <div v-if="message||error" class="feedback" :class="{danger:error}">{{error||message}} <button v-if="undo" @click="undoDelete">撤销删除</button></div>
 
+<Teleport to="body">
 <div v-if="selected&&!editing&&!eventEditor" class="backdrop" @click.self="selected=null">
   <section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="application-detail-title">
     <button class="close icon-button" aria-label="关闭投递详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button>
@@ -298,11 +299,16 @@ async function removeEvent(item:JobEvent){
     <div v-if="selectedTimeline.length" class="history-list"><article v-for="(item,index) in selectedTimeline" :key="String(item.id||index)"><i></i><div><strong>{{text(item.title,'状态更新')}}</strong><span>{{text(item.at,'')}}</span></div></article></div><p v-else class="empty">暂无历史。</p>
   </section>
 </div>
+</Teleport>
+<Teleport to="body">
 <div v-if="editing" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="application-editor-title" @submit.prevent="saveApplication"><button type="button" class="close icon-button" aria-label="关闭投递编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="application-editor-title">{{selected?'编辑投递':'新建投递'}}</h2>
 <label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段</span><BaseSelect v-model="form.stage" :options="stages" /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" rows="4"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+</Teleport>
 
+<Teleport to="body">
 <div v-if="eventEditor&&selected" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="schedule-editor-title" @submit.prevent="saveEvent"><button type="button" class="close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="schedule-editor-title">{{editingEvent?'编辑日程':'新增关联日程'}}</h2>
 <ScheduleTimeModeNotice class="wide" :mode="eventForm.timeMode" /><label><span>类型</span><BaseSelect v-model="eventForm.type" :options="eventTypes" /></label><label><span>名称 *</span><input v-model="eventForm.title" required placeholder="如：一面"></label><label><span>时间类型</span><BaseSelect v-model="eventForm.timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label><label><span>{{eventForm.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="eventForm.startsAt" type="datetime-local" required></label><label v-if="eventForm.timeMode==='range'"><span>结束时间 *</span><input v-model="eventForm.endsAt" type="datetime-local" :min="eventForm.startsAt" required></label><label class="wide"><span>地点 / 链接</span><input v-model="eventForm.location"></label><label class="wide"><span>备注</span><textarea v-model="eventForm.notes" rows="3"></textarea></label><div class="actions wide"><button :disabled="busy">{{editingEvent?'保存日程':'创建日程'}}</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+</Teleport>
 </template>
 
 <style scoped>
