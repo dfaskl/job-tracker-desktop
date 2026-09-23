@@ -301,6 +301,76 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .product-main.settings-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
 .page-content.settings-content { height: auto; }
 
+@media (min-width: 821px) {
+  .sidebar {
+    width: 76px;
+    padding: 16px 10px;
+    transition: width .32s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease;
+  }
+  .sidebar:hover,
+  .sidebar:focus-within { width: 232px; box-shadow: 10px 0 34px rgba(16,61,65,.19); }
+  .product-main {
+    margin-left: 76px;
+    transition: margin-left .32s cubic-bezier(.2,.8,.2,1);
+  }
+  .product-shell:has(.sidebar:hover) .product-main,
+  .product-shell:has(.sidebar:focus-within) .product-main { margin-left: 232px; }
+  .brand { justify-content: center; padding-inline: 7px; }
+  .brand div {
+    width: 0;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-7px);
+    transition: max-width .24s ease, opacity .18s ease, transform .24s ease;
+    white-space: nowrap;
+  }
+  .sidebar:hover .brand,
+  .sidebar:focus-within .brand { justify-content: flex-start; padding-inline: 9px; }
+  .sidebar:hover .brand div,
+  .sidebar:focus-within .brand div { width: auto; max-width: 150px; opacity: 1; transform: translateX(0); }
+  nav { margin-top: 14px; }
+  nav button { justify-content: center; gap: 0; padding-inline: 7px; }
+  .nav-copy {
+    width: 0;
+    max-width: 0;
+    flex: 0 0 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-7px);
+    transition: max-width .24s ease, opacity .16s ease, transform .24s ease;
+    white-space: nowrap;
+  }
+  .nav-arrow { width: 0; overflow: hidden; }
+  nav button.has-badge { padding-right: 7px; }
+  .nav-badge { top: 4px; right: 5px; }
+  .sidebar:hover nav button,
+  .sidebar:focus-within nav button { justify-content: flex-start; gap: 11px; padding-inline: 10px; }
+  .sidebar:hover .nav-copy,
+  .sidebar:focus-within .nav-copy { width: auto; max-width: 150px; flex: 1 1 auto; opacity: 1; transform: translateX(0); }
+  .sidebar:hover .nav-arrow,
+  .sidebar:focus-within .nav-arrow { width: auto; overflow: visible; }
+  .sidebar:hover nav button.has-badge,
+  .sidebar:focus-within nav button.has-badge { padding-right: 40px; }
+  .sidebar:hover .nav-badge,
+  .sidebar:focus-within .nav-badge { right: 8px; }
+  .sidebar-account {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-8px);
+    pointer-events: none;
+    transition: max-height .25s ease, opacity .16s ease, transform .25s ease;
+  }
+  .sidebar:hover .sidebar-account,
+  .sidebar:focus-within .sidebar-account {
+    max-height: 150px;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
 @media (max-width: 1200px) {
   .product-main.settings-page-shell, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content.settings-content, .page-content.mail-content { height: auto; }
