@@ -40,6 +40,40 @@
   --sidebar-active: linear-gradient(105deg, #168c9e, #2b9d8c);
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e5f1ee;
+  background: #0d1e21;
+  --color-primary: #45c0cc;
+  --color-on-primary: #071719;
+  --color-secondary: #78d0ae;
+  --color-accent: #f4b266;
+  --color-background: #0d1e21;
+  --color-foreground: #e5f1ee;
+  --color-card: #152b2e;
+  --color-card-foreground: #e5f1ee;
+  --color-muted: #213b3d;
+  --color-muted-foreground: #b7cbc7;
+  --color-border: #35595a;
+  --color-border-strong: #54807b;
+  --color-destructive: #ff7770;
+  --color-ring: #70d6dd;
+  --color-success: #78d0a8;
+  --color-warning: #f0b15d;
+  --color-paper: #172d30;
+  --color-canvas: #0d1e21;
+  --color-rail: #35595a;
+  --color-progress: #78d0a8;
+  --color-deadline: #efae58;
+  --color-stage: #ada3ef;
+  --accent: #45c0cc;
+  --sidebar: #102f33;
+  --sidebar-active: linear-gradient(105deg, #187f8b, #247865);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .28);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, .46);
+  --shadow-float: 0 16px 38px rgba(0, 0, 0, .32);
+}
+
 * { box-sizing: border-box; }
 [tabindex="-1"]:focus { outline:none; }
 html { min-width: 320px; scroll-padding-top: 120px; overscroll-behavior-y: none; }
@@ -173,6 +207,51 @@ body {
     linear-gradient(rgba(22,140,158,.028) 1px, transparent 1px),
     linear-gradient(90deg, rgba(22,140,158,.028) 1px, transparent 1px);
   background-size: 32px 32px;
+}
+:root[data-theme="dark"] body {
+  background-image:
+    linear-gradient(rgba(108,214,210,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(108,214,210,.045) 1px, transparent 1px);
+}
+:root[data-theme="dark"] #app :is(.card, .modal, .detail-modal, .link-modal, .password-dialog, .mail-help-dialog, .link-editor, .link-list article, .tool-box, .notice, .metrics-row div, .account-list article, .provider-guides > article, .mail-cards article, .application-match, .event-record, .application, .day, .calendar-pane, .month-card, .selected-card, .backup-list article, .users-card article, .empty-state, .empty, .feedback, .basic-info) {
+  color: var(--color-card-foreground);
+  background-color: var(--color-card);
+}
+:root[data-theme="dark"] #app :is(.account-email, .event-body p, .commit-box, .application-match, .selected-card article.completed, .day.muted, .inbox-empty) { background-color: var(--color-muted); }
+:root[data-theme="dark"] #app :is(.modal-close, .close, .secondary, .text-button, .text-link, .password-launch, .help-trigger, .mailbox-button) { color: var(--color-primary); background-color: var(--color-muted); }
+:root[data-theme="dark"] #app :is(.application, .event-record, .mail-cards article, .account-list article, .provider-guides > article, .link-list article, .tool-box, .metrics-row div, .calendar-pane, .month-card, .day, .selected-card article, .backup-list article, .users-card article) { border-color: var(--color-border); }
+:root[data-theme="dark"] #app :is(.basic-info strong, .event-body > strong, .event-date strong, .provider-guides ol) { color: var(--color-card-foreground); }
+:root[data-theme="dark"] #app :is(.empty-state, .empty) { background-image: none; }
+#app .sidebar button.theme-toggle { color: #d5f2eb; }
+#app .sidebar button.theme-toggle:hover { color: #fff; }
+:root[data-theme="dark"] #app .home-dashboard {
+  --home-ink: var(--color-foreground);
+  --home-muted: var(--color-muted-foreground);
+  --home-paper: var(--color-card);
+  --home-line: var(--color-border);
+}
+:root[data-theme="dark"] #app :is(.quote-strip, .timeline-column, .details-column, .member-legend, .timeline-user-card, .schedule-advice, .advice-timeline) {
+  border-color: var(--color-border);
+  color: var(--color-card-foreground);
+  background: var(--color-card);
+}
+:root[data-theme="dark"] #app :is(.timeline-user-card.is-self, .compact-advice, .column-heading > span) {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
+}
+:root[data-theme="dark"] #app :is(.summary-grid article, .registration, .health-grid > div, .registration-code, .group-manager, .group-list > span) {
+  border-color: var(--color-border);
+  color: var(--color-card-foreground);
+  background: var(--color-card);
+}
+:root[data-theme="dark"] #app .interview-list article.is-active {
+  --record-bg: color-mix(in srgb, var(--color-success) 14%, var(--color-card));
+  border-color: color-mix(in srgb, var(--color-success) 48%, var(--color-border));
+  background: var(--record-bg);
+}
+:root[data-theme="dark"] #app .interview-list article.is-ended {
+  --record-bg: color-mix(in srgb, var(--color-destructive) 12%, var(--color-card));
+  border-color: color-mix(in srgb, var(--color-destructive) 44%, var(--color-border));
+  background: var(--record-bg);
 }
 ::selection { color: #fff; background: var(--color-primary); }
 #app { min-height: 100vh; }

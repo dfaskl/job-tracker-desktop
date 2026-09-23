@@ -36,6 +36,7 @@ const activePage = ref<Page>('home')
 const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
+const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
 let workspaceRefreshTimer: number | undefined
 
 function routeFromHash() {
@@ -72,6 +73,14 @@ function navigate(page: Page, applicationId?: string) {
 
 function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') mobileMenuOpen.value = false
+}
+
+function toggleTheme() {
+  const nextTheme = theme.value === 'light' ? 'dark' : 'light'
+  theme.value = nextTheme
+  if (nextTheme === 'dark') document.documentElement.dataset.theme = 'dark'
+  else delete document.documentElement.dataset.theme
+  try { localStorage.setItem('job-tracker-theme', nextTheme) } catch { /* Keep the selected theme for this session. */ }
 }
 
 function refreshWorkspaceData(syncMail = false) {
@@ -114,6 +123,10 @@ onBeforeUnmount(() => {
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
+      <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
+        <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="19" />
+        <span class="theme-toggle-copy">{{ theme === 'dark' ? '浅色模式' : '暗色模式' }}</span>
+      </button>
       <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
     </aside>
 
@@ -254,6 +267,10 @@ nav button.active::before {
 nav button.active .nav-icon { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.08); }
 nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .sidebar :is(button,a):focus-visible { outline: 3px solid rgba(255,194,116,.72); outline-offset: 2px; }
+.theme-toggle { position:relative; z-index:1; display:flex; width:100%; min-height:44px; flex:none; align-items:center; justify-content:flex-start; gap:11px; padding:7px 10px; overflow:hidden; border:1px solid rgba(184,239,226,.15); border-radius:10px; color:#d5f2eb; background:rgba(255,255,255,.045); box-shadow:inset 0 1px rgba(255,255,255,.04); }
+.theme-toggle:hover { color:#fff; background:rgba(255,255,255,.1); }
+.theme-toggle svg { flex:none; }
+.theme-toggle-copy { min-width:0; overflow:hidden; font-size:14px; white-space:nowrap; }
 .sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; flex: none; align-items: center; justify-content: center; }
 @keyframes nav-group-in { from { transform: translateX(-7px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 232px; padding: 0 38px 64px; }
@@ -337,6 +354,15 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .sidebar:focus-within .nav-copy { opacity: 1; transform: translateX(0); visibility: visible; }
   .sidebar:hover .nav-arrow,
   .sidebar:focus-within .nav-arrow { opacity: .72; transform: translateX(0); }
+  .theme-toggle { width:100%; }
+  .theme-toggle-copy {
+    opacity:0;
+    transform:translateX(-10px);
+    visibility:hidden;
+    transition:opacity .36s ease .18s,transform .62s cubic-bezier(.22,1,.36,1) .1s;
+  }
+  .sidebar:hover .theme-toggle-copy,
+  .sidebar:focus-within .theme-toggle-copy { opacity:1; transform:translateX(0); visibility:visible; }
   /* Retain the account area's footprint so it never redistributes nav rows. */
   .sidebar-account {
     opacity: 0;
@@ -400,6 +426,9 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
   .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .theme-toggle { position:static; grid-column:1 / -1; width:100%; min-width:0; max-height:0; min-height:0; margin:0; padding:0 10px; opacity:0; transform:translateY(-6px); pointer-events:none; transition:max-height .25s ease, margin .25s ease, opacity .2s ease, transform .25s ease; }
+  .theme-toggle-copy { opacity:1; transform:none; visibility:visible; }
+  .menu-open .theme-toggle { max-height:52px; min-height:44px; margin-top:6px; opacity:1; transform:translateY(0); pointer-events:auto; }
   .sidebar-account { position: static; grid-column: 1 / -1; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height .25s ease, margin .25s ease, opacity .2s ease, transform .25s ease; }
   .menu-open .sidebar-account { max-height: 72px; margin-top: 6px; opacity: 1; transform: translateY(0); }
   .sidebar-account :deep(.signed.compact) { display: flex; width: auto; min-width: 0; padding: 5px 7px; flex-direction: row; }
