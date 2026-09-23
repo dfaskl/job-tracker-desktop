@@ -311,10 +311,7 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .sidebar:focus-within { width: 232px; box-shadow: 10px 0 34px rgba(16,61,65,.19); }
   .product-main {
     margin-left: 76px;
-    transition: margin-left .82s cubic-bezier(.22,1,.36,1);
   }
-  .product-shell:has(.sidebar:hover) .product-main,
-  .product-shell:has(.sidebar:focus-within) .product-main { margin-left: 232px; }
   /* Keep the brand and every nav icon on a fixed horizontal rail. */
   .brand { justify-content: flex-start; padding-inline: 9px; }
   .brand div {
