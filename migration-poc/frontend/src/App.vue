@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
         <svg class="journey-route" viewBox="0 0 190 112" focusable="false">
           <defs>
             <linearGradient id="journey-gradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stop-color="#168e89" />
+              <stop offset="0" stop-color="#7f6f59" />
               <stop offset=".72" stop-color="#55bcae" />
               <stop offset="1" stop-color="#f0a24b" />
             </linearGradient>
@@ -148,11 +148,11 @@ onBeforeUnmount(() => {
 .journey-loader{position:relative;width:190px;height:158px}
 .journey-route{position:absolute;top:0;left:0;width:100%;height:112px;overflow:visible}
 .route-bed,.route-drawn{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.route-bed{stroke:rgba(22,142,137,.12);stroke-width:5}
-.route-drawn{stroke:url(#journey-gradient);stroke-width:4;stroke-dasharray:1;stroke-dashoffset:1;filter:drop-shadow(0 2px 5px rgba(22,142,137,.26));animation:route-draw 2.45s cubic-bezier(.45,0,.2,1) infinite}
-.route-node{fill:#effaf7;stroke:#168e89;stroke-width:2;opacity:.38;transform:scale(.82);transform-box:fill-box;transform-origin:center;animation:route-node-pulse 2.45s ease-in-out infinite both}
+.route-bed{stroke:rgba(127,111,89,.14);stroke-width:5}
+.route-drawn{stroke:url(#journey-gradient);stroke-width:4;stroke-dasharray:1;stroke-dashoffset:1;filter:drop-shadow(0 2px 5px rgba(127,111,89,.28));animation:route-draw 2.45s cubic-bezier(.45,0,.2,1) infinite}
+.route-node{fill:#fffaf0;stroke:#7f6f59;stroke-width:2;opacity:.38;transform:scale(.82);transform-box:fill-box;transform-origin:center;animation:route-node-pulse 2.45s ease-in-out infinite both}
 .node-middle{animation-delay:.55s}.node-finish{stroke:#f0a24b;animation-delay:1.2s}
-.journey-beacon{position:absolute;left:0;top:0;width:12px;height:12px;border:2px solid rgba(255,255,255,.94);border-radius:50%;background:#168e89;box-shadow:0 0 0 5px rgba(22,142,137,.13),0 0 17px rgba(22,142,137,.72);offset-path:path("M14 83 C40 45 60 102 91 68 C121 35 145 51 176 80");offset-anchor:center;animation:beacon-travel 2.45s cubic-bezier(.45,0,.2,1) infinite}
+.journey-beacon{position:absolute;left:0;top:0;width:12px;height:12px;border:2px solid rgba(255,255,255,.94);border-radius:50%;background:#7f6f59;box-shadow:0 0 0 5px rgba(127,111,89,.14),0 0 17px rgba(127,111,89,.62);offset-path:path("M14 83 C40 45 60 102 91 68 C121 35 145 51 176 80");offset-anchor:center;animation:beacon-travel 2.45s cubic-bezier(.45,0,.2,1) infinite}
 .journey-logo{position:absolute;top:0;left:50%;z-index:3;display:grid;width:60px;height:60px;place-items:center;border:1px solid rgba(255,255,255,.9);border-radius:19px;background:rgba(255,255,255,.83);box-shadow:0 13px 30px rgba(20,93,91,.2),inset 0 1px 0 rgba(255,255,255,.95);animation:logo-float 1.8s ease-in-out infinite}
 .journey-logo::after{content:"";position:absolute;right:8px;bottom:7px;width:8px;height:8px;border-radius:50%;background:#f0a24b;box-shadow:0 0 0 4px rgba(240,162,75,.15),0 0 12px rgba(240,162,75,.62);animation:logo-signal 1.8s ease-in-out infinite}
 .journey-logo img{width:48px;height:48px;border-radius:14px;filter:drop-shadow(0 6px 9px rgba(20,93,91,.16))}

@@ -106,7 +106,7 @@ function timelineFromEvents(events:Record<string,unknown>[]) {
   }
   return [...groups.values()].sort((a,b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`))
 }
-const memberColors=['#168c9e','#3e77c5','#d07832','#8662b8','#c84f64','#4f8b45','#b360a8','#697a2c']
+const memberColors=['#7f6f59','#3e77c5','#d07832','#8662b8','#c84f64','#4f8b45','#b360a8','#697a2c']
 const timelineMembers=computed(()=>sharedTimelines.value.map((user,index)=>({
   ...user,name:displayName(user.displayName,user.email),color:memberColors[index%memberColors.length]
 })).filter(user=>user.events?.length))
@@ -314,10 +314,10 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 
 <style scoped>
 .home-dashboard {
-  --home-ink: #16233a;
-  --home-muted: #68788d;
-  --home-paper: #fcfdfb;
-  --home-line: #d8e1e8;
+  --home-ink: var(--color-foreground);
+  --home-muted: var(--color-muted-foreground);
+  --home-paper: var(--color-card);
+  --home-line: var(--color-border);
   --home-progress: #19725a;
   --home-deadline: #d07832;
   display: grid;

@@ -2,26 +2,26 @@
 
 :root {
   font-family: "Fira Sans", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-  color: #173e42;
-  background: #f5faf8;
+  color: #292720;
+  background: #f5f0e6;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --color-primary: #168c9e;
+  --color-primary: #28251f;
   --color-on-primary: #fff;
-  --color-secondary: #69c3a5;
-  --color-accent: #f2a65a;
-  --color-background: #f5faf8;
-  --color-foreground: #173e42;
-  --color-card: #fff;
-  --color-card-foreground: #173e42;
-  --color-muted: #e8f2ef;
-  --color-muted-foreground: #526a68;
-  --color-border: #c7e1db;
-  --color-border-strong: #8fcbbf;
+  --color-secondary: #8b8173;
+  --color-accent: #6f6253;
+  --color-background: #f5f0e6;
+  --color-foreground: #292720;
+  --color-card: #fffdf7;
+  --color-card-foreground: #292720;
+  --color-muted: #ece5d8;
+  --color-muted-foreground: #686257;
+  --color-border: #d8cfc0;
+  --color-border-strong: #bdae99;
   --color-destructive: #dc2626;
-  --color-ring: #168c9e;
-  --color-success: #2f8b68;
-  --color-warning: #bd712b;
+  --color-ring: #6f6659;
+  --color-success: #357c5f;
+  --color-warning: #a96727;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -31,47 +31,49 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --shadow-sm: 0 1px 2px rgba(23, 75, 79, .06);
-  --shadow-lg: 0 18px 48px rgba(23, 75, 79, .17);
+  --shadow-sm: 0 1px 2px rgba(63, 50, 32, .08);
+  --shadow-lg: 0 18px 48px rgba(63, 50, 32, .16);
   --control-height: 44px;
   --font-button: "Nunito", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-  --accent: #168c9e;
-  --sidebar: #174b4f;
-  --sidebar-active: linear-gradient(105deg, #168c9e, #2b9d8c);
+  --accent: #28251f;
+  --sidebar: #0c0d0f;
+  --sidebar-top: #181a1d;
+  --sidebar-active: linear-gradient(105deg, #292b2f, #414348);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  color: #e5f1ee;
-  background: #0d1e21;
-  --color-primary: #45c0cc;
-  --color-on-primary: #071719;
-  --color-secondary: #78d0ae;
-  --color-accent: #f4b266;
-  --color-background: #0d1e21;
-  --color-foreground: #e5f1ee;
-  --color-card: #152b2e;
-  --color-card-foreground: #e5f1ee;
-  --color-muted: #213b3d;
-  --color-muted-foreground: #b7cbc7;
-  --color-border: #35595a;
-  --color-border-strong: #54807b;
+  color: #f4f1e9;
+  background: #08090b;
+  --color-primary: #eee6d7;
+  --color-on-primary: #0a0b0d;
+  --color-secondary: #a7a095;
+  --color-accent: #c8bba7;
+  --color-background: #08090b;
+  --color-foreground: #f4f1e9;
+  --color-card: #12151a;
+  --color-card-foreground: #f4f1e9;
+  --color-muted: #1b2027;
+  --color-muted-foreground: #b6b1a8;
+  --color-border: #303640;
+  --color-border-strong: #4a525e;
   --color-destructive: #ff7770;
-  --color-ring: #70d6dd;
-  --color-success: #78d0a8;
-  --color-warning: #f0b15d;
-  --color-paper: #172d30;
-  --color-canvas: #0d1e21;
-  --color-rail: #35595a;
-  --color-progress: #78d0a8;
-  --color-deadline: #efae58;
-  --color-stage: #ada3ef;
-  --accent: #45c0cc;
-  --sidebar: #102f33;
-  --sidebar-active: linear-gradient(105deg, #187f8b, #247865);
+  --color-ring: #d8cfbf;
+  --color-success: #70c09e;
+  --color-warning: #e7aa61;
+  --color-paper: #12151a;
+  --color-canvas: #08090b;
+  --color-rail: #303640;
+  --color-progress: #70c09e;
+  --color-deadline: #e2a158;
+  --color-stage: #a9a0e8;
+  --accent: #eee6d7;
+  --sidebar: #080b0e;
+  --sidebar-top: #11161a;
+  --sidebar-active: linear-gradient(105deg, #292b30, #3a3b3f);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .28);
   --shadow-lg: 0 18px 48px rgba(0, 0, 0, .46);
-  --shadow-float: 0 16px 38px rgba(0, 0, 0, .32);
+  --shadow-float: 0 16px 38px rgba(0, 0, 0, .48);
 }
 
 * { box-sizing: border-box; }
@@ -152,7 +154,7 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
   padding: var(--card-padding, clamp(16px, 1.25vw, 24px));
   box-shadow: var(--shadow-sm);
 }
-#app :is(.secondary, .text-button, .text-link) { color: #176e77; background: #e5f3f1; }
+#app :is(.secondary, .text-button, .text-link) { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-card)); }
 #app :is(.danger, .error) { color: var(--color-destructive); }
 #app .danger-button { color: #fff; background: var(--color-destructive); }
 #app .success { color: var(--color-success); }
@@ -164,14 +166,14 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 #app button.success-button { color: #126b3a; background: #e5f6ec; }
 #app button.warning-button { color: #7a4707; background: #fff0cf; }
 #app button:is(.event-delete, .link-delete, .danger-outline) { color: #a52d2d; background: #fff5f4; }
-#app button:is(.close, .modal-close) { color: #40546c; background: #edf3f7; }
+#app button:is(.close, .modal-close) { color: var(--color-muted-foreground); background: var(--color-muted); }
 #app button.application,
 #app button.day,
 #app .backup-list button,
 #app button.select-trigger,
 #app button.select-option { color: var(--color-card-foreground); font-family: inherit; letter-spacing: normal; }
 #app button.brand { color: inherit; }
-#app nav button { color: #d5f2eb; }
+#app nav button { color: #ebe4d8; }
 #app nav button.active,
 #app nav button:hover,
 #app button.menu-toggle { color: #fff; }
@@ -179,7 +181,7 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 #app button.select-option.active,
 #app button.select-option.selected { color: var(--color-primary); }
 #app .eyebrow, #app .section-kicker { color: var(--color-primary); }
-#app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: rgba(13, 55, 57, .58); backdrop-filter: blur(4px); }
+#app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: color-mix(in srgb, #08090b 62%, transparent); backdrop-filter: blur(4px); }
 #app :is(.modal, .detail-modal, .link-modal) { border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); }
 #app :is(.feedback, .global-operation-toast) { font-size: 14px; }
 
@@ -192,26 +194,26 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 }
 /* Career workspace visual system */
 :root {
-  --color-paper: #fcfefc;
-  --color-canvas: #eff8f5;
-  --color-rail: #d2e9e3;
-  --color-progress: #2f8b68;
-  --color-deadline: #d88738;
+  --color-paper: #fffdf7;
+  --color-canvas: #f3ede1;
+  --color-rail: #ded4c3;
+  --color-progress: #357c5f;
+  --color-deadline: #bd7532;
   --color-stage: #6f66b6;
   --radius-panel: 14px;
-  --shadow-float: 0 16px 38px rgba(23, 75, 79, .10);
+  --shadow-float: 0 16px 38px rgba(63, 50, 32, .11);
 }
 body {
   background-color: var(--color-canvas);
   background-image:
-    linear-gradient(rgba(22,140,158,.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(22,140,158,.028) 1px, transparent 1px);
+    linear-gradient(rgba(74,61,43,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(74,61,43,.035) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 :root[data-theme="dark"] body {
   background-image:
-    linear-gradient(rgba(108,214,210,.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(108,214,210,.045) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
 }
 :root[data-theme="dark"] #app :is(.card, .modal, .detail-modal, .link-modal, .password-dialog, .mail-help-dialog, .link-editor, .link-list article, .tool-box, .notice, .metrics-row div, .account-list article, .provider-guides > article, .mail-cards article, .application-match, .event-record, .application, .day, .calendar-pane, .month-card, .selected-card, .backup-list article, .users-card article, .empty-state, .empty, .feedback, .basic-info) {
   color: var(--color-card-foreground);
@@ -222,7 +224,7 @@ body {
 :root[data-theme="dark"] #app :is(.application, .event-record, .mail-cards article, .account-list article, .provider-guides > article, .link-list article, .tool-box, .metrics-row div, .calendar-pane, .month-card, .day, .selected-card article, .backup-list article, .users-card article) { border-color: var(--color-border); }
 :root[data-theme="dark"] #app :is(.basic-info strong, .event-body > strong, .event-date strong, .provider-guides ol) { color: var(--color-card-foreground); }
 :root[data-theme="dark"] #app :is(.empty-state, .empty) { background-image: none; }
-#app .sidebar button.theme-toggle { color: #d5f2eb; }
+#app .sidebar button.theme-toggle { color: #ebe4d8; }
 #app .sidebar button.theme-toggle:hover { color: #fff; }
 :root[data-theme="dark"] #app .home-dashboard {
   --home-ink: var(--color-foreground);
@@ -307,7 +309,7 @@ body {
 #app .mail-toolbar { padding-left:14px; border-left:3px solid var(--color-primary); }
 #app .source-panel { border-top-color:var(--color-primary); }
 #app .review-panel { border-top-color:var(--color-progress); }
-#app .source-panel>textarea { background:linear-gradient(to bottom,transparent 31px,rgba(22,140,158,.055) 32px); background-size:100% 32px; line-height:32px; }
+#app .source-panel>textarea { background:linear-gradient(to bottom,transparent 31px,color-mix(in srgb,var(--color-foreground) 5%,transparent) 32px); background-size:100% 32px; line-height:32px; }
 #app .step { border-radius:50%; font-family:"Fira Code",monospace; }
 #app .settings-grid :is(.data-card,.backup-card,.api-card) { box-shadow:0 8px 24px rgba(23,75,79,.055); }
 #app .settings-grid .data-card { border-top-color:var(--color-primary); }
