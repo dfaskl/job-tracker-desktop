@@ -85,17 +85,19 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
               <div><i :class="['dot',overview.summary.adminEmailConfigured?'ok':'warn']"></i><span>管理员配置</span><b>{{overview.summary.adminEmailConfigured?'完整':'待配置'}}</b></div>
               <div><i :class="['dot',emptyDataUsers?'warn':'ok']"></i><span>空数据账号</span><b>{{emptyDataUsers}} 个</b></div>
             </div>
-            <div class="group-manager">
-              <div><strong>面试协作小组</strong><small>同组成员会在首页共享一个时间点日程轴</small></div>
-              <div class="group-create"><input v-model="newGroupName" maxlength="40" placeholder="例如：第一面试室" aria-label="新建协作小组名称" @keyup.enter="createGroup" /><button class="secondary" :disabled="busyUser==='group'||!newGroupName.trim()" @click="createGroup">新建</button></div>
-              <div v-if="overview.groups.length" class="group-list"><span v-for="group in overview.groups" :key="group.id"><b>{{group.name}}</b><small>{{group.memberCount}} 人</small><button class="danger-outline icon-button compact-icon" :disabled="busyUser==='group:'+group.id" :aria-label="'删除小组 '+group.name" :title="'删除小组 '+group.name" @click="deleteGroup(group)"><AppIcon name="trash" :size="16" /></button></span></div>
-              <p v-else class="hint">暂无小组，可先新建再为用户分配。</p>
-            </div>
           </section>
 
         </div>
 
-        <section class="card users-card">
+        <div class="users-column">
+          <section class="card group-manager group-manager-card">
+            <div><strong>面试协作小组</strong><small>同组成员会在首页共享一个时间点日程轴</small></div>
+            <div class="group-create"><input v-model="newGroupName" maxlength="40" placeholder="例如：第一面试室" aria-label="新建协作小组名称" @keyup.enter="createGroup" /><button class="secondary" :disabled="busyUser==='group'||!newGroupName.trim()" @click="createGroup">新建</button></div>
+            <div v-if="overview.groups.length" class="group-list"><span v-for="group in overview.groups" :key="group.id"><b>{{group.name}}</b><small>{{group.memberCount}} 人</small><button class="danger-outline icon-button compact-icon" :disabled="busyUser==='group:'+group.id" :aria-label="'删除小组 '+group.name" :title="'删除小组 '+group.name" @click="deleteGroup(group)"><AppIcon name="trash" :size="16" /></button></span></div>
+            <p v-else class="hint">暂无小组，可先新建再为用户分配。</p>
+          </section>
+
+          <section class="card users-card">
           <div class="section-title"><div><span>账号管理</span><h3>用户列表</h3></div><small>{{filteredUsers.length}} / {{overview.summary.totalUsers}}</small></div>
           <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户邮箱" placeholder="搜索用户邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>
           <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>
@@ -109,8 +111,9 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
             </article>
             <p v-if="!filteredUsers.length" class="empty">没有符合条件的用户</p>
 
-      </div>
-        </section>
+          </div>
+          </section>
+        </div>
 
         <section class="card audit-card">
         <div class="section-title"><div><span>操作审计</span><h3>最近操作</h3></div><small>最近 {{overview.audit.length}} 条</small></div>
@@ -135,6 +138,59 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .registration-code{display:grid;gap:6px;margin-top:9px;padding:12px;border:1px solid #e6eaf1;border-radius:10px;background:#fff}.registration-code label{font-size:12px;font-weight:800}.registration-code>small{color:var(--color-muted-foreground);font-size:10px}.registration-code-row{display:flex;gap:7px}.registration-code-row input{min-width:0;flex:1}.registration-code-row button{flex:none;padding:8px 10px}@media(max-width:480px){.registration-code-row{align-items:stretch;flex-wrap:wrap}.registration-code-row input{width:100%;flex-basis:100%}}
 .overview-column .control-card{overflow:auto}
 .group-manager{display:grid;gap:9px;margin-top:12px;padding:12px;border:1px solid #dfe7eb;border-radius:10px;background:color-mix(in srgb,var(--accent,var(--color-primary)) 3%,#fff)}.group-manager>div:first-child{display:grid;gap:3px}.group-manager>div:first-child small,.group-assignment>small{color:var(--color-muted-foreground);font-size:10px}.group-create{display:flex;gap:7px}.group-create input{min-width:0;flex:1}.group-create button{flex:none}.group-list{display:grid;gap:6px}.group-list>span{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:7px 8px;border:1px solid #e6ebef;border-radius:8px;background:#fff}.group-list b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-list small{color:var(--color-muted-foreground)}.group-list button{min-height:30px;padding:4px 8px;font-size:10px}.group-assignment{display:grid;width:148px;flex:0 0 148px;gap:3px}.group-assignment select{width:100%;height:34px;padding:0 28px 0 9px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-card-foreground);background:var(--color-card);font:inherit;font-size:11px;font-weight:600}.group-assignment select:focus-visible{outline:3px solid color-mix(in srgb,var(--color-ring) 15%,transparent);outline-offset:1px}@media(max-width:900px){.group-assignment{width:180px;flex-basis:180px}}@media(max-width:720px){.group-assignment{width:calc(100% - 48px);margin-left:48px;flex-basis:auto}}
+</style>
+<style scoped>
+.users-column {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.users-column .users-card {
+  flex: 1;
+}
+
+.registration-code-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 7px;
+}
+
+.registration-code-row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.registration-code-row button {
+  min-width: 50px;
+  padding: 8px 9px;
+  white-space: nowrap;
+}
+
+.group-manager-card {
+  margin: 0;
+}
+
+.group-manager-card .group-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+@media (max-width: 480px) {
+  .registration-code-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .registration-code-row input {
+    grid-column: 1 / -1;
+  }
+
+  .registration-code-row button {
+    width: 100%;
+  }
+}
 </style>
 <style scoped>
 :global(:root[data-theme="dark"]) .avatar {
