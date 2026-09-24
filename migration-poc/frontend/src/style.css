@@ -67,6 +67,24 @@
   --color-avatar-background: #30343b;
   --color-avatar-foreground: #fff4df;
   --color-avatar-border: #6c6457;
+  --application-pending-surface: #172433;
+  --application-pending-border: #466e9e;
+  --application-pending-accent: #6da7e6;
+  --application-interview-surface: #241d31;
+  --application-interview-border: #725c94;
+  --application-interview-accent: #aa8adb;
+  --application-assessment-surface: #2a2114;
+  --application-assessment-border: #80642f;
+  --application-assessment-accent: #e0a747;
+  --application-applied-surface: #1b211f;
+  --application-applied-border: #53635d;
+  --application-applied-accent: #91a29a;
+  --application-stopped-surface: #2a1b1d;
+  --application-stopped-border: #814b4a;
+  --application-stopped-accent: #dc7771;
+  --application-offer-surface: #15251d;
+  --application-offer-border: #3f7456;
+  --application-offer-accent: #67b486;
   --color-paper: #12151a;
   --color-canvas: #08090b;
   --color-rail: #303640;
@@ -427,6 +445,55 @@ body {
   color: var(--color-card-foreground) !important;
   background: var(--card-bg) !important;
   background-image: none !important;
+}
+:root[data-theme="dark"] #app .application.tone-pending {
+  --card-bg: var(--application-pending-surface);
+  --card-border: var(--application-pending-border);
+  --card-accent: var(--application-pending-accent);
+}
+:root[data-theme="dark"] #app .application.tone-interview {
+  --card-bg: var(--application-interview-surface);
+  --card-border: var(--application-interview-border);
+  --card-accent: var(--application-interview-accent);
+}
+:root[data-theme="dark"] #app .application.tone-assessment {
+  --card-bg: var(--application-assessment-surface);
+  --card-border: var(--application-assessment-border);
+  --card-accent: var(--application-assessment-accent);
+}
+:root[data-theme="dark"] #app .application.tone-applied {
+  --card-bg: var(--application-applied-surface);
+  --card-border: var(--application-applied-border);
+  --card-accent: var(--application-applied-accent);
+}
+:root[data-theme="dark"] #app .application.tone-stopped {
+  --card-bg: var(--application-stopped-surface);
+  --card-border: var(--application-stopped-border);
+  --card-accent: var(--application-stopped-accent);
+}
+:root[data-theme="dark"] #app .application.tone-offer {
+  --card-bg: var(--application-offer-surface);
+  --card-border: var(--application-offer-border);
+  --card-accent: var(--application-offer-accent);
+}
+:root[data-theme="dark"] #app .application[class*="tone-"] {
+  border-color: var(--card-border) !important;
+  border-left-color: var(--card-accent) !important;
+}
+:root[data-theme="dark"] #app .application-overview > em.health-good {
+  border: 1px solid var(--application-offer-border);
+  color: var(--application-offer-accent);
+  background: var(--application-offer-surface);
+}
+:root[data-theme="dark"] #app .application-overview > em.health-watch {
+  border: 1px solid var(--application-assessment-border);
+  color: var(--application-assessment-accent);
+  background: var(--application-assessment-surface);
+}
+:root[data-theme="dark"] #app .application-overview > em.health-risk {
+  border: 1px solid var(--application-stopped-border);
+  color: var(--application-stopped-accent);
+  background: var(--application-stopped-surface);
 }
 :root[data-theme="dark"] #app :is(.flow-node, .compact-node) {
   --node-soft: color-mix(in srgb, var(--node-color) 16%, #20242a);
