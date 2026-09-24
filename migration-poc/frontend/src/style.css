@@ -474,3 +474,63 @@ body {
   #app .mail-toolbar,#app .admin-head { padding-left:10px; }
   #app :is(.event-chip,.backup-list article,.users-card article):hover { box-shadow:none; }
 }
+
+/* Teleported overlays live under <body>, outside #app, so theme them explicitly. */
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) {
+  color: var(--color-foreground);
+  background: color-mix(in srgb, #08090b 72%, transparent) !important;
+  backdrop-filter: blur(5px);
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal) {
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-card-foreground) !important;
+  background: var(--color-card) !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .58) !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(
+  .basic-info,
+  .official-link-field,
+  .ai-review,
+  dl div,
+  .timeline article,
+  .event-record,
+  .registration,
+  .registration-code,
+  .group-manager,
+  .group-list > span,
+  .link-editor,
+  .link-list article
+) {
+  border-color: var(--color-border) !important;
+  color: var(--color-card-foreground) !important;
+  background: var(--color-muted) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.close, .modal-close) {
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-foreground) !important;
+  background: #24282e !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(input, textarea, select) {
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+  background: var(--color-muted) !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.company-icon, .event-body p) {
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+  background: #24282e !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(
+  .company-identity p,
+  .event-meta,
+  .event-date span,
+  .history-list span,
+  .detail-scroll span,
+  .detail-scroll time
+) {
+  color: var(--color-muted-foreground) !important;
+}
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.detail-actions, .detail-modal header, .detail-scroll > article) {
+  border-color: var(--color-border) !important;
+}
