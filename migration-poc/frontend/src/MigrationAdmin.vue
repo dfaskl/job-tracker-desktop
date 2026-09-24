@@ -324,10 +324,17 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 }
 </style>
 <style scoped>
+.avatar {
+  border: 1px solid var(--color-avatar-border);
+  color: var(--color-avatar-foreground);
+  background: var(--color-avatar-background);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-avatar-border) 18%, transparent);
+}
+
 :global(:root[data-theme="dark"]) .avatar {
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-foreground);
-  background: #2a2e34;
+  border-color: var(--color-avatar-border);
+  color: var(--color-avatar-foreground);
+  background: var(--color-avatar-background);
 }
 
 :global(:root[data-theme="dark"]) .identity span,

@@ -22,6 +22,9 @@
   --color-ring: #6f6659;
   --color-success: #357c5f;
   --color-warning: #a96727;
+  --color-avatar-background: #28251f;
+  --color-avatar-foreground: #fffdf7;
+  --color-avatar-border: #28251f;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -61,6 +64,9 @@
   --color-ring: #d8cfbf;
   --color-success: #70c09e;
   --color-warning: #e7aa61;
+  --color-avatar-background: #30343b;
+  --color-avatar-foreground: #fff4df;
+  --color-avatar-border: #6c6457;
   --color-paper: #12151a;
   --color-canvas: #08090b;
   --color-rail: #303640;
