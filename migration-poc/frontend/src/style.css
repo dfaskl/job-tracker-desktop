@@ -546,3 +546,35 @@ body {
   line-height: 1 !important;
   text-shadow: none !important;
 }
+
+:root[data-theme="dark"] #app .selected-list {
+  border-color: var(--color-border) !important;
+  color: var(--color-card-foreground) !important;
+  background: var(--color-card) !important;
+}
+:root[data-theme="dark"] #app .selected-list > h3 {
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+  background: var(--color-card) !important;
+}
+:root[data-theme="dark"] #app .selected-list .selected-scroll {
+  background: var(--color-card) !important;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+:root[data-theme="dark"] #app .selected-list article {
+  border-color: var(--event-color) !important;
+  color: var(--color-card-foreground) !important;
+  background: color-mix(in srgb, var(--event-color) 11%, var(--color-muted)) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] #app .selected-list .event-main strong {
+  color: var(--color-foreground) !important;
+}
+:root[data-theme="dark"] #app .selected-list .event-main span {
+  color: var(--color-muted-foreground) !important;
+}
+:root[data-theme="dark"] #app .selected-list .empty {
+  border-color: var(--color-border) !important;
+  color: var(--color-muted-foreground) !important;
+  background: var(--color-muted) !important;
+}
