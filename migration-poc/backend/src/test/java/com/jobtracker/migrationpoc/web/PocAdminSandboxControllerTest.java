@@ -2,6 +2,7 @@ package com.jobtracker.migrationpoc.web;
 
 import com.jobtracker.migrationpoc.database.AdminSandboxService;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.DisabledResult;
+import com.jobtracker.migrationpoc.database.AdminSandboxService.DisplayNameResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.RegistrationCodeResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.SessionResult;
 import com.jobtracker.migrationpoc.database.AdminSandboxService.GroupAssignmentResult;
@@ -75,6 +76,25 @@ class PocAdminSandboxControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(new DisabledResult(true, true));
         verify(service).setDisabled("admin@example.com", 9, true);
+    }
+
+    @Test
+    void updatesAUsersDisplayNameForAnAuthenticatedSameOriginRequest() throws Exception {
+        PocAuthController auth = mock(PocAuthController.class);
+        AdminSandboxService service = mock(AdminSandboxService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.setDisplayName("admin@example.com", 9, "小明"))
+            .thenReturn(new DisplayNameResult(true, "小明"));
+        PocAdminSandboxController controller = new PocAdminSandboxController(auth, service);
+
+        var response = controller.updateDisplayName(
+            "token", 9, new PocAdminSandboxController.DisplayNameRequest("小明"), sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new DisplayNameResult(true, "小明"));
+        verify(service).setDisplayName("admin@example.com", 9, "小明");
     }
 
     @Test

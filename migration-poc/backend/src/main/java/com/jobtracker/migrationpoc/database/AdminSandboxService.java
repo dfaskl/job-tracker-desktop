@@ -166,6 +166,33 @@ public class AdminSandboxService {
         }
     }
 
+    public DisplayNameResult setDisplayName(String adminEmail, long targetId, String displayName) throws Exception {
+        String cleanName = displayName == null ? "" : displayName.trim().replaceAll("\\s+", " ");
+        if (cleanName.isBlank() || cleanName.length() > 32) {
+            throw new AdminValidationException("昵称长度需为 1–32 个字符");
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "UPDATE users SET display_name=? WHERE id=?"
+                )) {
+                    statement.setString(1, cleanName);
+                    statement.setLong(2, target.id());
+                    if (statement.executeUpdate() != 1) throw new AdminNotFoundException("用户不存在");
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "update-display-name");
+                connection.commit();
+                return new DisplayNameResult(true, cleanName);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
     public RegistrationCodeResult setRegistrationCode(String adminEmail, String code, boolean clear) throws Exception {
         String clean = code == null ? "" : code.trim();
         if (!clear && (clean.length() < 4 || clean.length() > 128)) {
@@ -374,7 +401,7 @@ public class AdminSandboxService {
     }
 
     private List<UserView> users(Connection connection) throws Exception {
-        String sql = "SELECT u.id,u.email,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,"
+        String sql = "SELECT u.id,u.email,u.display_name,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,"
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
             + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
             + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
@@ -388,7 +415,7 @@ public class AdminSandboxService {
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     users.add(new UserView(
-                        String.valueOf(result.getLong("id")), result.getString("email"),
+                        String.valueOf(result.getLong("id")), result.getString("email"), result.getString("display_name"),
                         result.getBoolean("is_admin"), result.getObject("disabled_at") != null,
                         string(result.getObject("disabled_at")), string(result.getObject("created_at")),
                         string(result.getObject("last_active_at")), result.getInt("application_count"),
@@ -597,7 +624,7 @@ public class AdminSandboxService {
     public record Summary(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
                           int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
                           boolean adminEmailConfigured) {}
-    public record UserView(String id, String email, boolean isAdmin, boolean disabled, String disabledAt,
+    public record UserView(String id, String email, String displayName, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
                            boolean hasApiKey, String groupId, String groupName) {}
     public record GroupView(String id, String name, int memberCount) {}
@@ -613,6 +640,7 @@ public class AdminSandboxService {
     public record RegistrationResult(boolean ok, boolean registrationOpen) {}
     public record RegistrationCodeResult(boolean ok, boolean registrationCodeEnabled) {}
     public record DisabledResult(boolean ok, boolean disabled) {}
+    public record DisplayNameResult(boolean ok, String displayName) {}
     public record SessionResult(boolean ok, int revoked) {}
     public record DeleteResult(boolean ok) {}
     public record GroupResult(boolean ok, String groupId) {}

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import BaseSelect from './BaseSelect.vue'
 import { trackedJsonFetch } from './requestActivity'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
-type User={id:string;email:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
+type User={id:string;email:string;displayName:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
 type InterviewGroup={id:string;name:string;memberCount:number}
 type Audit={id:string;action:string;targetEmail:string;createdAt:string}
 type ApplicationDetail={id:string;company:string;position:string;stage:string;status:string;appliedDate:string;city:string;channel:string;flow:{at:string;title:string}[]}
@@ -15,11 +15,12 @@ const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selec
 const query=ref(''),stateFilter=ref('all'),sortMode=ref('group'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
 const registrationCode=ref('')
 const newGroupName=ref('')
-const actionLabels:Record<string,string>={'disable-user':'停用账号','enable-user':'启用账号','delete-user':'删除账号','open-registration':'开放注册','close-registration':'关闭注册','set-registration-code':'设置注册码','clear-registration-code':'清除注册码','view-user-details':'查看用户详情','revoke-sessions':'撤销登录会话','create-interview-group':'创建协作小组','delete-interview-group':'删除协作小组','assign-interview-group':'分配协作小组','remove-interview-group':'移出协作小组','migrate-completed-ranges':'迁移旧时间段日程'}
+const editingNameId=ref(''),displayNameDraft=ref(''),displayNameError=ref('')
+const actionLabels:Record<string,string>={'disable-user':'停用账号','enable-user':'启用账号','delete-user':'删除账号','open-registration':'开放注册','close-registration':'关闭注册','set-registration-code':'设置注册码','clear-registration-code':'清除注册码','view-user-details':'查看用户详情','revoke-sessions':'撤销登录会话','update-display-name':'修改用户昵称','create-interview-group':'创建协作小组','delete-interview-group':'删除协作小组','assign-interview-group':'分配协作小组','remove-interview-group':'移出协作小组','migrate-completed-ranges':'迁移旧时间段日程'}
 const users=computed(()=>overview.value?.users||[])
 const filteredUsers=computed(()=>{
   const keyword=query.value.trim().toLowerCase()
-  const result=users.value.filter(user=>(!keyword||user.email.toLowerCase().includes(keyword))&&(stateFilter.value==='all'||stateFilter.value==='admin'&&user.isAdmin||stateFilter.value==='enabled'&&!user.disabled||stateFilter.value==='disabled'&&user.disabled))
+  const result=users.value.filter(user=>(!keyword||user.email.toLowerCase().includes(keyword)||(user.displayName||'').toLowerCase().includes(keyword))&&(stateFilter.value==='all'||stateFilter.value==='admin'&&user.isAdmin||stateFilter.value==='enabled'&&!user.disabled||stateFilter.value==='disabled'&&user.disabled))
   const email=(user:User)=>user.email.toLowerCase(),domain=(user:User)=>email(user).split('@')[1]||'',created=(user:User)=>{const time=Date.parse(user.createdAt);return Number.isFinite(time)?time:0}
   return [...result].sort((a,b)=>{
     if(sortMode.value==='email-domain')return domain(a).localeCompare(domain(b),'zh-CN')||email(a).localeCompare(email(b),'zh-CN')
@@ -44,6 +45,9 @@ async function clearRegistrationCode(){if(!confirm('清除后，新用户注册�
 async function openDetails(user:User){selected.value=user;detail.value=null;busyUser.value=user.id;error.value='';try{detail.value=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/details`) as UserDetails;await loadOverview()}catch(cause){selected.value=null;error.value=failure(cause,'读取用户详情失败')}finally{busyUser.value=''}}
 async function setDisabled(user:User){busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({disabled:!user.disabled})});await loadOverview();message.value=user.disabled?'账号已启用':'账号已停用并撤销会话'}catch(cause){error.value=failure(cause,'修改账号状态失败')}finally{busyUser.value=''}}
 async function revokeSessions(user:User){if(!confirm(`确认让 ${user.email} 的所有设备重新登录吗？`))return;busyUser.value=user.id;error.value='';try{const result=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/sessions/revoke`,{method:'PATCH'});await loadOverview();message.value=`已撤销 ${Number(result.revoked||0)} 个登录会话`}catch(cause){error.value=failure(cause,'撤销会话失败')}finally{busyUser.value=''}}
+async function beginDisplayNameEdit(user:User){editingNameId.value=user.id;displayNameDraft.value=user.displayName||user.email.split('@')[0]||'';displayNameError.value='';await nextTick();document.getElementById('display-name-'+user.id)?.focus()}
+function cancelDisplayNameEdit(){editingNameId.value='';displayNameDraft.value='';displayNameError.value=''}
+async function saveDisplayName(user:User){const displayName=displayNameDraft.value.trim().replace(/\s+/g,' ');if(!displayName||displayName.length>32){displayNameError.value='请输入 1–32 个字符';return}busyUser.value=user.id;displayNameError.value='';error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}/display-name`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName})});await loadOverview();cancelDisplayNameEdit();message.value=`已将昵称修改为 ${displayName}`}catch(cause){displayNameError.value=failure(cause,'修改昵称失败')}finally{busyUser.value=''}}
 async function createGroup(){const name=newGroupName.value.trim();if(!name){error.value='请输入小组名称';return}busyUser.value='group';error.value='';try{await requestJson('/api/poc/admin-sandbox/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});newGroupName.value='';await loadOverview();message.value='协作小组已创建'}catch(cause){error.value=failure(cause,'创建小组失败')}finally{busyUser.value=''}}
 async function deleteGroup(group:InterviewGroup){if(!confirm(`删除“${group.name}”后，${group.memberCount} 名成员将变为未分组，日程数据不会删除。确认继续吗？`))return;busyUser.value='group:'+group.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/groups/${group.id}`,{method:'DELETE'});await loadOverview();message.value='协作小组已删除'}catch(cause){error.value=failure(cause,'删除小组失败')}finally{busyUser.value=''}}
 async function assignGroup(user:User,value:string){if(value===user.groupId)return;busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}/group`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({groupId:value?Number(value):null})});await loadOverview();message.value=value?'用户已加入协作小组':'用户已移出协作小组'}catch(cause){error.value=failure(cause,'分配小组失败')}finally{busyUser.value=''}}
@@ -98,12 +102,22 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 
           <section class="card users-card">
           <div class="section-title"><div><span>账号管理</span><h3>用户列表</h3></div><small>{{filteredUsers.length}} / {{overview.summary.totalUsers}}</small></div>
-          <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户邮箱" placeholder="搜索用户邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>
+          <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户昵称或邮箱" placeholder="搜索用户昵称或邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>
           <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>
           <div class="user-scroll">
             <article v-for="user in filteredUsers" :key="user.id" :class="{disabled:user.disabled}">
-              <div class="avatar">{{user.email.slice(0,1).toUpperCase()}}</div>
-              <div class="identity"><strong>{{user.email}}</strong><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span></div>
+              <div class="avatar">{{(user.displayName||user.email).slice(0,1).toUpperCase()}}</div>
+              <div class="identity">
+                <div v-if="editingNameId===user.id" class="display-name-editor">
+                  <input :id="'display-name-'+user.id" v-model="displayNameDraft" maxlength="32" autocomplete="nickname" :aria-invalid="Boolean(displayNameError)" :aria-describedby="displayNameError?'display-name-error-'+user.id:undefined" aria-label="用户昵称" @keyup.enter="saveDisplayName(user)" @keyup.esc="cancelDisplayNameEdit" />
+                  <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="保存昵称" title="保存昵称" @click="saveDisplayName(user)"><AppIcon name="check" :size="15" /></button>
+                  <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="取消修改昵称" title="取消" @click="cancelDisplayNameEdit"><AppIcon name="close" :size="15" /></button>
+                  <small v-if="displayNameError" :id="'display-name-error-'+user.id" class="field-error" role="alert">{{displayNameError}}</small>
+                </div>
+                <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
+                <small class="user-email" :title="user.email">{{user.email}}</small>
+                <span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span>
+              </div>
               <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
               <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
               <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
@@ -125,7 +139,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 
     <Teleport to="body">
     <div v-if="selected" class="modal-backdrop" @click.self="selected=null">
-      <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-detail-title"><button class="modal-close icon-button" aria-label="关闭用户详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button><header><div class="avatar large">{{selected.email.slice(0,1).toUpperCase()}}</div><div><span>用户详情</span><h2 id="admin-user-detail-title">{{selected.email}}</h2><p>{{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
+      <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-detail-title"><button class="modal-close icon-button" aria-label="关闭用户详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button><header><div class="avatar large">{{(selected.displayName||selected.email).slice(0,1).toUpperCase()}}</div><div><span>用户详情</span><h2 id="admin-user-detail-title">{{selected.displayName||selected.email.split('@')[0]}}</h2><p>{{selected.email}} · {{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
     </div>
     </Teleport>
   </section>
@@ -149,6 +163,75 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   flex: none;
   align-items: center;
   justify-content: flex-end;
+}
+
+.identity-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.identity-heading strong,
+.user-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-heading strong {
+  font-size: 14px;
+}
+
+.user-email {
+  display: block;
+  color: var(--color-muted-foreground);
+  font-size: 10px;
+}
+
+.edit-name-button {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  color: var(--color-muted-foreground);
+  background: transparent;
+  border-color: transparent;
+}
+
+.edit-name-button:hover,
+.edit-name-button:focus-visible {
+  color: var(--color-card-foreground);
+  border-color: var(--color-border);
+}
+
+.display-name-editor {
+  display: grid;
+  min-width: 190px;
+  grid-template-columns: minmax(110px, 1fr) 32px 32px;
+  gap: 5px;
+}
+
+.display-name-editor input {
+  min-width: 0;
+  height: 32px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.display-name-editor button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.display-name-editor .field-error {
+  grid-column: 1 / -1;
+  color: var(--color-destructive, #c33b36);
+  font-size: 10px;
 }
 
 .users-column {

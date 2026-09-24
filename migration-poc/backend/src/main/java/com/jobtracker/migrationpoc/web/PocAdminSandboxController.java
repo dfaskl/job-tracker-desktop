@@ -125,6 +125,24 @@ public class PocAdminSandboxController {
         }
     }
 
+    @PatchMapping("/users/{id}/display-name")
+    public ResponseEntity<?> updateDisplayName(
+        @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) DisplayNameRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.displayName() == null) return error(HttpStatus.BAD_REQUEST, "请输入用户昵称");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setDisplayName(user.get().email(), id, body.displayName()));
+        } catch (Exception exception) {
+            return mapException("update-display-name", exception);
+        }
+    }
+
     @PatchMapping("/users/{id}/sessions/revoke")
     public ResponseEntity<?> revokeSessions(
         @CookieValue(value = PocAuthController.COOKIE_NAME, required = false) String token,
@@ -250,6 +268,7 @@ public class PocAdminSandboxController {
     public record RegistrationRequest(Boolean enabled) {}
     public record RegistrationCodeRequest(String code, Boolean clear) {}
     public record UserStateRequest(Boolean disabled) {}
+    public record DisplayNameRequest(String displayName) {}
     public record GroupRequest(String name) {}
     public record GroupAssignmentRequest(Long groupId) {}
     public record DeleteUserRequest(String confirmEmail) {}
