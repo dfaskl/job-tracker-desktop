@@ -578,3 +578,27 @@ body {
   color: var(--color-muted-foreground) !important;
   background: var(--color-muted) !important;
 }
+
+@media (min-width: 1251px) and (min-height: 620px) {
+  html:has(#app .admin-page-shell),
+  body:has(#app .admin-page-shell) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app .admin-page-shell,
+  #app .admin-content {
+    height: 100dvh !important;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden !important;
+  }
+
+  #app .admin-shell {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+}

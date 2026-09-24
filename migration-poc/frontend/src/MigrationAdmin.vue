@@ -151,6 +151,18 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   flex: 1;
 }
 
+.users-column,
+.users-card,
+.audit-card {
+  overflow: hidden;
+}
+
+.user-scroll,
+.audit-scroll {
+  flex: 1;
+  overscroll-behavior: contain;
+}
+
 .registration-code-row {
   display: grid;
   width: 100%;
@@ -171,7 +183,11 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 }
 
 .group-manager-card {
+  max-height: 210px;
+  flex: none;
   margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .group-manager-card .group-list {
