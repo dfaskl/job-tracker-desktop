@@ -14,7 +14,6 @@ const status = ref<AiStatus | null>(null)
 const mailBody = ref('')
 const result = reactive({ company: '', position: '', noticeType: '其他', scheduleTitle: '', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
 const hasResult = ref(false)
-const createSchedule = ref(true)
 const timeMode = ref<'point' | 'range'>('point')
 const loading = ref(false)
 const saving = ref(false)
@@ -38,7 +37,7 @@ const recommendedApplications = computed(() => rankedApplications.value.filter(i
 const otherApplications = computed(() => rankedApplications.value.filter(item => !isRecommendedApplication(item)))
 const canCreateSchedule = computed(() => Boolean(result.startsAt) && result.noticeType !== '未通过')
 const actionSummary = computed(() => hasResult.value
-  ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${createSchedule.value && canCreateSchedule.value ? '，并创建关联日程' : ''}`
+  ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${canCreateSchedule.value ? '，并自动创建关联日程' : ''}`
   : '')
 
 watch(selectedApplicationId, () => {
@@ -149,7 +148,6 @@ async function recognize() {
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
     timeMode.value = value.endsAt ? 'range' : 'point'
-    createSchedule.value = Boolean(value.startsAt) && value.noticeType !== '未通过'
     message.value = '识别完成，请核对后确认录入'
   } catch (cause) { error.value = failure(cause, '邮件识别失败') }
   finally { loading.value = false }
@@ -166,16 +164,16 @@ function applicationPayload(item?: JobApplication) {
 async function saveResult() {
   const matched = matchedApplication.value
   if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
-  if(createSchedule.value&&canCreateSchedule.value&&timeMode.value==='range'&&!result.endsAt){error.value='时间段日程必须填写结束时间';return}
+  if(canCreateSchedule.value&&timeMode.value==='range'&&!result.endsAt){error.value='时间段日程必须填写结束时间';return}
   const startTime=result.startsAt?new Date(result.startsAt).getTime():NaN,endTime=result.endsAt?new Date(result.endsAt).getTime():NaN
-  if(createSchedule.value&&timeMode.value==='range'&&(!Number.isFinite(startTime)||!Number.isFinite(endTime)||endTime<=startTime)){error.value='结束时间必须晚于开始时间';return}
+  if(canCreateSchedule.value&&timeMode.value==='range'&&(!Number.isFinite(startTime)||!Number.isFinite(endTime)||endTime<=startTime)){error.value='结束时间必须晚于开始时间';return}
   saving.value = true; error.value = ''; message.value = ''
   try {
     const response = matched
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
     let duplicateSchedule=false
-    if (createSchedule.value && canCreateSchedule.value) {
+    if (canCreateSchedule.value) {
       const eventType=result.noticeType==='其他'?'其他':result.noticeType
       const startsAt=apiTime(result.startsAt),endsAt=timeMode.value==='range'?apiTime(result.endsAt):''
       duplicateSchedule=store.events.value.some(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
@@ -187,7 +185,7 @@ async function saveResult() {
       }) })
     }
     await store.refresh()
-    message.value = duplicateSchedule ? `已${matched ? '更新投递' : '新建投递'}；相同日程已存在，未重复创建` : `已${matched ? '更新投递' : '新建投递'}${createSchedule.value && canCreateSchedule.value ? '并创建日程' : ''}，写入前备份已自动生成`
+    message.value = duplicateSchedule ? `已${matched ? '更新投递' : '新建投递'}；相同日程已存在，未重复创建` : `已${matched ? '更新投递' : '新建投递'}${canCreateSchedule.value ? '并自动创建关联日程' : ''}，写入前备份已自动生成`
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
@@ -222,7 +220,7 @@ async function saveResult() {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult">
-          <label class="wide application-match"><span>关联已有投递</span><BaseSelect v-model="selectedApplicationId" :options="[{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{matchedApplication ? '将更新该投递的阶段和状态，并把识别出的日程关联到它。' : '未自动匹配时可手动选择；确实是新岗位再保留“不关联”。'}}</small></label>
+          <label class="wide application-match"><span>关联已有投递</span><BaseSelect v-model="selectedApplicationId" :options="[{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{matchedApplication ? '将更新该投递的阶段和状态；识别出有效时间时会自动创建关联日程。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><BaseSelect v-model="result.noticeType" :options="noticeTypes" /></label>
@@ -233,7 +231,6 @@ async function saveResult() {
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
           <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
-          <label v-if="canCreateSchedule" class="check wide"><input v-model="createSchedule" type="checkbox" /><span>同时创建关联日程</span></label>
           <div class="commit-box wide"><span>{{ actionSummary }}</span><button :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
         </form>
         <div v-else class="empty-state"><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div>
@@ -274,8 +271,7 @@ async function saveResult() {
 .result-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
 .result-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .result-form .wide { grid-column: 1 / -1; }
-.application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:var(--color-muted-foreground);font-weight:400}.check { display: flex !important; align-items: center; }
-.check input { flex: none; width: 18px; }
+.application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:var(--color-muted-foreground);font-weight:400}
 .mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(260px, .82fr) minmax(300px, 1fr) minmax(380px, 1.28fr); gap: 16px; padding-bottom: 18px; }
 .inbox-panel, .compose-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
 .inbox-panel, .compose-panel { display: flex; flex-direction: column; }
