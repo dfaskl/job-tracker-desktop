@@ -117,8 +117,8 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
                 <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
                 <small class="user-email" :title="user.email">{{user.email}}</small>
                 <span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span>
+                <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
               </div>
-              <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
               <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
               <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
             </article>
@@ -172,7 +172,6 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   gap: 6px;
 }
 
-.identity-heading strong,
 .user-email {
   min-width: 0;
   overflow: hidden;
@@ -181,7 +180,13 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 }
 
 .identity-heading strong {
+  min-width: 0;
+  flex: 1;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
   font-size: 14px;
+  line-height: 1.35;
 }
 
 .user-email {
@@ -232,6 +237,22 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   grid-column: 1 / -1;
   color: var(--color-destructive, #c33b36);
   font-size: 10px;
+}
+
+.users-card .identity {
+  min-width: 220px;
+  flex: 1 1 280px;
+}
+
+.users-card .identity .counts {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.users-card .identity .counts span {
+  white-space: nowrap;
 }
 
 .users-column {
