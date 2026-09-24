@@ -196,10 +196,6 @@ async function saveResult() {
 
 <template>
   <section class="mail-page">
-    <div class="mail-toolbar">
-      <div><span class="eyebrow">智能录入</span><h2>从招聘通知中提取投递与日程</h2><p>粘贴完整通知，识别后先核对，再由你确认写入。</p></div>
-    </div>
-
     <div class="mail-grid">
       <section class="card inbox-panel">
         <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
@@ -266,11 +262,9 @@ async function saveResult() {
 </template>
 
 <style scoped>
-.mail-page { display: grid; height: 100%; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 18px; padding-top: 18px; box-sizing: border-box; overflow: hidden; }
-.mail-toolbar, .panel-title, .panel-title > div, .commit-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.mail-toolbar h2 { margin: 5px 0 4px; font-size: 24px; }
-.mail-toolbar p, .panel-title p { margin: 0; }
-.eyebrow { color: var(--color-primary); font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.mail-page { display: grid; height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr); padding-top: 18px; box-sizing: border-box; overflow: hidden; }
+.panel-title, .panel-title > div, .commit-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-title p { margin: 0; }
 .match-badge { padding: 7px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .match-badge { color: #4259bd; background: #edf1ff; }
 .text-button { padding: 7px 10px; color: var(--color-card-foreground); background: transparent; }
@@ -305,7 +299,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 @media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {
-  .mail-toolbar { align-items: flex-start; flex-direction: column; }
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
