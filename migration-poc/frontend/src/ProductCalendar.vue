@@ -136,3 +136,30 @@ function eventCompany(event: JobEvent) {
 <style scoped>
 .day{position:relative;display:flex;align-items:stretch;overflow:hidden;flex-direction:column;padding-top:30px}.day-number{position:absolute;top:7px;left:7px;display:grid;width:23px;height:23px;place-items:center}.day-events{--calendar-event-row-height:23px;display:grid;width:100%;min-height:0;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height);align-content:start}.day .event-overflow{position:absolute;right:6px;bottom:4px;color:var(--color-muted-foreground);font-size:11px;line-height:15px}@media(max-width:850px){.day{padding:27px 4px 4px}.day-number{top:4px;left:4px;width:20px;height:20px;font-size:11px}.day-events{--calendar-event-row-height:9px;row-gap:2px}.day-events>i{height:5px;padding:0;border-radius:99px;color:transparent;font-size:0;line-height:0}.day-events>i.start,.day-events>i.end{margin-inline:0;border-radius:99px}.day-events>i.middle{height:5px;margin-inline:-4px}.day .event-overflow{right:3px;bottom:2px;font-size:10px;line-height:11px}}
 </style>
+<style scoped>
+:global(:root[data-theme="dark"]) .selected-card,
+:global(:root[data-theme="dark"]) .selected-card > h2 {
+  color: var(--color-card-foreground);
+  background: var(--color-card) !important;
+}
+
+:global(:root[data-theme="dark"]) .selected-card article {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-card-foreground);
+  background: var(--color-muted) !important;
+}
+
+:global(:root[data-theme="dark"]) .selected-card article.completed {
+  color: var(--color-muted-foreground);
+  background: #181b20 !important;
+}
+
+:global(:root[data-theme="dark"]) .event-location a {
+  border-color: var(--color-border-strong);
+  color: var(--color-foreground);
+  background: #24282e;
+}
+</style>

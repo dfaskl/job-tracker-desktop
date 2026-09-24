@@ -329,3 +329,25 @@ async function removeEvent(item:JobEvent){
 @media(max-width:720px){.application-toolbar-portal,.application-filter-stack{box-sizing:border-box;width:100%;max-width:100%;min-width:0}.application-toolbar-portal{overflow:visible}.application-toolbar-portal .toolbar{margin:4px 0 0}.application-filter-fields{width:100%;grid-template-columns:minmax(0,1fr)}.application-filter-fields>*{width:100%;max-width:100%;min-width:0}.application-filter-fields :deep(.base-select),.application-filter-fields :deep(.select-trigger){width:100%;max-width:100%;min-width:0}.application-heatmap{width:100%;min-width:0;justify-content:space-between;gap:16px;padding:12px 2px 2px;border-top:1px solid #d9e0eb;border-left:0}.application-legend{width:100%;max-width:100%;flex-wrap:wrap;gap:6px 12px;margin:9px 0 0;padding:0 2px 3px;overflow:visible;white-space:normal}.application-legend>span{white-space:nowrap}.toolbar{width:100%;max-width:100%;min-width:0;align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{min-width:0;grid-template-columns:1fr}.application{width:100%;min-width:0;padding:16px 14px}.application-overview{align-items:flex-start;flex-direction:column}.application-title{min-width:0}.application-title strong{font-size:15px}.application-title>i{margin-inline:5px}.flow{width:100%;max-width:100%;scroll-snap-type:x proximity}.flow-node{scroll-snap-align:start}.form .wide,dl .wide{grid-column:auto}.detail-modal{width:100%;padding:22px 16px}.detail-title{margin-bottom:24px}.detail-company-row{align-items:flex-start}.company-name-line strong{font-size:21px}.detail-actions .push-right{margin-left:0}.basic-info>div{align-items:flex-start;flex-direction:column;gap:5px}.event-record{grid-template-columns:16px 78px minmax(0,1fr);padding-right:10px}.event-body{padding:0 10px}.event-row-actions{grid-column:2/-1;justify-content:flex-end;margin-top:10px}.event-date strong{font-size:14px}}
 @media(min-width:721px){.application-toolbar-portal .application-legend{transform:translateY(7px)}}
 </style>
+<style scoped>
+.application-title > i {
+  background: transparent !important;
+}
+
+:global(:root[data-theme="dark"]) .heatmap-controls button {
+  border-color: var(--color-border-strong);
+  color: var(--color-foreground);
+  background: #24282e;
+}
+
+:global(:root[data-theme="dark"]) .heatmap-controls button:disabled {
+  border-color: var(--color-border);
+  color: #777b82;
+  background: #1b1e23;
+  opacity: 1;
+}
+
+:global(:root[data-theme="dark"]) .application-title > i {
+  color: var(--color-muted-foreground);
+}
+</style>

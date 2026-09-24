@@ -313,3 +313,28 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
 </style>
+<style scoped>
+:global(:root[data-theme="dark"]) .step {
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-foreground);
+  background: #2a2e34;
+}
+
+:global(:root[data-theme="dark"]) .inbox-step {
+  color: var(--color-foreground);
+  background: #24282e;
+}
+
+:global(:root[data-theme="dark"]) .process-all-button {
+  border-color: #3e5048;
+  color: #9ed9bc;
+  background: #1a2923;
+}
+
+:global(:root[data-theme="dark"]) .process-all-button:disabled {
+  border-color: var(--color-border);
+  color: #858a91;
+  background: #20242a;
+  opacity: 1;
+}
+</style>

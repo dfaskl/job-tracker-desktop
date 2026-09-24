@@ -136,3 +136,19 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .overview-column .control-card{overflow:auto}
 .group-manager{display:grid;gap:9px;margin-top:12px;padding:12px;border:1px solid #dfe7eb;border-radius:10px;background:color-mix(in srgb,var(--accent,var(--color-primary)) 3%,#fff)}.group-manager>div:first-child{display:grid;gap:3px}.group-manager>div:first-child small,.group-assignment>small{color:var(--color-muted-foreground);font-size:10px}.group-create{display:flex;gap:7px}.group-create input{min-width:0;flex:1}.group-create button{flex:none}.group-list{display:grid;gap:6px}.group-list>span{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:7px 8px;border:1px solid #e6ebef;border-radius:8px;background:#fff}.group-list b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-list small{color:var(--color-muted-foreground)}.group-list button{min-height:30px;padding:4px 8px;font-size:10px}.group-assignment{display:grid;width:148px;flex:0 0 148px;gap:3px}.group-assignment select{width:100%;height:34px;padding:0 28px 0 9px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-card-foreground);background:var(--color-card);font:inherit;font-size:11px;font-weight:600}.group-assignment select:focus-visible{outline:3px solid color-mix(in srgb,var(--color-ring) 15%,transparent);outline-offset:1px}@media(max-width:900px){.group-assignment{width:180px;flex-basis:180px}}@media(max-width:720px){.group-assignment{width:calc(100% - 48px);margin-left:48px;flex-basis:auto}}
 </style>
+<style scoped>
+:global(:root[data-theme="dark"]) .avatar {
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-foreground);
+  background: #2a2e34;
+}
+
+:global(:root[data-theme="dark"]) .identity span,
+:global(:root[data-theme="dark"]) .counts {
+  color: var(--color-muted-foreground);
+}
+
+:global(:root[data-theme="dark"]) .counts b {
+  color: var(--color-foreground);
+}
+</style>
