@@ -326,6 +326,150 @@ body {
   #app .page-content> :not(.access) { animation:workspace-arrive .28s cubic-bezier(.2,.72,.25,1) both; }
 }
 @keyframes workspace-arrive { from { opacity:.55; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+/* Night theme surface normalization: remove light-mode fills left in scoped components. */
+:root[data-theme="dark"] #app :is(
+  .card,
+  .modal,
+  .detail-modal,
+  .link-modal,
+  .password-dialog,
+  .mail-help-dialog,
+  .calendar-pane,
+  .month-card,
+  .selected-card,
+  .inbox-panel,
+  .compose-panel,
+  .review-panel
+) {
+  color: var(--color-card-foreground) !important;
+  background: var(--color-card) !important;
+}
+:root[data-theme="dark"] #app :is(
+  .account-email,
+  .commit-box,
+  .inbox-empty,
+  .application-match,
+  .basic-info,
+  .official-link-field,
+  .ai-review,
+  dl div,
+  .timeline article,
+  .registration,
+  .registration-code,
+  .group-manager,
+  .group-list > span,
+  .notice,
+  .tool-box,
+  .link-editor,
+  .link-list article,
+  .metrics-row div,
+  .account-list article,
+  .provider-guides > article,
+  .mail-cards article,
+  .users-card article,
+  .event-record,
+  .selected-card article,
+  .backup-list button,
+  .file-button
+) {
+  border-color: var(--color-border) !important;
+  color: var(--color-card-foreground) !important;
+  background: var(--color-muted) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] #app :is(
+  .selected-card > h2,
+  .schedule-copy > small,
+  .schedule-copy p b,
+  .date-block,
+  .date-range > .date-block
+) {
+  border-color: var(--color-border) !important;
+  color: var(--color-muted-foreground) !important;
+  background: var(--color-muted) !important;
+}
+:root[data-theme="dark"] #app .team-timeline-list article em {
+  border-color: color-mix(in srgb, var(--member-color) 46%, var(--color-border)) !important;
+  color: var(--color-card-foreground) !important;
+  background: color-mix(in srgb, var(--member-color) 16%, var(--color-muted)) !important;
+}
+:root[data-theme="dark"] #app .team-timeline-list article em strong {
+  color: color-mix(in srgb, var(--member-color) 65%, var(--color-foreground)) !important;
+}
+:root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day {
+  color: var(--color-card-foreground) !important;
+  background: var(--color-card) !important;
+}
+:root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day:hover,
+:root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day.muted {
+  background: var(--color-muted) !important;
+}
+:root[data-theme="dark"] #app .day-events > i {
+  color: color-mix(in srgb, var(--event-color) 68%, var(--color-foreground)) !important;
+  background: color-mix(in srgb, var(--event-color) 18%, var(--color-muted)) !important;
+}
+:root[data-theme="dark"] #app .day-events > i.middle { color: transparent !important; background: var(--event-color) !important; }
+:root[data-theme="dark"] #app .day-events > i.completed { color: var(--color-muted-foreground) !important; background: #262a31 !important; }
+:root[data-theme="dark"] #app .event-location a {
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-foreground) !important;
+  background: #24282e !important;
+}
+:root[data-theme="dark"] #app .application {
+  --card-bg: color-mix(in srgb, var(--card-accent, #7f8e87) 10%, var(--color-card));
+  color: var(--color-card-foreground) !important;
+  background: var(--card-bg) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] #app :is(.flow-node, .compact-node) {
+  --node-soft: color-mix(in srgb, var(--node-color) 16%, #20242a);
+}
+:root[data-theme="dark"] #app :is(.flow-node, .compact-node) > i {
+  border-color: color-mix(in srgb, var(--node-color) 70%, var(--color-border)) !important;
+  background: var(--node-soft) !important;
+}
+:root[data-theme="dark"] #app :is(
+  .primary-action,
+  .commit-box button,
+  .topbar > button,
+  .access form > button,
+  .quote-trigger,
+  .advice-trigger
+) {
+  border-color: #555a63 !important;
+  color: var(--color-foreground) !important;
+  background: #2a2e34 !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] #app :is(
+  .primary-action,
+  .commit-box button,
+  .topbar > button,
+  .access form > button,
+  .quote-trigger,
+  .advice-trigger
+):not(:disabled):hover { background: #343940 !important; }
+:root[data-theme="dark"] #app :is(.overdue-alert, .team-conflict-alert, .duplicate-warning) {
+  border-color: color-mix(in srgb, var(--color-destructive) 55%, var(--color-border)) !important;
+  color: #ffaaa4 !important;
+  background: color-mix(in srgb, var(--color-destructive) 12%, var(--color-card)) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] #app :is(.time-mode-notice, .similar-warning) {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border)) !important;
+  color: #f0c68f !important;
+  background: color-mix(in srgb, var(--color-warning) 11%, var(--color-card)) !important;
+  background-image: none !important;
+}
+:root[data-theme="dark"] #app :is(.global-operation-toast.success, .process-notice) {
+  color: #9ed9bc !important;
+  background: #15231e !important;
+}
+:root[data-theme="dark"] #app :is(.global-operation-toast.danger, .feedback.danger) {
+  color: #ffaaa4 !important;
+  background: #2a1718 !important;
+}
 @media(max-width:820px){
   #app .mail-toolbar,#app .admin-head { padding-left:10px; }
   #app :is(.event-chip,.backup-list article,.users-card article):hover { box-shadow:none; }
