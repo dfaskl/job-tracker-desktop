@@ -216,13 +216,13 @@ onBeforeUnmount(() => {
 .brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
 .brand small { color: #c7beb0; font-size: 11px; }
 .menu-toggle { display: none; }
-nav { position: relative; z-index: 1; display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: space-evenly; gap: clamp(6px,.75vh,10px); margin: 14px 0 12px; overflow-y: auto; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
+nav { position: relative; z-index: 1; display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: start; gap: 10px; margin: 14px 0 12px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 8px; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
 nav::-webkit-scrollbar { display: none; }
 nav button {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: clamp(52px,6.4vh,66px);
+  min-height: 52px;
   align-items: center;
   gap: 11px;
   padding: 8px 10px;
