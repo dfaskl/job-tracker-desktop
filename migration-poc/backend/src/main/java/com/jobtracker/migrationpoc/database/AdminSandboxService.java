@@ -408,7 +408,7 @@ public class AdminSandboxService {
             + "u.last_active_at "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
             + "LEFT JOIN interview_groups g ON g.id=u.group_id "
-            + "ORDER BY u.created_at DESC,u.id DESC LIMIT ?";
+            + "ORDER BY u.created_at ASC,u.id ASC LIMIT ?";
         List<UserView> users = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, MAX_USERS);
