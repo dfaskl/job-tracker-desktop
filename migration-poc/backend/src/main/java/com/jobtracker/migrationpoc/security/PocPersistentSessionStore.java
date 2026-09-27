@@ -89,6 +89,12 @@ public class PocPersistentSessionStore {
                     insert.setString(3, String.valueOf(sessionTtl().toSeconds()));
                     insert.executeUpdate();
                 }
+                try (PreparedStatement activity = connection.prepareStatement(
+                    "UPDATE users SET last_active_at=NOW() WHERE id=?"
+                )) {
+                    activity.setLong(1, userId);
+                    activity.executeUpdate();
+                }
                 connection.commit();
                 return token;
             } catch (Exception exception) {
@@ -100,9 +106,12 @@ public class PocPersistentSessionStore {
 
     public Optional<String> verifyEmail(String token) throws Exception {
         if (!isEnabled() || !validToken(token)) return Optional.empty();
-        String sql = "UPDATE sessions s SET last_active_at=NOW() FROM users u "
+        String sql = "WITH verified AS ("
+            + "UPDATE sessions s SET last_active_at=NOW() FROM users u "
             + "WHERE s.user_id=u.id AND s.token_hash=? AND s.expires_at>NOW() "
-            + "AND u.disabled_at IS NULL RETURNING u.email";
+            + "AND u.disabled_at IS NULL RETURNING s.user_id"
+            + ") UPDATE users u SET last_active_at=NOW() FROM verified v "
+            + "WHERE u.id=v.user_id RETURNING u.email";
         try (Connection connection = openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, tokenHash(token));

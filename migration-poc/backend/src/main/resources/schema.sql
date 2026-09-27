@@ -3,11 +3,13 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password_salt TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ;
 UPDATE users SET display_name=split_part(email,'@',1) WHERE trim(display_name)='';
 CREATE TABLE IF NOT EXISTS interview_groups (
   id BIGSERIAL PRIMARY KEY,
@@ -27,6 +29,12 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ;
 UPDATE sessions SET last_active_at=created_at WHERE last_active_at IS NULL;
 ALTER TABLE sessions ALTER COLUMN last_active_at SET DEFAULT NOW();
 ALTER TABLE sessions ALTER COLUMN last_active_at SET NOT NULL;
+UPDATE users u SET last_active_at=COALESCE(
+  (SELECT MAX(COALESCE(s.last_active_at,s.created_at)) FROM sessions s WHERE s.user_id=u.id),
+  u.created_at
+) WHERE u.last_active_at IS NULL;
+ALTER TABLE users ALTER COLUMN last_active_at SET DEFAULT NOW();
+ALTER TABLE users ALTER COLUMN last_active_at SET NOT NULL;
 CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS user_data (

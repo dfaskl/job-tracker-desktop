@@ -405,7 +405,7 @@ public class AdminSandboxService {
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
             + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
             + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
-            + "(SELECT MAX(COALESCE(s.last_active_at,s.created_at)) FROM sessions s WHERE s.user_id=u.id) AS last_active_at "
+            + "u.last_active_at "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
             + "LEFT JOIN interview_groups g ON g.id=u.group_id "
             + "ORDER BY u.is_admin DESC,u.created_at ASC LIMIT ?";
