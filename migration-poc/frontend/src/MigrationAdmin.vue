@@ -12,7 +12,7 @@ type ApplicationDetail={id:string;company:string;position:string;stage:string;st
 type UserDetails={user:{id:string;email:string};applications:ApplicationDetail[];totalApplications:number;truncated:boolean}
 type Overview={currentUser:{id:string;email:string};summary:Summary;groups:InterviewGroup[];users:User[];usersTruncated:boolean;audit:Audit[]}
 const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
-const query=ref(''),stateFilter=ref('all'),sortMode=ref('group'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
+const query=ref(''),stateFilter=ref('all'),sortMode=ref('created-new'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
 const registrationCode=ref('')
 const newGroupName=ref('')
 const editingNameId=ref(''),displayNameDraft=ref(''),displayNameError=ref('')
