@@ -2,7 +2,7 @@ spring:
   application:
     name: job-tracker
 server:
-  port: ${PORT:8080}
+  port: ${PORT:${APP_PORT:8080}}
   error:
     include-message: never
 

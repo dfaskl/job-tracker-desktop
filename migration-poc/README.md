@@ -37,7 +37,7 @@ Windows 主机可执行：
 - `SESSION_DAYS`：登录有效期，默认 7 天，范围 1–30 天。
 - `AI_CALLS_ENABLED`：是否允许调用用户配置的 AI 接口，默认 `true`。
 - `AI_ALLOWED_HOSTS`：允许访问的 AI API 域名，逗号分隔。
-- `APP_PORT`：Docker 对外端口，默认 8080。
+- `APP_PORT`：自托管应用端口，默认 8080。直接运行 JAR 时可使用 `APP_PORT` 或 Spring Boot 通用的 `PORT`；若两者同时存在，优先使用 `PORT`。
 - `MAINTENANCE_ACCESS_TOKEN`：仅用于兼容性检查接口，可不配置。
 
 数据库连接、会话密钥、加密主密钥和注册邀请码不适合写进代码：代码仓库及镜像通常会被复制、缓存或公开，写死后既容易泄露，也无法为不同服务器安全轮换。非敏感默认值已经内置。
