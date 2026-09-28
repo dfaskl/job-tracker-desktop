@@ -4,6 +4,7 @@ import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
+import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
@@ -76,7 +77,7 @@ function suggestApplication(company:unknown,position:unknown) {
 }
 function inputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function apiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
-function today() { const d=new Date(),pad=(v:number)=>String(v).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()) }
+function today() { return shanghaiDateKey() }
 function failure(cause: unknown, fallback: string) {
   if (cause instanceof ApiError && cause.status === 401) return '请先登录旧账号'
   return cause instanceof Error ? cause.message : fallback
@@ -137,8 +138,7 @@ function closeMailPreview() {
 }
 function mailDate(value: string) {
   if (!value) return '时间未知'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+  return formatShanghaiDateTime(value, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }, value)
 }
 async function recognize() {
   loading.value = true; error.value = ''; message.value = ''; hasResult.value = false

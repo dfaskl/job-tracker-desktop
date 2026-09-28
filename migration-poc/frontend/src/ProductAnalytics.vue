@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
+import { formatShanghaiScheduleDateTime } from './shanghaiTime'
 
 const store = useJobTrackerStore()
 const analyticsMain = ref<HTMLElement | null>(null)
@@ -43,8 +44,7 @@ function pad(value: number) { return String(value).padStart(2, '0') }
 function interviewTime(event: Record<string, unknown>) { return String(event.completedAt || event.startsAt || event.start || event.date || '') }
 function displayDate(value: string) {
   if (!value) return '时间未记录'
-  const date = new Date(value.replace(' ','T'))
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})
+  return formatShanghaiScheduleDateTime(value, value)
 }
 function timeOf(value: unknown) {
   const time = new Date(String(value || '').replace(' ', 'T')).getTime()

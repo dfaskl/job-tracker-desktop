@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
+import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
 
 type CompanyLink = { company: string; url: string }
 type CompanyLinkResponse = { items: CompanyLink[]; updatedAt: string }
@@ -40,7 +41,7 @@ const similarNewLinks = computed(() => findSimilarCompanies(newCompany.value).fi
 
 const exportName = computed(() => {
   const email = store.user.value?.email.replace(/[^a-z0-9._-]+/gi, '_') || 'job-tracker'
-  const day = new Date().toISOString().slice(0, 10)
+  const day = shanghaiDateKey()
   return `${email}-business-data-${day}.json`
 })
 
@@ -224,8 +225,7 @@ async function clearSandbox() {
 
 function formatDate(value: string) {
   if (!value) return '尚无更新时间'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatShanghaiDateTime(value, {}, value)
 }
 </script>
 

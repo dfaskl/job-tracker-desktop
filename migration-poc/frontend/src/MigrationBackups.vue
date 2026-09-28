@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import { trackedJsonFetch } from './requestActivity'
+import { formatShanghaiDateTime } from './shanghaiTime'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type BackupItem = {
@@ -85,8 +86,7 @@ async function restore() {
 }
 
 function formatDate(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatShanghaiDateTime(value, {}, value)
 }
 function formatSize(value: number) {
   if (value < 1024) return `${value} B`

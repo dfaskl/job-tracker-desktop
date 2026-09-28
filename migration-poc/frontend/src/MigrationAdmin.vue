@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import BaseSelect from './BaseSelect.vue'
 import { trackedJsonFetch } from './requestActivity'
+import { formatShanghaiDateTime } from './shanghaiTime'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
@@ -54,7 +55,7 @@ async function assignGroup(user:User,value:string){if(value===user.groupId)retur
 function assignGroupFromEvent(user:User,event:Event){void assignGroup(user,(event.target as HTMLSelectElement).value)}
 async function deleteUser(user:User){const confirmEmail=prompt(`删除后无法恢复。请输入 ${user.email} 确认：`,'');if(confirmEmail===null)return;busyUser.value=user.id;error.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmEmail})});if(selected.value?.id===user.id){selected.value=null;detail.value=null}await loadOverview();message.value='用户及其业务数据已删除'}catch(cause){error.value=failure(cause,'删除用户失败')}finally{busyUser.value=''}}
 function failure(cause:unknown,fallback:string){return cause instanceof Error?cause.message:fallback}
-function formatDate(value:string){if(!value)return '从未';const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'})}
+function formatDate(value:string){return value?formatShanghaiDateTime(value,{},value):'从未'}
 function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const days=Math.floor((Date.now()-time)/86400000);return days<=0?'今天活跃':days===1?'昨天活跃':`${days} 天前活跃`}
 </script>
 
