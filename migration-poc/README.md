@@ -83,3 +83,7 @@ java -jar backend\target\job-tracker.jar
 ```sh
 docker compose up -d --build
 ```
+
+## 无 Docker 的自带 Java 部署包
+
+没有 Docker 或 Java 21 权限的 Linux x64 服务器，可以使用 GitHub Actions 生成的自带 JRE 部署包。服务器只需解压、填写 `.env` 并执行 `./start.sh`，详细步骤参见 [SELF-HOSTED-JRE.md](SELF-HOSTED-JRE.md)。
