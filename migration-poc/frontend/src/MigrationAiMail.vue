@@ -27,9 +27,8 @@ const processingAll = ref(false)
 const selectedMailId = ref<number | null>(null)
 const processNotice = ref('')
 let processNoticeTimer = 0
-const smokeActive = ref(false)
+const smokingMailIds = ref(new Set<number>())
 const processingMailIds = new Set<number>()
-let smokeTimer = 0
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
 
@@ -105,10 +104,14 @@ function selectMail(mail: CollectedMail) {
   mailBody.value = [mail.subject ? `主题：${mail.subject}` : '', mail.sender ? `发件人：${mail.sender}` : '', '', mail.body].join('\n').trim()
   hasResult.value = false
 }
-function beginSmoke() {
-  smokeActive.value = true
-  window.clearTimeout(smokeTimer)
-  smokeTimer = window.setTimeout(() => { smokeActive.value = false }, 680)
+function setSmoking(ids: number[], active: boolean) {
+  const next = new Set(smokingMailIds.value)
+  ids.forEach(id => active ? next.add(id) : next.delete(id))
+  smokingMailIds.value = next
+}
+function waitForSmoke() {
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  return new Promise(resolve => window.setTimeout(resolve, reduced ? 130 : 680))
 }
 function restoreMail(mail: CollectedMail, index: number) {
   if (inbox.value.messages.some(item => item.id === mail.id)) return
@@ -123,13 +126,18 @@ async function processMail(mail: CollectedMail) {
   if (index < 0) return
   processingMailIds.add(mail.id)
   error.value = ''
-  beginSmoke()
+  setSmoking([mail.id], true)
+  if (previewMail.value?.id === mail.id) closeMailPreview()
+  const background = api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH', blockPage: false })
+    .then(() => ({ ok: true as const })).catch(cause => ({ ok: false as const, cause }))
+  await waitForSmoke()
   inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
   inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - 1)
   if (selectedMailId.value === mail.id) selectedMailId.value = null
-  if (previewMail.value?.id === mail.id) closeMailPreview()
+  setSmoking([mail.id], false)
+  const outcome = await background
   try {
-    await api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH', blockPage: false })
+    if (!outcome.ok) throw outcome.cause
     showProcessNotice('邮件已处理成功')
   } catch (cause) {
     restoreMail(mail, index)
@@ -147,11 +155,19 @@ async function processAllMail() {
   const count=inbox.value.pendingCount
   if(!count||!confirm(`确认将当前 ${count} 封待处理邮件全部标记为已处理吗？`))return
   const removed=[...inbox.value.messages],previousCount=inbox.value.pendingCount
-  processingAll.value=true;error.value='';beginSmoke()
-  inbox.value.messages=[];inbox.value.pendingCount=0;selectedMailId.value=null
+  const removedIds=removed.map(item=>item.id)
+  processingAll.value=true;error.value='';setSmoking(removedIds,true)
   if(previewMail.value)closeMailPreview()
+  const background=api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH',blockPage:false})
+    .then(value=>({ok:true as const,value})).catch(cause=>({ok:false as const,cause}))
+  await waitForSmoke()
+  const removedIdSet=new Set(removedIds)
+  inbox.value.messages=inbox.value.messages.filter(item=>!removedIdSet.has(item.id))
+  inbox.value.pendingCount=0;selectedMailId.value=null;setSmoking(removedIds,false)
+  const outcome=await background
   try {
-    const result=await api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH',blockPage:false})
+    if(!outcome.ok)throw outcome.cause
+    const result=outcome.value
     showProcessNotice(`已成功处理 ${Math.max(0,Number(result.processed)||count)} 封邮件`)
   } catch(cause) {
     const currentIds=new Set(inbox.value.messages.map(item=>item.id))
@@ -230,16 +246,16 @@ async function saveResult() {
   <section class="mail-page">
     <div class="mail-grid">
       <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingAll">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
-          <TransitionGroup v-else name="mail-smoke" tag="div" class="mail-cards" aria-label="待处理邮件">
-            <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id}">
+          <div v-else class="mail-cards" aria-label="待处理邮件">
+            <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
               <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
               <div class="mail-card-actions"><button class="mailbox-button icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click.stop="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
             </article>
-          </TransitionGroup>
-          <div v-if="!syncing&&!inbox.messages.length&&!smokeActive" class="inbox-empty">{{processingAll?'已清空列表，后台正在完成处理':inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
+          </div>
+          <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{processingAll?'已清空列表，后台正在完成处理':inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
         </div>
       </section>
 
@@ -314,7 +330,7 @@ async function saveResult() {
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .compose-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
 .inbox-heading,.inbox-heading>div,.inbox-actions,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:10px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading>div:first-child{flex:1}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.inbox-actions{min-width:max-content;flex:none;gap:6px}.sync-button,.process-all-button{min-height:38px;flex:none;padding:7px 11px;font-size:13px}.process-all-button{color:#176b4b;background:#eaf8f1;border-color:#b9d9c9}.mail-list-region{display:flex;min-height:120px;flex:1 1 auto;flex-direction:column}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow:auto;overscroll-behavior:contain}.mail-cards:empty{display:none}.mail-cards article{position:relative;align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}.inbox-loading{display:grid;min-height:140px;flex:1 1 auto;align-content:center;justify-items:center;gap:7px;color:var(--color-primary);text-align:center}.inbox-loading strong{font-size:14px}.inbox-loading small{color:var(--color-muted-foreground)}.inbox-spinner{width:34px;height:34px;margin-bottom:4px;border:3px solid color-mix(in srgb,var(--color-primary) 18%,transparent);border-top-color:var(--color-primary);border-right-color:color-mix(in srgb,var(--color-primary) 62%,#fff);border-radius:50%;animation:inbox-spin .8s linear infinite}
-.mail-smoke-move{transition:transform .28s cubic-bezier(.2,.8,.2,1)}.mail-smoke-leave-active{z-index:3;pointer-events:none;overflow:visible;animation:mail-card-vaporize .64s cubic-bezier(.2,.68,.22,1) forwards}.mail-smoke-leave-active::before,.mail-smoke-leave-active::after{position:absolute;z-index:4;inset:12% 8%;content:"";pointer-events:none;background:radial-gradient(circle at 18% 62%,rgba(177,184,190,.72) 0 7%,transparent 19%),radial-gradient(circle at 45% 38%,rgba(207,212,216,.78) 0 10%,transparent 23%),radial-gradient(circle at 72% 58%,rgba(151,160,168,.66) 0 8%,transparent 22%),radial-gradient(circle at 88% 30%,rgba(218,221,224,.62) 0 7%,transparent 18%);filter:blur(1px);animation:mail-smoke-cloud .64s ease-out forwards}.mail-smoke-leave-active::after{transform:scale(.78) translateY(5px);opacity:.72;animation-delay:.06s}.mail-smoke-leave-active :is(.mail-card-copy,.mail-card-actions){animation:mail-smoke-content .42s ease-in forwards}
+.mail-card-smoking{z-index:3;pointer-events:none;overflow:visible;animation:mail-card-vaporize .64s cubic-bezier(.2,.68,.22,1) forwards}.mail-card-smoking::before,.mail-card-smoking::after{position:absolute;z-index:4;inset:12% 8%;content:"";pointer-events:none;background:radial-gradient(circle at 18% 62%,rgba(177,184,190,.82) 0 8%,transparent 21%),radial-gradient(circle at 45% 38%,rgba(225,228,231,.9) 0 11%,transparent 25%),radial-gradient(circle at 72% 58%,rgba(151,160,168,.8) 0 9%,transparent 24%),radial-gradient(circle at 88% 30%,rgba(231,233,235,.78) 0 8%,transparent 20%);filter:blur(1px);animation:mail-smoke-cloud .64s ease-out forwards}.mail-card-smoking::after{transform:scale(.78) translateY(5px);opacity:.8;animation-delay:.06s}.mail-card-smoking :is(.mail-card-copy,.mail-card-actions){animation:mail-smoke-content .42s ease-in forwards}
 .privacy-note { margin-bottom: 14px; color: var(--color-muted-foreground); font-size: 12px; }
 .service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
@@ -329,7 +345,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 @keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(4px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(26px,-12px) scale(1.06)}}
 @keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.92}100%{opacity:0;transform:translate(30px,-24px) scale(1.45)}}
 @keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
-@media (prefers-reduced-motion: reduce) { .inbox-spinner{animation:inbox-spin 1.8s linear infinite!important}.mail-smoke-move{transition:none}.mail-smoke-leave-active{animation:mail-card-reduced-exit .12s linear forwards}.mail-smoke-leave-active::before,.mail-smoke-leave-active::after{display:none}.mail-smoke-leave-active :is(.mail-card-copy,.mail-card-actions){animation:none}@keyframes mail-card-reduced-exit{to{opacity:0}} }
+@media (prefers-reduced-motion: reduce) { .inbox-spinner{animation:inbox-spin 1.8s linear infinite!important}.mail-card-smoking{animation:mail-card-reduced-exit .12s linear forwards}.mail-card-smoking::before,.mail-card-smoking::after{display:none}.mail-card-smoking :is(.mail-card-copy,.mail-card-actions){animation:none}@keyframes mail-card-reduced-exit{to{opacity:0}} }
 @media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {
