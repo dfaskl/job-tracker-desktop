@@ -44,6 +44,16 @@ public final class AppEnvironment {
         }
     }
 
+    public static int sqliteBackupRetention(Environment environment) {
+        String value = first(environment, "SQLITE_BACKUP_RETENTION");
+        if (value == null) return 14;
+        try {
+            return Math.max(1, Math.min(90, Integer.parseInt(value)));
+        } catch (NumberFormatException ignored) {
+            return 14;
+        }
+    }
+
     public static boolean flag(Environment environment, boolean defaultValue, String... names) {
         String value = first(environment, names);
         return value == null ? defaultValue : Boolean.parseBoolean(value);

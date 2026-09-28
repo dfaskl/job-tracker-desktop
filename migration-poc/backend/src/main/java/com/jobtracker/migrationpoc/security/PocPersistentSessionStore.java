@@ -55,7 +55,7 @@ public class PocPersistentSessionStore {
             return new SessionModeStatus(true, false, sandbox.isolated(), sessionDays(),
                 "持久化会话已请求，但业务数据库未就绪");
         }
-        return new SessionModeStatus(true, true, sandbox.isolated(), sessionDays(), "PostgreSQL 持久化会话已开启");
+        return new SessionModeStatus(true, true, sandbox.isolated(), sessionDays(), "数据库持久化会话已开启");
     }
 
     public boolean isEnabled() {
@@ -106,17 +106,42 @@ public class PocPersistentSessionStore {
 
     public Optional<String> verifyEmail(String token) throws Exception {
         if (!isEnabled() || !validToken(token)) return Optional.empty();
-        String sql = "WITH verified AS ("
-            + "UPDATE sessions s SET last_active_at=NOW() FROM users u "
-            + "WHERE s.user_id=u.id AND s.token_hash=? AND s.expires_at>NOW() "
-            + "AND u.disabled_at IS NULL RETURNING s.user_id"
-            + ") UPDATE users u SET last_active_at=NOW() FROM verified v "
-            + "WHERE u.id=v.user_id RETURNING u.email";
-        try (Connection connection = openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, tokenHash(token));
-            try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? Optional.of(result.getString(1)) : Optional.empty();
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long userId;
+                String email;
+                try (PreparedStatement select = connection.prepareStatement(
+                    "SELECT u.id,u.email FROM sessions s JOIN users u ON u.id=s.user_id "
+                        + "WHERE s.token_hash=? AND s.expires_at>NOW() AND u.disabled_at IS NULL"
+                )) {
+                    select.setString(1, tokenHash(token));
+                    try (ResultSet result = select.executeQuery()) {
+                        if (!result.next()) {
+                            connection.rollback();
+                            return Optional.empty();
+                        }
+                        userId = result.getLong(1);
+                        email = result.getString(2);
+                    }
+                }
+                try (PreparedStatement updateSession = connection.prepareStatement(
+                    "UPDATE sessions SET last_active_at=NOW() WHERE token_hash=?"
+                )) {
+                    updateSession.setString(1, tokenHash(token));
+                    updateSession.executeUpdate();
+                }
+                try (PreparedStatement updateUser = connection.prepareStatement(
+                    "UPDATE users SET last_active_at=NOW() WHERE id=?"
+                )) {
+                    updateUser.setLong(1, userId);
+                    updateUser.executeUpdate();
+                }
+                connection.commit();
+                return Optional.of(email);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
             }
         }
     }

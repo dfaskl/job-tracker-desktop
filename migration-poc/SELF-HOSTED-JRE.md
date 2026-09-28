@@ -37,7 +37,7 @@ scp .\job-tracker-linux-x64.tar.gz zhoujiajun@服务器地址:/home/zhoujiajun/j
 ```bash
 cd /home/zhoujiajun/jobtracker
 tar -xzf job-tracker-linux-x64.tar.gz --strip-components=1
-chmod +x start.sh stop.sh status.sh
+chmod +x start.sh stop.sh status.sh migrate-to-sqlite.sh
 ```
 
 解压完成后的目录结构：
@@ -50,6 +50,9 @@ jobtracker/
 ├── start.sh
 ├── stop.sh
 ├── status.sh
+├── migrate-to-sqlite.sh    # 一次性迁移 Neon 数据并安全切换配置
+├── data/                    # SQLite 主数据库
+├── backups/                 # SQLite 与迁移前配置备份
 ├── logs/                    # 首次启动时创建
 └── run/                     # 首次启动时创建
 ```
@@ -63,7 +66,7 @@ chmod 600 .env
 nano .env
 ```
 
-第一阶段建议继续填写当前 Neon 的数据库连接地址，先确认自托管应用运行正常。迁移已有数据时，`SESSION_SECRET` 和 `ENCRYPTION_KEY` 应沿用 Render 中的原值，尤其不能随意更换 `ENCRYPTION_KEY`。
+首次从旧版本升级时，先保留当前 Neon 数据库连接，确认新版程序可以启动，再使用部署包内的迁移脚本切换到 SQLite。迁移已有数据时，`SESSION_SECRET` 和 `ENCRYPTION_KEY` 必须沿用原值，尤其不能随意更换 `ENCRYPTION_KEY`。
 
 服务器提供的端口快照中 `18080` 未被占用，因此模板默认使用它。启动前可再次确认：
 
@@ -117,3 +120,15 @@ tar -xzf job-tracker-linux-x64.tar.gz --strip-components=1
 
 部署包不会包含或覆盖 `.env`、`logs/` 和 `run/`。
 
+## 6. 从 Neon 一次性迁移到 SQLite
+
+迁移前请先确认新版部署包已经完整解压，且 `.env` 仍指向原来的 Neon PostgreSQL。然后执行：
+
+```bash
+cd /home/zhoujiajun/jobtracker
+./migrate-to-sqlite.sh
+```
+
+脚本会自动停止应用，直接通过 JDBC 从 Neon 读取全部业务表，在 `data/jobtracker.db` 中建立 SQLite 数据库，逐表核对记录数，再修改 `.env` 并重启。迁移失败时不会改动原数据库，也会恢复原配置并尝试重新启动。
+
+SQLite 数据每天 03:30 自动备份到 `backups/`，默认保留最近 14 份。数据库文件和备份目录权限均限制为当前服务器用户访问。

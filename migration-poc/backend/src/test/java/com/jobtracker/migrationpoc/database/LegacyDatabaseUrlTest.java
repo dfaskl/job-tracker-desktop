@@ -6,6 +6,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class LegacyDatabaseUrlTest {
     @Test
+    void parsesSqlitePaths() {
+        LegacyDatabaseUrl parsed = LegacyDatabaseUrl.parse("sqlite:/srv/jobtracker/data/jobtracker.db");
+        assertThat(parsed.jdbcUrl()).isEqualTo("jdbc:sqlite:/srv/jobtracker/data/jobtracker.db");
+        assertThat(parsed.isSqlite()).isTrue();
+        assertThat(parsed.username()).isNull();
+    }
+    @Test
     void convertsNodeStylePostgresUrlWithoutLoggingCredentials() {
         LegacyDatabaseUrl parsed = LegacyDatabaseUrl.parse(
             "postgresql://user%40example.com:p%40ss@db.example.com:5433/jobs?sslmode=require"

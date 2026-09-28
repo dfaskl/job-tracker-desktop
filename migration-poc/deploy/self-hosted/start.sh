@@ -28,7 +28,8 @@ if [[ ! "$effective_port" =~ ^[0-9]+$ ]] || (( effective_port < 1024 || effectiv
   exit 1
 fi
 
-mkdir -p "$APP_HOME/logs" "$APP_HOME/run"
+mkdir -p "$APP_HOME/logs" "$APP_HOME/run" "$APP_HOME/data" "$APP_HOME/backups"
+chmod 700 "$APP_HOME/data" "$APP_HOME/backups"
 pid_file="$APP_HOME/run/app.pid"
 
 if [[ -f "$pid_file" ]]; then
@@ -80,4 +81,3 @@ done
 
 echo "进程仍在运行，但健康检查在 30 秒内未通过。请查看：$log_file" >&2
 exit 1
-

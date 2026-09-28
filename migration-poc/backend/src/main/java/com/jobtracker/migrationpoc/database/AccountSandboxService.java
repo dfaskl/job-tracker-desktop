@@ -46,11 +46,11 @@ public class AccountSandboxService {
             c.setAutoCommit(false);
             try(PreparedStatement s=c.prepareStatement("INSERT INTO users(email,password_salt,password_hash,display_name) VALUES(?,?,?,?) RETURNING id,email,display_name")){
                 s.setString(1,clean);s.setString(2,record.salt());s.setString(3,record.hash());s.setString(4,defaultDisplayName(clean));
-                try(ResultSet r=s.executeQuery()){r.next();long id=r.getLong(1);String saved=r.getString(2);String displayName=r.getString(3);
-                    try(PreparedStatement d=c.prepareStatement("INSERT INTO user_data(user_id,data) VALUES(?,?::jsonb)")){d.setLong(1,id);d.setString(2,"{\"applications\":[],\"events\":[],\"settings\":{}}");d.executeUpdate();}
-                    c.commit();return new LegacyUser(id,saved,record.salt(),record.hash(),false,displayName);
-                }
-            }catch(SQLException e){c.rollback();if("23505".equals(e.getSQLState()))throw new AccountConflictException("该邮箱已注册");throw e;}catch(Exception e){c.rollback();throw e;}
+                long id;String saved;String displayName;
+                try(ResultSet r=s.executeQuery()){r.next();id=r.getLong(1);saved=r.getString(2);displayName=r.getString(3);}
+                try(PreparedStatement d=c.prepareStatement("INSERT INTO user_data(user_id,data) VALUES(?,?::jsonb)")){d.setLong(1,id);d.setString(2,"{\"applications\":[],\"events\":[],\"settings\":{}}");d.executeUpdate();}
+                c.commit();return new LegacyUser(id,saved,record.salt(),record.hash(),false,displayName);
+            }catch(SQLException e){c.rollback();if(uniqueViolation(e))throw new AccountConflictException("该邮箱已注册");throw e;}catch(Exception e){c.rollback();throw e;}
         }
     }
     public LegacyUser updateDisplayName(String email,String displayName)throws Exception{
@@ -97,6 +97,7 @@ public class AccountSandboxService {
         p.setProperty("ApplicationName","job-tracker-migration-poc-accounts");return PooledConnections.open(config,p);
     }
     private String normalize(String value){return value==null?"":value.trim().toLowerCase(Locale.ROOT);}
+    private boolean uniqueViolation(SQLException exception){String message=exception.getMessage();return "23505".equals(exception.getSQLState())||exception.getErrorCode()==19||(message!=null&&message.toLowerCase(Locale.ROOT).contains("unique constraint"));}
     private String defaultDisplayName(String email){int separator=email.indexOf('@');return separator>0?email.substring(0,separator):email;}
     public static class AccountValidationException extends RuntimeException{public AccountValidationException(String m){super(m);}}
     public static class AccountForbiddenException extends RuntimeException{public AccountForbiddenException(String m){super(m);}}

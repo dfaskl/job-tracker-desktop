@@ -1,6 +1,6 @@
 # 求职进度本（Vue + Java）
 
-这是正式版单体部署目录：Vue 前端会打包进 Spring Boot，应用与 PostgreSQL 可通过 Docker Compose 一起运行。
+这是正式版单体部署目录：Vue 前端会打包进 Spring Boot。应用支持单机 SQLite，也兼容 PostgreSQL；Docker Compose 部署仍可使用 PostgreSQL。
 
 ## 自有服务器快速部署
 
@@ -23,9 +23,9 @@ Windows 主机可执行：
 
 ## 最小正式配置
 
-直接运行 JAR 或使用已有 PostgreSQL 时，核心变量如下：
+直接运行 JAR 时，核心变量如下：
 
-- `APP_DATABASE_URL`：唯一的 PostgreSQL 连接地址。
+- `APP_DATABASE_URL`：数据库连接地址；可填写 `jdbc:sqlite:./data/jobtracker.db`，也可继续使用 PostgreSQL 地址。
 - `SESSION_SECRET`：会话签名密钥，至少 32 个字符。
 - `ENCRYPTION_KEY`：用户 AI API Key 的服务端加密主密钥，至少 32 个字符。
 - `ADMIN_EMAIL`：管理员账号邮箱；该用户注册或登录后会获得管理员权限。

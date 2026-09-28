@@ -6,6 +6,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,7 @@ import java.sql.Statement;
 import java.util.Properties;
 
 @Component
+@Order(10)
 public class DatabaseSchemaInitializer implements ApplicationRunner {
     private final Environment environment;
 
@@ -30,10 +32,17 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());
         properties.setProperty("ApplicationName", "job-tracker-schema");
-        String sql = new ClassPathResource("schema.sql").getContentAsString(StandardCharsets.UTF_8);
+        String resource = config.isSqlite() ? "schema-sqlite.sql" : "schema.sql";
+        String sql = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
         try (Connection connection = PooledConnections.open(config, properties);
              Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+            if (config.isSqlite()) {
+                for (String command : sql.split(";")) {
+                    if (!command.isBlank()) statement.execute(command);
+                }
+            } else {
+                statement.execute(sql);
+            }
             statement.executeUpdate("DELETE FROM sessions WHERE expires_at <= NOW()");
             String adminEmail = environment.getProperty("ADMIN_EMAIL", "").trim().toLowerCase();
             if (!adminEmail.isBlank()) {

@@ -52,6 +52,7 @@ jobs:
           cp migration-poc/deploy/self-hosted/start.sh "$package_root/start.sh"
           cp migration-poc/deploy/self-hosted/stop.sh "$package_root/stop.sh"
           cp migration-poc/deploy/self-hosted/status.sh "$package_root/status.sh"
+          cp migration-poc/deploy/self-hosted/migrate-to-sqlite.sh "$package_root/migrate-to-sqlite.sh"
 
           curl --fail --location --retry 5 --retry-all-errors \
             --output "$package_dir/temurin-jre21.tar.gz" \
@@ -61,7 +62,7 @@ jobs:
             --directory "$package_root/runtime" \
             --strip-components=1
 
-          chmod +x "$package_root/start.sh" "$package_root/stop.sh" "$package_root/status.sh"
+          chmod +x "$package_root/start.sh" "$package_root/stop.sh" "$package_root/status.sh" "$package_root/migrate-to-sqlite.sh"
           mkdir -p migration-poc/dist
           tar -czf migration-poc/dist/job-tracker-linux-x64.tar.gz \
             --directory "$package_dir" job-tracker

@@ -9,7 +9,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -616,8 +615,7 @@ public class AdminSandboxService {
     }
 
     private String instant(ResultSet result, String column) throws Exception {
-        OffsetDateTime value = result.getObject(column, OffsetDateTime.class);
-        return value == null ? "" : value.toInstant().toString();
+        return DatabaseTime.instant(result, column);
     }
 
     private record AdminIdentity(long id, String email) {}

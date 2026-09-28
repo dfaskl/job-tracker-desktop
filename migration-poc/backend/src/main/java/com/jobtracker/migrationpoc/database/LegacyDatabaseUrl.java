@@ -7,7 +7,14 @@ import java.nio.charset.StandardCharsets;
 public record LegacyDatabaseUrl(String jdbcUrl, String username, String password) {
     public static LegacyDatabaseUrl parse(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) throw new IllegalArgumentException("DATABASE_URL is not configured");
-        if (rawUrl.startsWith("jdbc:postgresql:")) return new LegacyDatabaseUrl(rawUrl, null, null);
+        if (rawUrl.startsWith("jdbc:postgresql:") || rawUrl.startsWith("jdbc:sqlite:")) {
+            return new LegacyDatabaseUrl(rawUrl, null, null);
+        }
+        if (rawUrl.startsWith("sqlite:")) {
+            String path = rawUrl.substring("sqlite:".length());
+            if (path.isBlank()) throw new IllegalArgumentException("SQLite database path is not configured");
+            return new LegacyDatabaseUrl("jdbc:sqlite:" + path, null, null);
+        }
 
         URI uri = URI.create(rawUrl);
         if (!"postgres".equals(uri.getScheme()) && !"postgresql".equals(uri.getScheme())) {
@@ -29,6 +36,10 @@ public record LegacyDatabaseUrl(String jdbcUrl, String username, String password
             password = credentials.length == 2 ? decode(credentials[1]) : "";
         }
         return new LegacyDatabaseUrl("jdbc:postgresql://" + host + ":" + port + path + query, username, password);
+    }
+
+    public boolean isSqlite() {
+        return jdbcUrl != null && jdbcUrl.startsWith("jdbc:sqlite:");
     }
 
     private static String decode(String value) {

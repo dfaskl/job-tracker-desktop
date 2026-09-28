@@ -10,7 +10,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -78,18 +77,27 @@ public class BackupSandboxService {
         }
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
-            try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
-                user.setString(1, normalizeEmail(email));
-                try (ResultSet result = user.executeQuery()) {
-                    if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                    long userId = result.getLong(1);
-                    try (PreparedStatement save = connection.prepareStatement(
-                        "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
-                    )) {
-                        save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(clean));
-                        try (ResultSet saved = save.executeQuery()) { saved.next(); String updatedAt = instant(saved, "updated_at"); connection.commit(); return new CompanyLinks(clean, updatedAt); }
+            try {
+                long userId;
+                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                    user.setString(1, normalizeEmail(email));
+                    try (ResultSet result = user.executeQuery()) {
+                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                        userId = result.getLong(1);
                     }
                 }
+                String updatedAt;
+                try (PreparedStatement save = connection.prepareStatement(
+                    "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
+                )) {
+                    save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(clean));
+                    try (ResultSet saved = save.executeQuery()) {
+                        saved.next();
+                        updatedAt = instant(saved, "updated_at");
+                    }
+                }
+                connection.commit();
+                return new CompanyLinks(clean, updatedAt);
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
     }
@@ -248,7 +256,7 @@ public class BackupSandboxService {
     }
 
     private String instant(ResultSet result, String column) throws Exception {
-        return result.getObject(column, OffsetDateTime.class).toInstant().toString();
+        return DatabaseTime.instant(result, column);
     }
 
     private String normalizeEmail(String email) {

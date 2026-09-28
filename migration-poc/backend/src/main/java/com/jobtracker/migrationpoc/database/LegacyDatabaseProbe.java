@@ -53,7 +53,7 @@ public class LegacyDatabaseProbe {
 
             try (Connection connection = PooledConnections.open(config, properties)) {
                 connection.setReadOnly(true);
-                List<String> missingTables = findMissingTables(connection);
+                List<String> missingTables = findMissingTables(connection, config.isSqlite());
                 SampleResult sample = missingTables.contains("user_data")
                     ? new SampleResult(false, false)
                     : inspectBusinessJson(connection);
@@ -72,11 +72,14 @@ public class LegacyDatabaseProbe {
         }
     }
 
-    private List<String> findMissingTables(Connection connection) throws Exception {
+    private List<String> findMissingTables(Connection connection, boolean sqlite) throws Exception {
         List<String> missing = new ArrayList<>();
-        try (PreparedStatement statement = connection.prepareStatement("SELECT to_regclass(?) IS NOT NULL")) {
+        String sql = sqlite
+            ? "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=?)"
+            : "SELECT to_regclass(?) IS NOT NULL";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
             for (String table : EXPECTED_TABLES) {
-                statement.setString(1, "public." + table);
+                statement.setString(1, sqlite ? table : "public." + table);
                 try (ResultSet result = statement.executeQuery()) {
                     if (!result.next() || !result.getBoolean(1)) missing.add(table);
                 }
