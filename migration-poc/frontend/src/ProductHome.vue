@@ -424,16 +424,6 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   62% { opacity:.9; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.92) rotate(82deg); }
   100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .quote-strip.is-refreshing, .quote-strip.is-refreshing > .quote-trigger > .quote-glyph { animation:none; }
-  .quote-strip.is-refreshing { background:color-mix(in srgb,var(--accent,var(--color-primary)) 5%,#fff); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 11%,transparent); }
-  .quote-strip.is-refreshing > .quote-trigger > .quote-glyph { opacity:.58; }
-  .quote-sparks > i { animation-name:quote-spark-soft;animation-duration:.62s!important;animation-iteration-count:1!important; }
-}
-@keyframes quote-spark-soft {
-  0%,100% { opacity:0;transform:translate(-50%,-50%); }
-  45% { opacity:1;transform:translate(-50%,-50%); }
-}
 
 .dashboard-panel {
   position: relative;
@@ -855,11 +845,6 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   to { opacity: 1; transform: none; }
 }
 @keyframes timeline-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .schedule-advice { animation: none; }
-  .advice-trigger.is-loading > .advice-glyph { animation:advice-icon-fade 1.6s ease-in-out infinite!important; }
-  .timeline-loading > i { animation: advice-icon-fade 1.6s ease-in-out infinite; }
-}
 @media (max-width: 1180px) {
   .schedule-workspace { grid-template-columns: 1fr; }
 }

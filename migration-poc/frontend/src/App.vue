@@ -151,21 +151,4 @@ onBeforeUnmount(() => {
 @keyframes dog-bob{to{transform:translateY(-4px) rotate(-2deg)}}
 @keyframes dog-shadow{to{transform:scaleX(.62);opacity:.45}}
 @keyframes puppy-frames{0%,24.99%{background-position:0 0}25%,49.99%{background-position:33.333% 0}50%,74.99%{background-position:66.666% 0}75%,100%{background-position:100% 0}}
-@keyframes route-draw-soft{0%{stroke-dashoffset:1;opacity:.42}78%,92%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.42}}
-@keyframes beacon-travel-soft{0%{offset-distance:0%;opacity:0}12%,84%{opacity:.92}88%{offset-distance:100%;opacity:.92}100%{offset-distance:100%;opacity:0}}
-@keyframes route-node-soft{0%,100%{opacity:.42}50%{opacity:1}}
-@keyframes logo-float-soft{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-2px)}}
-@keyframes logo-signal-soft{0%,100%{opacity:.48}50%{opacity:1}}
-@keyframes dog-run-soft{0%{transform:translateX(-82px) scaleX(1)}47%{transform:translateX(10px) scaleX(1)}50%{transform:translateX(10px) scaleX(-1)}97%{transform:translateX(-82px) scaleX(-1)}100%{transform:translateX(-82px) scaleX(1)}}
-@media(prefers-reduced-motion:reduce){
-  .session-loading img{animation:none}
-  .route-drawn{animation:route-draw-soft 3.6s ease-in-out infinite!important}
-  .route-node{transform:scale(1);animation:route-node-soft 3.6s ease-in-out infinite both!important}
-  .journey-beacon{animation:beacon-travel-soft 3.6s linear infinite!important}
-  .journey-logo{animation:logo-float-soft 2.8s ease-in-out infinite!important}
-  .journey-logo::after{animation:logo-signal-soft 2.8s ease-in-out infinite!important}
-  .dog-runner{animation:dog-run-soft 7.2s ease-in-out infinite!important}
-  .puppy-sprite{animation:puppy-frames 1s steps(1,end) infinite,dog-bob .72s ease-in-out infinite alternate!important}
-  .dog-runner::after{animation-duration:.72s!important}
-}
 </style>

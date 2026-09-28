@@ -96,5 +96,4 @@ async function switchMode() {
 @keyframes auth-panel-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @media(min-width:1024px){.login-page{height:100dvh;grid-template-columns:1fr 1fr;overflow:hidden}.login-story{display:flex}.login-entry{min-height:0;overflow-y:auto}.mobile-brand{display:none}}
 @media(max-width:640px){.source-link{top:16px;right:16px;width:40px;padding:0}.source-link span{display:none}.login-entry{padding:76px 20px 32px}.entry-heading{margin-bottom:32px}}
-@media(prefers-reduced-motion:reduce){.entry-inner{animation:none}.source-link,.login-submit,.login-submit>span{transition-duration:.01ms!important}}
 </style>

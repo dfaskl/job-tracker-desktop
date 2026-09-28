@@ -110,11 +110,8 @@ function setSmoking(ids: number[], active: boolean) {
   smokingMailIds.value = next
 }
 function waitForSmoke() {
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  // Keep the card mounted until its exit effect has visibly completed. The
-  // reduced-motion variant is deliberately gentler, but must not become an
-  // instantaneous removal when the OS asks for less motion.
-  return new Promise(resolve => window.setTimeout(resolve, reduced ? 560 : 760))
+  // Keep the card mounted until its exit effect has visibly completed.
+  return new Promise(resolve => window.setTimeout(resolve, 760))
 }
 function restoreMail(mail: CollectedMail, index: number) {
   if (inbox.value.messages.some(item => item.id === mail.id)) return
@@ -348,9 +345,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 @keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(3px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(12px,-8px) scale(1.04)}}
 @keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.96}100%{opacity:0;transform:translate(10px,-12px) scale(1.28)}}
 @keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
-@keyframes mail-card-soft-smoke{0%{opacity:1;filter:blur(0)}55%{opacity:.72;filter:blur(2px)}100%{opacity:0;filter:blur(6px)}}
-@keyframes mail-smoke-soft{0%{opacity:0;transform:scale(.88)}35%{opacity:.82}100%{opacity:0;transform:scale(1.08)}}
-@media (prefers-reduced-motion: reduce) { .inbox-spinner{animation:inbox-spin 1.8s linear infinite!important}.mail-card-smoking{animation:mail-card-soft-smoke .52s ease-out forwards!important}.mail-card-smoking::before,.mail-card-smoking::after{display:block;animation:mail-smoke-soft .52s ease-out forwards!important}.mail-card-smoking :is(.mail-card-copy,.mail-card-actions){animation:mail-card-soft-smoke .4s ease-out forwards!important} }
 @media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {

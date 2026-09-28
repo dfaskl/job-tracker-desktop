@@ -400,7 +400,4 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 @media (max-width: 520px) {
   .product-main { padding-inline: 12px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .sidebar *, .sidebar *::before, .sidebar *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
-}
 </style>

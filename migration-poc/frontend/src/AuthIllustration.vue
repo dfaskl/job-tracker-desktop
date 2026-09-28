@@ -220,5 +220,4 @@ const EyeDot = defineComponent({
 :deep(.auth-eye-dot){display:block;border-radius:999px;background:#2d2d2d;transition:transform .1s ease-out}
 .yellow-mouth{position:absolute;width:80px;height:4px;border-radius:999px;background:#2d2d2d;transition:all .2s ease-out}
 @media(max-width:1180px){.auth-illustration{transform:scale(.86);transform-origin:bottom center}}
-@media(prefers-reduced-motion:reduce){.auth-creature,.auth-face{transition-duration:.7s!important}.orange-face,.yellow-face,.yellow-mouth{transition-duration:.2s!important}:deep(.auth-eye),:deep(.auth-eye b),:deep(.auth-eye-dot){transition-duration:.1s!important}}
 </style>
