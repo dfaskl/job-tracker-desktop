@@ -9,6 +9,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -414,11 +415,12 @@ public class AdminSandboxService {
             statement.setInt(1, MAX_USERS);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
+                    String disabledAt = instant(result, "disabled_at");
                     users.add(new UserView(
                         String.valueOf(result.getLong("id")), result.getString("email"), result.getString("display_name"),
-                        result.getBoolean("is_admin"), result.getObject("disabled_at") != null,
-                        string(result.getObject("disabled_at")), string(result.getObject("created_at")),
-                        string(result.getObject("last_active_at")), result.getInt("application_count"),
+                        result.getBoolean("is_admin"), !disabledAt.isBlank(),
+                        disabledAt, instant(result, "created_at"),
+                        instant(result, "last_active_at"), result.getInt("application_count"),
                         result.getInt("event_count"), result.getBoolean("has_api_key"),
                         string(result.getObject("group_id")), string(result.getObject("group_name"))
                     ));
@@ -467,7 +469,7 @@ public class AdminSandboxService {
             while (result.next()) {
                 items.add(new AuditView(
                     String.valueOf(result.getLong("id")), result.getString("action"),
-                    result.getString("target_email"), string(result.getObject("created_at"))
+                    result.getString("target_email"), instant(result, "created_at")
                 ));
             }
         }
@@ -611,6 +613,11 @@ public class AdminSandboxService {
 
     private String string(Object value) {
         return value == null ? "" : value.toString();
+    }
+
+    private String instant(ResultSet result, String column) throws Exception {
+        OffsetDateTime value = result.getObject(column, OffsetDateTime.class);
+        return value == null ? "" : value.toInstant().toString();
     }
 
     private record AdminIdentity(long id, String email) {}
