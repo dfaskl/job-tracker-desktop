@@ -1,89 +1,105 @@
-# 求职进度本（Vue + Java）
+# CareerFlow 应用
 
-这是正式版单体部署目录：Vue 前端会打包进 Spring Boot。应用支持单机 SQLite，也兼容 PostgreSQL；Docker Compose 部署仍可使用 PostgreSQL。
+此目录包含 CareerFlow 正式版应用。Vue 前端由 Maven 调用 Vite 构建，并作为静态资源打入 Spring Boot JAR；部署时只需运行一个 Java 进程。
 
-## 自有服务器快速部署
+## 运行模式
 
-服务器需要安装 Docker 与 Docker Compose，并开放一个 HTTP 端口。进入本目录后执行：
+### SQLite 自托管（推荐）
 
-```sh
-chmod +x scripts/setup-self-host.sh
-./scripts/setup-self-host.sh your-admin@example.com
+适合单台服务器和当前生产环境：
+
+```text
+APP_DATABASE_URL=jdbc:sqlite:./data/jobtracker.db
 ```
 
-Windows 主机可执行：
+SQLite 文件应放在部署目录的 `data/` 下，并与 JAR 分开备份。应用支持定时一致性备份，默认每天 03:30 执行并保留最近14份。
 
-```powershell
-.\scripts\setup-self-host.ps1 -AdminEmail your-admin@example.com
-```
+### PostgreSQL / Docker Compose
 
-脚本只要求管理员邮箱，其余必要密钥会随机生成并写入本机 `.env`（该文件已被 Git 忽略），随后构建并启动应用。默认访问地址为 `http://服务器地址:8080`。
-
-数据库使用具名卷 `jobtracker_data` 持久化。应用启动时会自动创建缺失的数据表，因此首次部署不需要手动执行 SQL。升级前仍建议先导出业务数据或备份数据库卷。
-
-## 最小正式配置
-
-直接运行 JAR 时，核心变量如下：
-
-- `APP_DATABASE_URL`：数据库连接地址；可填写 `jdbc:sqlite:./data/jobtracker.db`，也可继续使用 PostgreSQL 地址。
-- `SESSION_SECRET`：会话签名密钥，至少 32 个字符。
-- `ENCRYPTION_KEY`：用户 AI API Key 的服务端加密主密钥，至少 32 个字符。
-- `ADMIN_EMAIL`：管理员账号邮箱；该用户注册或登录后会获得管理员权限。
-
-常用可选变量：
-
-- `ALLOW_REGISTRATION`：是否允许注册，默认 `true`，管理员页面可继续调整。
-- `REGISTRATION_CODE`：留空表示注册无需邀请码。
-- `SESSION_DAYS`：登录有效期，默认 7 天，范围 1–30 天。
-- `AI_CALLS_ENABLED`：是否允许调用用户配置的 AI 接口，默认 `true`。
-- `AI_ALLOWED_HOSTS`：允许访问的 AI API 域名，逗号分隔。
-- `APP_PORT`：自托管应用端口，默认 8080。直接运行 JAR 时可使用 `APP_PORT` 或 Spring Boot 通用的 `PORT`；若两者同时存在，优先使用 `PORT`。
-- `MAINTENANCE_ACCESS_TOKEN`：仅用于兼容性检查接口，可不配置。
-
-数据库连接、会话密钥、加密主密钥和注册邀请码不适合写进代码：代码仓库及镜像通常会被复制、缓存或公开，写死后既容易泄露，也无法为不同服务器安全轮换。非敏感默认值已经内置。
-
-## Render 兼容
-
-现有 Render 环境无需立即修改。正式配置层会按以下顺序读取：
-
-- `APP_DATABASE_URL` → `POC_WRITE_DATABASE_URL` → `DATABASE_URL`
-- `SESSION_SECRET` → `POC_SESSION_SECRET`
-- `ENCRYPTION_KEY` → `POC_ENCRYPTION_KEY`
-- `AI_CALLS_ENABLED` → `POC_AI_CALLS_ENABLED`
-- `ADMIN_ENABLED` → `POC_ADMIN_ENABLED`
-
-迁移到自有服务器时只需使用左侧的新变量；旧的 `POC_WRITE_ENABLED` 与 `POC_SHARED_DATABASE_WRITE_ENABLED` 已不再需要。
-
-### 免费实例健康检查
-
-在 Windows 电脑上每 10 分钟访问一次 Render 健康检查：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\keep-render-awake.ps1
-```
-
-需要隐藏窗口在后台运行时：
-
-```powershell
-Start-Process powershell -WindowStyle Hidden -ArgumentList '-ExecutionPolicy Bypass -File "scripts\keep-render-awake.ps1"'
-```
-
-停止后台脚本可在任务管理器中结束对应的 Windows PowerShell 进程。默认访问当前 Render 服务的 `/healthz`，也可以通过 `-HealthUrl` 和 `-IntervalMinutes` 参数覆盖。
-## 本地构建
-
-要求 Java 21+、Maven 3.9+、Node.js 22+：
-
-```powershell
-mvn -f backend\pom.xml clean package
-java -jar backend\target\job-tracker.jar
-```
-
-也可以直接运行：
+需要多人高并发或已有 PostgreSQL 时，可使用本目录的 `docker-compose.yml`：
 
 ```sh
 docker compose up -d --build
 ```
 
-## 无 Docker 的自带 Java 部署包
+数据库由具名卷 `jobtracker_data` 持久化。升级前应先导出数据库或备份数据卷。
 
-没有 Docker 或 Java 21 权限的 Linux x64 服务器，可以使用 GitHub Actions 生成的自带 JRE 部署包。服务器只需解压、填写 `.env` 并执行 `./start.sh`，详细步骤参见 [SELF-HOSTED-JRE.md](SELF-HOSTED-JRE.md)。
+## 必需配置
+
+复制 `.env.example` 或 `deploy/self-hosted/env.example`，至少配置：
+
+- `APP_DATABASE_URL`：SQLite JDBC 地址或 PostgreSQL 连接地址
+- `SESSION_SECRET`：会话签名密钥，至少32个字符
+- `ENCRYPTION_KEY`：用户 AI API Key 的服务端加密密钥，至少32个字符
+- `ADMIN_EMAIL`：管理员账号邮箱
+- `APP_PORT`：监听端口，自托管示例使用 `18080`
+
+常用可选配置：
+
+- `ALLOW_REGISTRATION`：是否允许新用户注册
+- `REGISTRATION_CODE`：新用户注册邀请码，留空表示无需邀请码
+- `SESSION_DAYS`：登录会话有效天数
+- `AI_CALLS_ENABLED`：是否允许调用用户配置的 AI 服务
+- `AI_ALLOWED_HOSTS`：允许访问的 AI API 域名列表
+- `SQLITE_BACKUP_ENABLED`：是否启用 SQLite 自动备份
+- `SQLITE_BACKUP_RETENTION`：SQLite 备份保留数量
+
+不要把真实密钥、邮箱授权码或生产 `.env` 提交到仓库。
+
+## 本地构建
+
+要求：Java 21、Maven 3.9、Node.js 22。
+
+在仓库根目录运行：
+
+```powershell
+mvn -f migration-poc/backend/pom.xml clean package
+```
+
+构建过程会依次完成：
+
+1. `npm ci`
+2. Vue / TypeScript 生产构建
+3. Spring Boot 编译与测试
+4. 前端资源复制到 `classpath:/static`
+5. 生成 `backend/target/job-tracker.jar`
+
+运行：
+
+```powershell
+java -jar migration-poc/backend/target/job-tracker.jar
+```
+
+## GitHub Actions 发布包
+
+推送 `main` 或 `codex/migration-poc-demo` 后，`.github/workflows/ci.yml` 会自动测试并生成：
+
+```text
+job-tracker-linux-x64.tar.gz
+job-tracker-linux-x64.tar.gz.sha256
+```
+
+压缩包包含应用 JAR、Java 21 JRE、环境变量示例和启停脚本。下载后无需服务器安装 Java 21。
+
+完整部署、更新和回滚步骤见 [SELF-HOSTED-JRE.md](SELF-HOSTED-JRE.md)。
+
+## 服务器操作
+
+```sh
+./start.sh
+./status.sh
+./stop.sh
+tail -f logs/app.log
+curl http://127.0.0.1:18080/healthz
+```
+
+更新程序时保留以下内容：
+
+```text
+.env
+data/
+backups/
+logs/
+```
+
+不要再次执行 `migrate-to-sqlite.sh`；它只用于首次从 PostgreSQL 迁移现有数据。
