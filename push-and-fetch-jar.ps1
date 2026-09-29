@@ -157,12 +157,11 @@ try {
     $artifactZip = Join-Path $tempDirectory 'job-tracker-jar.zip'
     $token = (& gh auth token).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Unable to read the GitHub CLI token.' }
-    $headers = @{
-        Authorization = "Bearer $token"
-        Accept = 'application/vnd.github+json'
-        'X-GitHub-Api-Version' = '2022-11-28'
-    }
-    Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri ([string]$artifact.archive_download_url) -OutFile $artifactZip
+    Invoke-Checked curl.exe --fail --location --retry 3 --silent --show-error `
+        --header "Authorization: Bearer $token" `
+        --header 'Accept: application/vnd.github+json' `
+        --header 'X-GitHub-Api-Version: 2022-11-28' `
+        --output $artifactZip ([string]$artifact.archive_download_url)
     Expand-Archive -LiteralPath $artifactZip -DestinationPath $downloadDirectory -Force
     $jar = Join-Path $downloadDirectory 'job-tracker.jar'
     if (-not (Test-Path -LiteralPath $jar)) {
