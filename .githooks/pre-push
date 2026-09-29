@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [ "$JOB_TRACKER_SKIP_AUTO_FETCH" = "1" ]; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel) || exit 0
+remote_name=$1
+
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$local_ref" in
+    refs/heads/*)
+      branch=${local_ref#refs/heads/}
+      powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass \
+        -File "$repo_root/launch-auto-jar-fetch.ps1" \
+        -Commit "$local_sha" -Branch "$branch" -Remote "$remote_name"
+      break
+      ;;
+  esac
+done
+
+exit 0

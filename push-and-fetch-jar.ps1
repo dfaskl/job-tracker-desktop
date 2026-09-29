@@ -2,6 +2,8 @@
 param(
     [string]$Remote = 'origin',
     [string]$Branch = '',
+    [string]$Commit = '',
+    [switch]$FetchOnly,
     [string]$OutputPath = ''
 )
 
@@ -72,24 +74,46 @@ try {
         throw 'Detached HEAD detected. Specify a branch with -Branch.'
     }
 
-    $commit = (& git rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or -not $commit) {
+    if (-not $Commit) {
+        $Commit = (& git rev-parse HEAD).Trim()
+    }
+    if ($LASTEXITCODE -ne 0 -or -not $Commit) {
         throw 'Unable to read the current commit.'
     }
 
     $knownRunIds = @{}
-    foreach ($run in (Get-CiRuns -Commit $commit)) {
-        $knownRunIds[[string]$run.databaseId] = $true
-    }
+    if (-not $FetchOnly) {
+        foreach ($run in (Get-CiRuns -Commit $Commit)) {
+            $knownRunIds[[string]$run.databaseId] = $true
+        }
 
-    Write-Host "Pushing $Branch to $Remote..." -ForegroundColor Cyan
-    Push-CurrentBranch -RemoteName $Remote -BranchName $Branch
+        Write-Host "Pushing $Branch to $Remote..." -ForegroundColor Cyan
+        $previousSkipHook = $env:JOB_TRACKER_SKIP_AUTO_FETCH
+        $env:JOB_TRACKER_SKIP_AUTO_FETCH = '1'
+        try {
+            Push-CurrentBranch -RemoteName $Remote -BranchName $Branch
+        }
+        finally {
+            $env:JOB_TRACKER_SKIP_AUTO_FETCH = $previousSkipHook
+        }
+    }
+    else {
+        Write-Host "Waiting for $Commit to reach $Remote/$Branch..." -ForegroundColor Cyan
+        $remoteRef = "refs/heads/$Branch"
+        $remoteReady = $false
+        for ($attempt = 0; $attempt -lt 60 -and -not $remoteReady; $attempt++) {
+            $line = & git -c http.proxy= -c https.proxy= ls-remote $Remote $remoteRef 2>$null
+            $remoteReady = $LASTEXITCODE -eq 0 -and $line -and (($line -split '\s+')[0] -eq $Commit)
+            if (-not $remoteReady) { Start-Sleep -Seconds 2 }
+        }
+        if (-not $remoteReady) { throw 'The pushed commit did not appear on the remote in time.' }
+    }
 
     Write-Host 'Waiting for GitHub Actions to receive the commit...' -ForegroundColor Cyan
     $selectedRun = $null
     for ($attempt = 0; $attempt -lt 10 -and -not $selectedRun; $attempt++) {
         Start-Sleep -Seconds 3
-        $selectedRun = Get-CiRuns -Commit $commit |
+        $selectedRun = Get-CiRuns -Commit $Commit |
             Where-Object { $_ -and $_.PSObject.Properties['databaseId'] -and -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
             Sort-Object createdAt -Descending |
             Select-Object -First 1
@@ -102,7 +126,7 @@ try {
         Invoke-Checked gh workflow run ci.yml --ref $Branch
         for ($attempt = 0; $attempt -lt 20 -and -not $selectedRun; $attempt++) {
             Start-Sleep -Seconds 3
-            $selectedRun = Get-CiRuns -Commit $commit |
+            $selectedRun = Get-CiRuns -Commit $Commit |
                 Where-Object { $_ -and $_.PSObject.Properties['databaseId'] -and -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
                 Sort-Object createdAt -Descending |
                 Select-Object -First 1
@@ -119,27 +143,13 @@ try {
 
     $tempDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("job-tracker-artifact-" + [Guid]::NewGuid().ToString('N'))
     $downloadDirectory = Join-Path $tempDirectory 'download'
-    $extractDirectory = Join-Path $tempDirectory 'extract'
-    New-Item -ItemType Directory -Path $downloadDirectory, $extractDirectory -Force | Out-Null
+    New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
 
-    Write-Host 'Downloading and verifying the build artifact...' -ForegroundColor Cyan
-    Invoke-Checked gh run download $runId --name job-tracker-linux-x64 --dir $downloadDirectory
-    $archive = Join-Path $downloadDirectory 'job-tracker-linux-x64.tar.gz'
-    $checksumFile = "$archive.sha256"
-    if (-not (Test-Path -LiteralPath $archive) -or -not (Test-Path -LiteralPath $checksumFile)) {
-        throw 'The Actions artifact is missing the archive or SHA-256 file.'
-    }
-
-    $expectedHash = ((Get-Content -LiteralPath $checksumFile -Raw).Trim() -split '\s+')[0].ToUpperInvariant()
-    $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToUpperInvariant()
-    if ($actualHash -ne $expectedHash) {
-        throw 'The downloaded archive failed SHA-256 verification.'
-    }
-
-    Invoke-Checked tar -xzf $archive -C $extractDirectory
-    $jar = Join-Path $extractDirectory 'job-tracker\job-tracker.jar'
+    Write-Host 'Downloading the server JAR artifact...' -ForegroundColor Cyan
+    Invoke-Checked gh run download $runId --name job-tracker-jar --dir $downloadDirectory
+    $jar = Join-Path $downloadDirectory 'job-tracker.jar'
     if (-not (Test-Path -LiteralPath $jar)) {
-        throw 'job-tracker.jar was not found in the downloaded archive.'
+        throw 'job-tracker.jar was not found in the downloaded artifact.'
     }
 
     $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
