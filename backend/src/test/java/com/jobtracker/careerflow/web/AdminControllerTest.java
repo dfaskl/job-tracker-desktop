@@ -1,0 +1,153 @@
+package com.jobtracker.careerflow.web;
+
+import com.jobtracker.careerflow.database.AdminService;
+import com.jobtracker.careerflow.database.AdminService.DisabledResult;
+import com.jobtracker.careerflow.database.AdminService.DisplayNameResult;
+import com.jobtracker.careerflow.database.AdminService.RegistrationCodeResult;
+import com.jobtracker.careerflow.database.AdminService.SessionResult;
+import com.jobtracker.careerflow.database.AdminService.GroupAssignmentResult;
+import com.jobtracker.careerflow.database.AdminService.GroupResult;
+import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+class AdminControllerTest {
+    @Test
+    void createsAndAssignsInterviewGroupsForAuthenticatedAdmins() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.createGroup("admin@example.com", "第一面试室")).thenReturn(new GroupResult(true, "4"));
+        when(service.assignGroup("admin@example.com", 9, 4L)).thenReturn(new GroupAssignmentResult(true, "4"));
+        AdminController controller = new AdminController(auth, service);
+
+        var created = controller.createGroup("token", new AdminController.GroupRequest("第一面试室"), sameOriginRequest());
+        var assigned = controller.assignGroup("token", 9, new AdminController.GroupAssignmentRequest(4L), sameOriginRequest());
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(assigned.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(service).createGroup("admin@example.com", "第一面试室");
+        verify(service).assignGroup("admin@example.com", 9, 4L);
+    }
+
+    @Test
+    void updatesRegistrationCodeOnlyForAnAuthenticatedSameOriginRequest() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.setRegistrationCode("admin@example.com", "join-2026", false))
+            .thenReturn(new RegistrationCodeResult(true, true));
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.registrationCode(
+            "token", new AdminController.RegistrationCodeRequest("join-2026", false),
+            sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new RegistrationCodeResult(true, true));
+        verify(service).setRegistrationCode("admin@example.com", "join-2026", false);
+    }
+
+    @Test
+    void disablesAUserOnlyForAnAuthenticatedSameOriginRequest() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.setDisabled("admin@example.com", 9, true)).thenReturn(new DisabledResult(true, true));
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.updateUser(
+            "token", 9, new AdminController.UserStateRequest(true), sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new DisabledResult(true, true));
+        verify(service).setDisabled("admin@example.com", 9, true);
+    }
+
+    @Test
+    void updatesAUsersDisplayNameForAnAuthenticatedSameOriginRequest() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.setDisplayName("admin@example.com", 9, "小明"))
+            .thenReturn(new DisplayNameResult(true, "小明"));
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.updateDisplayName(
+            "token", 9, new AdminController.DisplayNameRequest("小明"), sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new DisplayNameResult(true, "小明"));
+        verify(service).setDisplayName("admin@example.com", 9, "小明");
+    }
+
+    @Test
+    void revokesUserSessionsForAnAuthenticatedSameOriginRequest() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.revokeSessions("admin@example.com", 9)).thenReturn(new SessionResult(true, 2));
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.revokeSessions("token", 9, sameOriginRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(new SessionResult(true, 2));
+        verify(service).revokeSessions("admin@example.com", 9);
+    }
+    @Test
+    void rejectsCrossOriginMutationBeforeAuthenticationOrDatabaseAccess() {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        AdminController controller = new AdminController(auth, service);
+        MockHttpServletRequest request = sameOriginRequest();
+        request.removeHeader("Origin");
+        request.addHeader("Origin", "https://attacker.example.com");
+
+        var response = controller.updateUser(
+            "token", 9, new AdminController.UserStateRequest(true), request
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verifyNoInteractions(auth, service);
+    }
+
+    @Test
+    void rejectsBlankDeleteConfirmationBeforeAuthenticationOrDatabaseAccess() {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.deleteUser(
+            "token", 9, new AdminController.DeleteUserRequest("  "), sameOriginRequest()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(auth, service);
+    }
+
+    private MockHttpServletRequest sameOriginRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("https");
+        request.addHeader("Host", "demo.example.com");
+        request.addHeader("Origin", "https://demo.example.com");
+        return request;
+    }
+}

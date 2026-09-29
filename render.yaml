@@ -5,7 +5,6 @@ services:
     plan: free
     region: singapore
     branch: main
-    rootDir: migration-poc
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz

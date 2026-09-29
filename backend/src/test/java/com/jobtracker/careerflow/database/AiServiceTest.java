@@ -1,0 +1,96 @@
+package com.jobtracker.careerflow.database;
+
+import com.jobtracker.careerflow.ai.AiEndpointPolicy;
+import com.jobtracker.careerflow.compat.LegacySecretCrypto;
+import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class AiServiceTest {
+    @Test
+    void keepsExternalCallsDisabledWithoutEveryExplicitGate() {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("POC_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+            .withProperty("POC_AI_CALLS_ENABLED", "true");
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(
+            false, false, false, "未开启"
+        ));
+
+        var status = service(environment, sandbox).status();
+
+        assertThat(status.callsEnabled()).isFalse();
+        assertThat(status.sandboxEnabled()).isFalse();
+    }
+
+    @Test
+    void parsesJsonInsideTheCommonMarkdownEnvelope() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(
+            true, true, true, "已开启"
+        ));
+        AiService service = service(new MockEnvironment(), sandbox);
+
+        var parsed = service.parseModelJson("```json\n{\"company\":\"Example\",\"summary\":\"\"}\n```");
+
+        assertThat(parsed.path("company").asText()).isEqualTo("Example");
+    }
+
+    @Test
+    void sanitizesDailyQuoteFields() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+
+        var quote = service.dailyQuote(new ObjectMapper().readTree(
+            "{\"quote\":\"慢一点\\n也没关系\",\"author\":\"朋友\"}"
+        ));
+
+        assertThat(quote.quote()).isEqualTo("慢一点 也没关系");
+        assertThat(quote.author()).isEqualTo("朋友");
+    }
+    @Test
+    void sanitizesScheduleAdviceFields() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+
+        var advice = service.scheduleAdviceResult(new ObjectMapper().readTree(
+            "{\"summary\":\"先完成笔试\\n再参加面试\",\"plans\":[\"09:00-10:00 甲公司笔试\"],\"conflicts\":[\"两项安排重叠\"]}"
+        ));
+
+        assertThat(advice.path("summary").asText()).isEqualTo("先完成笔试 再参加面试");
+        assertThat(advice.path("plans").get(0).asText()).isEqualTo("09:00-10:00 甲公司笔试");
+        assertThat(advice.path("conflicts").get(0).asText()).isEqualTo("两项安排重叠");
+    }
+    @Test
+    void keepsRecognizedScheduleTitleEqualToNoticeType() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+
+        var result = service.recognition(new ObjectMapper().readTree(
+            "{\"noticeType\":\"笔试\",\"scheduleTitle\":\"新石器2027届AICoding后端工程类考试（二）\"}"
+        ));
+
+        assertThat(result.noticeType()).isEqualTo("笔试");
+        assertThat(result.scheduleTitle()).isEqualTo("笔试");
+    }
+    private AiService service(MockEnvironment environment, ApplicationService sandbox) {
+        ObjectMapper mapper = new ObjectMapper();
+        LegacySecretCrypto crypto = new LegacySecretCrypto();
+        return new AiService(
+            environment,
+            sandbox,
+            crypto,
+            new LegacySecretCryptoWriter(crypto),
+            new AiEndpointPolicy(environment),
+            mapper
+        );
+    }
+}

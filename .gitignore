@@ -2,10 +2,12 @@ data/*
 !data/.gitkeep
 .env
 .env.*
+!.env.example
 *.local
 *.log
 *backup*.json
 *before-*.json
 node_modules/
-migration-poc/backend/target/
-migration-poc/frontend/dist/
+backend/target/
+frontend/dist/
+dist/

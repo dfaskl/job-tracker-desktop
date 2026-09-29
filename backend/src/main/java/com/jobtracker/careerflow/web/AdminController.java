@@ -1,0 +1,275 @@
+package com.jobtracker.careerflow.web;
+
+import com.jobtracker.careerflow.database.AdminService;
+import com.jobtracker.careerflow.database.AdminService.AdminDisabledException;
+import com.jobtracker.careerflow.database.AdminService.AdminForbiddenException;
+import com.jobtracker.careerflow.database.AdminService.AdminNotFoundException;
+import com.jobtracker.careerflow.database.AdminService.AdminValidationException;
+import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/poc/admin-sandbox")
+public class AdminController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AdminController.class);
+
+    private final AuthController authController;
+    private final AdminService adminService;
+
+    public AdminController(AuthController authController, AdminService adminService) {
+        this.authController = authController;
+        this.adminService = adminService;
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<?> status() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(adminService.status());
+    }
+
+    @GetMapping("/overview")
+    public ResponseEntity<?> overview(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token
+    ) {
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.overview(user.get().email()));
+        } catch (Exception exception) {
+            return mapException("overview", exception);
+        }
+    }
+
+    @GetMapping("/users/{id}/details")
+    public ResponseEntity<?> details(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id
+    ) {
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.details(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("details", exception);
+        }
+    }
+
+    @PatchMapping("/settings/registration")
+    public ResponseEntity<?> registration(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) RegistrationRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.enabled() == null) return error(HttpStatus.BAD_REQUEST, "注册开关状态不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setRegistration(user.get().email(), body.enabled()));
+        } catch (Exception exception) {
+            return mapException("registration", exception);
+        }
+    }
+
+    @PatchMapping("/settings/registration-code")
+    public ResponseEntity<?> registrationCode(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) RegistrationCodeRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null) return error(HttpStatus.BAD_REQUEST, "注册码设置内容不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setRegistrationCode(
+                user.get().email(), body.code(), Boolean.TRUE.equals(body.clear())
+            ));
+        } catch (Exception exception) {
+            return mapException("registration-code", exception);
+        }
+    }
+
+    @PatchMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) UserStateRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.disabled() == null) return error(HttpStatus.BAD_REQUEST, "用户设置内容不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setDisabled(user.get().email(), id, body.disabled()));
+        } catch (Exception exception) {
+            return mapException("update-user", exception);
+        }
+    }
+
+    @PatchMapping("/users/{id}/display-name")
+    public ResponseEntity<?> updateDisplayName(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) DisplayNameRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.displayName() == null) return error(HttpStatus.BAD_REQUEST, "请输入用户昵称");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.setDisplayName(user.get().email(), id, body.displayName()));
+        } catch (Exception exception) {
+            return mapException("update-display-name", exception);
+        }
+    }
+
+    @PatchMapping("/users/{id}/sessions/revoke")
+    public ResponseEntity<?> revokeSessions(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.revokeSessions(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("revoke-sessions", exception);
+        }
+    }
+
+    @PostMapping("/groups")
+    public ResponseEntity<?> createGroup(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @RequestBody(required = false) GroupRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.name() == null) return error(HttpStatus.BAD_REQUEST, "请输入小组名称");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.createGroup(user.get().email(), body.name()));
+        } catch (Exception exception) {
+            return mapException("create-group", exception);
+        }
+    }
+
+    @DeleteMapping("/groups/{id}")
+    public ResponseEntity<?> deleteGroup(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.deleteGroup(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("delete-group", exception);
+        }
+    }
+
+    @PatchMapping("/users/{id}/group")
+    public ResponseEntity<?> assignGroup(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) GroupAssignmentRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null) return error(HttpStatus.BAD_REQUEST, "小组设置内容不正确");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.assignGroup(user.get().email(), id, body.groupId()));
+        } catch (Exception exception) {
+            return mapException("assign-group", exception);
+        }
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteUser(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id,
+        @RequestBody(required = false) DeleteUserRequest body,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        if (body == null || body.confirmEmail() == null || body.confirmEmail().isBlank()) {
+            return error(HttpStatus.BAD_REQUEST, "请输入目标用户邮箱确认删除");
+        }
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.deleteUser(user.get().email(), id, body.confirmEmail()));
+        } catch (Exception exception) {
+            return mapException("delete-user", exception);
+        }
+    }
+
+    private ResponseEntity<?> mapException(String operation, Exception exception) {
+        if (exception instanceof AdminForbiddenException) return error(HttpStatus.FORBIDDEN, exception.getMessage());
+        if (exception instanceof AdminNotFoundException) return error(HttpStatus.NOT_FOUND, exception.getMessage());
+        if (exception instanceof AdminValidationException) return error(HttpStatus.BAD_REQUEST, exception.getMessage());
+        if (exception instanceof AdminDisabledException) return error(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        LOGGER.warn("POC admin sandbox {} failed", operation, exception);
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "测试数据库暂时不可用");
+    }
+
+    private ResponseEntity<?> ok(Object body) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
+    }
+
+    private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
+        return ResponseEntity.status(status).cacheControl(CacheControl.noStore()).body(Map.of("message", message));
+    }
+
+    private boolean sameOrigin(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin == null || origin.isBlank()) return true;
+        try {
+            URI value = URI.create(origin);
+            String forwarded = request.getHeader("X-Forwarded-Proto");
+            String scheme = forwarded == null || forwarded.isBlank()
+                ? request.getScheme()
+                : forwarded.split(",", 2)[0].trim();
+            String host = request.getHeader("Host");
+            return scheme.equalsIgnoreCase(value.getScheme())
+                && host != null
+                && host.equalsIgnoreCase(value.getRawAuthority());
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    public record RegistrationRequest(Boolean enabled) {}
+    public record RegistrationCodeRequest(String code, Boolean clear) {}
+    public record UserStateRequest(Boolean disabled) {}
+    public record DisplayNameRequest(String displayName) {}
+    public record GroupRequest(String name) {}
+    public record GroupAssignmentRequest(Long groupId) {}
+    public record DeleteUserRequest(String confirmEmail) {}
+}

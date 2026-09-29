@@ -3,15 +3,23 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, "codex/migration-poc-demo"]
+    branches: [main]
     paths:
-      - "migration-poc/**"
+      - "backend/**"
+      - "frontend/**"
+      - "deploy/**"
+      - "Dockerfile"
+      - "docker-compose.yml"
       - ".github/workflows/ci.yml"
       - "render.yaml"
   pull_request:
     branches: [main]
     paths:
-      - "migration-poc/**"
+      - "backend/**"
+      - "frontend/**"
+      - "deploy/**"
+      - "Dockerfile"
+      - "docker-compose.yml"
       - ".github/workflows/ci.yml"
       - "render.yaml"
 
@@ -30,7 +38,7 @@ jobs:
         with:
           node-version: 22.22.0
           cache: npm
-          cache-dependency-path: migration-poc/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -38,7 +46,7 @@ jobs:
           java-version: "21"
           cache: maven
       - name: Build current Vue and Spring Boot application
-        run: mvn -B -f migration-poc/backend/pom.xml clean package
+        run: mvn -B -f backend/pom.xml clean package
       - name: Assemble self-contained Linux x64 package
         shell: bash
         run: |
@@ -47,12 +55,12 @@ jobs:
           package_root="$package_dir/job-tracker"
           mkdir -p "$package_root/runtime"
 
-          cp migration-poc/backend/target/job-tracker.jar "$package_root/job-tracker.jar"
-          cp migration-poc/deploy/self-hosted/env.example "$package_root/env.example"
-          cp migration-poc/deploy/self-hosted/start.sh "$package_root/start.sh"
-          cp migration-poc/deploy/self-hosted/stop.sh "$package_root/stop.sh"
-          cp migration-poc/deploy/self-hosted/status.sh "$package_root/status.sh"
-          cp migration-poc/deploy/self-hosted/migrate-to-sqlite.sh "$package_root/migrate-to-sqlite.sh"
+          cp backend/target/job-tracker.jar "$package_root/job-tracker.jar"
+          cp deploy/self-hosted/env.example "$package_root/env.example"
+          cp deploy/self-hosted/start.sh "$package_root/start.sh"
+          cp deploy/self-hosted/stop.sh "$package_root/stop.sh"
+          cp deploy/self-hosted/status.sh "$package_root/status.sh"
+          cp deploy/self-hosted/migrate-to-sqlite.sh "$package_root/migrate-to-sqlite.sh"
 
           curl --fail --location --retry 5 --retry-all-errors \
             --output "$package_dir/temurin-jre21.tar.gz" \
@@ -63,17 +71,17 @@ jobs:
             --strip-components=1
 
           chmod +x "$package_root/start.sh" "$package_root/stop.sh" "$package_root/status.sh" "$package_root/migrate-to-sqlite.sh"
-          mkdir -p migration-poc/dist
-          tar -czf migration-poc/dist/job-tracker-linux-x64.tar.gz \
+          mkdir -p dist
+          tar -czf dist/job-tracker-linux-x64.tar.gz \
             --directory "$package_dir" job-tracker
-          cd migration-poc/dist
+          cd dist
           sha256sum job-tracker-linux-x64.tar.gz > job-tracker-linux-x64.tar.gz.sha256
       - name: Upload self-contained Linux x64 package
         uses: actions/upload-artifact@v4
         with:
           name: job-tracker-linux-x64
           path: |
-            migration-poc/dist/job-tracker-linux-x64.tar.gz
-            migration-poc/dist/job-tracker-linux-x64.tar.gz.sha256
+            dist/job-tracker-linux-x64.tar.gz
+            dist/job-tracker-linux-x64.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14

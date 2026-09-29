@@ -1,0 +1,669 @@
+package com.jobtracker.careerflow.database;
+
+import com.jobtracker.careerflow.compat.LegacyPasswordVerifier;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
+
+@Component
+public class AdminService {
+    private static final int MAX_USERS = 500;
+    private static final int MAX_APPLICATIONS = 500;
+
+    private final Environment environment;
+    private final ObjectMapper objectMapper;
+    private final ApplicationService applicationSandboxService;
+    private final LegacyPasswordVerifier passwords;
+
+    public AdminService(
+        Environment environment,
+        ObjectMapper objectMapper,
+        ApplicationService applicationSandboxService,
+        LegacyPasswordVerifier passwords
+    ) {
+        this.environment = environment;
+        this.objectMapper = objectMapper;
+        this.applicationSandboxService = applicationSandboxService;
+        this.passwords = passwords;
+    }
+
+    public AdminStatus status() {
+        boolean requested = com.jobtracker.careerflow.config.AppEnvironment.adminEnabled(environment);
+        ApplicationService.SandboxStatus sandbox = applicationSandboxService.status();
+        if (!requested) {
+            return new AdminStatus(false, false, sandbox.enabled(), "管理员功能未开启");
+        }
+        if (!sandbox.enabled()) {
+            return new AdminStatus(false, true, false, "业务数据库当前不可写：" + sandbox.message());
+        }
+        return new AdminStatus(true, true, true, "管理员功能已开启");
+    }
+
+    public Overview overview(String adminEmail) throws Exception {
+        try (Connection connection = openConnection()) {
+            AdminIdentity admin = requireAdmin(connection, adminEmail);
+            List<UserView> users = users(connection);
+            SummaryCounts counts = summaryCounts(connection);
+            return new Overview(
+                new CurrentAdmin(String.valueOf(admin.id()), admin.email()),
+                new Summary(
+                    counts.totalUsers(), counts.enabledUsers(), counts.totalApplications(),
+                    counts.activeSessions(), counts.configuredApiKeys(), registrationIsOpen(connection),
+                    registrationCodeIsEnabled(connection), configured("ADMIN_EMAIL")
+                ),
+                groups(connection),
+                users,
+                counts.totalUsers() > users.size(),
+                audit(connection)
+            );
+        }
+    }
+
+    public UserDetails details(String adminEmail, long targetId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                UserDocument target = userDocument(connection, targetId);
+                UserDetails details = mapDetails(target.id(), target.email(), target.json());
+                insertAudit(connection, admin.id(), target.id(), target.email(), "view-user-details");
+                connection.commit();
+                return details;
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public RegistrationResult setRegistration(String adminEmail, boolean enabled) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO system_settings(key,value,updated_by) "
+                        + "VALUES('registration_open',to_jsonb(CAST(? AS boolean)),?) "
+                        + "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()"
+                )) {
+                    statement.setBoolean(1, enabled);
+                    statement.setLong(2, admin.id());
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), null, "系统注册入口",
+                    enabled ? "open-registration" : "close-registration");
+                connection.commit();
+                return new RegistrationResult(true, enabled);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public DisabledResult setDisabled(String adminEmail, long targetId, boolean disabled) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                rejectProtectedAdmin(admin, target, disabled ? "停用" : "修改");
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "UPDATE users SET disabled_at=CASE WHEN ? THEN NOW() ELSE NULL END WHERE id=?"
+                )) {
+                    statement.setBoolean(1, disabled);
+                    statement.setLong(2, target.id());
+                    statement.executeUpdate();
+                }
+                if (disabled) {
+                    try (PreparedStatement statement = connection.prepareStatement("DELETE FROM sessions WHERE user_id=?")) {
+                        statement.setLong(1, target.id());
+                        statement.executeUpdate();
+                    }
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(),
+                    disabled ? "disable-user" : "enable-user");
+                connection.commit();
+                return new DisabledResult(true, disabled);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public SessionResult revokeSessions(String adminEmail, long targetId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                rejectProtectedAdmin(admin, target, "撤销会话");
+                int revoked;
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM sessions WHERE user_id=?")) {
+                    statement.setLong(1, target.id());
+                    revoked = statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "revoke-sessions");
+                connection.commit();
+                return new SessionResult(true, revoked);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public DisplayNameResult setDisplayName(String adminEmail, long targetId, String displayName) throws Exception {
+        String cleanName = displayName == null ? "" : displayName.trim().replaceAll("\\s+", " ");
+        if (cleanName.isBlank() || cleanName.length() > 32) {
+            throw new AdminValidationException("昵称长度需为 1–32 个字符");
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "UPDATE users SET display_name=? WHERE id=?"
+                )) {
+                    statement.setString(1, cleanName);
+                    statement.setLong(2, target.id());
+                    if (statement.executeUpdate() != 1) throw new AdminNotFoundException("用户不存在");
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "update-display-name");
+                connection.commit();
+                return new DisplayNameResult(true, cleanName);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public RegistrationCodeResult setRegistrationCode(String adminEmail, String code, boolean clear) throws Exception {
+        String clean = code == null ? "" : code.trim();
+        if (!clear && (clean.length() < 4 || clean.length() > 128)) {
+            throw new AdminValidationException("注册码长度需为 4–128 位");
+        }
+        LegacyPasswordVerifier.PasswordRecord record = clear ? null : passwords.create(clean);
+        String stored = clear ? "" : record.salt() + ":" + record.hash();
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO system_settings(key,value,updated_by) "
+                        + "VALUES('registration_code_hash',to_jsonb(CAST(? AS text)),?) "
+                        + "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()"
+                )) {
+                    statement.setString(1, stored);
+                    statement.setLong(2, admin.id());
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), null, "系统注册码",
+                    clear ? "clear-registration-code" : "set-registration-code");
+                connection.commit();
+                return new RegistrationCodeResult(true, !clear);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+    public DeleteResult deleteUser(String adminEmail, long targetId, String confirmEmail) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                rejectProtectedAdmin(admin, target, "删除");
+                if (!normalizeEmail(confirmEmail).equals(target.email())) {
+                    throw new AdminValidationException("确认邮箱不匹配");
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "delete-user");
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM users WHERE id=?")) {
+                    statement.setLong(1, target.id());
+                    if (statement.executeUpdate() != 1) throw new AdminNotFoundException("用户不存在");
+                }
+                connection.commit();
+                return new DeleteResult(true);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public GroupResult createGroup(String adminEmail, String name) throws Exception {
+        String cleanName = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        if (cleanName.isBlank() || cleanName.length() > 40) {
+            throw new AdminValidationException("小组名称需为 1–40 个字符");
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                try (PreparedStatement duplicate = connection.prepareStatement(
+                    "SELECT 1 FROM interview_groups WHERE lower(name)=lower(?)"
+                )) {
+                    duplicate.setString(1, cleanName);
+                    try (ResultSet result = duplicate.executeQuery()) {
+                        if (result.next()) throw new AdminValidationException("已存在同名小组");
+                    }
+                }
+                long id;
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO interview_groups(name) VALUES(?) RETURNING id"
+                )) {
+                    statement.setString(1, cleanName);
+                    try (ResultSet result = statement.executeQuery()) {
+                        result.next();
+                        id = result.getLong(1);
+                    }
+                }
+                insertAudit(connection, admin.id(), null, "日程小组：" + cleanName, "create-interview-group");
+                connection.commit();
+                return new GroupResult(true, String.valueOf(id));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public GroupResult deleteGroup(String adminEmail, long groupId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                String name;
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT name FROM interview_groups WHERE id=? FOR UPDATE"
+                )) {
+                    statement.setLong(1, groupId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) throw new AdminNotFoundException("小组不存在");
+                        name = result.getString(1);
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement("DELETE FROM interview_groups WHERE id=?")) {
+                    statement.setLong(1, groupId);
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), null, "日程小组：" + name, "delete-interview-group");
+                connection.commit();
+                return new GroupResult(true, String.valueOf(groupId));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public GroupAssignmentResult assignGroup(String adminEmail, long targetId, Long groupId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                TargetUser target = lockTarget(connection, targetId);
+                if (groupId != null) {
+                    try (PreparedStatement statement = connection.prepareStatement(
+                        "SELECT name FROM interview_groups WHERE id=?"
+                    )) {
+                        statement.setLong(1, groupId);
+                        try (ResultSet result = statement.executeQuery()) {
+                            if (!result.next()) throw new AdminNotFoundException("小组不存在");
+                        }
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement("UPDATE users SET group_id=? WHERE id=?")) {
+                    if (groupId == null) statement.setNull(1, java.sql.Types.BIGINT);
+                    else statement.setLong(1, groupId);
+                    statement.setLong(2, target.id());
+                    statement.executeUpdate();
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(),
+                    groupId == null ? "remove-interview-group" : "assign-interview-group");
+                connection.commit();
+                return new GroupAssignmentResult(true, groupId == null ? "" : String.valueOf(groupId));
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    UserDetails mapDetails(long userId, String email, String json) throws Exception {
+        JsonNode root = objectMapper.readTree(json == null || json.isBlank()
+            ? "{\"applications\":[],\"events\":[]}" : json);
+        JsonNode applicationNodes = root.path("applications");
+        JsonNode eventNodes = root.path("events");
+        if (!applicationNodes.isArray() || !eventNodes.isArray()) {
+            throw new AdminValidationException("用户业务数据结构不兼容");
+        }
+
+        Map<String, List<FlowStep>> eventFlow = new HashMap<>();
+        for (JsonNode event : eventNodes) {
+            String applicationId = text(event, "applicationId", 160);
+            if (applicationId.isBlank()) continue;
+            String at = firstText(event, 40, "completedAt", "endsAt", "startsAt", "createdAt");
+            String type = text(event, "type", 100);
+            String title = text(event, "title", 300);
+            String result = event.path("missed").asBoolean(false)
+                ? "已错过"
+                : event.path("completed").asBoolean(false) ? firstText(event, 100, "result", "status") : "待完成";
+            if (result.isBlank()) result = "已完成";
+            String label = (type.isBlank() ? "" : type + " · ")
+                + (title.isBlank() ? "日程" : title) + " · " + result;
+            eventFlow.computeIfAbsent(applicationId, ignored -> new ArrayList<>()).add(new FlowStep(at, label));
+        }
+
+        List<AdminApplication> applications = new ArrayList<>();
+        int total = applicationNodes.size();
+        int visible = Math.min(total, MAX_APPLICATIONS);
+        for (int index = 0; index < visible; index++) {
+            JsonNode item = applicationNodes.get(index);
+            String id = text(item, "id", 160);
+            List<FlowStep> flow = new ArrayList<>();
+            flow.add(new FlowStep(firstText(item, 40, "appliedDate", "createdAt"), "已投递"));
+            JsonNode timeline = item.path("timeline");
+            if (timeline.isArray()) {
+                for (JsonNode step : timeline) {
+                    flow.add(new FlowStep(text(step, "at", 40), text(step, "title", 500)));
+                }
+            }
+            flow.addAll(eventFlow.getOrDefault(id, List.of()));
+            flow.removeIf(step -> step.at().isBlank() && step.title().isBlank());
+            flow.sort(Comparator.comparing(FlowStep::at));
+            applications.add(new AdminApplication(
+                id, text(item, "company", 300), text(item, "position", 300),
+                text(item, "stage", 100), text(item, "status", 100),
+                text(item, "appliedDate", 40), text(item, "city", 200),
+                text(item, "channel", 100), List.copyOf(flow)
+            ));
+        }
+        return new UserDetails(
+            new DetailUser(String.valueOf(userId), email), List.copyOf(applications), total, total > visible
+        );
+    }
+
+    private List<UserView> users(Connection connection) throws Exception {
+        String sql = "SELECT u.id,u.email,u.display_name,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,"
+            + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
+            + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
+            + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
+            + "u.last_active_at "
+            + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
+            + "LEFT JOIN interview_groups g ON g.id=u.group_id "
+            + "ORDER BY u.created_at ASC,u.id ASC LIMIT ?";
+        List<UserView> users = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, MAX_USERS);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    String disabledAt = instant(result, "disabled_at");
+                    users.add(new UserView(
+                        String.valueOf(result.getLong("id")), result.getString("email"), result.getString("display_name"),
+                        result.getBoolean("is_admin"), !disabledAt.isBlank(),
+                        disabledAt, instant(result, "created_at"),
+                        instant(result, "last_active_at"), result.getInt("application_count"),
+                        result.getInt("event_count"), result.getBoolean("has_api_key"),
+                        string(result.getObject("group_id")), string(result.getObject("group_name"))
+                    ));
+                }
+            }
+        }
+        return List.copyOf(users);
+    }
+
+    private List<GroupView> groups(Connection connection) throws Exception {
+        List<GroupView> groups = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT g.id,g.name,COUNT(u.id) AS member_count FROM interview_groups g "
+                + "LEFT JOIN users u ON u.group_id=g.id GROUP BY g.id,g.name ORDER BY lower(g.name),g.id"
+        ); ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                groups.add(new GroupView(String.valueOf(result.getLong("id")), result.getString("name"),
+                    result.getInt("member_count")));
+            }
+        }
+        return List.copyOf(groups);
+    }
+
+    private SummaryCounts summaryCounts(Connection connection) throws Exception {
+        String sql = "SELECT COUNT(*) AS total_users,COUNT(*) FILTER (WHERE disabled_at IS NULL) AS enabled_users,"
+            + "COALESCE(SUM(CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END),0) AS total_applications,"
+            + "(SELECT COUNT(*) FROM sessions WHERE expires_at>NOW()) AS active_sessions,"
+            + "(SELECT COUNT(*) FROM api_configs WHERE encrypted_api_key IS NOT NULL) AS configured_api_keys "
+            + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+            result.next();
+            return new SummaryCounts(
+                result.getInt("total_users"), result.getInt("enabled_users"),
+                result.getInt("total_applications"), result.getInt("active_sessions"),
+                result.getInt("configured_api_keys")
+            );
+        }
+    }
+
+    private List<AuditView> audit(Connection connection) throws Exception {
+        List<AuditView> items = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT id,action,target_email,created_at FROM admin_audit_logs ORDER BY created_at DESC LIMIT 30"
+        ); ResultSet result = statement.executeQuery()) {
+            while (result.next()) {
+                items.add(new AuditView(
+                    String.valueOf(result.getLong("id")), result.getString("action"),
+                    result.getString("target_email"), instant(result, "created_at")
+                ));
+            }
+        }
+        return List.copyOf(items);
+    }
+
+    private boolean registrationIsOpen(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT value::text FROM system_settings WHERE key='registration_open'"
+        ); ResultSet result = statement.executeQuery()) {
+            if (result.next()) return Boolean.parseBoolean(result.getString(1));
+        }
+        return !"false".equalsIgnoreCase(environment.getProperty("ALLOW_REGISTRATION", "true"));
+    }
+
+    private boolean registrationCodeIsEnabled(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT value #>> '{}' FROM system_settings WHERE key='registration_code_hash'"
+        ); ResultSet result = statement.executeQuery()) {
+            if (result.next()) {
+                String stored = result.getString(1);
+                return stored != null && !stored.isBlank();
+            }
+        }
+        return configured("REGISTRATION_CODE");
+    }
+
+    private AdminIdentity requireAdmin(Connection connection, String email) throws Exception {
+        String normalizedEmail = normalizeEmail(email);
+        String configuredAdminEmail = normalizeEmail(environment.getProperty("ADMIN_EMAIL"));
+        boolean configuredAdmin = !configuredAdminEmail.isBlank() && configuredAdminEmail.equals(normalizedEmail);
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT id,email,is_admin FROM users WHERE lower(email)=? AND disabled_at IS NULL"
+        )) {
+            statement.setString(1, normalizedEmail);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    throw new AdminForbiddenException("当前管理员账号不存在或已停用");
+                }
+                long id = result.getLong("id");
+                boolean databaseAdmin = result.getBoolean("is_admin");
+                if (!databaseAdmin && !configuredAdmin) {
+                    throw new AdminForbiddenException("当前账号没有管理员权限");
+                }
+                if (configuredAdmin && !databaseAdmin) {
+                    try (PreparedStatement promote = connection.prepareStatement(
+                        "UPDATE users SET is_admin=TRUE WHERE id=?"
+                    )) {
+                        promote.setLong(1, id);
+                        promote.executeUpdate();
+                    }
+                }
+                return new AdminIdentity(id, result.getString("email"));
+            }
+        }
+    }
+
+    private UserDocument userDocument(Connection connection, long targetId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT u.id,u.email,d.data::text FROM users u LEFT JOIN user_data d ON d.user_id=u.id WHERE u.id=?"
+        )) {
+            statement.setLong(1, targetId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new AdminNotFoundException("用户不存在");
+                return new UserDocument(result.getLong("id"), result.getString("email"), result.getString(3));
+            }
+        }
+    }
+
+    private TargetUser lockTarget(Connection connection, long targetId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT id,email,is_admin FROM users WHERE id=? FOR UPDATE"
+        )) {
+            statement.setLong(1, targetId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) throw new AdminNotFoundException("用户不存在");
+                return new TargetUser(result.getLong("id"), result.getString("email"), result.getBoolean("is_admin"));
+            }
+        }
+    }
+
+    private void rejectProtectedAdmin(AdminIdentity admin, TargetUser target, String action) {
+        if (target.id() == admin.id()) throw new AdminValidationException("不能" + action + "自己的管理员账号");
+        if (target.admin()) throw new AdminValidationException("不能通过迁移后台" + action + "管理员账号");
+    }
+
+    private void insertAudit(
+        Connection connection,
+        long adminId,
+        Long targetId,
+        String targetEmail,
+        String action
+    ) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "INSERT INTO admin_audit_logs(admin_user_id,target_user_id,target_email,action) VALUES(?,?,?,?)"
+        )) {
+            statement.setLong(1, adminId);
+            if (targetId == null) statement.setNull(2, java.sql.Types.BIGINT);
+            else statement.setLong(2, targetId);
+            statement.setString(3, targetEmail);
+            statement.setString(4, action);
+            statement.executeUpdate();
+        }
+    }
+
+    private Connection openConnection() throws Exception {
+        AdminStatus status = status();
+        if (!status.enabled()) throw new AdminDisabledException(status.message());
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(com.jobtracker.careerflow.config.AppEnvironment.databaseUrl(environment));
+        Properties properties = new Properties();
+        if (config.username() != null) properties.setProperty("user", config.username());
+        if (config.password() != null) properties.setProperty("password", config.password());
+        properties.setProperty("ApplicationName", "careerflow-admin-sandbox");
+        return PooledConnections.open(config, properties);
+    }
+
+    private boolean configured(String key) {
+        String value = environment.getProperty(key);
+        return value != null && !value.isBlank();
+    }
+
+    private String firstText(JsonNode node, int maxLength, String... fields) {
+        for (String field : fields) {
+            String value = text(node, field, maxLength);
+            if (!value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    private String text(JsonNode node, String field, int maxLength) {
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull() || value.isObject() || value.isArray()) return "";
+        String result = value.asText("").trim();
+        return result.length() <= maxLength ? result : result.substring(0, maxLength);
+    }
+
+    private String normalizeEmail(String value) {
+        String email = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return email.length() <= 254 ? email : email.substring(0, 254);
+    }
+
+    private String string(Object value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private String instant(ResultSet result, String column) throws Exception {
+        return DatabaseTime.instant(result, column);
+    }
+
+    private record AdminIdentity(long id, String email) {}
+    private record TargetUser(long id, String email, boolean admin) {}
+    private record UserDocument(long id, String email, String json) {}
+    private record SummaryCounts(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
+                                 int configuredApiKeys) {}
+
+    public record AdminStatus(boolean enabled, boolean requested, boolean sandboxEnabled, String message) {}
+    public record CurrentAdmin(String id, String email) {}
+    public record Summary(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
+                          int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
+                          boolean adminEmailConfigured) {}
+    public record UserView(String id, String email, String displayName, boolean isAdmin, boolean disabled, String disabledAt,
+                           String createdAt, String lastActiveAt, int applicationCount, int eventCount,
+                           boolean hasApiKey, String groupId, String groupName) {}
+    public record GroupView(String id, String name, int memberCount) {}
+    public record AuditView(String id, String action, String targetEmail, String createdAt) {}
+    public record Overview(CurrentAdmin currentUser, Summary summary, List<GroupView> groups, List<UserView> users,
+                           boolean usersTruncated, List<AuditView> audit) {}
+    public record FlowStep(String at, String title) {}
+    public record AdminApplication(String id, String company, String position, String stage, String status,
+                                   String appliedDate, String city, String channel, List<FlowStep> flow) {}
+    public record DetailUser(String id, String email) {}
+    public record UserDetails(DetailUser user, List<AdminApplication> applications,
+                              int totalApplications, boolean truncated) {}
+    public record RegistrationResult(boolean ok, boolean registrationOpen) {}
+    public record RegistrationCodeResult(boolean ok, boolean registrationCodeEnabled) {}
+    public record DisabledResult(boolean ok, boolean disabled) {}
+    public record DisplayNameResult(boolean ok, String displayName) {}
+    public record SessionResult(boolean ok, int revoked) {}
+    public record DeleteResult(boolean ok) {}
+    public record GroupResult(boolean ok, String groupId) {}
+    public record GroupAssignmentResult(boolean ok, String groupId) {}
+
+    public static class AdminDisabledException extends RuntimeException {
+        public AdminDisabledException(String message) { super(message); }
+    }
+
+    public static class AdminForbiddenException extends RuntimeException {
+        public AdminForbiddenException(String message) { super(message); }
+    }
+
+    public static class AdminNotFoundException extends RuntimeException {
+        public AdminNotFoundException(String message) { super(message); }
+    }
+
+    public static class AdminValidationException extends RuntimeException {
+        public AdminValidationException(String message) { super(message); }
+    }
+}
