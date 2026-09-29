@@ -4,7 +4,7 @@
 
 ## 1. 生成部署包
 
-推送到 `main` 后，GitHub Actions 的 `CI` 工作流会自动构建并上传名为 `job-tracker-linux-x64` 的产物。也可以在 GitHub 仓库的 **Actions → CI → Run workflow** 中手动运行。
+推送代码不会自动运行 GitHub Actions。需要重新生成带 Java 21 JRE 的完整部署包时，在 GitHub 仓库的 **Actions → Manual package → Run workflow** 中手动运行；日常版本更新直接在 Windows 本地运行 `.\build-jar.ps1`，使用生成的 `dist/job-tracker.jar` 即可。
 
 构建完成后下载产物 ZIP，解压可得到：
 
@@ -111,14 +111,22 @@ cd /home/zhoujiajun/jobtracker
 cp job-tracker.jar "job-tracker.jar.$(date +%Y%m%d-%H%M%S).bak"
 ```
 
-将新压缩包上传到同一目录，再覆盖解压：
+日常更新时，先在本地 PowerShell 上传新 JAR：
 
-```bash
-tar -xzf job-tracker-linux-x64.tar.gz --strip-components=1
-./start.sh
+```powershell
+scp .\dist\job-tracker.jar zhoujiajun@服务器地址:/home/zhoujiajun/jobtracker/job-tracker.jar
 ```
 
-部署包不会包含或覆盖 `.env`、`logs/` 和 `run/`。
+然后在服务器启动并检查：
+
+```bash
+cd /home/zhoujiajun/jobtracker
+./start.sh
+./status.sh
+curl http://127.0.0.1:18080/healthz
+```
+
+只替换 JAR 不会影响 `.env`、`data/`、`backups/`、`logs/` 和 `run/`。只有首次部署或需要更新内置 Java 运行时时，才需要手动运行 Actions 并下载完整压缩包。
 
 ## 6. 从 Neon 一次性迁移到 SQLite
 

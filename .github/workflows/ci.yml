@@ -1,27 +1,7 @@
-name: CI
+name: Manual package
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "deploy/**"
-      - "Dockerfile"
-      - "docker-compose.yml"
-      - ".github/workflows/ci.yml"
-      - "render.yaml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "deploy/**"
-      - "Dockerfile"
-      - "docker-compose.yml"
-      - ".github/workflows/ci.yml"
-      - "render.yaml"
 
 permissions:
   contents: read

@@ -19,7 +19,7 @@ CareerFlow 是一个面向个人与小组协作的求职管理系统，用于统
 - 前端：Vue 3、TypeScript、Vite
 - 后端：Java 21、Spring Boot、Maven
 - 数据库：SQLite 或 PostgreSQL
-- 发布：GitHub Actions 自动测试并生成自带 Java 21 JRE 的 Linux x64 部署包
+- 发布：本地脚本生成可直接上传服务器的 JAR；GitHub Actions 仅保留手动生成完整 Linux x64 部署包的入口
 
 ## 仓库结构
 
@@ -42,11 +42,16 @@ CareerFlow 是一个面向个人与小组协作的求职管理系统，用于统
 需要 Java 21、Maven 3.9 和 Node.js 22。在仓库根目录运行：
 
 ```powershell
-mvn -f backend/pom.xml clean package
-java -jar backend/target/job-tracker.jar
+.\build-jar.ps1
 ```
 
-Maven 会自动执行 `npm ci`、构建 Vue、运行后端测试，并将前端资源复制到最终 JAR。
+脚本会调用 Maven 自动执行 `npm ci`、构建 Vue、运行后端测试，并将前端资源复制到最终 JAR。构建成功后的服务器更新文件位于 `dist/job-tracker.jar`。
+
+如需在本地直接启动，也可以运行：
+
+```powershell
+java -jar .\dist\job-tracker.jar
+```
 
 应用默认读取环境变量或根目录 `.env` 中的配置。可参考 [.env.example](.env.example) 和 [deploy/self-hosted/env.example](deploy/self-hosted/env.example)。生产环境至少需要配置：
 
@@ -59,7 +64,7 @@ Maven 会自动执行 `npm ci`、构建 Vue、运行后端测试，并将前端�
 
 ### Linux 单机部署
 
-推荐从 GitHub Actions 的 `CI` 工作流下载 `job-tracker-linux-x64`。该部署包自带 Java 21 JRE，服务器无需安装 Docker、Maven、Node.js 或新版 Java。
+日常更新推荐运行 `.\build-jar.ps1`，然后把 `dist/job-tracker.jar` 上传到服务器替换旧 JAR。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
 
 完整的安装、更新、回滚和 SQLite 备份方法见 [自托管部署文档](docs/SELF-HOSTED-DEPLOYMENT.md)。更新版本时必须保留服务器上的 `.env`、`data/`、`backups/` 和 `logs/`。
 
