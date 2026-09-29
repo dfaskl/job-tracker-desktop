@@ -39,13 +39,6 @@ jobs:
           cache: maven
       - name: Build current Vue and Spring Boot application
         run: mvn -B -f migration-poc/backend/pom.xml clean package
-      - name: Upload server JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: job-tracker-jar
-          path: migration-poc/backend/target/job-tracker.jar
-          if-no-files-found: error
-          retention-days: 14
       - name: Assemble self-contained Linux x64 package
         shell: bash
         run: |

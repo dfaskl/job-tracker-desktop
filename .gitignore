@@ -9,4 +9,3 @@ data/*
 node_modules/
 migration-poc/backend/target/
 migration-poc/frontend/dist/
-local-artifacts/
