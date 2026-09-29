@@ -146,7 +146,24 @@ try {
     New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
 
     Write-Host 'Downloading the server JAR artifact...' -ForegroundColor Cyan
-    Invoke-Checked gh run download $runId --name job-tracker-jar --dir $downloadDirectory
+    $artifactJson = & gh api "repos/dfaskl/job-tracker-desktop/actions/runs/$runId/artifacts"
+    if ($LASTEXITCODE -ne 0 -or -not $artifactJson) { throw 'Unable to list artifacts for the CI run.' }
+    $artifactResponse = $artifactJson | ConvertFrom-Json
+    $artifact = @($artifactResponse.artifacts) |
+        Where-Object { $_.name -eq 'job-tracker-jar' } |
+        Select-Object -First 1
+    if (-not $artifact) { throw 'The job-tracker-jar artifact was not found.' }
+
+    $artifactZip = Join-Path $tempDirectory 'job-tracker-jar.zip'
+    $token = (& gh auth token).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Unable to read the GitHub CLI token.' }
+    $headers = @{
+        Authorization = "Bearer $token"
+        Accept = 'application/vnd.github+json'
+        'X-GitHub-Api-Version' = '2022-11-28'
+    }
+    Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri ([string]$artifact.archive_download_url) -OutFile $artifactZip
+    Expand-Archive -LiteralPath $artifactZip -DestinationPath $downloadDirectory -Force
     $jar = Join-Path $downloadDirectory 'job-tracker.jar'
     if (-not (Test-Path -LiteralPath $jar)) {
         throw 'job-tracker.jar was not found in the downloaded artifact.'
