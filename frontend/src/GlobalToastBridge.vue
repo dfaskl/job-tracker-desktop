@@ -10,6 +10,28 @@ function isToast(element: Element): element is HTMLElement {
     && element.matches('p.success, p.danger, .feedback')
 }
 
+function supportsPopover(element: HTMLElement): element is HTMLElement & {
+  showPopover: () => void
+  hidePopover: () => void
+} {
+  return typeof element.showPopover === 'function' && typeof element.hidePopover === 'function'
+}
+
+function openToast(element: HTMLElement) {
+  element.style.removeProperty('display')
+  if (!supportsPopover(element)) return
+  element.setAttribute('popover', 'manual')
+  if (!element.matches(':popover-open')) element.showPopover()
+}
+
+function closeToast(element: HTMLElement) {
+  if (supportsPopover(element) && element.isConnected && element.matches(':popover-open')) {
+    element.hidePopover()
+    return
+  }
+  element.style.setProperty('display', 'none', 'important')
+}
+
 function showToast(element: HTMLElement) {
   if (!element.textContent?.trim()) return
   const previous = timers.get(element)
@@ -17,12 +39,12 @@ function showToast(element: HTMLElement) {
   element.dataset.globalToast = 'true'
   element.setAttribute('role', element.classList.contains('danger') ? 'alert' : 'status')
   element.setAttribute('aria-live', element.classList.contains('danger') ? 'assertive' : 'polite')
-  element.style.removeProperty('display')
   element.classList.add('global-operation-toast')
+  openToast(element)
   timers.set(element, setTimeout(() => {
+    closeToast(element)
     element.dataset.globalToast = 'false'
     element.classList.remove('global-operation-toast')
-    element.style.setProperty('display', 'none', 'important')
     timers.delete(element)
   }, 3000))
 }
