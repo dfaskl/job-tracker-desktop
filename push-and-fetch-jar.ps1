@@ -27,7 +27,8 @@ function Get-CiRuns {
     param([string]$Commit)
     $json = & gh run list --workflow ci.yml --commit $Commit --limit 20 --json databaseId,status,conclusion,createdAt 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $json) { return @() }
-    return @($json | ConvertFrom-Json)
+    $parsed = $json | ConvertFrom-Json
+    foreach ($run in $parsed) { Write-Output $run }
 }
 
 function Push-CurrentBranch {
