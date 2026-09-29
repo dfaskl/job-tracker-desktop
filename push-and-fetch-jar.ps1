@@ -89,7 +89,7 @@ try {
     for ($attempt = 0; $attempt -lt 10 -and -not $selectedRun; $attempt++) {
         Start-Sleep -Seconds 3
         $selectedRun = Get-CiRuns -Commit $commit |
-            Where-Object { -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
+            Where-Object { $_ -and $_.PSObject.Properties['databaseId'] -and -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
             Sort-Object createdAt -Descending |
             Select-Object -First 1
     }
@@ -102,7 +102,7 @@ try {
         for ($attempt = 0; $attempt -lt 20 -and -not $selectedRun; $attempt++) {
             Start-Sleep -Seconds 3
             $selectedRun = Get-CiRuns -Commit $commit |
-                Where-Object { -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
+                Where-Object { $_ -and $_.PSObject.Properties['databaseId'] -and -not $knownRunIds.ContainsKey([string]$_.databaseId) } |
                 Sort-Object createdAt -Descending |
                 Select-Object -First 1
         }
