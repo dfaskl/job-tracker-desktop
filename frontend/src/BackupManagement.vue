@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
-import { trackedJsonFetch } from './requestActivity'
+import { jsonFetch } from './api'
 import { formatShanghaiDateTime } from './shanghaiTime'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
@@ -27,7 +27,7 @@ const error = ref('')
 onMounted(checkSandbox)
 
 async function requestJson(url: string, init?: RequestInit) {
-  return trackedJsonFetch<Record<string, any>>(url, { cache: 'no-store', ...init })
+  return jsonFetch<Record<string, any>>(url, { cache: 'no-store', ...init })
 }
 
 async function checkSandbox() {

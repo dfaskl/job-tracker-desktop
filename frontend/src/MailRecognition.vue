@@ -128,7 +128,7 @@ async function processMail(mail: CollectedMail) {
   error.value = ''
   setSmoking([mail.id], true)
   if (previewMail.value?.id === mail.id) closeMailPreview()
-  const background = api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH', blockPage: false })
+  const background = api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH' })
     .then(() => ({ ok: true as const })).catch(cause => ({ ok: false as const, cause }))
   await waitForSmoke()
   inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
@@ -158,7 +158,7 @@ async function processAllMail() {
   const removedIds=removed.map(item=>item.id)
   processingAll.value=true;error.value='';setSmoking(removedIds,true)
   if(previewMail.value)closeMailPreview()
-  const background=api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH',blockPage:false})
+  const background=api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH'})
     .then(value=>({ok:true as const,value})).catch(cause=>({ok:false as const,cause}))
   await waitForSmoke()
   const removedIdSet=new Set(removedIds)

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { pageMutationBusy } from './requestActivity'
+import { onBeforeUnmount, onMounted } from 'vue'
 
 const timers = new WeakMap<Element, ReturnType<typeof setTimeout>>()
-const pendingToasts = new Set<HTMLElement>()
 let observer: MutationObserver | null = null
 
 function isToast(element: Element): element is HTMLElement {
@@ -14,7 +12,6 @@ function isToast(element: Element): element is HTMLElement {
 
 function showToast(element: HTMLElement) {
   if (!element.textContent?.trim()) return
-  pendingToasts.delete(element)
   const previous = timers.get(element)
   if (previous) clearTimeout(previous)
   element.dataset.globalToast = 'true'
@@ -23,71 +20,30 @@ function showToast(element: HTMLElement) {
   element.style.removeProperty('display')
   element.classList.add('global-operation-toast')
   timers.set(element, setTimeout(() => {
+    element.dataset.globalToast = 'false'
+    element.classList.remove('global-operation-toast')
     element.style.setProperty('display', 'none', 'important')
     timers.delete(element)
   }, 3000))
 }
 
-function queueToast(element: HTMLElement) {
-  if (!element.textContent?.trim()) return
-  const previous = timers.get(element)
-  if (previous) clearTimeout(previous)
-  timers.delete(element)
-  element.dataset.globalToast = 'pending'
-  element.classList.remove('global-operation-toast')
-  element.style.setProperty('display', 'none', 'important')
-  pendingToasts.add(element)
-}
-
-function presentToast(element: HTMLElement) {
-  if (pageMutationBusy.value) queueToast(element)
-  else showToast(element)
-}
-
-function flushPendingToasts() {
-  if (pageMutationBusy.value) return
-  for (const element of [...pendingToasts]) {
-    if (element.isConnected) showToast(element)
-    else pendingToasts.delete(element)
-  }
-}
-
-function dismissVisibleToasts() {
-  document.querySelectorAll<HTMLElement>('.global-operation-toast').forEach(element => {
-    const timer = timers.get(element)
-    if (timer) clearTimeout(timer)
-    timers.delete(element)
-    element.dataset.globalToast = 'false'
-    element.classList.remove('global-operation-toast')
-    element.style.setProperty('display', 'none', 'important')
-  })
-}
-
 function inspect(node: Node) {
   if (node instanceof Element) {
-    if (isToast(node)) presentToast(node)
+    if (isToast(node)) showToast(node)
     node.querySelectorAll('p.success, p.danger, .feedback').forEach(item => {
-      if (isToast(item)) presentToast(item)
+      if (isToast(item)) showToast(item)
     })
   }
   const parent = node.parentElement
-  if (parent && ['true', 'pending'].includes(parent.dataset.globalToast || '')) {
+  if (parent && parent.dataset.globalToast === 'true') {
     parent.dataset.globalToast = 'false'
-    presentToast(parent)
+    showToast(parent)
   }
 }
 
-watch(pageMutationBusy, busy => {
-  if (busy) {
-    dismissVisibleToasts()
-    return
-  }
-  if (pendingToasts.size) flushPendingToasts()
-})
-
 onMounted(() => {
   document.querySelectorAll('p.success, p.danger, .feedback').forEach(item => {
-    if (isToast(item)) presentToast(item)
+    if (isToast(item)) showToast(item)
   })
   observer = new MutationObserver(records => records.forEach(record => inspect(record.target)))
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
@@ -95,7 +51,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  pendingToasts.clear()
 })
 </script>
 
@@ -120,7 +75,6 @@ onBeforeUnmount(() => {
   background: #f0fdf4 !important;
   box-shadow: var(--shadow-lg) !important;
   text-align: center !important;
-  animation: global-toast-in .18s ease-out !important;
 }
 .global-operation-toast.danger,
 .global-operation-toast.feedback.danger {
@@ -129,8 +83,15 @@ onBeforeUnmount(() => {
   background: #fef2f2 !important;
 }
 .global-operation-toast button { margin-left: 10px !important; }
-@keyframes global-toast-in {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+:root[data-theme="dark"] .global-operation-toast {
+  border-color: color-mix(in srgb,var(--color-success) 48%,var(--color-border)) !important;
+  color: #b8f5cf !important;
+  background: #13251c !important;
+}
+:root[data-theme="dark"] .global-operation-toast.danger,
+:root[data-theme="dark"] .global-operation-toast.feedback.danger {
+  border-color: color-mix(in srgb,var(--color-destructive) 54%,var(--color-border)) !important;
+  color: #ffc7c2 !important;
+  background: #2a1718 !important;
 }
 </style>

@@ -1,18 +1,24 @@
-import { trackedJsonFetch } from './requestActivity'
-
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message)
   }
 }
 
-export type ApiRequestInit = RequestInit & { blockPage?: boolean }
+export type ApiRequestInit = RequestInit
+
+export async function jsonFetch<T = Record<string, unknown>>(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+): Promise<{ response: Response; body: T }> {
+  const response = await fetch(input, init)
+  const body = await response.json().catch(() => ({})) as T
+  return { response, body }
+}
 
 export async function api<T>(url: string, init: ApiRequestInit = {}): Promise<T> {
-  const { blockPage, ...requestInit } = init
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-  const { response, body } = await trackedJsonFetch<Record<string, unknown>>(url, { cache: 'no-store', credentials: 'same-origin', ...requestInit, headers }, blockPage)
+  const { response, body } = await jsonFetch<Record<string, unknown>>(url, { cache: 'no-store', credentials: 'same-origin', ...init, headers })
   if (!response.ok) throw new ApiError(String(body.message || `请求失败（${response.status}）`), response.status)
   return body as T
 }

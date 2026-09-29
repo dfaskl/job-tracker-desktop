@@ -171,7 +171,7 @@ async function saveCompanyOfficialLink(){
 async function saveApplication(){
   if(!selected.value)applyOfficialCompany()
   if(!selected.value){const duplicate=store.applications.value.find(item=>String(item.company||'').trim().toLowerCase()===form.company.trim().toLowerCase()&&String(item.position||'').trim().toLowerCase()===form.position.trim().toLowerCase());if(duplicate){editing.value=false;selected.value=duplicate;error.value='';message.value='已存在相同公司和岗位的投递，不会重复创建；你可以直接追加日程或编辑原记录';return}}
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{
     const current=selected.value
     if(!current)await saveCompanyOfficialLink()
@@ -188,7 +188,7 @@ async function quickUpdate(stage:string,status:string){
 }
 async function removeApplication(){
   const item=selected.value;if(!item||!confirm(`确认删除“${item.company} / ${item.position}”及其关联日程吗？`))return
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{
     await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:item.updatedAt||''})})
     const backups=await api<{items:{id:number}[];currentUpdatedAt:string}>('/api/poc/backup-sandbox/backups')
@@ -198,7 +198,7 @@ async function removeApplication(){
 }
 async function undoDelete(){
   if(!undo.value)return
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{
     await api(`/api/poc/backup-sandbox/backups/${undo.value.backupId}/restore`,{method:'POST',body:JSON.stringify({expectedCurrentUpdatedAt:undo.value.expected})})
     undo.value=null;await store.refresh();message.value='刚才删除的投递和日程已恢复'
@@ -219,7 +219,7 @@ function openEvent(item?:JobEvent){
 }
 async function saveEvent(){
   if(!selected.value)return
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{
     const current=editingEvent.value
     if(eventForm.timeMode==='range'&&!eventForm.endsAt){error.value='时间段日程必须填写结束时间';return}
@@ -229,13 +229,13 @@ async function saveEvent(){
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存日程失败'}finally{busy.value=false}
 }
 async function resolveEvent(item:JobEvent,action:'complete'|'abandon'|'restore'){
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}/resolution`,{method:'POST',body:JSON.stringify({action,expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value=action==='complete'?'日程已完成':action==='abandon'?'日程已放弃':'日程已恢复为待处理'}
   catch(cause){error.value=cause instanceof Error?cause.message:'更新日程状态失败'}finally{busy.value=false}
 }
 async function removeEvent(item:JobEvent){
   if(!confirm(`确认删除“${item.title||item.type||'日程'}”吗？`))return
-  busy.value=true;error.value=''
+  busy.value=true;error.value='';message.value=''
   try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value='日程已删除'}
   catch(cause){error.value=cause instanceof Error?cause.message:'删除日程失败'}finally{busy.value=false}
 }

@@ -3,7 +3,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
-import { trackedJsonFetch } from './requestActivity'
+import { jsonFetch } from './api'
 import { useCalendarEventCapacity } from './useCalendarEventCapacity'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
@@ -150,7 +150,7 @@ function locationLink(value: string) { return String(value || '').match(/https?:
 function locationText(value: string) { const link=locationLink(value); return String(value || '').replace(link,'').replace(/^[\s·,，;；:：-]+|[\s·,，;；:：-]+$/g,'') }
 
 async function requestJson(url: string, init?: RequestInit) {
-  return trackedJsonFetch<Record<string, any>>(url, { cache: 'no-store', ...init })
+  return jsonFetch<Record<string, any>>(url, { cache: 'no-store', ...init })
 }
 
 

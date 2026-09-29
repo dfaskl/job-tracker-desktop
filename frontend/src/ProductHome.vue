@@ -151,7 +151,7 @@ function displayName(name:string|undefined,email:string){return String(name||'')
 async function loadSharedTimelines(){
   if(!store.user.value||sharedTimelinesLoading.value)return
   sharedTimelinesLoading.value=true;sharedTimelinesNotice.value=''
-  try{const result=await api<{groupId:string;groupName:string;users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines',{blockPage:false});sharedTimelines.value=Array.isArray(result.users)?result.users:[];sharedGroupName.value=String(result.groupName||'')}
+  try{const result=await api<{groupId:string;groupName:string;users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines');sharedTimelines.value=Array.isArray(result.users)?result.users:[];sharedGroupName.value=String(result.groupName||'')}
   catch{sharedTimelines.value=[];sharedGroupName.value='';sharedTimelinesNotice.value='小组时间轴暂时无法加载'}
   finally{sharedTimelinesLoading.value=false}
 }
@@ -188,7 +188,7 @@ function localScheduleAdvice():ScheduleAdvice{
   adviceLoading.value=true
   try{
     const schedules=adviceCandidates.value.map(event=>({id:event.id,company:eventCompany(event),title:String(event.title||event.type||'未命名日程'),startsAt:eventStart(event),endsAt:String(event.endsAt||event.end||eventStart(event))}))
-    const advice=await api<ScheduleAdvice>('/api/poc/ai-sandbox/schedule-advice',{method:'POST',body:JSON.stringify({schedules}),blockPage:false})
+    const advice=await api<ScheduleAdvice>('/api/poc/ai-sandbox/schedule-advice',{method:'POST',body:JSON.stringify({schedules})})
     if(adviceSignature.value!==signature)return
     scheduleAdvice.value=advice
     localStorage.setItem(adviceCacheKey(),JSON.stringify({expiresAt:scheduleAdviceExpiry(),signature,advice}))
@@ -236,7 +236,7 @@ async function generateQuote(force:boolean){
   try{
     const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
     if(!status.callsEnabled){quote.value=fallbackQuote();return}
-    const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()}),blockPage:false})
+    const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})})
     quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true}
     localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value))
     refreshed=true
@@ -248,8 +248,8 @@ async function generateQuote(force:boolean){
     if(force&&refreshed){await nextTick();celebrateQuote()}
   }
 }
-async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();await loadSharedTimelines();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
-async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
+async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';message.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();await loadSharedTimelines();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
+async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';message.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
 watch(message,value=>{if(messageTimer)clearTimeout(messageTimer);if(value)messageTimer=setTimeout(()=>{if(message.value===value)message.value=''},2600)})
 function syncScheduleAdvice(signature:string){

@@ -33,9 +33,9 @@ let mailInboxPromise: Promise<void> | null = null
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
 
-function refresh(throwOnError = false, reportError = true, blockPage = true) {
+function refresh(throwOnError = false, reportError = true, showLocalLoading = true) {
   if (refreshPromise) return refreshPromise
-  if (blockPage) loading.value = true
+  if (showLocalLoading) loading.value = true
   refreshPromise = (async () => {
     try {
       const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
@@ -54,7 +54,7 @@ function refresh(throwOnError = false, reportError = true, blockPage = true) {
       if (reportError) error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
       if (throwOnError) throw cause
     } finally {
-      if (blockPage) loading.value = false
+      if (showLocalLoading) loading.value = false
       initialized.value = true
       refreshPromise = null
     }
@@ -67,11 +67,11 @@ async function initialize() {
   await refresh()
 }
 
-function refreshMailInbox(sync = false, blockPage = false) {
+function refreshMailInbox(sync = false) {
   if (mailInboxPromise) return mailInboxPromise
   mailInboxPromise = (async () => {
     try {
-      const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST', blockPage } : {})
+      const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST' } : {})
       mailInbox.value = { accounts: result.accounts || [], messages: result.messages || [], pendingCount: Math.max(0, Number(result.pendingCount) || 0) }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
