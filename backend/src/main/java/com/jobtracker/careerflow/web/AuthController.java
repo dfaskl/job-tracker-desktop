@@ -181,8 +181,8 @@ public class AuthController {
         try {
             Optional<LegacyUser> authenticated = authenticatedUser(token);
             if (authenticated.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            LegacyUser updated = accountSandboxService.updateDisplayName(authenticated.get().email(), body == null ? null : body.displayName());
-            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("user", publicUser(updated), "message", "昵称已更新"));
+            LegacyUser updated = accountSandboxService.updateProfile(authenticated.get().email(), body == null ? null : body.displayName(), body == null ? null : body.avatar());
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("user", publicUser(updated), "message", "个人资料已更新"));
         } catch (AccountService.AccountValidationException e) { return error(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (AccountService.AccountForbiddenException e) { return error(HttpStatus.FORBIDDEN, e.getMessage());
         } catch (Exception e) { LOGGER.warn("POC profile update failed", e); return error(HttpStatus.SERVICE_UNAVAILABLE, "账户信息暂时无法更新"); }
@@ -234,7 +234,7 @@ public class AuthController {
     }
 
     private Map<String, Object> publicUser(LegacyUser user) {
-        return Map.of("id", String.valueOf(user.id()), "email", user.email(), "displayName", user.displayName());
+        return Map.of("id", String.valueOf(user.id()), "email", user.email(), "displayName", user.displayName(), "avatar", user.avatar());
     }
 
     private ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
@@ -302,6 +302,6 @@ public class AuthController {
 
     public record LoginRequest(String email, String password) {}
     public record RegisterRequest(String email, String password, String registrationCode) {}
-    public record ProfileRequest(String displayName) {}
+    public record ProfileRequest(String displayName, String avatar) {}
     public record PasswordChangeRequest(String currentPassword, String newPassword) {}
 }

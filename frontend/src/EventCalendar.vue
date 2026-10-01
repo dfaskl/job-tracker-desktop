@@ -344,7 +344,7 @@ async function remove(item: EventItem) {
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
           <div ref="calendarGrid" class="calendar-grid">
-            <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" type="button" :class="['day', { outside: !cell.inMonth, selected: cell.key === selectedDate, today: cell.key === dateKey(new Date()) }]" :aria-label="`${cell.key}，${cell.events.length} 项日程`" :aria-pressed="cell.key === selectedDate" @click="selectDate(cell.key)">
+            <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" type="button" :disabled="!cell.inMonth" :class="['day', { outside: !cell.inMonth, selected: cell.inMonth && cell.key === selectedDate, today: cell.inMonth && cell.key === dateKey(new Date()) }]" :aria-label="cell.inMonth ? `${cell.key}，${cell.events.length} 项日程` : `${cell.key}，非本月日期，不可选择`" :aria-pressed="cell.inMonth && cell.key === selectedDate" @click="selectDate(cell.key)">
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
                 <small v-for="(entry,index) in visibleCalendarEntries(cell.key,cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry,index)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
@@ -423,7 +423,16 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
 .weekdays b { padding: 8px; color: var(--color-muted-foreground); font-size: 12px; text-align: center; }
 .day { min-height: 92px; padding: 7px; border: 1px solid #e5e9f1; border-radius: 0; color: var(--color-card-foreground); background: #fff; text-align: left; }
-.day.outside { color: #b3bac7; background: #f8fafc; }
+.day.outside,
+.day.outside:disabled {
+  color: color-mix(in srgb, var(--color-muted-foreground) 58%, transparent);
+  background: color-mix(in srgb, var(--color-muted) 52%, var(--color-card));
+  cursor: default;
+  opacity: 1;
+}
+.day.outside .day-events,
+.day.outside .event-overflow { opacity: .28; }
+.day.outside .day-number { opacity: .72; }
 .day.selected { position: relative; z-index: 1; outline: 2px solid var(--color-primary); }
 .day.today > .day-number { display: inline-grid; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: var(--color-primary); place-items: center; }
 .day > small { --event-color:#4357ad; --event-bg:#edf1ff; display:block; overflow:hidden; margin-top:4px; padding:3px 5px; border-radius:5px; color:var(--event-color); background:var(--event-bg); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }

@@ -27,7 +27,7 @@ class ApplicationControllerTest {
             "备注", "2026-09-03 10:00", "2026-09-03 10:00"
         );
         when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));
-        when(sandbox.create(any(), any())).thenReturn(new Mutation("{}", application, 1));
+        when(sandbox.create(any(), any(), any())).thenReturn(new Mutation("{}", application, 1));
         var controller = new ApplicationController(auth, sandbox);
 
         var response = controller.create("token", requestBody(), sameOriginRequest());
@@ -55,7 +55,8 @@ class ApplicationControllerTest {
 
     private ApplicationController.ApplicationWriteRequest requestBody() {
         return new ApplicationController.ApplicationWriteRequest(
-            "Example", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果", "备注", ""
+            "Example", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果", "备注", "",
+            "面试", "一面", "2026-09-08 10:00", "", "线上", "准备简历"
         );
     }
 

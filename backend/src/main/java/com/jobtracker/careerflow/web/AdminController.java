@@ -71,6 +71,20 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/users/{id}/data")
+    public ResponseEntity<?> userData(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        @PathVariable long id
+    ) {
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(adminService.exportData(user.get().email(), id));
+        } catch (Exception exception) {
+            return mapException("export-user-data", exception);
+        }
+    }
+
     @PatchMapping("/settings/registration")
     public ResponseEntity<?> registration(
         @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,

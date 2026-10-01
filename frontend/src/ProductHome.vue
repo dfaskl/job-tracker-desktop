@@ -871,7 +871,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 }
 </style>
 <style scoped>
-:global(:root[data-theme="dark"]) .schedule-actions > i {
+:global(:root[data-theme="dark"] .schedule-actions > i) {
   border: 1px solid var(--color-border-strong);
   color: var(--color-foreground);
   background: #2a2e34;

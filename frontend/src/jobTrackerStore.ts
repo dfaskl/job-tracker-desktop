@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { api, ApiError, clearApiCache } from './api'
 
-export type User = { id: string; email: string; displayName?: string }
+export type User = { id: string; email: string; displayName?: string; avatar?: string }
 export type JobApplication = Record<string, unknown> & {
   id: string; company?: string; position?: string; city?: string; channel?: string
   appliedDate?: string; stage?: string; status?: string; updatedAt?: string

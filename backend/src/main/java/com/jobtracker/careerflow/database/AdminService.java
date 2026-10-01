@@ -88,6 +88,30 @@ public class AdminService {
         }
     }
 
+    public UserBusinessData exportData(String adminEmail, long targetId) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                AdminIdentity admin = requireAdmin(connection, adminEmail);
+                UserDocument target = userDocument(connection, targetId);
+                JsonNode data = objectMapper.readTree(target.json() == null || target.json().isBlank()
+                    ? "{\"applications\":[],\"events\":[]}" : target.json());
+                if (!data.isObject() || !data.path("applications").isArray() || !data.path("events").isArray()) {
+                    throw new AdminValidationException("用户业务数据结构不兼容");
+                }
+                if (data.has("settings") && data.path("settings").isObject()) {
+                    ((tools.jackson.databind.node.ObjectNode) data.path("settings")).remove("apiKey");
+                }
+                insertAudit(connection, admin.id(), target.id(), target.email(), "export-user-data");
+                connection.commit();
+                return new UserBusinessData(new DetailUser(String.valueOf(target.id()), target.email()), data);
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
     public RegistrationResult setRegistration(String adminEmail, boolean enabled) throws Exception {
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
@@ -401,7 +425,7 @@ public class AdminService {
     }
 
     private List<UserView> users(Connection connection) throws Exception {
-        String sql = "SELECT u.id,u.email,u.display_name,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,"
+        String sql = "SELECT u.id,u.email,u.display_name,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,d.data::text AS user_data,"
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
             + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
             + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
@@ -417,6 +441,7 @@ public class AdminService {
                     String disabledAt = instant(result, "disabled_at");
                     users.add(new UserView(
                         String.valueOf(result.getLong("id")), result.getString("email"), result.getString("display_name"),
+                        profileAvatar(result.getString("user_data")),
                         result.getBoolean("is_admin"), !disabledAt.isBlank(),
                         disabledAt, instant(result, "created_at"),
                         instant(result, "last_active_at"), result.getInt("application_count"),
@@ -610,6 +635,14 @@ public class AdminService {
         return email.length() <= 254 ? email : email.substring(0, 254);
     }
 
+    private String profileAvatar(String json) {
+        try {
+            String avatar = objectMapper.readTree(json == null ? "{}" : json).path("settings").path("profileAvatar").asText("");
+            return avatar.startsWith("data:image/") ? avatar : "";
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
     private String string(Object value) {
         return value == null ? "" : value.toString();
     }
@@ -629,7 +662,7 @@ public class AdminService {
     public record Summary(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
                           int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
                           boolean adminEmailConfigured) {}
-    public record UserView(String id, String email, String displayName, boolean isAdmin, boolean disabled, String disabledAt,
+    public record UserView(String id, String email, String displayName, String avatar, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
                            boolean hasApiKey, String groupId, String groupName) {}
     public record GroupView(String id, String name, int memberCount) {}
@@ -642,6 +675,7 @@ public class AdminService {
     public record DetailUser(String id, String email) {}
     public record UserDetails(DetailUser user, List<AdminApplication> applications,
                               int totalApplications, boolean truncated) {}
+    public record UserBusinessData(DetailUser user, JsonNode data) {}
     public record RegistrationResult(boolean ok, boolean registrationOpen) {}
     public record RegistrationCodeResult(boolean ok, boolean registrationCodeEnabled) {}
     public record DisabledResult(boolean ok, boolean disabled) {}

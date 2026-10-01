@@ -35,7 +35,7 @@ public class LegacyReadService {
     }
 
     public Optional<LegacyUser> findUserByEmail(String email) throws Exception {
-        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled,display_name FROM users WHERE email=?";
+        String sql = "SELECT u.id,u.email,u.password_salt,u.password_hash,u.disabled_at IS NOT NULL AS disabled,u.display_name,d.data::text AS user_data FROM users u LEFT JOIN user_data d ON d.user_id=u.id WHERE u.email=?";
         try (Connection connection = openReadOnlyConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, email);
@@ -46,7 +46,7 @@ public class LegacyReadService {
     }
 
     public Optional<LegacyUser> findUserById(long userId) throws Exception {
-        String sql = "SELECT id,email,password_salt,password_hash,disabled_at IS NOT NULL AS disabled,display_name FROM users WHERE id=?";
+        String sql = "SELECT u.id,u.email,u.password_salt,u.password_hash,u.disabled_at IS NOT NULL AS disabled,u.display_name,d.data::text AS user_data FROM users u LEFT JOIN user_data d ON d.user_id=u.id WHERE u.id=?";
         try (Connection connection = openReadOnlyConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, userId);
@@ -169,8 +169,18 @@ public class LegacyReadService {
             result.getString("password_salt"),
             result.getString("password_hash"),
             result.getBoolean("disabled"),
-            result.getString("display_name")
+            result.getString("display_name"),
+            profileAvatar(result.getString("user_data"))
         );
+    }
+
+    private String profileAvatar(String json) {
+        try {
+            String avatar = objectMapper.readTree(json == null ? "{}" : json).path("settings").path("profileAvatar").asText("");
+            return avatar.startsWith("data:image/") ? avatar : "";
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private String text(JsonNode item, String name, int maxLength) {
@@ -192,9 +202,13 @@ public class LegacyReadService {
         return value.startsWith("http://") || value.startsWith("https://");
     }
 
-    public record LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled, String displayName) {
+    public record LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled, String displayName, String avatar) {
         public LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled) {
-            this(id, email, passwordSalt, passwordHash, disabled, defaultDisplayName(email));
+            this(id, email, passwordSalt, passwordHash, disabled, defaultDisplayName(email), "");
+        }
+
+        public LegacyUser(long id, String email, String passwordSalt, String passwordHash, boolean disabled, String displayName) {
+            this(id, email, passwordSalt, passwordHash, disabled, displayName, "");
         }
 
         private static String defaultDisplayName(String email) {

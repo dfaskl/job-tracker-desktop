@@ -7,7 +7,7 @@ import { useJobTrackerStore } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
 const ready = ref(false)
-const allowedPages = new Set(['home', 'applications', 'calendar', 'mail', 'stats', 'settings', 'admin'])
+const allowedPages = new Set(['home', 'applications', 'calendar', 'mail', 'stats', 'profile', 'settings', 'admin'])
 const requestedRoute = ref(readRequestedRoute())
 function readRouteFromHash() {
   return window.location.hash.replace(/^#\/?/, '') || 'home'

@@ -2,22 +2,27 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import BaseSelect from './BaseSelect.vue'
 import { jsonFetch } from './api'
+import type { BusinessData } from './jobTrackerStore'
+import { exportRawBusinessData, exportReadableBusinessData } from './businessDataExport'
 import { formatShanghaiDateTime } from './shanghaiTime'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;adminEmailConfigured:boolean}
-type User={id:string;email:string;displayName:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
+type User={id:string;email:string;displayName:string;avatar:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
 type InterviewGroup={id:string;name:string;memberCount:number}
 type Audit={id:string;action:string;targetEmail:string;createdAt:string}
 type ApplicationDetail={id:string;company:string;position:string;stage:string;status:string;appliedDate:string;city:string;channel:string;flow:{at:string;title:string}[]}
 type UserDetails={user:{id:string;email:string};applications:ApplicationDetail[];totalApplications:number;truncated:boolean}
+type UserBusinessData={user:{id:string;email:string};data:BusinessData}
 type Overview={currentUser:{id:string;email:string};summary:Summary;groups:InterviewGroup[];users:User[];usersTruncated:boolean;audit:Audit[]}
 const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
 const query=ref(''),stateFilter=ref('all'),sortMode=ref('created-old'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
 const registrationCode=ref('')
 const newGroupName=ref('')
 const editingNameId=ref(''),displayNameDraft=ref(''),displayNameError=ref('')
+const expandedUserIds=ref<Set<string>>(new Set())
 const actionLabels:Record<string,string>={'disable-user':'停用账号','enable-user':'启用账号','delete-user':'删除账号','open-registration':'开放注册','close-registration':'关闭注册','set-registration-code':'设置注册码','clear-registration-code':'清除注册码','view-user-details':'查看用户详情','revoke-sessions':'撤销登录会话','update-display-name':'修改用户昵称','create-interview-group':'创建协作小组','delete-interview-group':'删除协作小组','assign-interview-group':'分配协作小组','remove-interview-group':'移出协作小组','migrate-completed-ranges':'迁移旧时间段日程'}
+actionLabels['export-user-data']='导出用户数据'
 const users=computed(()=>overview.value?.users||[])
 const filteredUsers=computed(()=>{
   const keyword=query.value.trim().toLowerCase()
@@ -46,7 +51,24 @@ async function clearRegistrationCode(){if(!confirm('清除后，新用户注册�
 async function openDetails(user:User){selected.value=user;detail.value=null;busyUser.value=user.id;error.value='';try{detail.value=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/details`) as UserDetails;await loadOverview()}catch(cause){selected.value=null;error.value=failure(cause,'读取用户详情失败')}finally{busyUser.value=''}}
 async function setDisabled(user:User){busyUser.value=user.id;error.value='';message.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({disabled:!user.disabled})});await loadOverview();message.value=user.disabled?'账号已启用':'账号已停用并撤销会话'}catch(cause){error.value=failure(cause,'修改账号状态失败')}finally{busyUser.value=''}}
 async function revokeSessions(user:User){if(!confirm(`确认让 ${user.email} 的所有设备重新登录吗？`))return;busyUser.value=user.id;error.value='';message.value='';try{const result=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/sessions/revoke`,{method:'PATCH'});await loadOverview();message.value=`已撤销 ${Number(result.revoked||0)} 个登录会话`}catch(cause){error.value=failure(cause,'撤销会话失败')}finally{busyUser.value=''}}
-async function beginDisplayNameEdit(user:User){editingNameId.value=user.id;displayNameDraft.value=user.displayName||user.email.split('@')[0]||'';displayNameError.value='';await nextTick();document.getElementById('display-name-'+user.id)?.focus()}
+async function downloadUserData(user:User,format:'raw'|'readable'){
+  busyUser.value=user.id;error.value='';message.value=''
+  try{
+    const result=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/data`) as UserBusinessData
+    const exportUser={email:user.email,displayName:user.displayName}
+    if(format==='raw')exportRawBusinessData(result.data,exportUser)
+    else await exportReadableBusinessData(result.data,exportUser)
+    message.value=`已导出 ${user.displayName||user.email} 的${format==='raw'?'原始数据':'规范 Excel'}`
+    await loadOverview()
+  }catch(cause){error.value=failure(cause,'导出用户数据失败')}
+  finally{busyUser.value=''}
+}
+function toggleUser(user:User){
+  const next=new Set(expandedUserIds.value)
+  if(next.has(user.id)){next.delete(user.id);if(editingNameId.value===user.id)cancelDisplayNameEdit()}
+  else next.add(user.id)
+  expandedUserIds.value=next
+}async function beginDisplayNameEdit(user:User){editingNameId.value=user.id;displayNameDraft.value=user.displayName||user.email.split('@')[0]||'';displayNameError.value='';await nextTick();document.getElementById('display-name-'+user.id)?.focus()}
 function cancelDisplayNameEdit(){editingNameId.value='';displayNameDraft.value='';displayNameError.value=''}
 async function saveDisplayName(user:User){const displayName=displayNameDraft.value.trim().replace(/\s+/g,' ');if(!displayName||displayName.length>32){displayNameError.value='请输入 1–32 个字符';return}busyUser.value=user.id;displayNameError.value='';error.value='';message.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}/display-name`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName})});await loadOverview();cancelDisplayNameEdit();message.value=`已将昵称修改为 ${displayName}`}catch(cause){displayNameError.value=failure(cause,'修改昵称失败')}finally{busyUser.value=''}}
 async function createGroup(){const name=newGroupName.value.trim();if(!name){error.value='请输入小组名称';return}busyUser.value='group';error.value='';message.value='';try{await requestJson('/api/poc/admin-sandbox/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});newGroupName.value='';await loadOverview();message.value='协作小组已创建'}catch(cause){error.value=failure(cause,'创建小组失败')}finally{busyUser.value=''}}
@@ -106,24 +128,31 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
           <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户昵称或邮箱" placeholder="搜索用户昵称或邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>
           <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>
           <div class="user-scroll">
-            <article v-for="user in filteredUsers" :key="user.id" :class="{disabled:user.disabled}">
-              <div class="avatar">{{(user.displayName||user.email).slice(0,1).toUpperCase()}}</div>
-              <div class="identity">
-                <div v-if="editingNameId===user.id" class="display-name-editor">
-                  <input :id="'display-name-'+user.id" v-model="displayNameDraft" maxlength="32" autocomplete="nickname" :aria-invalid="Boolean(displayNameError)" :aria-describedby="displayNameError?'display-name-error-'+user.id:undefined" aria-label="用户昵称" @keyup.enter="saveDisplayName(user)" @keyup.esc="cancelDisplayNameEdit" />
-                  <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="保存昵称" title="保存昵称" @click="saveDisplayName(user)"><AppIcon name="check" :size="15" /></button>
-                  <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="取消修改昵称" title="取消" @click="cancelDisplayNameEdit"><AppIcon name="close" :size="15" /></button>
-                  <small v-if="displayNameError" :id="'display-name-error-'+user.id" class="field-error" role="alert">{{displayNameError}}</small>
+            <article v-for="user in filteredUsers" :key="user.id" class="user-row" :class="{disabled:user.disabled,expanded:expandedUserIds.has(user.id)}">
+              <button type="button" class="user-summary" :aria-expanded="expandedUserIds.has(user.id)" :aria-controls="'admin-user-'+user.id" @click="toggleUser(user)">
+                <span class="avatar"><img v-if="user.avatar" :src="user.avatar" alt=""><span v-else aria-hidden="true">{{(user.displayName||user.email).slice(0,1).toUpperCase()}}</span></span>
+                <span class="summary-identity"><strong :title="user.displayName||user.email">{{user.displayName||user.email.split('@')[0]}}</strong></span>
+                <span class="group-pill">{{user.groupName||'未分组'}}</span>
+                <span class="expand-icon" aria-hidden="true"><AppIcon name="chevron-right" :size="18" /></span>
+              </button>
+              <div v-if="expandedUserIds.has(user.id)" :id="'admin-user-'+user.id" class="user-expanded">
+                <div class="identity">
+                  <div v-if="editingNameId===user.id" class="display-name-editor">
+                    <input :id="'display-name-'+user.id" v-model="displayNameDraft" maxlength="32" autocomplete="nickname" :aria-invalid="Boolean(displayNameError)" :aria-describedby="displayNameError?'display-name-error-'+user.id:undefined" aria-label="用户昵称" @keyup.enter="saveDisplayName(user)" @keyup.esc="cancelDisplayNameEdit" />
+                    <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="保存昵称" title="保存昵称" @click="saveDisplayName(user)"><AppIcon name="check" :size="15" /></button>
+                    <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="取消修改昵称" title="取消" @click="cancelDisplayNameEdit"><AppIcon name="close" :size="15" /></button>
+                    <small v-if="displayNameError" :id="'display-name-error-'+user.id" class="field-error" role="alert">{{displayNameError}}</small>
+                  </div>
+                  <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
+                  <small class="user-email" :title="user.email">{{user.email}}</small>
+                  <span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span>
+                  <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
+                  <div class="user-export-actions"><small>导出</small><button type="button" class="secondary" :disabled="busyUser===user.id" @click="downloadUserData(user,'raw')"><AppIcon name="download" :size="14" />原始 JSON</button><button type="button" :disabled="busyUser===user.id" @click="downloadUserData(user,'readable')"><AppIcon name="download" :size="14" />规范 Excel</button></div>
                 </div>
-                <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
-                <small class="user-email" :title="user.email">{{user.email}}</small>
-                <span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span>
-                <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
+                <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
+                <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
               </div>
-              <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
-              <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
-            </article>
-            <p v-if="!filteredUsers.length" class="empty">没有符合条件的用户</p>
+            </article>            <p v-if="!filteredUsers.length" class="empty">没有符合条件的用户</p>
 
           </div>
           </section>
@@ -140,7 +169,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 
     <Teleport to="body">
     <div v-if="selected" class="modal-backdrop" @click.self="selected=null">
-      <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-detail-title"><button class="modal-close icon-button" aria-label="关闭用户详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button><header><div class="avatar large">{{(selected.displayName||selected.email).slice(0,1).toUpperCase()}}</div><div><span>用户详情</span><h2 id="admin-user-detail-title">{{selected.displayName||selected.email.split('@')[0]}}</h2><p>{{selected.email}} · {{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
+      <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-detail-title"><button class="modal-close icon-button" aria-label="关闭用户详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button><header><div class="avatar large"><img v-if="selected.avatar" :src="selected.avatar" alt=""><span v-else aria-hidden="true">{{(selected.displayName||selected.email).slice(0,1).toUpperCase()}}</span></div><div><span>用户详情</span><h2 id="admin-user-detail-title">{{selected.displayName||selected.email.split('@')[0]}}</h2><p>{{selected.email}} · {{selected.applicationCount}} 条投递 · {{selected.eventCount}} 项日程 · API Key {{selected.hasApiKey?'已配置':'未配置'}}</p></div></header><div v-if="!detail" class="loading-panel">正在读取详情…</div><div v-else class="detail-scroll"><p v-if="detail.truncated" class="hint">共 {{detail.totalApplications}} 条投递，当前展示前 500 条。</p><article v-for="application in detail.applications" :key="application.id"><div><strong>{{application.company||'未填写公司'}} · {{application.position||'未填写岗位'}}</strong><span>{{application.stage||'—'}} / {{application.status||'—'}} · {{application.city||'地点未填'}} · {{application.channel||'渠道未填'}}</span></div><ol><li v-for="step in application.flow" :key="step.at+step.title"><time>{{step.at||'时间未知'}}</time><span>{{step.title}}</span></li></ol></article><p v-if="!detail.applications.length" class="empty">该用户暂无投递记录</p></div></section>
     </div>
     </Teleport>
   </section>
@@ -332,18 +361,42 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-avatar-border) 18%, transparent);
 }
 
-:global(:root[data-theme="dark"]) .avatar {
+:global(:root[data-theme="dark"] .avatar) {
   border-color: var(--color-avatar-border);
   color: var(--color-avatar-foreground);
   background: var(--color-avatar-background);
 }
 
-:global(:root[data-theme="dark"]) .identity span,
-:global(:root[data-theme="dark"]) .counts {
+:global(:root[data-theme="dark"] .identity span),
+:global(:root[data-theme="dark"] .counts) {
   color: var(--color-muted-foreground);
 }
 
-:global(:root[data-theme="dark"]) .counts b {
+:global(:root[data-theme="dark"] .counts b) {
   color: var(--color-foreground);
 }
+</style>
+
+<style scoped>
+.users-card article.user-row{display:block;padding:0;border-top:1px solid var(--color-border)}
+.users-card article.user-row.expanded{background:color-mix(in srgb,var(--color-primary) 3%,var(--color-card))}
+.user-summary{display:grid;width:100%;min-height:62px;grid-template-columns:42px minmax(0,1fr) auto 28px;align-items:center;gap:12px;padding:9px 4px;border:0;border-radius:0;color:var(--color-card-foreground);background:transparent;text-align:left;box-shadow:none}
+.user-summary:hover,.user-summary:focus-visible{background:color-mix(in srgb,var(--color-primary) 6%,var(--color-card))}
+.user-summary:focus-visible{position:relative;z-index:1;outline:3px solid color-mix(in srgb,var(--color-ring) 24%,transparent);outline-offset:-3px}
+.avatar{overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.summary-identity{display:grid;min-width:0;gap:2px}
+.summary-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.group-pill{max-width:190px;overflow:hidden;padding:5px 9px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:11px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+.expand-icon{display:grid;width:28px;height:28px;place-items:center;color:var(--color-muted-foreground);transition:transform .18s ease}
+.user-row.expanded .expand-icon{transform:rotate(90deg)}
+.user-expanded{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px 14px 58px;border-top:1px dashed var(--color-border)}
+.user-expanded .identity{min-width:210px;flex:1 1 260px}
+.user-expanded .group-assignment{flex:none}
+.user-expanded .actions{flex:none}
+.user-export-actions{display:flex;align-items:center;gap:6px;margin-top:4px}
+.user-export-actions>small{color:var(--color-muted-foreground);font-size:10px;font-weight:700}
+.user-export-actions button{display:inline-flex;min-height:28px;align-items:center;gap:5px;padding:4px 8px;font-size:10px}
+@media(max-width:720px){.user-summary{grid-template-columns:42px minmax(0,1fr) auto 24px}.group-pill{max-width:110px}.user-expanded{align-items:stretch;flex-direction:column;padding-left:58px}.user-expanded .group-assignment,.user-expanded .actions{width:100%;margin-left:0;flex-basis:auto}.user-expanded .actions{justify-content:flex-start}}
+@media(max-width:480px){.user-summary{grid-template-columns:42px minmax(0,1fr) 24px}.group-pill{grid-column:2;justify-self:start}.expand-icon{grid-column:3;grid-row:1/3}.user-expanded{padding-left:12px}}
 </style>

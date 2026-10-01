@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$Deploy
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -45,7 +47,16 @@ try {
     Write-Host '本地 JAR 构建完成。' -ForegroundColor Green
     Write-Host "文件：$($jar.FullName)"
     Write-Host "大小：$sizeMb MB"
-    Write-Host '后续只需停止服务器应用、备份旧 JAR、上传此文件并重新启动。'
+    if ($Deploy) {
+        Write-Host ''
+        & (Join-Path $repoRoot 'deploy-server.ps1') -JarPath $outputJar
+        if ($LASTEXITCODE -ne 0) {
+            throw "服务器部署失败，退出码：$LASTEXITCODE"
+        }
+    }
+    else {
+        Write-Host '需要部署时运行：.\build-jar.ps1 -Deploy'
+    }
 }
 finally {
     Pop-Location

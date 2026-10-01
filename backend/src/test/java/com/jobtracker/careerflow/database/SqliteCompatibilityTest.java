@@ -40,9 +40,37 @@ class SqliteCompatibilityTest {
         var registered = accounts.register("admin@example.com", "correct-horse-battery", "");
         assertThat(registered.displayName()).isEqualTo("admin");
         assertThat(accounts.findByEmail("admin@example.com")).isPresent();
+        String avatar = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=";
+        var updatedProfile = accounts.updateProfile("admin@example.com", "管理员", avatar);
+        assertThat(updatedProfile.displayName()).isEqualTo("管理员");
+        assertThat(updatedProfile.avatar()).isEqualTo(avatar);
+        assertThat(accounts.findByEmail("admin@example.com").orElseThrow().avatar()).isEqualTo(avatar);
+        var created = applications.create(
+            "admin@example.com",
+            new ApplicationDocumentMutator.ApplicationInput(
+                "Example", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果", "备注"
+            ),
+            new EventDocumentMutator.EventInput(
+                "", "面试", "一面", "2026-09-08 10:00", "", "线上", "准备简历"
+            )
+        );
+        assertThat(created.application().id()).isNotBlank();
+        assertThat(mapper.readTree(created.documentJson()).path("events")).hasSize(1);
+        var createdWithoutSchedule = applications.create(
+            "admin@example.com",
+            new ApplicationDocumentMutator.ApplicationInput(
+                "Without Schedule", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果", ""
+            ),
+            null
+        );
+        assertThat(createdWithoutSchedule.application().id()).isNotBlank();
+        assertThat(mapper.readTree(createdWithoutSchedule.documentJson()).path("events")).hasSize(1);
+        assertThat(applications.findApplications("admin@example.com").total()).isEqualTo(2);
 
         AdminService admin = new AdminService(environment, mapper, applications, passwords);
-        assertThat(admin.overview("admin@example.com").users()).hasSize(1);
+        var adminOverview = admin.overview("admin@example.com");
+        assertThat(adminOverview.users()).hasSize(1);
+        assertThat(adminOverview.users().getFirst().avatar()).isEqualTo(avatar);
         admin.setRegistration("admin@example.com", false);
         assertThat(accounts.registrationOpen()).isFalse();
         admin.setRegistration("admin@example.com", true);

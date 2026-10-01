@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap');
 
 :root {
+  color-scheme: light;
   font-family: "Fira Sans", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
   color: #292720;
   background: #f5f0e6;
@@ -37,6 +38,7 @@
   --shadow-sm: 0 1px 2px rgba(63, 50, 32, .08);
   --shadow-lg: 0 18px 48px rgba(63, 50, 32, .16);
   --control-height: 44px;
+  --sidebar-width: 232px;
   --font-button: "Nunito", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
   --accent: #28251f;
   --sidebar: #0c0d0f;
@@ -102,7 +104,7 @@
 
 * { box-sizing: border-box; }
 [tabindex="-1"]:focus { outline:none; }
-html { min-width: 320px; scroll-padding-top: 120px; overscroll-behavior-y: none; }
+html { min-width: 320px; scroll-padding-top: 120px; scrollbar-gutter: stable; overscroll-behavior-y: none; }
 body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); overscroll-behavior-y: none; }
 button, input, textarea, select { font: inherit; }
 button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
@@ -322,7 +324,7 @@ body {
 #app :is(.calendar-pane,.month-card) { background:var(--color-paper); }
 #app :is(.calendar-grid,.month-grid) { border-color:var(--color-rail); }
 #app :is(.calendar-grid,.month-grid) .day { background:color-mix(in srgb,var(--color-paper) 96%,var(--color-background)); }
-#app :is(.calendar-grid,.month-grid) .day:hover { background:color-mix(in srgb,var(--color-primary) 5%,#fff); }
+#app :is(.calendar-grid,.month-grid) .day:not(:disabled):hover { background:color-mix(in srgb,var(--color-primary) 5%,#fff); }
 #app :is(.calendar-grid,.month-grid) .day.selected { box-shadow:inset 0 0 0 2px var(--color-primary); }
 #app .mail-toolbar { padding-left:14px; border-left:3px solid var(--color-primary); }
 #app .source-panel { border-top-color:var(--color-primary); }
@@ -416,7 +418,7 @@ body {
   color: var(--color-card-foreground) !important;
   background: var(--color-card) !important;
 }
-:root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day:hover,
+:root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day:not(:disabled):hover,
 :root[data-theme="dark"] #app :is(.calendar-grid, .month-grid) .day.muted {
   background: var(--color-muted) !important;
 }
@@ -662,6 +664,78 @@ body {
   #app .admin-shell {
     height: 100%;
     max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 1181px) and (min-height: 900px) {
+  html:has(#app .stats-page-shell),
+  body:has(#app .stats-page-shell) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app:has(.stats-page-shell),
+  #app:has(.stats-page-shell) .app-stage,
+  #app:has(.stats-page-shell) .product-shell {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 851px) and (min-height: 620px) {
+  html:has(#app .calendar-page),
+  body:has(#app .calendar-page) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app:has(.calendar-page),
+  #app:has(.calendar-page) .app-stage,
+  #app:has(.calendar-page) .product-shell {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 901px) and (min-height: 620px) {
+  html:has(#app .mail-page-shell),
+  body:has(#app .mail-page-shell) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app:has(.mail-page-shell),
+  #app:has(.mail-page-shell) .app-stage,
+  #app:has(.mail-page-shell) .product-shell {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 821px) and (min-height: 620px) {
+  html:has(#app .application-page),
+  body:has(#app .application-page) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app:has(.application-page),
+  #app:has(.application-page) .app-stage,
+  #app:has(.application-page) .product-shell {
+    height: 100dvh;
+    max-height: 100dvh;
     min-height: 0;
     overflow: hidden;
   }

@@ -5,6 +5,9 @@ import com.jobtracker.careerflow.config.AppEnvironment;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.ApplicationInput;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.ApplicationView;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.Mutation;
+import com.jobtracker.careerflow.event.EventDocumentMutator;
+import com.jobtracker.careerflow.event.EventDocumentMutator.EventInput;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -26,15 +29,23 @@ public class ApplicationService {
     private final Environment environment;
     private final ObjectMapper objectMapper;
     private final ApplicationDocumentMutator mutator;
+    private final EventDocumentMutator eventMutator;
 
+    @Autowired
     public ApplicationService(
         Environment environment,
         ObjectMapper objectMapper,
-        ApplicationDocumentMutator mutator
+        ApplicationDocumentMutator mutator,
+        EventDocumentMutator eventMutator
     ) {
         this.environment = environment;
         this.objectMapper = objectMapper;
         this.mutator = mutator;
+        this.eventMutator = eventMutator;
+    }
+
+    public ApplicationService(Environment environment, ObjectMapper objectMapper, ApplicationDocumentMutator mutator) {
+        this(environment, objectMapper, mutator, new EventDocumentMutator(objectMapper));
     }
 
     public SandboxStatus status() {
@@ -61,8 +72,21 @@ public class ApplicationService {
         }
     }
 
-    public Mutation create(String email, ApplicationInput input) throws Exception {
-        return mutate(email, "poc-application-create", json -> mutator.create(json, input));
+    public Mutation create(String email, ApplicationInput input, EventInput schedule) throws Exception {
+        return mutate(email, "poc-application-create", json -> {
+            Mutation application = mutator.create(json, input);
+            if (schedule == null) return application;
+            EventInput linkedSchedule = new EventInput(
+                application.application().id(), schedule.type(), schedule.title(), schedule.startsAt(),
+                schedule.endsAt(), schedule.location(), schedule.notes()
+            );
+            try {
+                var event = eventMutator.create(application.documentJson(), linkedSchedule);
+                return new Mutation(event.documentJson(), application.application(), application.total());
+            } catch (EventDocumentMutator.ValidationException exception) {
+                throw new ApplicationDocumentMutator.ValidationException(exception.getMessage());
+            }
+        });
     }
 
     public Mutation update(String email, String id, ApplicationInput input, String expectedUpdatedAt) throws Exception {

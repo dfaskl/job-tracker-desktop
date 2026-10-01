@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductAnalytics from './ProductAnalytics.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
@@ -7,10 +7,9 @@ import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MailRecognition from './MailRecognition.vue'
 import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
-import AccountAccess from './AccountAccess.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
-type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'settings' | 'admin'
+type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'profile' | 'admin'
 
 const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6H9.5v6H5a1.5 1.5 0 0 1-1.5-1.5Z' },
@@ -18,7 +17,6 @@ const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'calendar', label: '日程', icon: 'M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2ZM8 2v4m8-4v4M3 9h18M7 13h3m4 0h3m-10 4h3m4 0h3' },
   { id: 'mail', label: '邮件识别', icon: 'M3 5h14v12H3ZM3 6l7 6 7-6M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm2.2 5.2L22 21' },
   { id: 'stats', label: '统计', icon: 'M4 4v16h16M7 16l4-5 3 3 5-7M16 7h3v3' },
-  { id: 'settings', label: '设置', icon: 'M4 6h6m4 0h6M10 3v6M4 12h10m4 0h2M14 9v6M4 18h3m4 0h9M7 15v6' },
   { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2' }
 ]
 
@@ -28,7 +26,7 @@ const pageComponents: Record<Page, Component> = {
   calendar: ProductCalendarWorkspace,
   mail: MailRecognition,
   stats: ProductAnalytics,
-  settings: ProductSettingsWorkspace,
+  profile: ProductSettingsWorkspace,
   admin: AdminDashboard
 }
 
@@ -37,11 +35,13 @@ const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
+const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
 let workspaceRefreshTimer: number | undefined
 
 function routeFromHash() {
   const [pageValue, query = ''] = window.location.hash.replace(/^#\/?/, '').split('?')
-  const page = pages.some((item) => item.id === pageValue) ? (pageValue as Page) : 'home'
+  const normalizedPage = pageValue === 'settings' ? 'profile' : pageValue
+  const page = Object.prototype.hasOwnProperty.call(pageComponents, normalizedPage) ? (normalizedPage as Page) : 'home'
   const applicationId = page === 'applications' ? new URLSearchParams(query).get('application') || '' : ''
   return { page, applicationId }
 }
@@ -126,17 +126,17 @@ onBeforeUnmount(() => {
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
-      <div class="sidebar-account"><AccountAccess v-if="store.user.value" compact /></div>
+      <div class="sidebar-account"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><span v-else aria-hidden="true"><AppIcon name="user" :size="23" /></span></button></div>
     </aside>
 
-    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'settings-page-shell': activePage === 'settings', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
       <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
         <button v-if="activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'settings-content': activePage === 'settings', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
+      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
         <KeepAlive :max="7">
           <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
         </KeepAlive>
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
   inset: 0 auto 0 0;
   z-index: 20;
   display: flex;
-  width: 232px;
+  width: var(--sidebar-width);
   flex-direction: column;
   padding: 20px 14px 18px;
   color: #f2eadc;
@@ -270,8 +270,9 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .theme-toggle:hover { color:#fff; border-color:rgba(255,248,235,.3); background:rgba(255,255,255,.1); }
 .theme-toggle svg { flex:none; }
 .sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; flex: none; align-items: center; justify-content: center; }
+.profile-entry{display:grid;width:50px;min-width:50px;height:50px;min-height:50px;place-items:center;padding:0;overflow:hidden;border:1px solid rgba(255,255,255,.2);border-radius:50%;color:#f2eadc;background:rgba(255,255,255,.07);box-shadow:0 7px 18px rgba(0,0,0,.15);transition:background-color .2s ease,border-color .2s ease,transform .2s ease,box-shadow .2s ease}.profile-entry:hover,.profile-entry.active{transform:translateY(-2px);border-color:rgba(242,234,220,.5);background:rgba(255,255,255,.14);box-shadow:0 9px 22px rgba(0,0,0,.22)}.profile-entry>img,.profile-entry>span{display:grid;width:100%;height:100%;place-items:center;object-fit:cover}.profile-entry.active::after{content:"";position:absolute;right:calc(50% - 28px);bottom:-5px;width:7px;height:7px;border:2px solid var(--sidebar);border-radius:50%;background:#8bd8bd}
 @keyframes nav-group-in { from { transform: translateX(-7px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 232px; padding: 0 38px 64px; }
+.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 38px 64px; }
 .topbar {
   position: sticky;
   top: 0;
@@ -300,30 +301,68 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
 .page-content.application-content,
 .page-content.calendar-content,
 .page-content.mail-content,
-.page-content.settings-content,
+.page-content.profile-content,
 .page-content.admin-content,
 .page-content.stats-content { width: 100%; max-width: none; }
 .product-main.application-page,
 .product-main.calendar-page,
 .product-main.mail-page-shell,
-.product-main.settings-page-shell,
+.product-main.profile-page-shell,
 .product-main.admin-page-shell { height: 100vh; overflow: hidden; padding-bottom: 0; }
+.page-content.calendar-content,
 .page-content.mail-content,
-.page-content.settings-content,
-.page-content.admin-content { height: 100vh; }
+.page-content.profile-content,
+.page-content.admin-content { height: 100%; min-height: 0; }
 .page-content :deep(.card) { margin-top: 18px; }
 .page-content.admin-content :deep(.card) { margin-top: 0; }
 .page-content.stats-content :deep(.analytics-layout > .interview-panel.card) { margin-top: 0; }
-.product-main.settings-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
-.page-content.settings-content { height: auto; }
+.product-main.profile-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
+.page-content.profile-content { height: auto; }
+
+/* The desktop analytics dashboard fits inside one viewport. Keep the outer
+   document fixed there and let the interview list own its scrollbar. */
+@media (min-width: 1181px) and (min-height: 900px) {
+  .product-main.stats-page-shell {
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+  .page-content.stats-content {
+    height: 100%;
+    min-height: 0;
+  }
+  .page-content.stats-content :deep(.analytics-layout) {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 821px) and (min-height: 620px) {
+  .product-main.application-page {
+    display: grid;
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .page-content.application-content {
+    height: 100%;
+    min-height: 0;
+    padding-top: 12px;
+  }
+  .page-content.application-content :deep(.workspace) {
+    height: 100%;
+    margin-top: 0 !important;
+  }
+}
 
 @media (max-width: 1200px) {
-  .product-main.settings-page-shell, .product-main.mail-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
-  .page-content.settings-content, .page-content.mail-content { height: auto; }
+  .product-main.profile-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
+  .page-content.profile-content { height: auto; }
 }
 @media (max-width: 900px) {
   .product-main.mail-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
-  .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
+  .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
 }
 @media (max-width: 820px) {
   .product-shell { width: 100%; max-width: 100%; overflow-x: clip; }
@@ -367,10 +406,8 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .theme-toggle { position:static; width:44px; min-width:44px; height:44px; min-height:44px; align-self:center; }
   .sidebar-account { position: static; grid-column: 1 / -1; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height .25s ease, margin .25s ease, opacity .2s ease, transform .25s ease; }
   .menu-open .sidebar-account { max-height: 72px; margin-top: 6px; opacity: 1; transform: translateY(0); }
-  .sidebar-account :deep(.signed.compact) { display: flex; width: auto; min-width: 0; padding: 5px 7px; flex-direction: row; }
-  .sidebar-account :deep(.signed.compact > div) { width: auto; }
-  .sidebar-account :deep(.signed.compact span) { display: none; }
-  .sidebar-account :deep(.signed.compact button) { width: auto; }
+  .profile-entry { width: 48px; min-width: 48px; height: 48px; min-height: 48px; margin: 0 auto; }
+
   nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; flex: none; align-content: stretch; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
   .menu-open nav { max-height: 240px; margin-top: 8px; opacity: 1; transform: translateY(0); pointer-events: auto; }
   nav::-webkit-scrollbar { display: none; }
@@ -385,10 +422,10 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .product-main.application-page,
   .product-main.calendar-page,
   .product-main.mail-page-shell,
-  .product-main.settings-page-shell,
+  .product-main.profile-page-shell,
   .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content { min-width: 0; max-width: 100%; }
-  .page-content.mail-content, .page-content.settings-content, .page-content.admin-content { height: auto; }
+  .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
   .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 12px 0; }
   .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
 }

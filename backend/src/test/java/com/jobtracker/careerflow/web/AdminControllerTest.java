@@ -1,5 +1,7 @@
 package com.jobtracker.careerflow.web;
 
+import com.jobtracker.careerflow.database.AdminService.DetailUser;
+import com.jobtracker.careerflow.database.AdminService.UserBusinessData;
 import com.jobtracker.careerflow.database.AdminService;
 import com.jobtracker.careerflow.database.AdminService.DisabledResult;
 import com.jobtracker.careerflow.database.AdminService.DisplayNameResult;
@@ -8,6 +10,7 @@ import com.jobtracker.careerflow.database.AdminService.SessionResult;
 import com.jobtracker.careerflow.database.AdminService.GroupAssignmentResult;
 import com.jobtracker.careerflow.database.AdminService.GroupResult;
 import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -21,6 +24,26 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AdminControllerTest {
+    @Test
+    void exportsAUsersBusinessDataForAnAuthenticatedAdmin() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser admin = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        UserBusinessData data = new UserBusinessData(
+            new DetailUser("9", "user@example.com"),
+            new ObjectMapper().readTree("{\"applications\":[],\"events\":[]}")
+        );
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(admin));
+        when(service.exportData("admin@example.com", 9)).thenReturn(data);
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.userData("token", 9);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(data);
+        verify(service).exportData("admin@example.com", 9);
+    }
+
     @Test
     void createsAndAssignsInterviewGroupsForAuthenticatedAdmins() throws Exception {
         AuthController auth = mock(AuthController.class);

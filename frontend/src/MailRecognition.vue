@@ -5,6 +5,7 @@ import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
+import { validateScheduleTime } from './scheduleValidation'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
@@ -19,6 +20,7 @@ const timeMode = ref<'point' | 'range'>('point')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
+const scheduleError = ref('')
 const message = ref('')
 const selectedApplicationId = ref('')
 const inbox = store.mailInbox
@@ -38,9 +40,9 @@ const rankedApplications = computed(() => store.applications.value.slice().sort(
 ))
 const recommendedApplications = computed(() => rankedApplications.value.filter(isRecommendedApplication))
 const otherApplications = computed(() => rankedApplications.value.filter(item => !isRecommendedApplication(item)))
-const canCreateSchedule = computed(() => Boolean(result.startsAt) && result.noticeType !== '未通过')
+const canCreateSchedule = computed(() => Boolean(result.startsAt))
 const actionSummary = computed(() => hasResult.value
-  ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}${canCreateSchedule.value ? '，并自动创建关联日程' : ''}`
+  ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}，并自动创建关联日程`
   : '')
 
 watch(selectedApplicationId, () => {
@@ -49,7 +51,8 @@ watch(selectedApplicationId, () => {
   result.company = matched.company
   result.position = matched.position
 })
-watch(timeMode, mode => { if (mode === 'point') result.endsAt = '' })
+watch(timeMode, mode => { if (mode === 'point') result.endsAt = ''; scheduleError.value = '' })
+watch([()=>result.startsAt,()=>result.endsAt],()=>{scheduleError.value=''})
 
 onMounted(async () => {
   await store.initialize()
@@ -191,7 +194,7 @@ function mailDate(value: string) {
   return formatShanghaiDateTime(value, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }, value)
 }
 async function recognize() {
-  loading.value = true; error.value = ''; message.value = ''; hasResult.value = false
+  loading.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
     Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
@@ -203,28 +206,30 @@ async function recognize() {
   finally { loading.value = false }
 }
 function applicationPayload(item?: JobApplication) {
-  return {
+  const payload = {
     company: String(item?.company || result.company).trim(), position: String(item?.position || result.position).trim(),
     city: String(item?.city || ''), channel: String(item?.channel || '邮件识别'),
     appliedDate: String(item?.appliedDate || today()), stage: result.suggestedStage,
     status: result.suggestedStatus, notes: result.notes.trim() || String(item?.notes || ''),
     expectedUpdatedAt: String(item?.updatedAt || '')
   }
+  if(item)return payload
+  const eventType=result.noticeType==='其他'||result.noticeType==='未通过'?'其他':result.noticeType
+  return {...payload,scheduleType:eventType,scheduleTitle:result.scheduleTitle.trim()||result.noticeType||'邮件通知',scheduleStartsAt:apiTime(result.startsAt),scheduleEndsAt:timeMode.value==='range'?apiTime(result.endsAt):'',scheduleLocation:result.location.trim(),scheduleNotes:result.notes.trim()}
 }
 async function saveResult() {
   const matched = matchedApplication.value
   if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
-  if(canCreateSchedule.value&&timeMode.value==='range'&&!result.endsAt){error.value='时间段日程必须填写结束时间';return}
-  const startTime=result.startsAt?new Date(result.startsAt).getTime():NaN,endTime=result.endsAt?new Date(result.endsAt).getTime():NaN
-  if(canCreateSchedule.value&&timeMode.value==='range'&&(!Number.isFinite(startTime)||!Number.isFinite(endTime)||endTime<=startTime)){error.value='结束时间必须晚于开始时间';return}
+  scheduleError.value=validateScheduleTime(timeMode.value,result.startsAt,result.endsAt)
+  if(scheduleError.value){error.value='';return}
   saving.value = true; error.value = ''; message.value = ''
   try {
     const response = matched
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
     let duplicateSchedule=false
-    if (canCreateSchedule.value) {
-      const eventType=result.noticeType==='其他'?'其他':result.noticeType
+    if (matched) {
+      const eventType=result.noticeType==='其他'||result.noticeType==='未通过'?'其他':result.noticeType
       const startsAt=apiTime(result.startsAt),endsAt=timeMode.value==='range'?apiTime(result.endsAt):''
       duplicateSchedule=store.events.value.some(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
       if(!duplicateSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
@@ -235,7 +240,7 @@ async function saveResult() {
       }) })
     }
     await store.refresh()
-    message.value = duplicateSchedule ? `已${matched ? '更新投递' : '新建投递'}；相同日程已存在，未重复创建` : `已${matched ? '更新投递' : '新建投递'}${canCreateSchedule.value ? '并自动创建关联日程' : ''}，写入前备份已自动生成`
+    message.value = duplicateSchedule ? '已更新投递；相同日程已存在，未重复创建' : `已${matched ? '更新投递' : '新建投递'}并自动创建关联日程，写入前备份已自动生成`
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
@@ -275,12 +280,13 @@ async function saveResult() {
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><BaseSelect v-model="result.noticeType" :options="noticeTypes" /></label>
           <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
-          <ScheduleTimeModeNotice v-if="canCreateSchedule" class="wide" :mode="timeMode" detected />
-          <label><span>时间类型</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
-          <label><span>{{timeMode==='range'?'开始时间':'时间'}}</span><input v-model="result.startsAt" type="datetime-local" /></label>
+          <ScheduleTimeModeNotice class="wide" :mode="timeMode" :detected="canCreateSchedule" />
+          <label><span>时间类型 *</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
+          <label><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
           <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
-          <label v-if="timeMode==='range'"><span>结束时间</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" /></label>
+          <label v-if="timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
           <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
+          <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
           <div class="commit-box wide"><span>{{ actionSummary }}</span><button :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
         </form>
         <div v-else class="empty-state"><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div>
@@ -338,6 +344,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .review-panel > .empty-state { min-height: 0; flex: 1 1 auto; margin-top: 18px; }
 .empty-state.small { min-height: 100px; }
 .commit-box { padding: 14px; border-radius: 12px; color: var(--color-muted-foreground); background: #f4f6fb; }
+.schedule-error{margin:0;padding:9px 12px;border:1px solid color-mix(in srgb,var(--color-destructive) 35%,var(--color-border));border-radius:9px;color:var(--color-destructive);background:color-mix(in srgb,var(--color-destructive) 9%,var(--color-card));font-size:12px;font-weight:700}
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
 .process-notice{position:fixed;z-index:1200;top:22px;left:50%;display:flex;align-items:center;gap:9px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid #a9d7c0;border-radius:12px;color:#145c43;background:#f0fbf5;box-shadow:0 12px 32px rgba(14,75,55,.18);font-family:var(--font-button);font-weight:700;transform:translateX(-50%)}.process-notice span{display:grid;width:22px;height:22px;border-radius:50%;color:#fff;background:#26956b;place-items:center}.process-notice-enter-active,.process-notice-leave-active{transition:opacity .18s ease,transform .18s ease}.process-notice-enter-from,.process-notice-leave-to{opacity:0;transform:translate(-50%,-8px)}
 .mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:#fff;box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:#fff;background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:#f5f9fb;place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:#f7fafc}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid #dce6eb;border-radius:12px;background:#fbfcfc;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid #b9d9c9;border-radius:10px}
@@ -345,7 +352,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 @keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(3px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(12px,-8px) scale(1.04)}}
 @keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.96}100%{opacity:0;transform:translate(10px,-12px) scale(1.28)}}
 @keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
-@media (max-width: 1200px) { .mail-page { height: auto; overflow: visible; } .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); padding-bottom: 0; } .inbox-panel { grid-column: 1 / -1; height: auto; } .inbox-panel .mail-cards { max-height: 230px; } .compose-panel, .review-panel { min-height: 620px; height: auto; } }
+@media (min-width: 901px) and (max-width: 1200px) { .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); grid-template-rows:minmax(150px,.34fr) minmax(0,1fr); } .inbox-panel { grid-column: 1 / -1; height:100%; overflow:hidden; } .compose-panel, .review-panel { min-height:0; height:100%; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
 @media (max-width: 650px) {
   .result-form { grid-template-columns: 1fr; }
@@ -356,24 +363,24 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 }
 </style>
 <style scoped>
-:global(:root[data-theme="dark"]) .step {
+:global(:root[data-theme="dark"] .step) {
   border: 1px solid var(--color-border-strong);
   color: var(--color-foreground);
   background: #2a2e34;
 }
 
-:global(:root[data-theme="dark"]) .inbox-step {
+:global(:root[data-theme="dark"] .inbox-step) {
   color: var(--color-foreground);
   background: #24282e;
 }
 
-:global(:root[data-theme="dark"]) .process-all-button {
+:global(:root[data-theme="dark"] .process-all-button) {
   border-color: #3e5048;
   color: #9ed9bc;
   background: #1a2923;
 }
 
-:global(:root[data-theme="dark"]) .process-all-button:disabled {
+:global(:root[data-theme="dark"] .process-all-button:disabled) {
   border-color: var(--color-border);
   color: #858a91;
   background: #20242a;

@@ -89,12 +89,12 @@ class AuthControllerTest {
         LegacyUser updated = new LegacyUser(7, "person@example.com", SALT, HASH, false, "小明");
         when(accounts.enabled()).thenReturn(true);
         when(accounts.findById(7)).thenReturn(Optional.of(current));
-        when(accounts.updateDisplayName("person@example.com", "小明")).thenReturn(updated);
+        when(accounts.updateProfile("person@example.com", "小明", "")).thenReturn(updated);
         SessionManager sessions = new SessionManager(new MockEnvironment()
             .withProperty("POC_SESSION_SECRET", "0123456789abcdef0123456789abcdef"));
         AuthController controller = new AuthController(legacy, new LegacyPasswordVerifier(), sessions, null, accounts);
 
-        var response = controller.updateProfile(sessions.issue(7), new AuthController.ProfileRequest("小明"), secureRequest());
+        var response = controller.updateProfile(sessions.issue(7), new AuthController.ProfileRequest("小明", ""), secureRequest());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().toString()).contains("displayName=小明");

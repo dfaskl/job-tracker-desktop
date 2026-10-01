@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
-import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
+import { formatShanghaiDateTime } from './shanghaiTime'
+import { exportRawBusinessData, exportReadableBusinessData } from './businessDataExport'
 
 type CompanyLink = { company: string; url: string }
 type CompanyLinkResponse = { items: CompanyLink[]; updatedAt: string }
@@ -24,6 +25,7 @@ const clearConfirmation = ref('')
 const importFileName = ref('')
 const importData = ref<BusinessData | null>(null)
 const loading = ref(false)
+const exporting = ref<'raw' | 'readable' | ''>('')
 const message = ref('')
 const error = ref('')
 
@@ -38,12 +40,6 @@ const exactNewLink = computed(() => {
   return company ? links.value.find(item => normalizeCompany(item.company) === company) || null : null
 })
 const similarNewLinks = computed(() => findSimilarCompanies(newCompany.value).filter(item => item !== exactNewLink.value))
-
-const exportName = computed(() => {
-  const email = store.user.value?.email.replace(/[^a-z0-9._-]+/gi, '_') || 'job-tracker'
-  const day = shanghaiDateKey()
-  return `${email}-business-data-${day}.json`
-})
 
 onMounted(() => {
   loadLinks()
@@ -149,20 +145,29 @@ async function saveEdit() {
 async function removeLink(item: CompanyLink) {
   if (confirm(`确认删除“${item.company}”的官网链接吗？`)) await saveLinks(links.value.filter(value => value !== item))
 }
-function exportData() {
+function exportRawData() {
   message.value = ''
   error.value = ''
-  const payload = JSON.stringify(store.data.value, null, 2)
-  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = exportName.value
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+  if (!store.user.value) return
+  exporting.value = 'raw'
+  exportRawBusinessData(store.data.value, store.user.value)
+  exporting.value = ''
   message.value = `已导出 ${store.applications.value.length} 条投递、${store.events.value.length} 项日程`
+}
+
+async function exportReadableData() {
+  message.value = ''
+  error.value = ''
+  if (!store.user.value) return
+  exporting.value = 'readable'
+  try {
+    await exportReadableBusinessData(store.data.value, store.user.value)
+    message.value = `已生成规范 Excel：${store.applications.value.length} 条投递、${store.events.value.length} 项日程`
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : '规范数据导出失败'
+  } finally {
+    exporting.value = ''
+  }
 }
 
 async function chooseImportFile(event: Event) {
@@ -245,8 +250,8 @@ function formatDate(value: string) {
     <div class="data-grid">
       <div class="tool-box">
         <h3>导出数据</h3>
-        <p>导出当前登录账号的完整业务数据，已去除旧系统保存的 AI 密钥字段。</p>
-        <button type="button" :disabled="!store.user.value" @click="exportData">导出数据</button>
+        <p>原始 JSON 适合备份和重新导入；规范 Excel 按投递记录时间线整理，适合直接查看和筛选。</p>
+        <div class="export-actions"><button type="button" class="secondary" :disabled="!store.user.value||Boolean(exporting)" @click="exportRawData"><AppIcon name="download" :size="16" />{{exporting==='raw'?'正在导出…':'原始数据'}}</button><button type="button" :disabled="!store.user.value||Boolean(exporting)" @click="exportReadableData"><AppIcon name="download" :size="16" />{{exporting==='readable'?'正在生成…':'规范 Excel'}}</button></div>
       </div>
 
       <div class="tool-box">
@@ -334,6 +339,8 @@ function formatDate(value: string) {
 .notice { padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: #f7f9fc; color: var(--color-muted-foreground); }
 .data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .tool-box { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
+.export-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .tool-box h3 { margin: 0; font-size: 16px; }
 .tool-box p { margin: 0; }
 .tool-box input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }

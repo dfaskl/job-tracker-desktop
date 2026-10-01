@@ -10,6 +10,7 @@ import com.jobtracker.careerflow.database.ApplicationService.ApplicationPage;
 import com.jobtracker.careerflow.database.ApplicationService.SandboxDataNotFoundException;
 import com.jobtracker.careerflow.database.ApplicationService.SandboxDisabledException;
 import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
+import com.jobtracker.careerflow.event.EventDocumentMutator.EventInput;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,7 @@ public class ApplicationController {
         try {
             Optional<LegacyUser> user = authController.authenticatedUser(token);
             if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            var mutation = sandboxService.create(user.get().email(), input(body));
+            var mutation = sandboxService.create(user.get().email(), input(body), schedule(body));
             return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
                 .body(new MutationResponse(mutation.application(), mutation.total(), true));
         } catch (Exception exception) {
@@ -131,6 +132,14 @@ public class ApplicationController {
         );
     }
 
+    private EventInput schedule(ApplicationWriteRequest body) {
+        if (body == null || body.scheduleStartsAt() == null || body.scheduleStartsAt().isBlank()) return null;
+        return new EventInput(
+            "", body.scheduleType(), body.scheduleTitle(), body.scheduleStartsAt(), body.scheduleEndsAt(),
+            body.scheduleLocation(), body.scheduleNotes()
+        );
+    }
+
     private ResponseEntity<?> mapException(String operation, Exception exception) {
         if (exception instanceof ValidationException) return error(HttpStatus.BAD_REQUEST, exception.getMessage());
         if (exception instanceof NotFoundException || exception instanceof SandboxDataNotFoundException) {
@@ -173,7 +182,13 @@ public class ApplicationController {
         String stage,
         String status,
         String notes,
-        String expectedUpdatedAt
+        String expectedUpdatedAt,
+        String scheduleType,
+        String scheduleTitle,
+        String scheduleStartsAt,
+        String scheduleEndsAt,
+        String scheduleLocation,
+        String scheduleNotes
     ) {}
 
     public record DeleteRequest(String expectedUpdatedAt) {}
