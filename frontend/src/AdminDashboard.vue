@@ -211,10 +211,10 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 
 .identity-heading strong {
   min-width: 0;
-  flex: 1;
-  overflow: visible;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   line-height: 1.35;
 }
@@ -394,9 +394,10 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .group-pill{max-width:190px;overflow:hidden;padding:5px 9px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:11px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
 .expand-icon{display:grid;width:28px;height:28px;place-items:center;color:var(--color-muted-foreground);transition:transform .18s ease}
 .user-row.expanded .expand-icon{transform:rotate(90deg)}
-.user-expanded{display:grid;grid-template-columns:minmax(180px,30%) 124px 266px;align-items:center;gap:8px;padding:12px 4px 14px 28px;border-top:1px dashed var(--color-border)}
+.user-expanded{display:grid;grid-template-columns:minmax(180px,30%) 124px minmax(266px,1fr);align-items:center;gap:8px;padding:12px 4px 14px 28px;border-top:1px dashed var(--color-border)}
 .user-expanded .identity{min-width:0}
 .user-expanded .group-assignment,.user-expanded .actions{min-width:0}
+.user-expanded .actions{justify-self:end}
 @media(max-width:720px){.user-summary{grid-template-columns:42px minmax(0,1fr) auto 24px}.group-pill{max-width:110px}.user-expanded{grid-template-columns:1fr;align-items:stretch;padding-left:58px}.user-expanded .group-assignment,.user-expanded .actions{width:100%;margin-left:0;flex-basis:auto}.user-expanded .actions{justify-content:flex-start}}
 @media(max-width:480px){.user-summary{grid-template-columns:42px minmax(0,1fr) 24px}.group-pill{grid-column:2;justify-self:start}.expand-icon{grid-column:3;grid-row:1/3}.user-expanded{padding-left:12px}}
 </style>
