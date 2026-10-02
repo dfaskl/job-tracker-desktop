@@ -63,7 +63,9 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .quote-strip { justify-content: flex-start; padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
 #app .quote-strip strong { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.65; }
 #app .quote-strip small { font-size: 12px; font-weight: 600; }
-#app .quote-trigger { width: 34px; min-width: 34px; height: 34px; min-height: 34px; color: var(--color-primary); background: var(--surface-selected); border-radius: 8px; }
+#app .home-quote-slot .quote-trigger { width: 34px; min-width: 34px; height: 34px; min-height: 34px; border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border)); border-radius: 8px; color: var(--color-primary); background: var(--surface-selected); }
+#app .home-quote-slot .quote-trigger:disabled { opacity: .8; }
+:root[data-theme="dark"] #app .home-quote-slot .quote-trigger { border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border)) !important; color: var(--color-primary) !important; background: var(--surface-selected) !important; }
 #app .dashboard-panel { padding: 24px; }
 #app .panel-head { padding-left: 0; }
 #app .panel-head h2 { font-size: 18px; }
