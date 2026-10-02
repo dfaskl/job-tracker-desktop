@@ -222,6 +222,10 @@ git -c http.proxy= -c https.proxy= ls-remote origin refs/heads/main
 
 ### UI 与交互偏好
 
+- 前端视觉规范见根目录 `DESIGN.md`，参考 awesome-design-md 的 Linear / Cal.com；原始参考和 MIT 许可证在 `docs/design-references/`。
+- 使用冷灰画布、单一靛蓝操作色和细边框；统一系统无衬线字体，不再加载外部 Google Fonts。深浅主题变量在 `frontend/src/style.css`，跨页面样式在 `frontend/src/workspace-design.css`。
+- 首页按快捷概览、个人日程、小组时间轴、人工确认排列；账户与设置入口显示头像、昵称和文字说明。
+- 手机导航收起时必须退出键盘焦点顺序；保留跳到主内容入口和可见焦点。
 - 页面主体尽量不出现浏览器级滚动；日程、邮件识别、投递记录、统计等页面优先让内部组件滚动并使用弹性布局。
 - 深色和浅色模式切换不能产生像素位移。
 - 状态不能只靠接近的颜色区分，深色模式尤其要保持明显对比。
@@ -248,6 +252,7 @@ f0e5dba Harden AI mail recognition
 - 小组选择保持在中间。
 - 右侧依次为：查看详情、导出原始 JSON、导出规范 Excel、撤销会话、启停账号、删除账号。
 - 六个按钮保持单行，按钮组距右边框 50px。
+- 1251–1599px 视口使用两列管理区，审计面板在下方；更宽桌面保持三列。展开行按用户列表容器宽度自适应，较窄时按钮组独占下一行，六个按钮不换行；手机取消右侧额外留白以保证可点击。
 
 ## 10. 常用诊断命令
 
@@ -259,6 +264,8 @@ git diff --check
 git log -8 --oneline
 .\build-jar.ps1
 ```
+
+Windows 完整构建前应先关闭本会话启动的 Vite 预览，否则 `npm ci` 可能因 Rolldown 原生模块被占用而报 `EPERM`。需要同时检查页面时，可在前端构建完成后用静态服务器预览 `frontend/dist`。
 
 服务器：
 
@@ -299,4 +306,3 @@ ss -lntp | grep 18080
 - 关键业务排序、邮件识别或时间规则变化
 - 自动推送与部署约定变化
 - 新增需要后续会话长期遵守的 UI/交互原则
-

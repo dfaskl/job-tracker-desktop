@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
-import AuthIllustration from './AuthIllustration.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
@@ -12,8 +11,6 @@ const submitting = ref(false)
 const message = ref('')
 const emailInput = ref<HTMLInputElement | null>(null)
 const showPassword = ref(false)
-const emailFocused = ref(false)
-const passwordFocused = ref(false)
 
 async function submit() {
   submitting.value = true
@@ -47,13 +44,18 @@ async function switchMode() {
     </a>
 
     <section class="login-story" aria-labelledby="welcome-title">
-      <div class="login-brand"><span><img src="/favicon.svg" alt=""></span><strong>求职进度本</strong></div>
-      <h1 id="welcome-title" class="sr-only">求职进度本登录</h1>
-      <div class="illustration-wrap"><AuthIllustration :is-typing="emailFocused" :show-password="showPassword" :password-length="password.length" :password-active="passwordFocused" /></div>
-      <div class="story-footer"><span>隐私保护</span><span>专注求职进度</span></div>
-      <div class="story-grid" aria-hidden="true"></div>
-      <div class="story-glow glow-top" aria-hidden="true"></div>
-      <div class="story-glow glow-bottom" aria-hidden="true"></div>
+      <div class="login-brand"><span><img src="/favicon.svg" alt=""></span><strong>CareerFlow</strong></div>
+      <div class="story-content">
+        <p class="story-label">求职进度本</p>
+        <h1 id="welcome-title">让每一次机会，<br>都有清晰的下一步。</h1>
+        <p class="story-description">把投递、招聘邮件与面试安排放在一起，<br>专注准备，也看得见自己的进展。</p>
+        <ol class="story-flow" aria-label="求职管理流程">
+          <li><span class="story-node"><AppIcon name="check" :size="18" /></span><div><strong>记录投递</strong><small>公司、岗位与进度，一处整理</small></div><span class="story-tag">起点</span></li>
+          <li><span class="story-node"><AppIcon name="mail" :size="18" /></span><div><strong>接收下一步</strong><small>识别招聘通知，关联日程</small></div></li>
+          <li><span class="story-node"><AppIcon name="calendar" :size="18" /></span><div><strong>从容赴约</strong><small>掌握面试安排，记录每份进展</small></div></li>
+        </ol>
+      </div>
+      <div class="story-footer"><span>你的求职旅程，有序向前。</span><span>CareerFlow</span></div>
     </section>
 
     <section class="login-entry" aria-labelledby="login-title">
@@ -66,21 +68,21 @@ async function switchMode() {
 
         <form @submit.prevent="submit">
           <label for="login-email">邮箱地址
-            <input id="login-email" ref="emailInput" v-model.trim="email" type="email" autocomplete="username" inputmode="email" placeholder="name@example.com" required autofocus @focus="emailFocused=true" @blur="emailFocused=false">
+            <input id="login-email" ref="emailInput" v-model.trim="email" type="email" autocomplete="username" inputmode="email" placeholder="name@example.com" required autofocus>
           </label>
           <label for="login-password">{{ mode === 'login' ? '登录密码' : '设置密码' }}
             <span class="password-field">
-              <input id="login-password" v-model="password" :type="showPassword?'text':'password'" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" placeholder="••••••••" minlength="10" required @focus="passwordFocused=true" @blur="passwordFocused=false">
+              <input id="login-password" v-model="password" :type="showPassword?'text':'password'" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" placeholder="••••••••" minlength="10" required>
               <button type="button" :aria-label="showPassword?'隐藏密码':'显示密码'" :title="showPassword?'隐藏密码':'显示密码'" @click="showPassword=!showPassword"><AppIcon :name="showPassword?'eye-off':'eye'" :size="19" /></button>
             </span>
           </label>
           <label v-if="mode === 'register'" for="registration-code">注册码 <small>如管理员已启用</small>
-            <input id="registration-code" v-model.trim="registrationCode" autocomplete="one-time-code" placeholder="输入管理员提供的注册码" @focus="emailFocused=true" @blur="emailFocused=false">
+            <input id="registration-code" v-model.trim="registrationCode" autocomplete="one-time-code" placeholder="输入管理员提供的注册码">
           </label>
           <p v-if="message" class="login-error" role="alert">{{ message }}</p>
-          <button class="login-submit" type="submit" :disabled="submitting">
+          <button class="login-submit" type="submit" :disabled="submitting" :aria-busy="submitting">
             <span>{{ submitting ? '正在处理…' : mode === 'login' ? '进入账户' : '开始使用' }}</span>
-            <span aria-hidden="true">{{ submitting ? '请稍候' : mode === 'login' ? '进入账户' : '开始使用' }}<AppIcon name="chevron-right" :size="17" /></span>
+            <AppIcon v-if="!submitting" name="chevron-right" :size="17" />
           </button>
         </form>
 
@@ -91,9 +93,49 @@ async function switchMode() {
 </template>
 
 <style scoped>
-.login-page{display:grid;min-height:100dvh;color:#f5f5f4;background:#0c0a09;font-family:Inter,"Noto Sans SC",ui-sans-serif,system-ui,sans-serif}.source-link{position:fixed;top:24px;right:24px;z-index:50;display:inline-flex;height:36px;align-items:center;justify-content:center;gap:8px;padding:0 13px;border:1px solid rgba(255,255,255,.1);border-radius:999px;color:#f5f5f4;background:rgba(12,10,9,.45);box-shadow:0 8px 24px rgba(0,0,0,.18);backdrop-filter:blur(12px);font-size:12px;font-weight:500;text-decoration:none;transition:border-color .2s,background .2s,color .2s}.source-link:hover{border-color:rgba(255,255,255,.2);color:#fff;background:rgba(28,25,23,.7)}.source-link svg{width:16px;height:16px;fill:currentColor}.login-story{position:relative;display:none;min-height:100dvh;flex-direction:column;justify-content:space-between;padding:48px;overflow:hidden;color:#111827;background:linear-gradient(135deg,#e4e4e4,#d7d7d7 52%,#c9c9c9)}.login-brand,.mobile-brand{position:relative;z-index:20;display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}.login-brand>span,.mobile-brand>span{display:grid;width:34px;height:34px;place-items:center;border-radius:9px;background:#fff;box-shadow:0 4px 13px rgba(0,0,0,.08)}.login-brand img,.mobile-brand img{width:28px;height:28px;border-radius:7px}.login-brand strong,.mobile-brand strong{letter-spacing:-.025em}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.illustration-wrap{position:relative;z-index:20;display:flex;height:500px;align-items:flex-end;justify-content:center}.story-footer{position:relative;z-index:20;display:flex;align-items:center;gap:32px;color:#4b5563;font-size:14px}.story-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.16) 1px,transparent 1px);background-size:20px 20px}.story-glow{position:absolute;border-radius:999px;filter:blur(64px)}.glow-top{top:25%;right:25%;width:256px;height:256px;background:rgba(255,255,255,.2)}.glow-bottom{bottom:25%;left:25%;width:384px;height:384px;background:rgba(255,255,255,.14)}
-.login-entry{display:flex;min-height:100dvh;align-items:center;justify-content:center;padding:32px 24px;background:#0c0a09}.entry-inner{width:100%;max-width:420px;animation:auth-panel-enter .42s cubic-bezier(.2,.8,.2,1) both}.mobile-brand{justify-content:center;margin-bottom:48px;color:#f5f5f4}.entry-heading{margin-bottom:40px;text-align:center}.entry-heading h2{margin:0 0 8px;color:#fafaf9;font-size:30px;line-height:1.2;letter-spacing:-.025em}.entry-heading p{margin:0;color:#a8a29e;font-size:14px}.entry-inner form{display:grid;gap:20px}.entry-inner label{display:grid;gap:8px;color:#f5f5f4;font-size:14px;font-weight:500}.entry-inner label small{margin-left:5px;color:#78716c;font-weight:400}#login-page .login-entry input{width:100%;height:48px;padding:0 14px;border:1px solid #292524;border-radius:8px;outline:0;color:#fafaf9;background:#0c0a09;font:inherit;transition:border-color .15s,box-shadow .15s}#login-page .login-entry input::placeholder{color:#78716c}#login-page .login-entry input:focus{border-color:#4f46a5;box-shadow:0 0 0 3px rgba(79,70,165,.2)}.password-field{position:relative;display:block}#login-page .password-field input{padding-right:48px}#login-page .password-field button{position:absolute;top:50%;right:4px;display:grid;width:44px;min-width:44px;height:44px;min-height:44px;place-items:center;padding:0;transform:translateY(-50%);border:0;border-radius:7px;color:#a8a29e;background:transparent}#login-page .password-field button:hover{color:#fafaf9;background:#1c1917}#login-page .password-field button:focus-visible{outline:2px solid #6366f1;outline-offset:1px}.login-error{margin:0;padding:10px 12px;border:1px solid rgba(239,68,68,.35);border-radius:8px;color:#fca5a5;background:rgba(127,29,29,.16);font-size:12px;line-height:1.5}#login-page .login-submit{position:relative;width:100%;height:48px;margin-top:0;overflow:hidden;border:1px solid #292524;border-radius:999px;color:#fafaf9;background:#0c0a09;font-size:16px;font-weight:500;cursor:pointer;transition:transform .2s}.login-submit>span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;transition:transform .3s,opacity .3s}.login-submit>span:last-child{z-index:1;color:#fff;background:#4f46a5;transform:translateX(-12%);opacity:0}.login-submit:not(:disabled):hover>span:first-child{transform:translateX(100%);opacity:0}.login-submit:not(:disabled):hover>span:last-child{transform:translateX(0);opacity:1}.login-submit:not(:disabled):active{transform:scale(.98)}.login-submit:focus-visible{outline:3px solid rgba(99,102,241,.4);outline-offset:3px}.login-submit:disabled{cursor:wait;opacity:.55}.mode-line{margin:32px 0 0;color:#a8a29e;font-size:14px;text-align:center}#login-page .mode-switch{min-height:36px;padding:4px;border:0;border-radius:4px;color:#fafaf9;background:transparent;font-weight:500}.mode-switch:hover{text-decoration:underline;text-underline-offset:4px}.mode-switch:focus-visible{outline:2px solid #6366f1;outline-offset:2px}
-@keyframes auth-panel-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@media(min-width:1024px){.login-page{height:100dvh;grid-template-columns:1fr 1fr;overflow:hidden}.login-story{display:flex}.login-entry{min-height:0;overflow-y:auto}.mobile-brand{display:none}}
-@media(max-width:640px){.source-link{top:16px;right:16px;width:40px;padding:0}.source-link span{display:none}.login-entry{padding:76px 20px 32px}.entry-heading{margin-bottom:32px}}
+.login-page { display: grid; min-height: 100dvh; color: var(--color-foreground); background: var(--color-card); font-family: var(--font-ui); }
+.source-link { position: absolute; top: 24px; right: 32px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; color: var(--color-muted-foreground); border: 1px solid var(--color-border); border-radius: 8px; font-size: 12px; text-decoration: none; }
+.source-link:hover { color: var(--color-primary); background: var(--color-muted); }
+.source-link svg { width: 16px; height: 16px; fill: currentColor; }
+.login-story { display: none; flex-direction: column; justify-content: space-between; padding: clamp(32px,4vw,64px); border-right: 1px solid var(--color-border); background: var(--color-background); }
+.login-brand, .mobile-brand { display: flex; align-items: center; gap: 12px; font-size: 20px; }
+.login-brand img, .mobile-brand img { display: block; width: 36px; height: 36px; border-radius: 10px; }
+.login-brand strong { font-weight: 650; letter-spacing: -.5px; }
+.story-content { max-width: 520px; margin: 48px 0; }
+.story-label { color: var(--color-primary); font-size: 14px; font-weight: 600; }
+#app .story-content h1 { margin: 20px 0; font-size: clamp(30px,3.1vw,46px); line-height: 1.5; font-weight: 600; letter-spacing: -.045em; }
+.story-description { font-size: 15px; line-height: 1.9; }
+.story-flow { display: grid; gap: 0; margin: 36px 0 0; padding: 8px 24px; list-style: none; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-card); }
+.story-flow li { display: flex; position: relative; align-items: center; gap: 16px; min-height: 88px; }
+.story-flow li + li { border-top: 1px solid var(--color-border); }
+.story-node { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-primary); background: var(--surface-selected); }
+.story-flow li > div { display: grid; gap: 6px; }
+.story-flow strong { font-size: 14px; font-weight: 600; }
+.story-flow small { color: var(--color-muted-foreground); font-size: 12px; }
+.story-tag { margin-left: auto; padding: 4px 8px; color: var(--color-primary); background: var(--surface-selected); border-radius: 5px; font-size: 12px; }
+.story-footer { display: flex; justify-content: space-between; gap: 12px; color: var(--color-muted-foreground); font-size: 12px; }
+.login-entry { display: flex; min-height: 100dvh; align-items: center; justify-content: center; padding: 88px 32px 48px; }
+.entry-inner { width: 100%; max-width: 380px; animation: auth-panel-enter .25s ease both; }
+.mobile-brand { margin-bottom: 44px; }
+.entry-heading { margin-bottom: 32px; }
+#app .entry-heading h2 { margin: 0 0 12px; font-size: 28px; font-weight: 650; }
+.entry-heading p { margin: 0; font-size: 14px; }
+.entry-inner form { display: grid; gap: 20px; }
+.entry-inner label { display: grid; gap: 9px; font-size: 14px; font-weight: 500; }
+.entry-inner label small { color: var(--color-muted-foreground); font-size: 12px; }
+#login-page .login-entry input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--color-border-strong); border-radius: 8px; color: var(--color-foreground); background: var(--color-card); font: inherit; }
+#login-page .login-entry input:focus { border-color: var(--color-ring); box-shadow: 0 0 0 3px color-mix(in srgb,var(--color-ring) 12%,transparent); }
+.password-field { position: relative; display: block; }
+#login-page .password-field input { padding-right: 52px; }
+#login-page .password-field button { position: absolute; top: 2px; right: 4px; display: grid; width: 44px; height: 44px; place-items: center; padding: 0; border: 0; color: var(--color-muted-foreground); background: transparent; }
+#login-page .password-field button:hover { background: var(--color-muted); }
+.login-error { margin: 0; padding: 12px; border: 1px solid var(--color-destructive); border-radius: 8px; color: var(--color-destructive); background: color-mix(in srgb,var(--color-destructive) 7%,var(--color-card)); font-size: 13px; }
+#login-page .login-submit { display: flex; width: 100%; height: 48px; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; border: 1px solid transparent; border-radius: 8px; color: var(--color-on-primary); background: var(--color-primary); font-size: 14px; font-weight: 600; }
+#login-page .login-submit:hover { filter: brightness(.96); }
+.mode-line { margin: 24px 0 0; color: var(--color-muted-foreground); font-size: 13px; text-align: center; }
+#login-page .mode-switch { padding: 4px 8px; border: 0; color: var(--color-primary); background: transparent; font-size: 13px; }
+.mode-switch:hover { text-decoration: underline; text-underline-offset: 4px; }
+@keyframes auth-panel-enter { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (min-width: 1024px) { .login-page { grid-template-columns: 1.08fr 1fr; } .login-story { display: flex; } .mobile-brand { display: none; } }
+@media (max-width: 600px) { .source-link { top: 16px; right: 20px; } .login-entry { padding-inline: 24px; } }
 </style>

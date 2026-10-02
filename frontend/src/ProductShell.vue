@@ -36,6 +36,8 @@ const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
 const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
+const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
+function syncViewport() { mobileViewport.value = window.matchMedia('(max-width: 820px)').matches }
 let workspaceRefreshTimer: number | undefined
 
 function routeFromHash() {
@@ -94,6 +96,7 @@ onMounted(async () => {
   window.addEventListener('hashchange', syncHash)
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
+  window.addEventListener('resize', syncViewport)
   await store.initialize()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
   syncHash()
@@ -104,15 +107,17 @@ onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
+  window.removeEventListener('resize', syncViewport)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
 })
 </script>
 
 <template>
   <div class="product-shell">
+    <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
     <aside class="sidebar" :class="{ 'menu-open': mobileMenuOpen }">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
-        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职进度本</strong><small>Vue + Java</small></div>
+        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>CareerFlow</strong><small>求职进度本</small></div>
       </button>
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
@@ -120,13 +125,14 @@ onBeforeUnmount(() => {
       <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起页面导航' : '展开页面导航'" aria-controls="primary-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
-      <nav id="primary-navigation" aria-label="主要导航">
+      <div class="sidebar-section-label" aria-hidden="true">工作空间</div>
+      <nav id="primary-navigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
-      <div class="sidebar-account"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><span v-else aria-hidden="true"><AppIcon name="user" :size="23" /></span></button></div>
+      <div class="sidebar-account" :inert="mobileViewport && !mobileMenuOpen"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats' }">
@@ -146,139 +152,46 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.product-shell { min-height: 100vh; background: var(--color-background); }
-.sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 20;
-  display: flex;
-  width: var(--sidebar-width);
-  flex-direction: column;
-  padding: 20px 14px 18px;
-  color: #f2eadc;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(255,248,235,.09), transparent 26%),
-    radial-gradient(circle at 1px 1px, rgba(255,248,235,.07) 1px, transparent 1.4px) 0 0 / 22px 22px,
-    repeating-linear-gradient(132deg, transparent 0 47px, rgba(255,248,235,.025) 48px, transparent 49px 96px),
-    linear-gradient(180deg, var(--sidebar-top), var(--sidebar));
-  border-right: 1px solid rgba(255,255,255,.1);
-  box-shadow: 10px 0 34px rgba(0,0,0,.18);
-  overflow: hidden;
-}
-.sidebar::before {
-  content: "";
-  position: absolute;
-  inset: 76px 8px 104px 22px;
-  background:
-    radial-gradient(circle at 13% 9%, rgba(255,248,235,.42) 0 2px, transparent 3px),
-    radial-gradient(circle at 79% 29%, rgba(255,248,235,.3) 0 2px, transparent 3px),
-    radial-gradient(circle at 27% 56%, rgba(255,248,235,.25) 0 2px, transparent 3px),
-    radial-gradient(circle at 86% 82%, rgba(255,248,235,.32) 0 2px, transparent 3px),
-    linear-gradient(150deg, transparent 0 18%, rgba(255,248,235,.06) 18.2% 18.55%, transparent 18.75% 47%, rgba(255,248,235,.045) 47.2% 47.5%, transparent 47.7% 73%, rgba(255,248,235,.05) 73.2% 73.5%, transparent 73.7%);
-  opacity: .72;
-  mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 90%, transparent);
-  pointer-events: none;
-}
-.sidebar::after {
-  content: "";
-  position: absolute;
-  right: -90px;
-  bottom: 12%;
-  width: 180px;
-  height: 180px;
-  border: 1px solid rgba(255,248,235,.1);
-  border-radius: 50%;
-  box-shadow: 0 0 0 34px rgba(255,248,235,.025), 0 0 0 68px rgba(255,248,235,.018);
-  pointer-events: none;
-}
-
-.brand {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  min-height: 52px;
-  align-items: center;
-  gap: 11px;
-  padding: 7px 9px;
-  border: 1px solid transparent;
-  border-radius: 13px;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-  transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
-}
-.brand:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.055); }
-.brand > img { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 11px; box-shadow: 0 7px 18px rgba(0,0,0,.16); transition: transform .24s cubic-bezier(.2,.8,.2,1); }
-.brand:hover > img { transform: rotate(-4deg) scale(1.04); }
-.brand div { display: grid; gap: 2px; }
-.brand strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-size: 15px; letter-spacing: -.04em; }
-.brand small { color: #c7beb0; font-size: 11px; }
+.product-shell { min-height: 100dvh; background: var(--color-background); }
+.skip-link { position: fixed; z-index: 100; top: 8px; left: 232px; padding: 12px 18px; transform: translateY(-150%); border-radius: 8px; color: var(--color-on-primary); background: var(--color-primary); }
+.skip-link:focus { transform: none; }
+.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; width: var(--sidebar-width); flex-direction: column; padding: 24px 12px 16px; border-right: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-card); }
+.brand { display: flex; align-items: center; gap: 10px; width: 100%; padding: 4px 10px 22px; border: 0; background: transparent; text-align: left; }
+.brand > img { width: 34px; height: 34px; flex: none; border-radius: 10px; }
+.brand div { display: grid; gap: 3px; }
+.brand strong { font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
+.brand small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
+.sidebar-section-label { padding: 20px 12px 10px; border-top: 1px solid var(--color-border); color: var(--color-muted-foreground); font-size: 12px; }
+nav { display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; overflow-y: auto; scrollbar-width: thin; }
+nav button { position: relative; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
+nav button:hover { background: var(--color-muted); }
+nav button.active { border-color: color-mix(in srgb,var(--color-primary) 14%,transparent); background: color-mix(in srgb,var(--color-primary) 9%,var(--color-card)); }
+nav button.active::before { content: ''; position: absolute; left: -1px; top: 13px; bottom: 13px; width: 3px; border-radius: 3px; background: var(--color-primary); }
+.nav-icon { display: grid; width: 20px; height: 20px; flex: none; place-items: center; }
+.nav-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.nav-copy { min-width: 0; flex: 1; }
+.nav-copy strong { font-size: 14px; font-weight: 550; }
+.nav-arrow { display: none; }
+.nav-badge { display: grid; min-width: 22px; height: 22px; padding: 0 5px; place-items: center; border-radius: 6px; color: var(--color-on-primary); background: var(--color-primary); font-size: 11px; font-weight: 600; }
+.sr-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.theme-toggle { position: absolute; right: 14px; bottom: 90px; display: grid; width: 36px; height: 36px; min-height: 36px; place-items: center; padding: 0; border: 1px solid var(--color-border); background: var(--color-card); }
+.theme-toggle:hover { background: var(--color-muted); }
+.sidebar-account { flex: none; padding-top: 12px; margin-top: 56px; border-top: 1px solid var(--color-border); }
+.profile-entry { display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px; border: 1px solid transparent; background: transparent; text-align: left; }
+.profile-entry:hover, .profile-entry.active { background: var(--color-muted); }
+.profile-entry-avatar { display: grid; width: 36px; height: 36px; flex: none; place-items: center; overflow: hidden; border: 1px solid var(--color-border); border-radius: 50%; color: var(--color-primary); background: var(--color-muted); }
+.profile-entry-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-entry-copy { display: grid; flex: 1; min-width: 0; gap: 3px; }
+.profile-entry-copy strong { overflow: hidden; color: var(--color-foreground); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-entry-copy small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 .menu-toggle { display: none; }
-nav { position: relative; z-index: 1; display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: start; gap: 10px; margin: 14px 0 12px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 8px; scrollbar-width: none; animation: nav-group-in .38s both cubic-bezier(.2,.8,.2,1); }
-nav::-webkit-scrollbar { display: none; }
-nav button {
-  position: relative;
-  display: flex;
-  width: 100%;
-  min-height: 52px;
-  align-items: center;
-  gap: 11px;
-  padding: 8px 10px;
-  overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: 13px;
-  color: #ebe4d8;
-  background: transparent;
-  text-align: left;
-  transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s cubic-bezier(.2,.8,.2,1);
-}
-.nav-icon { position: relative; z-index: 1; display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid rgba(255,248,235,.14); border-radius: 10px; color: #d9d0c2; background: rgba(255,255,255,.045); transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
-.nav-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.nav-copy { position: relative; z-index: 1; display: flex; min-width: 0; flex: 1; align-items: center; }
-.nav-copy strong { font-family: "Noto Serif SC", "STKaiti", "KaiTi", serif; font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: .045em; text-shadow: 0 1px 10px rgba(255,248,235,.1); }
-.nav-arrow { position: relative; z-index: 1; flex: none; color: rgba(235,228,216,.36); font-size: 21px; line-height: 1; transform: translateX(-3px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
-nav button.has-badge { padding-right: 40px; }
-nav button.has-badge .nav-arrow { display: none; }
-.nav-badge { position: absolute; top: 5px; right: 8px; display: grid; min-width: 20px; height: 20px; place-items: center; padding: 0 5px; border: 2px solid var(--sidebar); border-radius: 999px; color: #fff; background: var(--color-destructive); font: 800 10px/1 var(--font-button); letter-spacing: 0; box-shadow: 0 2px 6px rgba(0,0,0,.22); }
-.sr-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-nav button:hover { transform: translateX(3px); color: #fff; background: rgba(255,255,255,.075); }
-nav button:hover .nav-icon { transform: scale(1.05); color: #fff8eb; border-color: rgba(255,248,235,.24); background: rgba(255,255,255,.08); }
-nav button:hover .nav-arrow { transform: translateX(0); opacity: 1; }
-nav button.active {
-  border-color: rgba(255,248,235,.18);
-  color: #fff;
-  background: var(--sidebar-active);
-  box-shadow: 0 9px 20px rgba(1,39,42,.18), inset 0 1px rgba(255,255,255,.08);
-}
-nav button.active::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 0;
-  width: 3px;
-  border-radius: 0 99px 99px 0;
-  background: #f2eadc;
-  box-shadow: 0 0 14px rgba(242,234,220,.38);
-}
-nav button.active .nav-icon { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.12); box-shadow: inset 0 1px rgba(255,255,255,.08); }
-nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
-.sidebar :is(button,a):focus-visible { outline: 3px solid rgba(242,234,220,.66); outline-offset: 2px; }
-.theme-toggle { position:absolute; z-index:2; top:26px; right:14px; display:grid; width:40px; min-width:40px; height:40px; min-height:40px; place-items:center; padding:0; border:1px solid rgba(255,248,235,.18); border-radius:12px; color:#ebe4d8; background:rgba(255,255,255,.045); box-shadow:inset 0 1px rgba(255,255,255,.04); }
-.theme-toggle:hover { color:#fff; border-color:rgba(255,248,235,.3); background:rgba(255,255,255,.1); }
-.theme-toggle svg { flex:none; }
-.sidebar-account { position: relative; z-index: 1; display: flex; width: 100%; flex: none; align-items: center; justify-content: center; }
-.profile-entry{display:grid;width:50px;min-width:50px;height:50px;min-height:50px;place-items:center;padding:0;overflow:hidden;border:1px solid rgba(255,255,255,.2);border-radius:50%;color:#f2eadc;background:rgba(255,255,255,.07);box-shadow:0 7px 18px rgba(0,0,0,.15);transition:background-color .2s ease,border-color .2s ease,transform .2s ease,box-shadow .2s ease}.profile-entry:hover,.profile-entry.active{transform:translateY(-2px);border-color:rgba(242,234,220,.5);background:rgba(255,255,255,.14);box-shadow:0 9px 22px rgba(0,0,0,.22)}.profile-entry>img,.profile-entry>span{display:grid;width:100%;height:100%;place-items:center;object-fit:cover}.profile-entry.active::after{content:"";position:absolute;right:calc(50% - 28px);bottom:-5px;width:7px;height:7px;border:2px solid var(--sidebar);border-radius:50%;background:#8bd8bd}
-@keyframes nav-group-in { from { transform: translateX(-7px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 38px 64px; }
+.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; }
 .topbar {
   position: sticky;
   top: 0;
   z-index: 12;
   display: flex;
-  min-height: 88px;
+  min-height: 76px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -364,77 +277,40 @@ nav button.active .nav-arrow { transform: translateX(0); opacity: .82; }
   .product-main.mail-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
 }
+
 @media (max-width: 820px) {
   .product-shell { width: 100%; max-width: 100%; overflow-x: clip; }
-  .sidebar {
-    position: fixed;
-    inset: 0 0 auto 0;
-    top: 0;
-    z-index: 30;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    column-gap: 6px;
-    width: 100%;
-    max-width: 100vw;
-    height: auto;
-    padding: 8px 12px 10px;
-    overflow: hidden;
-    transition: box-shadow .24s ease;
-  }
-  .sidebar::before, .sidebar::after { display: none; }
-  .brand { width: fit-content; max-width: 100%; min-width: 0; }
-  .brand div { min-width: 0; }
-  .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .skip-link { left: 12px; }
+  .sidebar { inset: 0 0 auto; z-index: 30; display: grid; width: 100%; grid-template-columns: minmax(0,1fr) auto auto; gap: 0 8px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
+  .brand { width: fit-content; min-width: 0; padding: 0; }
   .brand small { display: none; }
-  .menu-toggle {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    align-self: center;
-    place-content: center;
-    gap: 5px;
-    padding: 0;
-    border: 1px solid rgba(242,234,220,.32);
-    color: #f2eadc;
-    background: rgba(255,255,255,.06);
-  }
-  .menu-toggle span { display: block; width: 19px; height: 2px; border-radius: 99px; background: currentColor; transition: transform .18s ease, opacity .18s ease; }
+  .brand strong { font-size: 17px; }
+  .theme-toggle { position: static; width: 44px; height: 44px; min-height: 44px; }
+  .menu-toggle { display: grid; width: 44px; height: 44px; place-content: center; gap: 5px; border: 1px solid var(--color-border); background: var(--color-card); }
+  .menu-toggle span { display: block; width: 18px; height: 2px; background: currentColor; transition: transform .18s, opacity .18s; }
   .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
   .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  .theme-toggle { position:static; width:44px; min-width:44px; height:44px; min-height:44px; align-self:center; }
-  .sidebar-account { position: static; grid-column: 1 / -1; width: 100%; min-width: 0; max-height: 0; margin: 0; overflow: hidden; opacity: 0; transform: translateY(-6px); transition: max-height .25s ease, margin .25s ease, opacity .2s ease, transform .25s ease; }
-  .menu-open .sidebar-account { max-height: 72px; margin-top: 6px; opacity: 1; transform: translateY(0); }
-  .profile-entry { width: 48px; min-width: 48px; height: 48px; min-height: 48px; margin: 0 auto; }
-
-  nav { grid-column: 1 / -1; display: grid; width: 100%; min-width: 0; max-height: 0; flex: none; align-content: stretch; margin: 0; overflow: hidden; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 4px; opacity: 0; transform: translateY(-8px); pointer-events: none; animation: none; transition: max-height .3s ease, margin .3s ease, opacity .2s ease, transform .3s ease; }
-  .menu-open nav { max-height: 240px; margin-top: 8px; opacity: 1; transform: translateY(0); pointer-events: auto; }
-  nav::-webkit-scrollbar { display: none; }
-  nav button { width: 100%; min-width: 0; min-height: 44px; justify-content: center; padding: 7px 5px; border-radius: 10px; text-align: center; animation: none; }
-  nav button:hover { transform: translateY(-1px); }
-  .nav-icon, .nav-arrow, nav button.active::before { display: none; }
-  .nav-copy { display: block; flex: 0 1 auto; }
-  .nav-copy strong { font-size: 16px; letter-spacing: .035em; }
-  nav button.has-badge { padding-right: 26px; }
-  .nav-badge { top: 2px; right: 3px; }
-  .product-main { width: 100%; max-width: 100vw; margin-left: 0; padding: 70px 16px 44px; overflow-x: clip; }
-  .product-main.application-page,
-  .product-main.calendar-page,
-  .product-main.mail-page-shell,
-  .product-main.profile-page-shell,
-  .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
+  .sidebar-section-label { display: none; }
+  nav { grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 0; overflow: hidden; opacity: 0; transition: opacity .16s; }
+  .menu-open nav { max-height: 240px; margin-top: 12px; opacity: 1; }
+  nav button { gap: 8px; padding: 10px 8px; }
+  .nav-copy strong { font-size: 13px; }
+  .nav-icon { width: 18px; }
+  .nav-badge { position: absolute; top: 0; right: 0; min-width: 17px; height: 17px; font-size: 10px; }
+  .sidebar-account { grid-column: 1/-1; display: none; margin-top: 12px; }
+  .menu-open .sidebar-account { display: block; }
+  .profile-entry { max-width: 100%; }
+  .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px 32px; }
+  .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
-  .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 12px 0; }
-  .home-quote-slot, .application-toolbar-slot { order: 3; width: auto; max-width: 100%; flex: 0 0 100%; margin: 4px 0; }
+  .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 10px 0; }
+  .home-quote-slot, .application-toolbar-slot { width: 100%; max-width: 100%; flex: 0 0 100%; margin: 0; }
 }
-@media (max-width: 620px) {
-  nav, .menu-open nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  nav button { width: 100%; min-width: 0; min-height: 38px; justify-content: center; padding: 7px 4px; font-size: 13px; text-align: center; }
-  .topbar > button { order: 4; display: block; width: 100%; min-width: 0; min-height: 44px; }
-}
-@media (max-width: 520px) {
+@media (max-width: 480px) {
+  .sidebar { padding-inline: 12px; }
   .product-main { padding-inline: 12px; }
+  .topbar > button { width: 100%; }
 }
 </style>

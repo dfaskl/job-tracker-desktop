@@ -1,0 +1,206 @@
+/* CareerFlow product surfaces. Reference and design decisions: /DESIGN.md. */
+:root {
+  --font-ui: "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --surface-hover: #f0f2f8;
+  --surface-selected: #eceefa;
+  --shadow-panel: 0 1px 3px rgb(24 32 56 / 3%);
+}
+:root[data-theme="dark"] {
+  --surface-hover: #262a36;
+  --surface-selected: #2b3050;
+  --shadow-panel: 0 1px 3px rgb(0 0 0 / 10%);
+}
+html { font-family: var(--font-ui); }
+body { background: var(--color-background); }
+#app :is(h1, h2, h3, .brand, .nav-copy strong, .home-dashboard, .quote-strip strong, .metrics strong, .summary-grid strong) { font-family: var(--font-ui); }
+#app h1 { font-weight: 650; letter-spacing: -.025em; }
+#app h2 { font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
+#app h3 { font-size: 15px; font-weight: 600; }
+#app button { border-radius: 8px; letter-spacing: 0; }
+#app :is(button, a, input, select, textarea):focus-visible,
+body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 3px;
+}
+#app :is(.card, .dashboard-panel, .calendar-pane, .selected-list, .month-card, .profile-hero) {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-panel);
+}
+#app :is(.dashboard-panel, .card)::before,
+#app .summary-grid article::after { display: none; }
+#app :is(.primary-action, .commit-box button, .topbar > button) {
+  border: 1px solid transparent;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: none;
+}
+#app :is(.primary-action, .commit-box button, .topbar > button):hover { filter: brightness(.96); }
+#app :is(.secondary, .text-button, .text-link, .modal-close, .close) {
+  color: var(--color-foreground);
+  border-color: var(--color-border);
+  background: var(--color-muted);
+}
+#app :is(.empty-state, .empty, .inbox-empty) {
+  color: var(--color-muted-foreground);
+  background: var(--color-muted);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+#app :is(input, textarea)::placeholder { color: var(--color-muted-foreground); opacity: .85; }
+#app :is(.section-kicker, .eyebrow) { letter-spacing: 0; }
+#app .profile-workspace { width: min(960px,100%); padding-top: 24px; }
+#app .profile-avatar { width: 64px; height: 64px; flex-basis: 64px; box-shadow: none; font-weight: 600; }
+#app .profile-hero h1 { font-size: 24px; }
+#app .profile-hero > div:last-child > span { font-size: 12px; font-weight: 500; letter-spacing: 0; }
+#app :is(.settings-column, .settings-grid) .card { box-shadow: var(--shadow-panel); }
+
+/* Overview: one strip of actionable counts, followed by the actual agenda. */
+#app .home-dashboard { gap: 20px; padding-top: 24px; }
+#app .overview-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+#app .overview-heading h1 { margin: 0; font-size: 28px; }
+#app .overview-heading p { margin: 8px 0 0; font-size: 13px; }
+#app .overview-mail { display: inline-flex; align-items: center; gap: 8px; flex: none; padding: 0 16px; border: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-card); font-size: 13px; }
+#app .overview-mail:hover { background: var(--surface-hover); }
+#app .overview-shortcuts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; background: var(--color-card); }
+#app .overview-shortcuts button { display: grid; gap: 8px; padding: 20px 24px; border: 0; border-right: 1px solid var(--color-border); border-radius: 0; color: var(--color-foreground); background: transparent; text-align: left; }
+#app .overview-shortcuts button:last-child { border-right: 0; }
+#app .overview-shortcuts button:hover { background: var(--surface-hover); }
+#app .overview-shortcuts button:focus-visible { outline-offset: -4px; }
+#app .overview-shortcuts span { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; }
+#app .overview-shortcuts strong { font-size: 30px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+#app .overview-shortcuts small { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
+#app .home-quote-slot { justify-content: flex-start; }
+#app .quote-strip { justify-content: flex-start; padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
+#app .quote-strip strong { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.65; }
+#app .quote-strip small { font-size: 12px; font-weight: 600; }
+#app .quote-trigger { width: 34px; min-width: 34px; height: 34px; min-height: 34px; color: var(--color-primary); background: var(--surface-selected); border-radius: 8px; }
+#app .dashboard-panel { padding: 24px; }
+#app .panel-head { padding-left: 0; }
+#app .panel-head h2 { font-size: 18px; }
+#app .panel-head .text-link { font-size: 12px; padding: 6px 12px; background: transparent; }
+#app :is(.timeline-column, .details-column, .schedule-advice, .advice-timeline, .member-legend) { background: var(--color-card); border-color: var(--color-border); box-shadow: none; }
+#app .timeline-column { border-radius: 8px; background: var(--color-muted); }
+#app .member-legend { background: transparent; }
+#app .column-heading strong { font-size: 14px; }
+#app .column-heading small { font-size: 12px; }
+#app .column-heading > span { border-radius: 6px; color: var(--color-muted-foreground); background: var(--color-muted); }
+#app .schedule-list article { min-height: 96px; padding: 16px 0; gap: 18px; }
+#app .date-block { border-left-width: 2px; border-radius: 4px 8px 8px 4px; background: var(--surface-selected); }
+#app .schedule-copy > small { color: var(--color-muted-foreground); background: var(--color-muted); font-size: 12px; }
+#app .schedule-copy > strong { font-weight: 600; }
+#app .schedule-actions > i { position: static; padding: 4px 8px; border-radius: 5px; color: var(--color-primary); background: var(--surface-selected); }
+#app .confirmation-panel { background: var(--color-card); }
+#app .confirmation-panel .empty { padding: 18px; }
+#app .overdue-alert { box-shadow: none; }
+
+/* Lists keep their semantic stage accents while reducing competing fills. */
+#app .application { background-image: none; box-shadow: none; transition: border-color .18s, background-color .18s; }
+#app .application:hover { transform: none; box-shadow: 0 0 0 1px var(--color-border-strong); }
+#app .application-title strong { font-weight: 650; }
+#app .application-legend { font-size: 12px; }
+#app .application-heatmap { box-shadow: none; }
+#app .application.tone-pending { --stage-tint: #4383c9; }
+#app .application.tone-interview { --stage-tint: #8661bc; }
+#app .application.tone-assessment { --stage-tint: #bd861c; }
+#app .application.tone-applied { --stage-tint: #74827b; }
+#app .application.tone-stopped { --stage-tint: #c55e59; }
+#app .application.tone-offer { --stage-tint: #298e5b; }
+:root:not([data-theme="dark"]) #app .application[class*="tone-"] { --card-bg: color-mix(in srgb,var(--stage-tint) 4%,var(--color-card)); background: var(--card-bg); border-color: color-mix(in srgb,var(--stage-tint) 30%,var(--color-border)); border-left-color: var(--stage-tint); }
+#app .mail-select { border: 0; color: var(--color-foreground); }
+#app .mail-select:hover { background: var(--surface-hover); }
+#app .timeline-list b { color: var(--color-foreground); }
+#app .team-timeline-list article em { box-shadow: none; }
+:root[data-theme="dark"] #app .team-timeline-list article em strong { color: var(--color-muted-foreground); }
+#app .details-column { padding: 0; border: 0; margin-top: 18px; }
+#app .schedule-actions button { border: 1px solid var(--color-border); background: var(--color-muted); }
+:root[data-theme="dark"] #app .schedule-actions > i { color: var(--color-primary); background: var(--surface-selected); }
+:root[data-theme="dark"] #app .quote-strip { background: transparent; }
+#app .heatmap-controls button { min-height: 28px; }
+#app .workspace { box-shadow: none; }
+#app .mail-toolbar, #app .admin-head { padding-left: 0; border-left: 0; }
+#app :is(.source-panel, .review-panel, .compose-panel, .inbox-panel) { border-top-color: var(--color-border); }
+#app .step { border-radius: 6px; font-family: var(--font-ui); }
+#app .mail-cards article { box-shadow: none; border-radius: 8px; }
+#app .mail-cards article.selected { border-color: var(--color-primary); background: var(--surface-selected); }
+#app .mail-card-copy strong { font-weight: 600; }
+#app .source-panel > textarea { background: var(--color-card); line-height: 1.7; }
+#app :is(.metrics, .summary-grid) article { box-shadow: none; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 10px; }
+#app .metrics article strong { font-size: 30px; font-weight: 600; }
+#app :is(.metrics, .summary-grid) small { color: var(--color-muted-foreground); font-size: 12px; }
+#app :is(.calendar-grid, .month-grid) .day { border-radius: 0; }
+#app :is(.calendar-grid, .month-grid) .day.today > .day-number { color: var(--color-on-primary); background: var(--color-primary); border-radius: 6px; }
+#app :is(.calendar-grid, .month-grid) .day.selected { box-shadow: inset 0 0 0 2px var(--color-primary); }
+#app .calendar-head { border-color: var(--color-border); }
+@media (min-width: 1251px) {
+  #app .admin-grid { grid-template-columns: minmax(180px,.8fr) minmax(560px,2.2fr) minmax(180px,.8fr); }
+  #app .overview-column .health-grid { grid-template-columns: 1fr; }
+  #app .overview-column .health-grid > div { white-space: nowrap; }
+  #app .overview-column .summary-grid article { padding: 14px; }
+}
+#app .users-card { container-type: inline-size; }
+@container (max-width: 740px) {
+  #app .user-expanded { grid-template-columns: minmax(0,1fr) 124px; padding-left: 16px; }
+  #app .user-expanded .group-assignment { width: 124px; margin: 0; }
+  #app .user-expanded .actions { grid-column: 1/-1; width: max-content; display: flex; flex-wrap: nowrap; justify-self: end; margin: 8px 46px 0 0; gap: 4px; }
+}
+@container (max-width: 380px) {
+  #app .user-expanded { grid-template-columns: 1fr; padding-inline: 8px; }
+  #app .user-expanded .actions { justify-self: start; margin-right: 0; }
+  #app .user-expanded .actions button.icon-button { width: 36px; min-width: 36px; height: 40px; min-height: 40px; flex: 0 0 36px; }
+}
+@media (min-width: 1251px) and (max-width: 1599px) {
+  #app .admin-grid { grid-template-columns: minmax(250px,.75fr) minmax(0,1.75fr); grid-template-rows: minmax(0,1fr) 150px; }
+  #app .admin-grid > .audit-card { grid-column: 1/-1; }
+  #app .overview-column .health-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #app .overview-column .health-grid > div { flex-wrap: wrap; }
+}
+
+/* Teleported dialogs use the same tokens as the workspace. */
+body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { background: rgb(15 18 30 / 55%); backdrop-filter: blur(3px); }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) { color: var(--color-foreground); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); font-family: var(--font-ui); }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(input, textarea, select) { color: var(--color-foreground); border-color: var(--color-border); border-radius: 8px; background: var(--color-card); }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-border-strong); font: inherit; font-size: 14px; }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) textarea { min-height: 88px; resize: vertical; }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) button { min-height: 40px; border-radius: 8px; font-family: var(--font-ui); }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) button.icon-button { display: inline-grid; width: 40px; min-width: 40px; height: 40px; place-items: center; padding: 0; }
+body .modal.form .actions > button { padding: 10px 16px; font-size: 14px; font-weight: 600; }
+body .modal.form .actions > button:not([type="button"]) { color: var(--color-on-primary); background: var(--color-primary); }
+body .modal.form .actions > :is(.ai-button, .secondary) { color: var(--color-foreground); background: var(--color-muted); border: 1px solid var(--color-border); }
+body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-family: var(--font-ui); }
+
+@media (min-width: 821px) and (min-height: 700px) {
+  #app .product-main:has(.home-content) { display: flex; height: 100dvh; min-height: 0; flex-direction: column; padding-bottom: 0; overflow: hidden; }
+  #app .product-main:has(.home-content) > .topbar { flex: none; }
+  #app .home-content { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; padding-right: 6px; }
+}
+@media (max-width: 820px) {
+  #app .overview-heading h1 { font-size: 24px; }
+  #app .overview-heading { align-items: flex-start; flex-wrap: wrap; }
+  #app .overview-shortcuts button { padding: 16px 12px; }
+  #app .overview-shortcuts strong { font-size: 26px; }
+  #app .overview-shortcuts small { line-height: 1.5; }
+  #app .overview-shortcuts small svg { display: none; }
+  #app .dashboard-panel { padding: 18px 16px; }
+  #app .home-dashboard { padding-top: 16px; }
+  #app .profile-workspace { padding-top: 16px; }
+  #app .profile-hero { padding: 18px 16px; }
+  #app .profile-hero h1 { font-size: 22px; }
+}
+@media (max-width: 480px) {
+  #app .overview-shortcuts button { gap: 10px; padding: 16px 10px; }
+  #app .overview-shortcuts span { font-size: 12px; }
+  #app .overview-shortcuts small { font-size: 12px; }
+  #app .schedule-list article { gap: 12px; }
+  #app .calendar-pane .calendar-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  #app .calendar-pane .calendar-head > div { justify-content: space-between; }
+  #app .calendar-pane .calendar-head :is(strong, button, span) { white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app .page-content > :not(.access) { animation-name: workspace-fade; animation-duration: .16s; }
+  #app :is(.sidebar button, .application, .profile-entry) { transition: background-color .12s, color .12s, border-color .12s; }
+  #app .entry-inner { animation: workspace-fade .16s both; }
+}
+@keyframes workspace-fade { from { opacity: .6; } to { opacity: 1; } }

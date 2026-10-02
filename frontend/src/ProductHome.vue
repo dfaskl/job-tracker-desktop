@@ -265,6 +265,12 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
+    <header class="overview-heading"><div><h1>求职概览</h1><p>安排好下一步，每一份进展都值得记录。</p></div><button type="button" class="overview-mail" @click="emit('navigate','mail')"><AppIcon name="mail" :size="18" />处理招聘邮件</button></header>
+    <nav class="overview-shortcuts" aria-label="求职概览快捷入口">
+      <button type="button" @click="emit('navigate','applications')"><span>投递记录</span><strong>{{ store.applications.value.length }}</strong><small>查看所有岗位<AppIcon name="chevron-right" :size="14" /></small></button>
+      <button type="button" @click="emit('navigate','calendar')"><span>待完成日程</span><strong>{{ recentSchedules.length }}</strong><small>{{ overdueSchedules.length ? `${overdueSchedules.length} 项需要及时处理` : '查看面试与测评安排' }}<AppIcon name="chevron-right" :size="14" /></small></button>
+      <button type="button" @click="emit('navigate','mail')"><span>待处理邮件</span><strong>{{ store.pendingMailCount.value }}</strong><small>识别通知并更新进度<AppIcon name="chevron-right" :size="14" /></small></button>
+    </nav>
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong>{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
       <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
@@ -272,6 +278,17 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
         <span class="warning-triangle warning-triangle-large" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span>
         <div><strong>{{overdueSchedules.length}} 个日程已超过设置时间仍未完成</strong><span v-for="event in overdueSchedules.slice(0,3)" :key="event.id">{{deadlineText(event)}}　{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</span><small v-if="overdueSchedules.length>3">另有 {{overdueSchedules.length-3}} 个逾期日程，请前往日程页面处理。</small></div>
       </section>
+        <section class="details-column" aria-labelledby="my-schedule-title">
+          <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
+          <div v-if="recentSchedules.length" class="schedule-list">
+            <article v-for="(event,index) in recentSchedules" :key="event.id">
+              <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
+              <div class="schedule-copy"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}} <a v-if="String(event.location||'').startsWith('http')" :href="String(event.location)" target="_blank" rel="noreferrer">· 打开链接 ↗</a> <b>{{event.type||'其他'}}</b></p><small>备注：{{event.notes||'暂无备注'}}</small></div>
+              <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
+            </article>
+          </div>
+          <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
+        </section>
       <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
@@ -288,17 +305,7 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
 
-        <section class="details-column" aria-labelledby="my-schedule-title">
-          <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
-          <div v-if="recentSchedules.length" class="schedule-list">
-            <article v-for="(event,index) in recentSchedules" :key="event.id">
-              <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
-              <div class="schedule-copy"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}} <a v-if="String(event.location||'').startsWith('http')" :href="String(event.location)" target="_blank" rel="noreferrer">· 打开链接 ↗</a> <b>{{event.type||'其他'}}</b></p><small>备注：{{event.notes||'暂无备注'}}</small></div>
-              <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
-            </article>
-          </div>
-          <div v-else class="empty">暂无待完成日程。</div>
-        </section>
+
     </section>
 
     <section class="dashboard-panel confirmation-panel">

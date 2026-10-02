@@ -11,3 +11,5 @@ node_modules/
 backend/target/
 frontend/dist/
 dist/
+.design-reference/
+.design-qa/

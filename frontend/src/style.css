@@ -1,31 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@400;500;600;700&family=Nunito:wght@600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap');
-
 :root {
   color-scheme: light;
-  font-family: "Fira Sans", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-  color: #292720;
-  background: #f5f0e6;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  color: #202330;
+  background: #f6f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --color-primary: #28251f;
+  --color-primary: #535fc7;
   --color-on-primary: #fff;
-  --color-secondary: #8b8173;
-  --color-accent: #6f6253;
-  --color-background: #f5f0e6;
-  --color-foreground: #292720;
-  --color-card: #fffdf7;
-  --color-card-foreground: #292720;
-  --color-muted: #ece5d8;
-  --color-muted-foreground: #686257;
-  --color-border: #d8cfc0;
-  --color-border-strong: #bdae99;
+  --color-secondary: #626879;
+  --color-accent: #535fc7;
+  --color-background: #f6f7fa;
+  --color-foreground: #202330;
+  --color-card: #ffffff;
+  --color-card-foreground: #202330;
+  --color-muted: #eff1f6;
+  --color-muted-foreground: #626879;
+  --color-border: #dfe3eb;
+  --color-border-strong: #9ba4b5;
   --color-destructive: #dc2626;
-  --color-ring: #6f6659;
+  --color-ring: #535fc7;
   --color-success: #357c5f;
   --color-warning: #a96727;
-  --color-avatar-background: #28251f;
-  --color-avatar-foreground: #fffdf7;
-  --color-avatar-border: #28251f;
+  --color-avatar-background: #535fc7;
+  --color-avatar-foreground: #ffffff;
+  --color-avatar-border: #535fc7;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -35,12 +33,12 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --shadow-sm: 0 1px 2px rgba(63, 50, 32, .08);
-  --shadow-lg: 0 18px 48px rgba(63, 50, 32, .16);
+  --shadow-sm: 0 1px 2px rgba(24, 32, 56, .04);
+  --shadow-lg: 0 18px 48px rgba(24, 32, 56, .16);
   --control-height: 44px;
-  --sidebar-width: 232px;
-  --font-button: "Nunito", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-  --accent: #28251f;
+  --sidebar-width: 216px;
+  --font-button: "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --accent: #535fc7;
   --sidebar: #0c0d0f;
   --sidebar-top: #181a1d;
   --sidebar-active: linear-gradient(105deg, #292b2f, #414348);
@@ -48,27 +46,27 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  color: #f4f1e9;
-  background: #08090b;
-  --color-primary: #eee6d7;
-  --color-on-primary: #0a0b0d;
-  --color-secondary: #a7a095;
-  --color-accent: #c8bba7;
-  --color-background: #08090b;
-  --color-foreground: #f4f1e9;
-  --color-card: #12151a;
-  --color-card-foreground: #f4f1e9;
-  --color-muted: #1b2027;
-  --color-muted-foreground: #b6b1a8;
-  --color-border: #303640;
-  --color-border-strong: #4a525e;
+  color: #eceef5;
+  background: #101116;
+  --color-primary: #a4adff;
+  --color-on-primary: #10132b;
+  --color-secondary: #a5acbe;
+  --color-accent: #a4adff;
+  --color-background: #101116;
+  --color-foreground: #eceef5;
+  --color-card: #191b23;
+  --color-card-foreground: #eceef5;
+  --color-muted: #232631;
+  --color-muted-foreground: #a5acbe;
+  --color-border: #333847;
+  --color-border-strong: #626e86;
   --color-destructive: #ff7770;
-  --color-ring: #d8cfbf;
+  --color-ring: #a4adff;
   --color-success: #70c09e;
   --color-warning: #e7aa61;
   --color-avatar-background: #30343b;
-  --color-avatar-foreground: #fff4df;
-  --color-avatar-border: #6c6457;
+  --color-avatar-foreground: #eceef5;
+  --color-avatar-border: #626e86;
   --application-pending-surface: #172433;
   --application-pending-border: #466e9e;
   --application-pending-accent: #6da7e6;
@@ -87,13 +85,13 @@
   --application-offer-surface: #15251d;
   --application-offer-border: #3f7456;
   --application-offer-accent: #67b486;
-  --color-paper: #12151a;
-  --color-canvas: #08090b;
-  --color-rail: #303640;
+  --color-paper: #191b23;
+  --color-canvas: #101116;
+  --color-rail: #333847;
   --color-progress: #70c09e;
   --color-deadline: #e2a158;
   --color-stage: #a9a0e8;
-  --accent: #eee6d7;
+  --accent: #a4adff;
   --sidebar: #080b0e;
   --sidebar-top: #11161a;
   --sidebar-active: linear-gradient(105deg, #292b30, #3a3b3f);
@@ -108,12 +106,12 @@ html { min-width: 320px; scroll-padding-top: 120px; scrollbar-gutter: stable; ov
 body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--color-background); overscroll-behavior-y: none; }
 button, input, textarea, select { font: inherit; }
 button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
-button { cursor: pointer; }
+button { cursor: pointer; border: 1px solid transparent; }
 button:disabled { cursor: not-allowed; opacity: .55; }
 a { color: var(--color-primary); text-underline-offset: 3px; }
 p { color: var(--color-muted-foreground); line-height: 1.6; }
 h1, h2, h3 { color: var(--color-foreground); }
-h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-spacing: -.035em; }
+h1, .topbar h1 { font-family: var(--font-button); letter-spacing: -.035em; }
 
 #app :is(button, input, textarea, select, a[href], [tabindex]):focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-ring) 28%, transparent);
@@ -148,8 +146,8 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
   border-radius: 10px;
   color: var(--color-primary);
   font-family: var(--font-button);
-  font-weight: 700;
-  letter-spacing: .012em;
+  font-weight: 600;
+  letter-spacing: 0;
   transition: color .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease;
 }
 #app button.icon-button {
@@ -199,15 +197,14 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 #app button.select-trigger,
 #app button.select-option { color: var(--color-card-foreground); font-family: inherit; letter-spacing: normal; }
 #app button.brand { color: inherit; }
-#app nav button { color: #ebe4d8; }
-#app nav button.active,
-#app nav button:hover,
-#app button.menu-toggle { color: #fff; }
+#app .sidebar nav button { color: var(--color-muted-foreground); }
+#app .sidebar nav button.active { color: var(--color-primary); }
+#app .sidebar nav button:hover, #app button.menu-toggle { color: var(--color-foreground); }
 #app button.select-option:hover,
 #app button.select-option.active,
 #app button.select-option.selected { color: var(--color-primary); }
 #app .eyebrow, #app .section-kicker { color: var(--color-primary); }
-#app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: color-mix(in srgb, #08090b 62%, transparent); backdrop-filter: blur(4px); }
+#app :is(.backdrop, .modal-backdrop, .link-backdrop) { background: color-mix(in srgb, #101116 62%, transparent); backdrop-filter: blur(4px); }
 #app :is(.modal, .detail-modal, .link-modal) { border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); }
 #app :is(.feedback, .global-operation-toast) { font-size: 14px; }
 
@@ -217,27 +214,16 @@ h1, .topbar h1 { font-family: "Fira Code", "Noto Sans SC", sans-serif; letter-sp
 }
 /* Career workspace visual system */
 :root {
-  --color-paper: #fffdf7;
-  --color-canvas: #f3ede1;
-  --color-rail: #ded4c3;
+  --color-paper: #ffffff;
+  --color-canvas: #f6f7fa;
+  --color-rail: #dfe3eb;
   --color-progress: #357c5f;
   --color-deadline: #bd7532;
   --color-stage: #6f66b6;
   --radius-panel: 14px;
-  --shadow-float: 0 16px 38px rgba(63, 50, 32, .11);
+  --shadow-float: 0 16px 38px rgba(24, 32, 56, .12);
 }
-body {
-  background-color: var(--color-canvas);
-  background-image:
-    linear-gradient(rgba(74,61,43,.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(74,61,43,.035) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-:root[data-theme="dark"] body {
-  background-image:
-    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-}
+body { background: var(--color-background); }
 :root[data-theme="dark"] #app :is(.card, .modal, .detail-modal, .link-modal, .password-dialog, .mail-help-dialog, .link-editor, .link-list article, .tool-box, .notice, .metrics-row div, .account-list article, .provider-guides > article, .mail-cards article, .application-match, .event-record, .application, .day, .calendar-pane, .month-card, .selected-card, .backup-list article, .users-card article, .empty-state, .empty, .feedback, .basic-info) {
   color: var(--color-card-foreground);
   background-color: var(--color-card);
@@ -247,8 +233,8 @@ body {
 :root[data-theme="dark"] #app :is(.application, .event-record, .mail-cards article, .account-list article, .provider-guides > article, .link-list article, .tool-box, .metrics-row div, .calendar-pane, .month-card, .day, .selected-card article, .backup-list article, .users-card article) { border-color: var(--color-border); }
 :root[data-theme="dark"] #app :is(.basic-info strong, .event-body > strong, .event-date strong, .provider-guides ol) { color: var(--color-card-foreground); }
 :root[data-theme="dark"] #app :is(.empty-state, .empty) { background-image: none; }
-#app .sidebar button.theme-toggle { color: #ebe4d8; }
-#app .sidebar button.theme-toggle:hover { color: #fff; }
+#app .sidebar button.theme-toggle { color: var(--color-muted-foreground); }
+#app .sidebar button.theme-toggle:hover { color: var(--color-primary); }
 :root[data-theme="dark"] #app .home-dashboard {
   --home-ink: var(--color-foreground);
   --home-muted: var(--color-muted-foreground);
@@ -302,7 +288,7 @@ body {
 #app :is(.feedback.danger, .global-operation-toast.danger) { border-left: 4px solid var(--color-destructive); }
 #app :is(.empty-state, .empty) { background: color-mix(in srgb,var(--color-background) 48%,#fff); }
 #app :is(.workspace > .grid, .audit-scroll, .user-scroll, .review-panel, .backup-list) { scrollbar-color: color-mix(in srgb,var(--color-primary) 34%,transparent) transparent; }
-#app :is(.metrics-row, .metrics, .summary-grid) strong { font-family: "Fira Code", "Noto Sans SC", sans-serif; font-variant-numeric: tabular-nums; }
+#app :is(.metrics-row, .metrics, .summary-grid) strong { font-family: var(--font-button); font-variant-numeric: tabular-nums; }
 #app :is(.mail-grid, .calendar-layout, .settings-grid, .admin-grid, .two-column) { isolation: isolate; }
 #app :is(.mail-grid, .calendar-layout, .settings-grid, .admin-grid) > * { min-width: 0; }
 @keyframes workspace-arrive {
@@ -544,7 +530,7 @@ body {
 /* Teleported overlays live under <body>, outside #app, so theme them explicitly. */
 :root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) {
   color: var(--color-foreground);
-  background: color-mix(in srgb, #08090b 72%, transparent) !important;
+  background: color-mix(in srgb, #101116 72%, transparent) !important;
   backdrop-filter: blur(5px);
 }
 :root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal) {
