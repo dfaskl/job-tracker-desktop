@@ -388,6 +388,7 @@ async function removeEvent(item:JobEvent){
 <Teleport to="body">
 <div v-if="selected&&!editing&&!eventEditor" class="backdrop" @click.self="selected=null">
   <section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="application-detail-title">
+    <div class="detail-fixed-header">
     <button class="close icon-button" aria-label="关闭投递详情" title="关闭" @click="selected=null"><AppIcon name="close" /></button>
     <h2 id="application-detail-title" class="detail-title">投递详情</h2>
     <div class="detail-company-row">
@@ -400,6 +401,8 @@ async function removeEvent(item:JobEvent){
     <div v-if="!store.readOnly.value" class="actions detail-actions">
       <button class="icon-button" :disabled="busy" aria-label="编辑投递" title="编辑投递" @click="openEdit(selected)"><AppIcon name="edit" /></button><button class="secondary icon-button" :disabled="busy" aria-label="新增关联日程" title="新增日程" @click="openEvent()"><AppIcon name="calendar" /></button><button class="offer" :disabled="busy" @click="quickUpdate('Offer','已通过')">Offer</button><button class="abandon" :disabled="busy" @click="quickUpdate('已结束','已放弃')">放弃</button><button class="reject" :disabled="busy" @click="quickUpdate('已结束','未通过')">未通过</button><button class="danger-button push-right icon-button" :disabled="busy" aria-label="删除投递" title="删除投递" @click="removeApplication"><AppIcon name="trash" /></button>
     </div>
+    </div>
+    <div class="detail-scroll">
     <h3 class="section-heading">基本信息</h3>
     <div class="basic-info"><div><strong>投递日期</strong><span>{{text(selected.appliedDate)}}</span><strong>投递渠道</strong><span>{{text(selected.channel)}}</span></div><p>{{text(selected.notes,'暂无岗位备注')}}</p></div>
     <h3 class="section-heading">安排记录</h3>
@@ -413,6 +416,7 @@ async function removeEvent(item:JobEvent){
     </div><p v-else class="empty">暂无安排。</p>
     <h3 class="section-heading">状态历史</h3>
     <div v-if="selectedTimeline.length" class="history-list"><article v-for="(item,index) in selectedTimeline" :key="String(item.id||index)"><i></i><div><strong>{{text(item.title,'状态更新')}}</strong><span>{{text(item.at,'')}}</span></div></article></div><p v-else class="empty">暂无历史。</p>
+    </div>
   </section>
 </div>
 </Teleport>
@@ -467,6 +471,23 @@ async function removeEvent(item:JobEvent){
 .detail-modal{width:min(1180px,calc(100vw - 48px));max-height:94vh;padding:32px;border-radius:18px}.detail-title{margin:0 0 34px;font-size:22px}.detail-company-row{display:flex;align-items:center;justify-content:space-between;gap:24px}.company-identity{min-width:0}.company-name-line{display:flex;align-items:center;gap:8px}.company-name-line>a{display:flex;min-width:0;align-items:center;gap:10px;color:var(--color-foreground);text-decoration:none}.company-name-line strong{font-size:25px}.company-name-line>a:hover strong{color:#315fb6}.company-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:50%;color:#315fb6;background:#e9f1ff;font-size:18px;font-weight:800}.company-name-line .official-link-edit{width:26px;min-width:26px;height:26px;min-height:26px;flex:0 0 26px;padding:0;border-radius:7px}.company-identity p{margin:8px 0 0;color:#596579;font-size:16px}.official-link-backdrop{z-index:60}.official-link-modal{display:grid;width:min(540px,100%);gap:16px}.official-link-modal h2,.official-link-modal p{margin:0}.official-link-modal label{display:grid;gap:7px;color:var(--color-muted-foreground);font-size:13px;font-weight:700}.official-link-modal input{width:100%}.official-link-modal .actions{margin:2px 0 0}.detail-actions{padding:18px 0;border-bottom:1px solid #d8e0eb}.detail-actions button{min-width:76px}.detail-actions .push-right{margin-left:auto}.section-heading{margin:26px 0 12px}.basic-info{padding:16px;border-radius:12px;background:var(--color-muted)}.basic-info>div{display:flex;align-items:center;gap:12px}.basic-info strong{color:var(--color-card-foreground);font-size:13px}.basic-info span{margin-right:12px;color:var(--color-muted-foreground)}.basic-info p{margin:15px 0 0;color:var(--color-muted-foreground)}.event-records{display:grid;gap:12px}.event-record{position:relative;display:grid;grid-template-columns:22px 105px minmax(0,1fr) auto;align-items:center;min-height:110px;padding:14px 16px 14px 0;border:1px solid var(--color-border);border-radius:13px;background:var(--color-card);box-shadow:var(--shadow-sm)}.event-rail{position:relative;align-self:stretch}.event-rail::before{content:"";position:absolute;left:7px;top:-27px;bottom:-27px;width:1px;background:var(--color-border)}.event-record:first-child .event-rail::before{top:50%}.event-record:last-child .event-rail::before{bottom:50%}.event-rail i{position:absolute;z-index:1;left:1px;top:50%;width:12px;height:12px;transform:translateY(-50%);border:2px solid var(--color-card);border-radius:50%;background:#3f75c5;box-shadow:0 0 0 1px #7ca1d8}.event-date{display:grid;gap:4px;padding-right:14px;border-right:1px solid var(--color-border)}.event-date strong{color:#2f63b3;font-size:17px}.event-date span{color:var(--color-muted-foreground);font-size:12px}.event-body{display:grid;min-width:0;gap:7px;padding:0 16px}.event-body>strong{font-size:15px}.event-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--color-muted-foreground);font-size:12px}.event-meta a{color:#205fc1}.event-meta b{padding:4px 8px;border:1px solid var(--color-border-strong);border-radius:8px;color:var(--color-card-foreground);background:var(--color-muted)}.event-meta i{font-style:normal;color:var(--color-muted-foreground)}.event-body p{margin:0;padding:7px 10px;border-radius:7px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:12px}.event-row-actions{display:flex;align-items:center;gap:8px}.event-row-actions button{padding:9px 12px}.event-row-actions .event-delete{color:#b83d36;background:var(--color-card);border:1px solid #e5b9b5}.history-list{display:grid;margin-left:8px}.history-list article{position:relative;display:flex;gap:18px;padding:4px 0 18px 20px;border-left:2px solid var(--color-border)}.history-list article:last-child{padding-bottom:4px}.history-list article>i{position:absolute;left:-7px;top:7px;width:12px;height:12px;border:2px solid var(--color-card);border-radius:50%;background:#5eb288}.history-list article>div{display:grid;gap:5px}.history-list article strong{font-size:14px}.history-list article span{color:var(--color-muted-foreground);font-size:12px}@media(min-width:721px) and (min-height:620px){.workspace{display:flex;height:calc(100vh - 108px);min-height:0;flex-direction:column;overflow:hidden}.workspace>.head,.workspace>.toolbar,.workspace>.application-legend{flex:0 0 auto}.workspace>.grid{min-height:0;flex:1 1 auto;align-content:start;grid-auto-rows:max-content;overflow-y:auto;overscroll-behavior:contain;padding:12px 7px 18px 2px;border-top:1px solid var(--color-border);scrollbar-width:thin;scrollbar-color:var(--color-border-strong) transparent}.workspace>.grid::-webkit-scrollbar{width:7px}.workspace>.grid::-webkit-scrollbar-track{background:transparent}.workspace>.grid::-webkit-scrollbar-thumb{border-radius:99px;background:var(--color-border-strong)}.workspace>.empty{min-height:0;flex:1 1 auto;padding-top:18px;border-top:1px solid var(--color-border)}}
 @media(max-width:720px){.application-toolbar-portal,.application-filter-stack{box-sizing:border-box;width:100%;max-width:100%;min-width:0}.application-toolbar-portal{overflow:visible}.application-toolbar-portal .toolbar{margin:4px 0 0}.application-filter-fields{width:100%;grid-template-columns:minmax(0,1fr)}.application-filter-fields>*{width:100%;max-width:100%;min-width:0}.application-filter-fields :deep(.base-select),.application-filter-fields :deep(.select-trigger){width:100%;max-width:100%;min-width:0}.application-heatmap{width:100%;min-width:0;justify-content:space-between;gap:16px;padding:12px 2px 2px;border-top:1px solid #d9e0eb;border-left:0}.application-legend{width:100%;max-width:100%;flex-wrap:wrap;gap:6px 12px;margin:9px 0 0;padding:0 2px 3px;overflow:visible;white-space:normal}.application-legend>span{white-space:nowrap}.toolbar{width:100%;max-width:100%;min-width:0;align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{min-width:0;grid-template-columns:1fr}.application{width:100%;min-width:0;padding:16px 14px}.application-overview{align-items:flex-start;flex-direction:column}.application-title{min-width:0}.application-title strong{font-size:15px}.application-title>i{margin-inline:5px}.flow{width:100%;max-width:100%;scroll-snap-type:x proximity}.flow-node{scroll-snap-align:start}.form .wide,dl .wide{grid-column:auto}.detail-modal{width:100%;padding:22px 16px}.detail-title{margin-bottom:24px}.detail-company-row{align-items:flex-start}.company-name-line strong{font-size:21px}.detail-actions .push-right{margin-left:0}.basic-info>div{align-items:flex-start;flex-direction:column;gap:5px}.event-record{grid-template-columns:16px 78px minmax(0,1fr);padding-right:10px}.event-body{padding:0 10px}.event-row-actions{grid-column:2/-1;justify-content:flex-end;margin-top:10px}.event-date strong{font-size:14px}}
 @media(min-width:721px){.application-toolbar-portal .application-legend{transform:translateY(7px)}}
+</style>
+<style scoped>
+.detail-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.detail-fixed-header { flex: none; border-bottom: 1px solid var(--color-border); }
+.detail-fixed-header .detail-actions { margin-bottom: 0; border-bottom: 0; }
+.detail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+}
 </style>
 <style scoped>
 .application-overview {
