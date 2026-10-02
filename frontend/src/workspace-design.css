@@ -127,7 +127,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
   #app .overview-column .summary-grid article { padding: 14px; }
 }
 #app .users-card { container-type: inline-size; }
-@container (max-width: 740px) {
+@container (max-width: 880px) {
   #app .user-expanded { grid-template-columns: minmax(0,1fr) 124px; padding-left: 16px; }
   #app .user-expanded .group-assignment { width: 124px; margin: 0; }
   #app .user-expanded .actions { grid-column: 1/-1; width: max-content; display: flex; flex-wrap: nowrap; justify-self: end; margin: 8px 46px 0 0; gap: 4px; }

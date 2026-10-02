@@ -145,9 +145,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
                   </div>
                   <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
                   <small class="user-email" :title="user.email">{{user.email}}</small>
-                  <span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span>
-                  <div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div>
-
+                  <div class="identity-meta"><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span><div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div></div>
                 </div>
                 <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
                 <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的原始 JSON'" title="导出原始 JSON" @click="downloadUserData(user,'raw')"><AppIcon name="database" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的规范 Excel'" title="导出规范 Excel" @click="downloadUserData(user,'readable')"><AppIcon name="file-spreadsheet" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
@@ -270,15 +268,28 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 }
 
 .users-card .identity {
-  min-width: 220px;
+  min-width: 0;
   flex: 1 1 280px;
 }
+
+.identity-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--color-muted-foreground);
+  font-size: 11px;
+}
+
+.identity-meta > span,
+.identity-meta .counts span { white-space: nowrap; }
 
 .users-card .identity .counts {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 4px 10px;
 }
 
 .users-card .identity .counts span {
@@ -394,7 +405,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .group-pill{max-width:190px;overflow:hidden;padding:5px 9px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:11px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
 .expand-icon{display:grid;width:28px;height:28px;place-items:center;color:var(--color-muted-foreground);transition:transform .18s ease}
 .user-row.expanded .expand-icon{transform:rotate(90deg)}
-.user-expanded{display:grid;grid-template-columns:minmax(180px,30%) 124px minmax(266px,1fr);align-items:center;gap:8px;padding:12px 4px 14px 28px;border-top:1px dashed var(--color-border)}
+.user-expanded{display:grid;grid-template-columns:minmax(400px,1fr) 124px max-content;align-items:center;gap:8px;padding:9px 4px 10px 28px;border-top:1px dashed var(--color-border)}
 .user-expanded .identity{min-width:0}
 .user-expanded .group-assignment,.user-expanded .actions{min-width:0}
 .user-expanded .actions{justify-self:end;margin-right:46px}
