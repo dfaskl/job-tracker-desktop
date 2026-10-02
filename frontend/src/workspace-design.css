@@ -57,21 +57,8 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .profile-hero > div:last-child > span { font-size: 12px; font-weight: 500; letter-spacing: 0; }
 #app :is(.settings-column, .settings-grid) .card { box-shadow: var(--shadow-panel); }
 
-/* Overview: one strip of actionable counts, followed by the actual agenda. */
+/* The home workspace starts with the personal agenda. */
 #app .home-dashboard { gap: 20px; padding-top: 24px; }
-#app .overview-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-#app .overview-heading h1 { margin: 0; font-size: 28px; }
-#app .overview-heading p { margin: 8px 0 0; font-size: 13px; }
-#app .overview-mail { display: inline-flex; align-items: center; gap: 8px; flex: none; padding: 0 16px; border: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-card); font-size: 13px; }
-#app .overview-mail:hover { background: var(--surface-hover); }
-#app .overview-shortcuts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; background: var(--color-card); }
-#app .overview-shortcuts button { display: grid; gap: 8px; padding: 20px 24px; border: 0; border-right: 1px solid var(--color-border); border-radius: 0; color: var(--color-foreground); background: transparent; text-align: left; }
-#app .overview-shortcuts button:last-child { border-right: 0; }
-#app .overview-shortcuts button:hover { background: var(--surface-hover); }
-#app .overview-shortcuts button:focus-visible { outline-offset: -4px; }
-#app .overview-shortcuts span { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; }
-#app .overview-shortcuts strong { font-size: 30px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
-#app .overview-shortcuts small { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 #app .home-quote-slot { justify-content: flex-start; }
 #app .quote-strip { justify-content: flex-start; padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
 #app .quote-strip strong { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.65; }
@@ -94,7 +81,6 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .schedule-actions > i { position: static; padding: 4px 8px; border-radius: 5px; color: var(--color-primary); background: var(--surface-selected); }
 #app .confirmation-panel { background: var(--color-card); }
 #app .confirmation-panel .empty { padding: 18px; }
-#app .overdue-alert { box-shadow: none; }
 
 /* Lists keep their semantic stage accents while reducing competing fills. */
 #app .application { background-image: none; box-shadow: none; transition: border-color .18s, background-color .18s; }
@@ -177,12 +163,6 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
   #app .home-content { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; padding-right: 6px; }
 }
 @media (max-width: 820px) {
-  #app .overview-heading h1 { font-size: 24px; }
-  #app .overview-heading { align-items: flex-start; flex-wrap: wrap; }
-  #app .overview-shortcuts button { padding: 16px 12px; }
-  #app .overview-shortcuts strong { font-size: 26px; }
-  #app .overview-shortcuts small { line-height: 1.5; }
-  #app .overview-shortcuts small svg { display: none; }
   #app .dashboard-panel { padding: 18px 16px; }
   #app .home-dashboard { padding-top: 16px; }
   #app .profile-workspace { padding-top: 16px; }
@@ -190,9 +170,6 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
   #app .profile-hero h1 { font-size: 22px; }
 }
 @media (max-width: 480px) {
-  #app .overview-shortcuts button { gap: 10px; padding: 16px 10px; }
-  #app .overview-shortcuts span { font-size: 12px; }
-  #app .overview-shortcuts small { font-size: 12px; }
   #app .schedule-list article { gap: 12px; }
   #app .calendar-pane .calendar-head { flex-direction: column; align-items: stretch; gap: 12px; }
   #app .calendar-pane .calendar-head > div { justify-content: space-between; }

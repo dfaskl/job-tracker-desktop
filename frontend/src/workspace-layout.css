@@ -4,15 +4,9 @@
 #app .quote-copy { width: 100%; max-width: none; flex: 1 1 auto; }
 #app .quote-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #app .home-dashboard { gap: 28px; }
-#app .overview-heading { padding-bottom: 18px; border-bottom: 1px solid var(--color-border); }
-#app .overview-shortcuts { border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; }
-#app .overview-shortcuts button { min-width: 0; padding: 4px 24px 20px; }
-#app .overview-shortcuts button:first-child { padding-left: 0; }
-#app .overview-shortcuts button:last-child { padding-right: 0; }
-#app .overview-shortcuts strong { font-size: 32px; letter-spacing: -.04em; }
 #app .dashboard-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 #app .dashboard-panel > .panel-head { padding: 0 0 15px; border-bottom: 1px solid var(--color-border); }
-#app .dashboard-panel > .details-column { margin-top: 18px; }
+#app .dashboard-panel > .details-column { margin-top: 0; }
 #app .details-column,
 :root[data-theme="dark"] #app .details-column { padding: 0; border: 0; border-radius: 0; background: transparent; }
 #app .details-column .schedule-list { gap: 12px; border-top: 0; }
@@ -165,7 +159,6 @@
 }
 @media (max-width: 820px) {
   #app .quote-copy strong { overflow: visible; text-overflow: clip; white-space: normal; }
-  #app .overview-shortcuts button { padding: 8px 12px 18px; }
   #app .dashboard-panel { padding: 0; }
   #app .schedule-list article { padding: 14px; }
   #app .workspace > .grid { padding-right: 0; }
@@ -174,9 +167,6 @@
 }
 @media (max-width: 640px) {
   #app .home-dashboard { gap: 22px; }
-  #app .overview-shortcuts button { padding: 8px 8px 14px; }
-  #app .overview-shortcuts strong { font-size: 26px; }
-  #app .overview-shortcuts small { display: none; }
   #app .analytics-main .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #app .analytics-main .metrics article { padding: 14px 8px; }
   #app .analytics-main .metrics article strong { font-size: 25px; }

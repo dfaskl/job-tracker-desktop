@@ -32,19 +32,13 @@ const sharedTimelines = ref<SharedTimelineUser[]>([])
 const sharedGroupName = ref('')
 const sharedTimelinesLoading = ref(false)
 const sharedTimelinesNotice = ref('')
-const nowTime = ref(Date.now())
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 let quoteBurstTimer: ReturnType<typeof setTimeout> | null = null
-let overdueClock: ReturnType<typeof setInterval> | null = null
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
 const recentSchedules = computed(() => upcomingItems.value)
-const overdueSchedules = computed(() => recentSchedules.value.filter(event => {
-  const deadline=parseTime(eventDeadline(event))
-  return Number.isFinite(deadline)&&deadline<nowTime.value
-}))
 const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
   id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
@@ -133,7 +127,6 @@ const staleApplications = computed(() => store.applications.value.map(item => ({
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
 
 onMounted(async () => {
-  overdueClock=setInterval(()=>{nowTime.value=Date.now()},30000)
   await store.initialize()
   void loadSharedTimelines()
   const cached = loadCachedQuote()
@@ -145,7 +138,6 @@ function today(){return localText().slice(0,10)}
 function eventStart(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||'')}
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||eventStart(item))}
 function parseTime(value:string){const time=new Date(value.replace(' ','T')).getTime();return Number.isFinite(time)?time:Infinity}
-function deadlineText(event:JobEvent){const value=eventDeadline(event),date=new Date(value.replace(' ','T'));return Number.isNaN(date.getTime())?value:`${date.getMonth()+1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`}
 function teamConflictTime(item:TeamTimelineEntry){const match=item.date.match(/^\d{4}-(\d{2})-(\d{2})$/);return match?`${Number(match[1])}月${Number(match[2])}日 ${item.start}`:`${item.date} ${item.start}`}
 function displayName(name:string|undefined,email:string){return String(name||'').trim()||String(email||'').split('@')[0]||'未命名用户'}
 async function loadSharedTimelines(){
@@ -262,23 +254,12 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer);if(overdueClock)clearInterval(overdueClock)})</script>
+onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <header class="overview-heading"><div><h1>求职概览</h1><p>安排好下一步，每一份进展都值得记录。</p></div><button type="button" class="overview-mail" @click="emit('navigate','mail')"><AppIcon name="mail" :size="18" />处理招聘邮件</button></header>
-    <nav class="overview-shortcuts" aria-label="求职概览快捷入口">
-      <button type="button" @click="emit('navigate','applications')"><span>投递记录</span><strong>{{ store.applications.value.length }}</strong><small>查看所有岗位<AppIcon name="chevron-right" :size="14" /></small></button>
-      <button type="button" @click="emit('navigate','calendar')"><span>待完成日程</span><strong>{{ recentSchedules.length }}</strong><small>{{ overdueSchedules.length ? `${overdueSchedules.length} 项需要及时处理` : '查看面试与测评安排' }}<AppIcon name="chevron-right" :size="14" /></small></button>
-      <button type="button" @click="emit('navigate','mail')"><span>待处理邮件</span><strong>{{ store.pendingMailCount.value }}</strong><small>识别通知并更新进度<AppIcon name="chevron-right" :size="14" /></small></button>
-    </nav>
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong :title="quote.author?`${quote.quote} — ${quote.author}`:quote.quote">{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
-      <div class="panel-head"><h2>近期日程 <span title="显示最近的待办、笔试和面试安排">ⓘ</span></h2><button class="text-link" @click="emit('navigate','calendar')">查看全部</button></div>
-      <section v-if="overdueSchedules.length" class="overdue-alert" role="alert" aria-live="polite">
-        <span class="warning-triangle warning-triangle-large" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span>
-        <div><strong>{{overdueSchedules.length}} 个日程已超过设置时间仍未完成</strong><span v-for="event in overdueSchedules.slice(0,3)" :key="event.id">{{deadlineText(event)}}　{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</span><small v-if="overdueSchedules.length>3">另有 {{overdueSchedules.length-3}} 个逾期日程，请前往日程页面处理。</small></div>
-      </section>
         <section class="details-column" aria-labelledby="my-schedule-title">
           <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
           <div v-if="recentSchedules.length" class="schedule-list">
@@ -450,16 +431,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   width: 5px;
   background: linear-gradient(180deg, var(--accent, var(--color-primary)), var(--home-progress) 58%, var(--home-deadline));
 }
-.overdue-alert { display:flex; align-items:flex-start; gap:14px; margin:14px 0 16px; padding:14px 16px; border:1px solid #e89a95; border-left:5px solid #bd332d; border-radius:12px; color:#812722; background:linear-gradient(100deg,#fff0ee,#fff8f7); box-shadow:0 8px 22px rgba(160,45,39,.1); }
-.overdue-alert > div { display:grid; min-width:0; gap:4px; line-height:1.5; }
-.overdue-alert strong { color:#9d2f29; font-size:14px; }
-.overdue-alert span,.overdue-alert small { overflow-wrap:anywhere; color:#713632; font-size:11px; }
-.overdue-alert div > span::before { content:"• "; font-weight:800; }
-.overdue-alert > .warning-triangle { color:#c43e37; }
 .warning-triangle { display:inline-flex; color:#c43e37; }
 .warning-triangle svg { display:block; width:100%; height:100%; overflow:visible; fill:currentColor; filter:drop-shadow(0 2px 3px rgba(142,34,29,.25)); }
 .warning-triangle .warning-mark { fill:none; stroke:#fff; stroke-width:2.4; stroke-linecap:round; }
-.warning-triangle-large { width:28px; height:26px; flex:0 0 28px; margin-top:1px; }
 
 .panel-head,
 .schedule-actions,
