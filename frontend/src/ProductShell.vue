@@ -128,7 +128,6 @@ onBeforeUnmount(() => {
       <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起页面导航' : '展开页面导航'" aria-controls="primary-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
-      <div class="sidebar-section-label" aria-hidden="true">工作空间</div>
       <nav id="primary-navigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
         <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
@@ -164,8 +163,7 @@ onBeforeUnmount(() => {
 .brand div { display: grid; gap: 3px; }
 .brand strong { font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
 .brand small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
-.sidebar-section-label { padding: 20px 12px 10px; border-top: 1px solid var(--color-border); color: var(--color-muted-foreground); font-size: 12px; }
-nav { display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; overflow-y: auto; scrollbar-width: thin; }
+nav { display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; padding-top: 12px; border-top: 1px solid var(--color-border); overflow-y: auto; scrollbar-width: thin; }
 nav button { position: relative; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
 nav button:hover { background: var(--color-muted); }
 nav button.active { border-color: color-mix(in srgb,var(--color-primary) 14%,transparent); background: color-mix(in srgb,var(--color-primary) 9%,var(--color-card)); }
@@ -294,8 +292,7 @@ nav button.active::before { content: ''; position: absolute; left: -1px; top: 13
   .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
   .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  .sidebar-section-label { display: none; }
-  nav { grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 0; overflow: hidden; opacity: 0; transition: opacity .16s; }
+  nav { grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 0; padding-top: 0; border-top: 0; overflow: hidden; opacity: 0; transition: opacity .16s; }
   .menu-open nav { max-height: 240px; margin-top: 12px; opacity: 1; }
   nav button { gap: 8px; padding: 10px 8px; }
   .nav-copy strong { font-size: 13px; }
