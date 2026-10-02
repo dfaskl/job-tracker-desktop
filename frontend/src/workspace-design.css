@@ -94,7 +94,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .application.tone-applied { --stage-tint: #74827b; }
 #app .application.tone-stopped { --stage-tint: #c55e59; }
 #app .application.tone-offer { --stage-tint: #298e5b; }
-:root:not([data-theme="dark"]) #app .application[class*="tone-"] { --card-bg: color-mix(in srgb,var(--stage-tint) 4%,var(--color-card)); background: var(--card-bg); border-color: color-mix(in srgb,var(--stage-tint) 30%,var(--color-border)); border-left-color: var(--stage-tint); }
+:root:not([data-theme="dark"]) #app .application[class*="tone-"] { --card-bg: color-mix(in srgb,var(--stage-tint) 18%,var(--color-card)); border-color: color-mix(in srgb,var(--stage-tint) 30%,var(--color-border)); border-left-color: var(--stage-tint); }
 #app .mail-select { border: 0; color: var(--color-foreground); }
 #app .mail-select:hover { background: var(--surface-hover); }
 #app .timeline-list b { color: var(--color-foreground); }

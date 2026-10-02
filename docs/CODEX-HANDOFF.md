@@ -224,6 +224,7 @@ git -c http.proxy= -c https.proxy= ls-remote origin refs/heads/main
 
 - 前端视觉规范见根目录 `DESIGN.md`，参考 awesome-design-md 的 Linear / Cal.com；原始参考和 MIT 许可证在 `docs/design-references/`。
 - 工作区优先使用连续列表、分栏、标题和细分隔线；首页日程和投递记录可以按条目使用低对比卡片，其他栏目避免大量嵌套卡片。布局覆盖样式在 `frontend/src/workspace-layout.css`。
+- 投递记录卡片在明暗主题下均以当前类别色从左向右渐变，卡片整体颜色应易于区分，同时保持文字可读。
 - 首页顶部的每日一语使用整行可用宽度，桌面尽可能单行展示；窄屏允许自然换行。
 - 使用冷灰画布、单一靛蓝操作色和细边框；统一系统无衬线字体，不再加载外部 Google Fonts。深浅主题变量在 `frontend/src/style.css`，跨页面样式在 `frontend/src/workspace-design.css`。
 - 首页在每日一语下直接展示个人日程、小组时间轴、人工确认；账户与设置入口显示头像、昵称和文字说明。

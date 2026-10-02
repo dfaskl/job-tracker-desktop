@@ -45,10 +45,29 @@
 :root[data-theme="dark"] #app button.application[class*="tone-"] {
   margin: 0; padding: 17px 16px 18px 19px; border: 1px solid var(--color-border);
   border-left: 3px solid var(--stage-tint, var(--color-primary)); border-radius: 10px;
-  background: var(--color-card); background-image: none; box-shadow: var(--shadow-panel);
+  box-shadow: var(--shadow-panel);
+}
+#app button.application[class*="tone-"] {
+  --gradient-start: 26%;
+  --gradient-middle: 13%;
+  --gradient-end: 3%;
+  background-color: var(--color-card) !important;
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-start), var(--color-card)) 0%,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-middle), var(--color-card)) 48%,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-end), var(--color-card)) 100%) !important;
+}
+:root[data-theme="dark"] #app button.application[class*="tone-"] {
+  --gradient-start: 36%;
+  --gradient-middle: 18%;
+  --gradient-end: 6%;
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-start), var(--color-card)) 0%,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-middle), var(--color-card)) 48%,
+    color-mix(in srgb, var(--stage-tint) var(--gradient-end), var(--color-card)) 100%) !important;
 }
 #app .workspace > .grid > .application:last-child { border-bottom: 1px solid var(--color-border); }
-#app button.application:hover { border-color: var(--color-border-strong); border-left-color: var(--stage-tint, var(--color-primary)); background: var(--surface-hover); box-shadow: 0 2px 10px rgb(24 32 56 / 5%); }
+#app button.application:hover { border-color: var(--color-border-strong); border-left-color: var(--stage-tint, var(--color-primary)); box-shadow: 0 2px 10px rgb(24 32 56 / 5%); }
 #app button.application:focus-visible { outline-offset: -3px; }
 #app .application-overview { min-width: 0; }
 #app .application .flow-node:is(.success, .failed) { background: transparent !important; }
@@ -195,11 +214,9 @@
 }
 :root[data-theme="dark"] #app button.application[class*="tone-"] {
   color: var(--color-foreground) !important;
-  background: var(--color-card) !important;
   border-color: var(--color-border) !important;
   border-left-color: var(--stage-tint) !important;
 }
-:root[data-theme="dark"] #app button.application[class*="tone-"]:hover { background: var(--surface-hover) !important; }
 :root[data-theme="dark"] #app .application-title :is(span, small, i) { color: var(--color-muted-foreground) !important; }
 :root[data-theme="dark"] #app .mail-cards article { background: transparent !important; }
 :root[data-theme="dark"] #app .mail-cards article:hover { background: var(--surface-hover) !important; }
