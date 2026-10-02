@@ -1,4 +1,8 @@
 /* Continuous work surfaces: rhythm comes from type, columns and rules. */
+#app .home-quote-slot { width: 100%; min-width: 0; flex: 1 1 100%; }
+#app .quote-strip { width: 100%; max-width: none; flex: 1 1 100%; }
+#app .quote-copy { width: 100%; max-width: none; flex: 1 1 auto; }
+#app .quote-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #app .home-dashboard { gap: 28px; }
 #app .overview-heading { padding-bottom: 18px; border-bottom: 1px solid var(--color-border); }
 #app .overview-shortcuts { border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; }
@@ -11,9 +15,12 @@
 #app .dashboard-panel > .details-column { margin-top: 18px; }
 #app .details-column,
 :root[data-theme="dark"] #app .details-column { padding: 0; border: 0; border-radius: 0; background: transparent; }
-#app .details-column .schedule-list { border-top: 0; }
+#app .details-column .schedule-list { gap: 12px; border-top: 0; }
 #app .schedule-list article,
-:root[data-theme="dark"] #app .schedule-list article { border-color: var(--color-border); background: transparent; }
+:root[data-theme="dark"] #app .schedule-list article {
+  min-width: 0; padding: 16px 18px; border: 1px solid var(--color-border);
+  border-radius: 10px; background: var(--color-card); box-shadow: var(--shadow-panel);
+}
 #app .schedule-list article:last-child { border-bottom: 1px solid var(--color-border); }
 #app .schedule-copy > small,
 :root[data-theme="dark"] #app .schedule-copy > small { padding-left: 0; background: transparent; }
@@ -27,7 +34,8 @@
 #app .confirmation-panel .empty { margin-top: 12px; padding: 14px 0; border-radius: 0; background: transparent; }
 #app .schedule-list article > :not(.schedule-row-target) { position: relative; z-index: 1; pointer-events: none; }
 #app .schedule-row-target { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
-#app .schedule-list article:has(.schedule-row-target:hover) { background: var(--surface-hover); }
+#app .schedule-list article:has(.schedule-row-target:hover),
+:root[data-theme="dark"] #app .schedule-list article:has(.schedule-row-target:hover) { border-color: var(--color-border-strong); background: var(--surface-hover); }
 #app .schedule-list article:has(.schedule-row-target:focus-visible) { outline: 2px solid var(--color-ring); outline-offset: -2px; }
 #app .schedule-link { width: fit-content; max-width: 100%; color: var(--color-foreground); font-size: 15px; line-height: 1.45; text-decoration: none; }
 #app .schedule-link strong { font-weight: 650; }
@@ -35,20 +43,21 @@
 #app .schedule-link:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
 #app .schedule-list :is(.schedule-link, .schedule-actions button) { position: relative; z-index: 2; pointer-events: auto; }
 
-/* One readable application ledger, with stage and health kept in the row. */
-#app .workspace { padding: 0; border: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
-#app .workspace > .grid { gap: 0; padding: 0; }
+/* Application records can be individual cards within one scrollable list. */
+#app .workspace { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+#app .workspace > .grid { gap: 12px; padding: 2px 8px 16px 0; }
 #app button.application,
 :root:not([data-theme="dark"]) #app button.application[class*="tone-"],
 :root[data-theme="dark"] #app button.application[class*="tone-"] {
-  margin: 0; padding: 17px 16px 18px 19px; border: 0; border-bottom: 1px solid var(--color-border);
-  border-left: 3px solid var(--stage-tint, var(--color-primary)); border-radius: 0;
-  background: transparent; background-image: none; box-shadow: none;
+  margin: 0; padding: 17px 16px 18px 19px; border: 1px solid var(--color-border);
+  border-left: 3px solid var(--stage-tint, var(--color-primary)); border-radius: 10px;
+  background: var(--color-card); background-image: none; box-shadow: var(--shadow-panel);
 }
-#app .workspace > .grid > .application:last-child { border-bottom: 0; }
-#app button.application:hover { background: var(--surface-hover); box-shadow: none; }
+#app .workspace > .grid > .application:last-child { border-bottom: 1px solid var(--color-border); }
+#app button.application:hover { border-color: var(--color-border-strong); border-left-color: var(--stage-tint, var(--color-primary)); background: var(--surface-hover); box-shadow: 0 2px 10px rgb(24 32 56 / 5%); }
 #app button.application:focus-visible { outline-offset: -3px; }
 #app .application-overview { min-width: 0; }
+#app .application .flow-node:is(.success, .failed) { background: transparent !important; }
 #app .application-arrival { position: relative; }
 #app .application-arrival::after { position: absolute; inset: 0; z-index: 1; border: 1px solid var(--color-primary); background: color-mix(in srgb, var(--color-primary) 18%, transparent); content: ""; pointer-events: none; animation: application-arrival-flash 1.45s ease-in-out both; }
 @keyframes application-arrival-flash { 0%, 38%, 75%, 100% { opacity: 0; } 16%, 56% { opacity: 1; } }
@@ -155,8 +164,11 @@
   #app .admin-grid > .audit-card { padding: 18px 0 0; border-top: 1px solid var(--color-border); }
 }
 @media (max-width: 820px) {
+  #app .quote-copy strong { overflow: visible; text-overflow: clip; white-space: normal; }
   #app .overview-shortcuts button { padding: 8px 12px 18px; }
   #app .dashboard-panel { padding: 0; }
+  #app .schedule-list article { padding: 14px; }
+  #app .workspace > .grid { padding-right: 0; }
   #app .analytics-main .metrics article { padding: 14px 10px; }
   #app .analytics-main .two-column > .card + .card { padding-left: 0; border-left: 0; }
 }
@@ -193,7 +205,7 @@
 }
 :root[data-theme="dark"] #app button.application[class*="tone-"] {
   color: var(--color-foreground) !important;
-  background: transparent !important;
+  background: var(--color-card) !important;
   border-color: var(--color-border) !important;
   border-left-color: var(--stage-tint) !important;
 }
