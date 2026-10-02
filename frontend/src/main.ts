@@ -3,6 +3,7 @@ import App from './App.vue'
 import AppIcon from './AppIcon.vue'
 import './style.css'
 import './workspace-design.css'
+import './workspace-layout.css'
 
 try {
   const savedTheme = localStorage.getItem('job-tracker-theme')

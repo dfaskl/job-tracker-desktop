@@ -223,6 +223,7 @@ git -c http.proxy= -c https.proxy= ls-remote origin refs/heads/main
 ### UI 与交互偏好
 
 - 前端视觉规范见根目录 `DESIGN.md`，参考 awesome-design-md 的 Linear / Cal.com；原始参考和 MIT 许可证在 `docs/design-references/`。
+- 工作区优先使用连续列表、分栏、标题和细分隔线；避免首页、投递、日历、邮件、统计及设置出现大量嵌套卡片。布局覆盖样式在 `frontend/src/workspace-layout.css`。
 - 使用冷灰画布、单一靛蓝操作色和细边框；统一系统无衬线字体，不再加载外部 Google Fonts。深浅主题变量在 `frontend/src/style.css`，跨页面样式在 `frontend/src/workspace-design.css`。
 - 首页按快捷概览、个人日程、小组时间轴、人工确认排列；账户与设置入口显示头像、昵称和文字说明。
 - 手机导航收起时必须退出键盘焦点顺序；保留跳到主内容入口和可见焦点。

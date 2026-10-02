@@ -1,0 +1,201 @@
+/* Continuous work surfaces: rhythm comes from type, columns and rules. */
+#app .home-dashboard { gap: 28px; }
+#app .overview-heading { padding-bottom: 18px; border-bottom: 1px solid var(--color-border); }
+#app .overview-shortcuts { border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; }
+#app .overview-shortcuts button { min-width: 0; padding: 4px 24px 20px; }
+#app .overview-shortcuts button:first-child { padding-left: 0; }
+#app .overview-shortcuts button:last-child { padding-right: 0; }
+#app .overview-shortcuts strong { font-size: 32px; letter-spacing: -.04em; }
+#app .dashboard-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+#app .dashboard-panel > .panel-head { padding: 0 0 15px; border-bottom: 1px solid var(--color-border); }
+#app .dashboard-panel > .details-column { margin-top: 18px; }
+#app .details-column,
+:root[data-theme="dark"] #app .details-column { padding: 0; border: 0; border-radius: 0; background: transparent; }
+#app .details-column .schedule-list { border-top: 0; }
+#app .schedule-list article,
+:root[data-theme="dark"] #app .schedule-list article { border-color: var(--color-border); background: transparent; }
+#app .schedule-list article:last-child { border-bottom: 1px solid var(--color-border); }
+#app .schedule-copy > small,
+:root[data-theme="dark"] #app .schedule-copy > small { padding-left: 0; background: transparent; }
+#app .timeline-column { padding: 18px 0 0; border: 0; border-radius: 0; background: transparent; }
+#app .timeline-column,
+:root[data-theme="dark"] #app .timeline-column { background: transparent; }
+#app .team-timeline { margin-top: 16px; border-top: 1px solid var(--color-border); }
+#app .member-legend { padding: 8px 0; border: 0; border-radius: 0; }
+#app .schedule-advice { margin-top: 20px; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
+#app .confirmation-panel { padding: 0 0 24px; background: transparent; }
+#app .confirmation-panel .empty { margin-top: 12px; padding: 14px 0; border-radius: 0; background: transparent; }
+
+/* One readable application ledger, with stage and health kept in the row. */
+#app .workspace { padding: 0; border: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
+#app .workspace > .grid { gap: 0; padding: 0; }
+#app button.application,
+:root:not([data-theme="dark"]) #app button.application[class*="tone-"],
+:root[data-theme="dark"] #app button.application[class*="tone-"] {
+  margin: 0; padding: 17px 16px 18px 19px; border: 0; border-bottom: 1px solid var(--color-border);
+  border-left: 3px solid var(--stage-tint, var(--color-primary)); border-radius: 0;
+  background: transparent; background-image: none; box-shadow: none;
+}
+#app .workspace > .grid > .application:last-child { border-bottom: 0; }
+#app button.application:hover { background: var(--surface-hover); box-shadow: none; }
+#app button.application:focus-visible { outline-offset: -3px; }
+#app .application-overview { min-width: 0; }
+
+/* Mail reads as a three-column workbench, instead of three floating cards. */
+#app .mail-grid { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+#app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) {
+  margin: 0; padding: 20px 22px; border: 0; border-right: 1px solid var(--color-border);
+  border-radius: 0; background: transparent; box-shadow: none;
+}
+#app .mail-grid > .review-panel { border-right: 0; }
+#app .mail-cards { gap: 0; padding: 0; }
+#app .mail-cards article,
+:root[data-theme="dark"] #app .mail-cards article {
+  margin: 0; padding: 12px 8px; border: 0; border-bottom: 1px solid var(--color-border);
+  border-radius: 0; background: transparent; box-shadow: none;
+}
+#app .mail-cards article:hover { transform: none; background: var(--surface-hover); box-shadow: none; }
+#app .mail-cards article.selected,
+:root[data-theme="dark"] #app .mail-cards article.selected { border-color: var(--color-border); border-left: 2px solid var(--color-primary); background: var(--surface-selected); box-shadow: none; }
+#app .mail-grid .application-match { padding: 12px 0; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
+
+/* The calendar grid is the structure; the event rail needs only a divider. */
+#app .event-sandbox { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+#app .event-sandbox .calendar-layout { gap: 0; border-top: 1px solid var(--color-border); }
+#app .event-sandbox :is(.calendar-pane, .selected-list) { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+#app .event-sandbox .selected-list { border-left: 1px solid var(--color-border); }
+#app .selected-list article,
+:root[data-theme="dark"] #app .selected-list article {
+  margin: 0; padding: 15px 2px; border: 0; border-bottom: 1px solid var(--color-border);
+  border-radius: 0; background: transparent;
+}
+#app .selected-list article::before { content: ""; width: 3px; align-self: stretch; flex: none; background: var(--event-color); }
+#app .selected-list .selected-scroll { padding-inline: 16px; }
+
+/* Analytics uses open sections and a ruled interview rail. */
+#app .analytics-layout { gap: 28px; }
+#app .analytics-main { gap: 24px; }
+#app .analytics-main .metrics { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+#app .analytics-main .metrics article,
+#app .summary-grid article {
+  min-height: 0; padding: 17px 18px; border: 0; border-right: 1px solid var(--color-border);
+  border-radius: 0; background: transparent; box-shadow: none;
+}
+#app .analytics-main .metrics article:first-child,
+#app .summary-grid article:nth-child(odd) { padding-left: 0; }
+#app .analytics-main .metrics article:last-child,
+#app .summary-grid article:nth-child(even) { border-right: 0; }
+#app .analytics-main .metrics article::before { display: none; }
+#app .analytics-main .two-column { gap: 28px; }
+#app .analytics-main .two-column > .card,
+#app .analytics-main > .card,
+#app .interview-panel {
+  margin: 0; padding: 18px 0 0; border: 0; border-top: 1px solid var(--color-border);
+  border-radius: 0; background: transparent; box-shadow: none;
+}
+#app .analytics-main .two-column > .card + .card { padding-left: 24px; border-left: 1px solid var(--color-border); }
+#app .interview-panel { padding: 18px 0 0 24px; border-top: 0; border-left: 1px solid var(--color-border); }
+#app .interview-list { gap: 0; }
+#app .interview-list article,
+:root[data-theme="dark"] #app .interview-list article {
+  --record-bg: var(--color-card); padding: 14px 4px; border: 0; border-bottom: 1px solid var(--color-border);
+  border-radius: 0; background: transparent;
+}
+#app .interview-list article.is-active { --record-bg: var(--color-card); }
+#app .interview-list article.is-ended { --record-bg: var(--color-card); }
+
+/* Settings and administration follow the same document-like section rhythm. */
+#app .profile-workspace { width: min(980px, 100%); }
+#app .profile-hero { margin-bottom: 0; padding: 8px 0 24px; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
+#app .settings-column { gap: 0; }
+#app .settings-column > .card,
+#app .settings-column > :is(section, div).card { margin: 0; padding: 26px 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
+#app .settings-column .metrics-row { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+#app .settings-column .metrics-row div { border: 0; border-right: 1px solid var(--color-border); border-radius: 0; background: transparent; }
+#app .settings-column .metrics-row div:last-child { border-right: 0; }
+#app .admin-grid { gap: 0; }
+#app .admin-grid > .overview-column { padding-right: 22px; border-right: 1px solid var(--color-border); }
+#app .admin-grid > .users-column { min-width: 0; padding: 0 22px; border-right: 1px solid var(--color-border); }
+#app .admin-grid > .audit-card { padding: 0 0 0 22px; }
+#app .admin-grid .summary-grid { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+#app .admin-grid .summary-grid article { min-height: 86px; }
+#app .admin-grid :is(.control-card, .group-manager-card, .users-card, .audit-card) {
+  margin: 0; padding: 18px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+#app .admin-grid .group-manager-card { border-bottom: 1px solid var(--color-border); }
+#app .admin-grid .health-grid > div { padding: 9px 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; }
+#app .admin-grid .registration { padding: 12px 0; border-radius: 0; background: transparent; }
+
+@media (max-width: 1200px) {
+  #app .mail-grid > .inbox-panel { border-right: 0; border-bottom: 1px solid var(--color-border); }
+  #app .mail-grid > .compose-panel { border-right: 1px solid var(--color-border); }
+}
+@media (max-width: 900px) {
+  #app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) { padding: 18px 0; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  #app .mail-grid > .review-panel { border-bottom: 0; }
+  #app .event-sandbox .selected-list { border-left: 0; border-top: 1px solid var(--color-border); }
+  #app .interview-panel { padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--color-border); }
+  #app .admin-grid > :is(.overview-column, .users-column) { padding: 0; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  #app .admin-grid > .audit-card { padding: 18px 0; }
+}
+@media (min-width: 901px) and (max-width: 1599px) {
+  #app .admin-grid > .users-column { border-right: 0; }
+  #app .admin-grid > .audit-card { padding: 18px 0 0; border-top: 1px solid var(--color-border); }
+}
+@media (max-width: 820px) {
+  #app .overview-shortcuts button { padding: 8px 12px 18px; }
+  #app .dashboard-panel { padding: 0; }
+  #app .analytics-main .metrics article { padding: 14px 10px; }
+  #app .analytics-main .two-column > .card + .card { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 640px) {
+  #app .home-dashboard { gap: 22px; }
+  #app .overview-shortcuts button { padding: 8px 8px 14px; }
+  #app .overview-shortcuts strong { font-size: 26px; }
+  #app .overview-shortcuts small { display: none; }
+  #app .analytics-main .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #app .analytics-main .metrics article { padding: 14px 8px; }
+  #app .analytics-main .metrics article strong { font-size: 25px; }
+  #app .interview-list { grid-template-columns: 1fr; }
+  #app .settings-column .metrics-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #app .settings-column .metrics-row div { padding: 10px 8px; }
+}
+
+/* Legacy dark-theme fills used strong selectors; keep the new workbench flat. */
+:root[data-theme="dark"] #app .dashboard-panel,
+:root[data-theme="dark"] #app .details-column,
+:root[data-theme="dark"] #app .timeline-column,
+:root[data-theme="dark"] #app .schedule-advice,
+:root[data-theme="dark"] #app .workspace,
+:root[data-theme="dark"] #app .event-sandbox,
+:root[data-theme="dark"] #app .event-sandbox :is(.calendar-pane, .selected-list),
+:root[data-theme="dark"] #app .selected-list :is(h3, .selected-scroll),
+:root[data-theme="dark"] #app .analytics-layout .card,
+:root[data-theme="dark"] #app .analytics-main .metrics article,
+:root[data-theme="dark"] #app .interview-panel,
+:root[data-theme="dark"] #app .profile-hero,
+:root[data-theme="dark"] #app .settings-column > .card,
+:root[data-theme="dark"] #app .admin-grid :is(.card, .summary-grid article, .registration, .health-grid > div) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] #app button.application[class*="tone-"] {
+  color: var(--color-foreground) !important;
+  background: transparent !important;
+  border-color: var(--color-border) !important;
+  border-left-color: var(--stage-tint) !important;
+}
+:root[data-theme="dark"] #app button.application[class*="tone-"]:hover { background: var(--surface-hover) !important; }
+:root[data-theme="dark"] #app .application-title :is(span, small, i) { color: var(--color-muted-foreground) !important; }
+:root[data-theme="dark"] #app .mail-cards article { background: transparent !important; }
+:root[data-theme="dark"] #app .mail-cards article:hover { background: var(--surface-hover) !important; }
+:root[data-theme="dark"] #app .mail-cards article.selected { background: var(--surface-selected) !important; }
+:root[data-theme="dark"] #app .selected-list article {
+  border-color: var(--color-border) !important;
+  background: transparent !important;
+}
+:root[data-theme="dark"] #app .interview-list article { background: transparent !important; border-color: var(--color-border) !important; }
+:root[data-theme="dark"] #app .interview-list article > p { color: var(--color-muted-foreground); }
+:root[data-theme="dark"] #app .interview-list .compact-node { background: transparent !important; }
+:root[data-theme="dark"] #app .schedule-copy > small { background: transparent !important; }
+:root[data-theme="dark"] #app .settings-column .metrics-row div { background: transparent !important; }

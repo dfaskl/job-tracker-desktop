@@ -22,7 +22,7 @@
 
 使用本机 Segoe UI / 苹方 / 微软雅黑无衬线字体，避免外部字体加载影响中文阅读和布局。正文 14–16px，说明至少 12px，标题 20–28px，数字使用等宽数字；不使用等宽字体作为正文或导航。
 
-间距以 4px 为单位。控件圆角 8px、容器 12px、对话框 16px。桌面主操作高 44px；导航可点击范围至少 44px。普通面板用边框分层，浮层才使用明显阴影。
+间距以 4px 为单位。控件圆角 8px、对话框 16px。桌面主操作高 44px；导航可点击范围至少 44px。工作区用标题、列宽、留白与细分隔线组织内容；只有对话框、警示和需要明确选中的内容使用封闭表面与阴影。不要把统计数字、列表项或每个工作区栏目都做成独立卡片。
 
 ```text
 品牌 / 导航      工作区标题与搜索、主要操作
@@ -49,5 +49,5 @@
 ## 实现位置
 
 基础变量与通用可访问性：frontend/src/style.css。
-各页面统一表面、排版与状态样式：frontend/src/workspace-design.css。
+各页面统一颜色、排版与状态样式：frontend/src/workspace-design.css；连续式工作区布局：frontend/src/workspace-layout.css。
 导航及响应式框架：ProductShell.vue；首页概览：ProductHome.vue；登录：LoginPage.vue。
