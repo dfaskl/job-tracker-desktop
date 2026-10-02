@@ -260,18 +260,6 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   <div v-if="store.user.value" class="home-dashboard">
     <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong :title="quote.author?`${quote.quote} — ${quote.author}`:quote.quote">{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
-        <section class="details-column" aria-labelledby="my-schedule-title">
-          <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
-          <div v-if="recentSchedules.length" class="schedule-list">
-            <article v-for="(event,index) in recentSchedules" :key="event.id">
-              <button type="button" class="schedule-row-target" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" @click="focusApplication(event)"></button>
-              <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
-              <div class="schedule-copy"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}}</p><small>备注：{{event.notes||'暂无备注'}}</small></div>
-              <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
-            </article>
-          </div>
-          <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
-        </section>
       <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
@@ -287,8 +275,18 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
         <p v-if="adviceNotice&&!adviceLoading" class="advice-notice">{{adviceNotice}}</p>
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
-
-
+      <section class="details-column" aria-labelledby="my-schedule-title">
+        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
+        <div v-if="recentSchedules.length" class="schedule-list">
+          <article v-for="(event,index) in recentSchedules" :key="event.id">
+            <button type="button" class="schedule-row-target" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" @click="focusApplication(event)"></button>
+            <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
+            <div class="schedule-copy"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}}</p><small>备注：{{event.notes||'暂无备注'}}</small></div>
+            <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
+          </article>
+        </div>
+        <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
+      </section>
     </section>
 
     <section class="dashboard-panel confirmation-panel">
