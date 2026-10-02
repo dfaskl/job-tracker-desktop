@@ -143,8 +143,8 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
                     <button class="secondary icon-button compact-icon" :disabled="busyUser===user.id" aria-label="取消修改昵称" title="取消" @click="cancelDisplayNameEdit"><AppIcon name="close" :size="15" /></button>
                     <small v-if="displayNameError" :id="'display-name-error-'+user.id" class="field-error" role="alert">{{displayNameError}}</small>
                   </div>
-                  <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button></div>
-                  <small class="user-email" :title="user.email">{{user.email}}</small>
+                  <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button><small class="user-email" :title="user.email">{{user.email}}</small></div>
+                  <small v-if="editingNameId===user.id" class="user-email" :title="user.email">{{user.email}}</small>
                   <div class="identity-meta"><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span><div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div></div>
                 </div>
                 <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
@@ -222,6 +222,8 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   color: var(--color-muted-foreground);
   font-size: 10px;
 }
+
+.identity-heading .user-email { flex: 1 1 auto; }
 
 .edit-name-button {
   width: 30px;
