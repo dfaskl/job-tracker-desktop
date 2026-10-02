@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
@@ -7,7 +7,14 @@ import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 
 const store = useJobTrackerStore()
+const props = defineProps<{ focusApplicationId?: string }>()
 const query = ref('')
+const applicationGrid = ref<HTMLElement | null>(null)
+const highlightedApplicationId = ref('')
+let focusFrame = 0
+let highlightTimer = 0
+let lastFocusedId = ''
+let pendingFocusId = ''
 const stageFilter = ref('全部')
 const selected = ref<JobApplication | null>(null)
 const editing = ref(false)
@@ -53,12 +60,62 @@ watch(store.applicationDetailRequest, request => {
   editingEvent.value = null
 }, { immediate: true })
 
+async function focusApplicationInList() {
+  const id = props.focusApplicationId
+  if (!id || id === lastFocusedId || id === pendingFocusId) return
+  pendingFocusId = id
+  query.value = ''
+  stageFilter.value = '全部'
+  selected.value = null
+  await nextTick()
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  const grid = applicationGrid.value
+  const row = Array.from(grid?.querySelectorAll<HTMLElement>('[data-application-id]') || []).find(item => item.dataset.applicationId === id)
+  if (!grid || !row || !row.isConnected || props.focusApplicationId !== id) { pendingFocusId = ''; return }
+  lastFocusedId = id
+  pendingFocusId = ''
+  cancelAnimationFrame(focusFrame)
+  window.clearTimeout(highlightTimer)
+  highlightedApplicationId.value = ''
+
+  const innerScroll = grid.scrollHeight > grid.clientHeight + 2
+  const start = innerScroll ? (grid.scrollTop = 0) : (window.scrollTo(0, 0), window.scrollY)
+  const rowTop = row.getBoundingClientRect().top
+  const top = innerScroll
+    ? Math.max(0, Math.min(grid.scrollHeight - grid.clientHeight, rowTop - grid.getBoundingClientRect().top + grid.scrollTop - grid.clientHeight * .28))
+    : Math.max(0, rowTop + window.scrollY - window.innerHeight * .28)
+  const distance = Math.abs(top - start)
+  const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 420 : Math.min(1400, Math.max(650, distance * .28))
+  const started = performance.now()
+  function step(now: number) {
+    const progress = Math.min(1, (now - started) / duration)
+    const eased = progress < .5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
+    const position = start + (top - start) * eased
+    if (innerScroll) grid!.scrollTop = position
+    else window.scrollTo(0, position)
+    if (progress < 1) focusFrame = requestAnimationFrame(step)
+    else {
+      highlightedApplicationId.value = id
+      highlightTimer = window.setTimeout(() => { highlightedApplicationId.value = '' }, 1500)
+    }
+  }
+  focusFrame = requestAnimationFrame(step)
+}
+onActivated(() => { void focusApplicationInList() })
+function stopFocusAnimation() { cancelAnimationFrame(focusFrame); window.clearTimeout(highlightTimer); highlightedApplicationId.value = ''; lastFocusedId = ''; pendingFocusId = '' }
+onDeactivated(stopFocusAnimation)
+onBeforeUnmount(stopFocusAnimation)
+
 const filtered = computed(() => {
   const keyword=query.value.trim().toLowerCase()
   return store.applications.value.filter(item => (stageFilter.value==='全部'||applicationCategory(item)===stageFilter.value)
     && (!keyword || Object.values(item).join(' ').toLowerCase().includes(keyword)))
     .sort(compareApplications)
 })
+watch([() => props.focusApplicationId, () => filtered.value.some(item => item.id === props.focusApplicationId)], ([id, found]) => {
+  if (!id) { lastFocusedId = ''; return }
+  if (found) void focusApplicationInList()
+}, { immediate: true })
 const flowSlots = computed(() => Math.max(1, ...filtered.value.map(item => flow(item).length)))
 const applicationMonthBounds = computed(() => {
   const values=store.applications.value.map(item=>String(item.appliedDate||item.createdAt||'').slice(0,7)).filter(value=>/^\d{4}-\d{2}$/.test(value)).sort()
@@ -318,8 +375,8 @@ async function removeEvent(item:JobEvent){
   </div>
 </Teleport>
 <section class="card workspace">
-  <div v-if="store.user.value&&filtered.length" class="grid">
-    <button v-for="item in filtered" :key="item.id" class="application" :class="`tone-${cardTone(item)}`" @click="selected=item">
+  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid">
+    <button v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]" @click="selected=item">
       <div class="application-overview"><div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><i>·</i><span>{{text(item.position,'未填写岗位')}}</span><i>·</i><small>{{text(item.city,'地点未填')}}</small><i>·</i><small>{{text(item.channel,'渠道未填')}}</small></div><span v-if="String(item.notes||'').trim()" class="application-note" :title="text(item.notes)"><b>备注：</b>{{text(item.notes)}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div>
       <div class="flow" :style="{'--flow-slots':flowSlots}" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span></div>
     </button>

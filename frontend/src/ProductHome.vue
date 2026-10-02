@@ -15,7 +15,7 @@ type SharedTimelineEvent = Record<string,unknown> & { id:string; type:string; ti
 type SharedTimelineUser = { email:string; displayName:string; events:SharedTimelineEvent[] }
 type TeamTimelineEntry = { id:string;email:string;name:string;color:string;date:string;start:string;label:string;timestamp:number;conflict:boolean }
 type TeamConflict = { id:string; text:string }
-const emit = defineEmits<{ navigate: [page: Page, applicationId?: string] }>()
+const emit = defineEmits<{ navigate: [page: Page, applicationId?: string, behavior?: 'detail' | 'focus'] }>()
 const store = useJobTrackerStore()
 const quoteKey = 'job_tracker_daily_quote_vue_v2'
 const legacyQuoteKey = 'job_tracker_daily_quote_vue_v1'
@@ -212,6 +212,7 @@ function progressHealth(item:JobApplication){
 }
 function appFor(event:JobEvent){return store.applications.value.find(item=>item.id===event.applicationId)}
 function openApplicationDetail(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id))}
+function focusApplication(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id),'focus')}
 function eventCompany(event:JobEvent){return String(event.company||appFor(event)?.company||'未填写公司')}
 function eventPosition(event:JobEvent){return String(event.position||appFor(event)?.position||'未填写岗位')}
 function eventDate(event:JobEvent){
@@ -282,8 +283,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
           <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
           <div v-if="recentSchedules.length" class="schedule-list">
             <article v-for="(event,index) in recentSchedules" :key="event.id">
+              <button type="button" class="schedule-row-target" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" @click="focusApplication(event)"></button>
               <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
-              <div class="schedule-copy"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}} <a v-if="String(event.location||'').startsWith('http')" :href="String(event.location)" target="_blank" rel="noreferrer">· 打开链接 ↗</a> <b>{{event.type||'其他'}}</b></p><small>备注：{{event.notes||'暂无备注'}}</small></div>
+              <div class="schedule-copy"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}}</p><small>备注：{{event.notes||'暂无备注'}}</small></div>
               <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
             </article>
           </div>

@@ -25,6 +25,15 @@
 #app .schedule-advice { margin-top: 20px; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
 #app .confirmation-panel { padding: 0 0 24px; background: transparent; }
 #app .confirmation-panel .empty { margin-top: 12px; padding: 14px 0; border-radius: 0; background: transparent; }
+#app .schedule-list article > :not(.schedule-row-target) { position: relative; z-index: 1; pointer-events: none; }
+#app .schedule-row-target { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+#app .schedule-list article:has(.schedule-row-target:hover) { background: var(--surface-hover); }
+#app .schedule-list article:has(.schedule-row-target:focus-visible) { outline: 2px solid var(--color-ring); outline-offset: -2px; }
+#app .schedule-link { width: fit-content; max-width: 100%; color: var(--color-foreground); font-size: 15px; line-height: 1.45; text-decoration: none; }
+#app .schedule-link strong { font-weight: 650; }
+#app .schedule-link span { margin-left: 6px; color: var(--color-primary); font-size: 13px; }
+#app .schedule-link:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
+#app .schedule-list :is(.schedule-link, .schedule-actions button) { position: relative; z-index: 2; pointer-events: auto; }
 
 /* One readable application ledger, with stage and health kept in the row. */
 #app .workspace { padding: 0; border: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
@@ -40,6 +49,9 @@
 #app button.application:hover { background: var(--surface-hover); box-shadow: none; }
 #app button.application:focus-visible { outline-offset: -3px; }
 #app .application-overview { min-width: 0; }
+#app .application-arrival { position: relative; }
+#app .application-arrival::after { position: absolute; inset: 0; z-index: 1; border: 1px solid var(--color-primary); background: color-mix(in srgb, var(--color-primary) 18%, transparent); content: ""; pointer-events: none; animation: application-arrival-flash 1.45s ease-in-out both; }
+@keyframes application-arrival-flash { 0%, 38%, 75%, 100% { opacity: 0; } 16%, 56% { opacity: 1; } }
 
 /* Mail reads as a three-column workbench, instead of three floating cards. */
 #app .mail-grid { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }

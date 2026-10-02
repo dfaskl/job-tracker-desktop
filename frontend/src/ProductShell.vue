@@ -31,6 +31,7 @@ const pageComponents: Record<Page, Component> = {
 }
 
 const activePage = ref<Page>('home')
+const focusApplicationId = ref('')
 const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
@@ -51,6 +52,7 @@ function routeFromHash() {
 function syncHash() {
   const route = routeFromHash()
   activePage.value = route.page
+  focusApplicationId.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('focus') || '' : ''
   if (route.applicationId) store.requestApplicationDetail(route.applicationId)
 }
 
@@ -61,15 +63,16 @@ async function createApplication() {
   }
   store.requestNewApplication()
 }
-function navigate(page: Page, applicationId?: string) {
+function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focus' = 'detail') {
   mobileMenuOpen.value = false
-  const targetHash = page === 'applications' && applicationId ? 'applications?application=' + encodeURIComponent(applicationId) : page
+  const targetHash = page === 'applications' && applicationId ? `applications?${behavior === 'focus' ? 'focus' : 'application'}=${encodeURIComponent(applicationId)}` : page
   if (window.location.hash.replace(/^#\/?/, '') === targetHash) {
-    if (applicationId) store.requestApplicationDetail(applicationId)
+    if (applicationId && behavior === 'detail') store.requestApplicationDetail(applicationId)
     return
   }
   window.location.hash = targetHash
   activePage.value = page
+  focusApplicationId.value = page === 'applications' && behavior === 'focus' ? applicationId || '' : ''
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
@@ -144,7 +147,7 @@ onBeforeUnmount(() => {
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
         <KeepAlive :max="7">
-          <component :is="pageComponents[activePage]" :key="activePage" @navigate="navigate" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" />
         </KeepAlive>
       </div>
     </main>
