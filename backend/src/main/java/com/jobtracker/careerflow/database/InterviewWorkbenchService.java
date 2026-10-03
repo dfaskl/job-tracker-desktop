@@ -22,6 +22,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
+    private static final String SUMMARY_VERSION = "broad-topics-v2";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -44,7 +45,7 @@ public class InterviewWorkbenchService {
             String currentKey = sourceKey(allReviews);
             result.put("sourceKey", currentKey);
             if (result.path("overallSummary") instanceof ObjectNode summary) {
-                String fingerprint = digest(summaryInput(allReviews).toString() + result.path("resume").toString());
+                String fingerprint = summaryFingerprint(summaryInput(allReviews), result.path("resume"));
                 summary.put("stale", !fingerprint.equals(summary.path("sourceKey").asText("")));
             }
             return result;
@@ -79,7 +80,7 @@ public class InterviewWorkbenchService {
         if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
         if (size > 100_000) throw new AiValidationException("面试回顾内容超过本次汇总上限，请精简过长的记录后重试");
         JsonNode resume = workbench.path("resume");
-        String summaryKey = digest(selected.toString() + resume.toString());
+        String summaryKey = summaryFingerprint(selected, resume);
         JsonNode result = ai.summarizeInterviewReviews(email, selected, resume);
         ObjectNode summary = cleanSummary(result);
         summary.put("sourceKey", summaryKey);
@@ -88,8 +89,8 @@ public class InterviewWorkbenchService {
             try {
                 Document current = read(connection, email, true);
                 ObjectNode currentWorkbench = workbench(current.root());
-                if (!summaryKey.equals(digest(summaryInput(reviews(current.root())).toString()
-                    + currentWorkbench.path("resume").toString()))) {
+                if (!summaryKey.equals(summaryFingerprint(summaryInput(reviews(current.root())),
+                    currentWorkbench.path("resume")))) {
                     throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
                 }
                 currentWorkbench.remove("classification");
@@ -189,6 +190,10 @@ public class InterviewWorkbenchService {
         for (JsonNode review : reviews) signatures.add(review.toString());
         signatures.sort(String::compareTo);
         return signatures.isEmpty() ? "" : digest(String.join("\n", signatures));
+    }
+
+    private String summaryFingerprint(ArrayNode selected, JsonNode resume) throws Exception {
+        return digest(SUMMARY_VERSION + "\n" + selected.toString() + resume.toString());
     }
 
     private String digest(String value) throws Exception {

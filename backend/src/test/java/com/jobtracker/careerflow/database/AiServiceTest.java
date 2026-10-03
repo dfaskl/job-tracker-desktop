@@ -218,4 +218,14 @@ class AiServiceTest {
             "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"{\\\"topics\\\":[]}\"}}]}"))
             .path("topics").isArray()).isTrue();
     }
+
+    @Test
+    void requestsBroadInterviewTopicsWithQuestionFrequency() {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+        var request = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(), new ObjectMapper().createObjectNode());
+        String instruction = request.path("messages").get(0).path("content").asText();
+        assertThat(instruction).contains("宽泛的知识主题", "最多归纳 8 个主题", "每个原始问题只计入一个", "覆盖的原始问题数");
+    }
 }

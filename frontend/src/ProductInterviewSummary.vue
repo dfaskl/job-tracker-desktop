@@ -19,6 +19,7 @@ const message = ref('')
 const selectedReviewId = ref('')
 const reviewDialog = ref<HTMLDialogElement | null>(null)
 const selectedTopicKey = ref('')
+const activeTopicKind = ref<'project' | 'knowledge'>('project')
 const activePane = ref<'reviews' | 'topics' | 'detail'>('reviews')
 const detailScroll = ref<HTMLElement | null>(null)
 const detailHeading = ref<HTMLElement | null>(null)
@@ -39,6 +40,7 @@ const topicGroups = computed(() => [
   { kind: 'project', label: '项目考点', topics: projectTopics.value },
   { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value }
 ])
+const activeTopicGroup = computed(() => topicGroups.value.find(group => group.kind === activeTopicKind.value)!)
 const topicEntries = computed(() => summary.value?.stale ? [] : topicGroups.value.flatMap(group =>
   group.topics.map((topic, index) => ({ key: `${group.kind}:${index}:${topic.name}`, group: group.label, topic }))
 ))
@@ -90,6 +92,12 @@ async function selectTopic(key: string) {
   detailScroll.value?.scrollTo({ top: 0 })
   detailHeading.value?.focus()
 }
+function switchTopicKind(kind: 'project' | 'knowledge') {
+  if (activeTopicKind.value === kind) return
+  activeTopicKind.value = kind
+  selectedTopicKey.value = ''
+  detailScroll.value?.scrollTo({ top: 0 })
+}
 onActivated(activate)
 onDeactivated(closeReview)
 watch(reviewSignature, (next, previous) => { if (previous && next !== previous) void loadState() })
@@ -113,11 +121,11 @@ watch(topicEntries, entries => {
           <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
       <section class="topic-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'topics' }" aria-labelledby="topic-title">
-        <div class="section-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点分类</h2></div><span>按频次排序</span></div>
+        <div class="section-heading topic-column-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点分类</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button></div></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳所有问题的考点。</p>
           <p v-else-if="summarizing && (!summary || summary.stale)" class="empty-state" role="status">正在归纳全部面试问题…</p>
           <p v-else-if="!summary || summary.stale" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <template v-else><section v-for="group in topicGroups" :key="group.kind" class="topic-section" :aria-label="group.label"><div class="section-heading"><h3>{{ group.label }}</h3><span>{{ group.topics.length }} 个考点</span></div><ol v-if="group.topics.length" class="topic-list"><li v-for="(topic, index) in group.topics" :key="`${group.kind}:${index}:${topic.name}`"><button type="button" class="topic-choice" :class="{ selected: selectedTopicKey === `${group.kind}:${index}:${topic.name}` }" :aria-pressed="selectedTopicKey === `${group.kind}:${index}:${topic.name}`" @click="selectTopic(`${group.kind}:${index}:${topic.name}`)"><span>{{ topic.name }}</span><strong>{{ topic.count }} 次</strong></button></li></ol><p v-else class="empty-state">暂无{{ group.label }}。</p></section></template>
+          <template v-else><section class="topic-section" :aria-label="activeTopicGroup.label"><div class="section-heading"><h3>{{ activeTopicGroup.label }}</h3><span>{{ activeTopicGroup.topics.length }} 类 · 按频次排序</span></div><ol v-if="activeTopicGroup.topics.length" class="topic-list"><li v-for="(topic, index) in activeTopicGroup.topics" :key="`${activeTopicGroup.kind}:${index}:${topic.name}`"><button type="button" class="topic-choice" :class="{ selected: selectedTopicKey === `${activeTopicGroup.kind}:${index}:${topic.name}` }" :aria-pressed="selectedTopicKey === `${activeTopicGroup.kind}:${index}:${topic.name}`" @click="selectTopic(`${activeTopicGroup.kind}:${index}:${topic.name}`)"><span>{{ topic.name }}</span><strong>{{ topic.count }} 次</strong></button></li></ol><p v-else class="empty-state">暂无{{ activeTopicGroup.label }}。</p></section></template>
         </div>
       </section>
       <section class="detail-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'detail' }" aria-labelledby="detail-title">
@@ -167,6 +175,12 @@ watch(topicEntries, entries => {
 .topic-choice.selected{border-color:var(--color-border-strong);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
 .topic-choice span{min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .topic-choice strong{flex:none;color:var(--color-primary);font-size:12px;white-space:nowrap}
+.topic-column-heading{align-items:center}
+.topic-kind-switch{display:inline-flex;flex:none;gap:2px;padding:3px;border:1px solid var(--color-border);border-radius:9px;background:var(--color-card)}
+.topic-kind-switch button{min-width:46px;min-height:44px;padding:5px 9px;border:0;border-radius:6px;color:var(--color-muted-foreground);background:transparent;font-size:12px;font-weight:700}
+.topic-kind-switch button:hover{color:var(--color-foreground);background:var(--surface-hover)}
+.topic-kind-switch button[aria-pressed="true"]{color:var(--color-on-primary);background:var(--color-primary)}
+.topic-kind-switch button:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px}
 .detail-kind{color:var(--color-primary);font-size:12px;font-weight:700}
 .topic-detail h3{margin:8px 0 10px;overflow-wrap:anywhere;font-size:clamp(20px,2vw,26px);line-height:1.35}
 .detail-frequency{display:inline-block;padding:5px 9px;border-radius:6px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card));font-size:12px;font-weight:700}

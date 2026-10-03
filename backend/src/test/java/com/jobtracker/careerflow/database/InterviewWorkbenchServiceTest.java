@@ -11,7 +11,10 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.DriverManager;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,6 +69,9 @@ class InterviewWorkbenchServiceTest {
         assertThat(summarized.has("summaries")).isFalse();
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目架构");
         assertThat(summarized.path("overallSummary").path("stale").asBoolean()).isFalse();
+        String previousFormatKey = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            .digest((reviews.getValue().toString() + resume.getValue().toString()).getBytes(StandardCharsets.UTF_8)));
+        assertThat(summarized.path("overallSummary").path("sourceKey").asText()).isNotEqualTo(previousFormatKey);
 
         try (var connection = DriverManager.getConnection(jdbc);
              var statement = connection.createStatement()) {
