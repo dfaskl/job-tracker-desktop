@@ -345,8 +345,8 @@ function eventDate(event:JobEvent){
   const date=new Date(value.replace(' ','T')),endDate=new Date(endValue.replace(' ','T'))
   if(Number.isNaN(date.getTime()))return {tag:'待定',date:'未设置',time:'',range:false,endDate:'',endTime:''}
   const range=Boolean(endValue.trim())&&!Number.isNaN(endDate.getTime())
-  const same=today()===value.slice(0,10),dateText=`${date.getMonth()+1}月${date.getDate()}日`,time=`${pad(date.getHours())}:${pad(date.getMinutes())}`
-  const endDateText=range?`${endDate.getMonth()+1}月${endDate.getDate()}日`:''
+  const same=today()===value.slice(0,10),dateText=`${date.getMonth()+1}.${date.getDate()}`,time=`${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const endDateText=range?`${endDate.getMonth()+1}.${endDate.getDate()}`:''
   const endTime=range?`${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`:''
   return {tag:same?'今天':'',date:dateText,time,range,endDate:endDateText,endTime}
 }
