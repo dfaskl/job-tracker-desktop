@@ -99,11 +99,11 @@ watch(topicEntries, entries => {
 </script>
 
 <template>
-  <section class="interview-summary" aria-labelledby="interview-summary-title">
-    <header class="page-heading"><div><span class="eyebrow">面试复盘</span><h1 id="interview-summary-title">面试总结</h1><p>汇总所有已完成日程中的面试问题，按出现频率整理项目考点和八股考点。</p></div><button type="button" class="primary-action" :disabled="summarizing || !reviews.length" @click="summarize(false)">{{ summarizing ? '正在汇总…' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button></header>
+  <section class="interview-summary" aria-label="面试总结">
     <div class="page-notices">
       <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
       <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="emit('navigate', 'profile')">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
+      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="summarize(false)">{{ summarizing ? '正在汇总…' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'topics'" @click="activePane = 'topics'">考点分类</button><button type="button" :aria-pressed="activePane === 'detail'" @click="activePane = 'detail'">考点详情</button></nav>
     <div class="summary-columns">
@@ -142,11 +142,13 @@ watch(topicEntries, entries => {
 @media(max-width:900px){.topic-column{padding:28px 0 0;border-left:0;border-top:1px solid var(--color-border)}}
 
 /* The page stays fixed; each of its three columns owns its content scroll. */
-.interview-summary{display:grid;grid-template-rows:auto auto minmax(0,1fr);width:100%;height:100%;min-height:0;margin:0;padding:24px 0 0;overflow:hidden}
+.interview-summary{display:grid;grid-template-rows:auto auto minmax(0,1fr);width:100%;height:100%;min-height:0;margin:0;padding:12px 0 0;overflow:hidden}
 .page-heading{align-items:center;padding-bottom:18px}
 .page-heading h1{font-size:clamp(24px,2.4vw,32px)}
-.page-notices{min-height:0}
-.resume-hint{margin:10px 0 12px}
+.page-notices{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 18px;min-height:0;padding:0 0 12px}
+.page-notices .feedback{flex-basis:100%}
+.resume-hint{flex:1;min-width:0;margin:0}
+.summarize-action{flex:none;min-height:44px;color:var(--color-on-primary);background:var(--color-primary)}
 .feedback{margin:8px 0 0}
 .summary-columns{display:grid;grid-template-columns:minmax(230px,1.05fr) minmax(220px,.85fr) minmax(280px,1.4fr);gap:0;min-height:0;border-top:1px solid var(--color-border)}
 .summary-pane{display:flex;flex-direction:column;min-width:0;min-height:0;padding:20px 20px 0 0}
@@ -174,11 +176,13 @@ watch(topicEntries, entries => {
 .detail-section ol{display:grid;gap:10px;margin:0;padding-left:22px;line-height:1.65;overflow-wrap:anywhere}
 .mobile-pane-tabs{display:none}
 @media(max-width:900px){
-  .interview-summary{padding-top:12px;grid-template-rows:auto auto auto minmax(0,1fr)}
+  .interview-summary{padding-top:8px;grid-template-rows:auto auto minmax(0,1fr)}
   .page-heading{align-items:flex-start;gap:10px;padding-bottom:10px}
   .page-heading p{font-size:12px}
   .page-heading>button{width:auto;min-height:44px}
-  .resume-hint{margin:6px 0 8px}
+  .page-notices{padding-bottom:8px}
+  .resume-hint{flex-basis:100%;margin:0}
+  .summarize-action{width:100%}
   .mobile-pane-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0 0 10px}
   .mobile-pane-tabs button{min-height:44px;padding:7px 4px;border:1px solid var(--color-border);border-radius:7px;color:var(--color-muted-foreground);background:var(--color-card);font-size:12px}
   .mobile-pane-tabs button[aria-pressed="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card))}
