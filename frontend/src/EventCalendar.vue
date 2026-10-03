@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, reactive, ref, watch } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
@@ -74,6 +74,19 @@ const loading = ref(false)
 const error = ref('')
 const message = ref('')
 const form = reactive<EventForm>(emptyForm())
+const calendarMotion = ref<'entry' | 'month' | ''>('')
+const agendaMotion = ref<'entry' | 'date' | ''>('')
+const calendarVisit = ref(0)
+
+onActivated(() => {
+  calendarMotion.value = 'entry'
+  agendaMotion.value = 'entry'
+  calendarVisit.value += 1
+})
+onDeactivated(() => {
+  calendarMotion.value = ''
+  agendaMotion.value = ''
+})
 
 const monthTitle = computed(() => `${month.value.getFullYear()}年${month.value.getMonth() + 1}月`)
 const eventLanes = computed(() => allocateEventLanes(events.value))
@@ -223,13 +236,24 @@ function calendarEventsOn(key: string): CalendarEvent[] {
 function eventStyle(entry: CalendarEvent, displayIndex?: number) { const color=eventColors[entry.color]; return { '--event-color':color[0], '--event-bg':color[1], gridRow:String((displayIndex ?? entry.lane) + 1) } }
 
 function changeMonth(offset: number) {
-  month.value = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
+  const nextMonth = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
+  if (monthValue(nextMonth) === monthValue(month.value)) return
+  calendarMotion.value = 'month'
+  month.value = nextMonth
 }
 function resetMonth() {
-  month.value = clampMonth(firstOfMonth(new Date()))
-  selectedDate.value = dateKey(new Date())
+  const nextMonth = clampMonth(firstOfMonth(new Date()))
+  const today = dateKey(new Date())
+  if (monthValue(nextMonth) !== monthValue(month.value)) calendarMotion.value = 'month'
+  month.value = nextMonth
+  selectDate(today)
 }
-function selectDate(key: string) { selectedDate.value = key }
+function selectDate(key: string) {
+  if (selectedDate.value === key) return
+  if (calendarMotion.value === 'entry') calendarMotion.value = ''
+  agendaMotion.value = 'date'
+  selectedDate.value = key
+}
 
 function edit(item: EventItem) {
   editing.value = item
@@ -328,7 +352,7 @@ async function remove(item: EventItem) {
 </script>
 
 <template>
-  <section class="card event-sandbox">
+  <section class="card event-sandbox" :class="{ 'calendar-entering':calendarMotion === 'entry', 'calendar-month-changing':calendarMotion === 'month', 'agenda-entering':agendaMotion === 'entry', 'agenda-date-changing':agendaMotion === 'date' }">
 
     <div v-if="sandbox && !sandbox.enabled" class="notice">
       <strong>{{ sandbox.message }}</strong><span>日程写入与职位 CRUD 共用同一套隔离测试库开关。</span>
@@ -343,11 +367,11 @@ async function remove(item: EventItem) {
             <div><button class="secondary compact icon-button compact-icon" :disabled="!canGoPrevious" aria-label="上一个月" title="上一个月" @click="changeMonth(-1)"><AppIcon name="chevron-left" /></button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact icon-button compact-icon" :disabled="!canGoNext" aria-label="下一个月" title="下一个月" @click="changeMonth(1)"><AppIcon name="chevron-right" /></button></div>
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
-          <div ref="calendarGrid" class="calendar-grid">
-            <button v-for="cell in cells" :key="cell.key" :data-calendar-date="cell.key" type="button" :disabled="!cell.inMonth" :class="['day', { outside: !cell.inMonth, selected: cell.inMonth && cell.key === selectedDate, today: cell.inMonth && cell.key === dateKey(new Date()) }]" :aria-label="cell.inMonth ? `${cell.key}，${cell.events.length} 项日程` : `${cell.key}，非本月日期，不可选择`" :aria-pressed="cell.inMonth && cell.key === selectedDate" @click="selectDate(cell.key)">
+          <div ref="calendarGrid" :key="`${monthTitle}-${calendarVisit}`" class="calendar-grid">
+            <button v-for="(cell,cellIndex) in cells" :key="cell.key" :data-calendar-date="cell.key" type="button" :disabled="!cell.inMonth" :style="{ '--calendar-week-delay':`${Math.floor(cellIndex / 7) * 90}ms`, '--calendar-month-delay':`${Math.floor(cellIndex / 7) * 35}ms` }" :class="['day', { outside: !cell.inMonth, selected: cell.inMonth && cell.key === selectedDate, today: cell.inMonth && cell.key === dateKey(new Date()) }]" :aria-label="cell.inMonth ? `${cell.key}，${cell.events.length} 项日程` : `${cell.key}，非本月日期，不可选择`" :aria-pressed="cell.inMonth && cell.key === selectedDate" @click="selectDate(cell.key)">
               <span class="day-number">{{ cell.day }}</span>
               <span class="day-events">
-                <small v-for="(entry,index) in visibleCalendarEntries(cell.key,cell.events)" :key="entry.event.id + entry.position" :style="eventStyle(entry,index)" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
+                <small v-for="(entry,index) in visibleCalendarEntries(cell.key,cell.events)" :key="entry.event.id + entry.position" :style="[eventStyle(entry,index), { '--calendar-entry-delay':`${index * 30}ms` }]" :class="['event-chip', entry.position, { completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }]">
                   {{ entry.position === 'middle' ? '' : entry.position === 'start' ? `开始 ${entry.event.company} · ${entry.event.title || entry.event.type}` : entry.position === 'end' ? `截止 ${entry.event.company} · ${entry.event.title || entry.event.type}` : `${entry.event.company} · ${entry.event.title || entry.event.type}` }}
                 </small>
               </span>
@@ -358,8 +382,8 @@ async function remove(item: EventItem) {
 
         <aside class="selected-list">
           <h3>{{ selectedDate }} 的日程</h3>
-          <div class="selected-scroll">
-            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
+          <div :key="`${selectedDate}-${calendarVisit}`" class="selected-scroll">
+            <article v-for="(entry,index) in selectedEvents" :key="entry.event.id" :style="[eventStyle(entry), { '--agenda-delay':`${Math.min(index,8) * 85}ms` }]" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
               <div class="event-main">
                 <a v-if="locationLink(entry.event.location)" class="event-title-link" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开${entry.event.company} · ${entry.event.title || entry.event.type}的日程链接`"><strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong><span aria-hidden="true">↗</span></a>
                 <strong v-else>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
@@ -466,6 +490,27 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .compact { padding: 8px 11px; }
 
 .calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;height:clamp(570px,calc(100vh - 205px),720px);margin-top:20px}.calendar-pane,.selected-list{min-width:0;min-height:0;border:1px solid var(--color-border);border-radius:14px;background:#fff;overflow:hidden}.calendar-pane{display:flex;flex-direction:column}.calendar-pane .calendar-head{flex:0 0 auto;margin:0;padding:14px 16px;border-top:0;border-bottom:1px solid #edf0f5}.calendar-pane .weekdays{flex:0 0 auto}.calendar-pane .calendar-grid{min-height:0;flex:1;grid-template-rows:repeat(6,minmax(0,1fr))}.day{position:relative;display:flex;min-height:0;flex-direction:column;align-items:stretch;padding:6px;overflow:hidden}.day-number{position:absolute;top:6px;left:6px;z-index:2;display:inline-grid;width:24px;height:24px;place-items:center}.day.today>.day-number{display:inline-grid;width:24px;height:24px}.day-events{display:grid;margin-top:24px;min-height:60px;flex:1;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(3,20px);align-content:start}.day-events>.event-chip{--event-color:#4357ad;--event-bg:#edf1ff;display:block;align-self:center;min-width:0;max-width:100%;height:18px;margin:0;padding:2px 5px;overflow:hidden;border-radius:5px;color:var(--event-color);background:var(--event-bg);font-size:10px;font-style:normal;line-height:14px;text-overflow:ellipsis;white-space:nowrap}.day-events>.event-chip.middle{height:4px;margin:0 -6px;padding:0;border-radius:0;background:var(--event-color);opacity:.58}.day-events>.event-chip.start{margin-right:-6px;border-radius:5px 0 0 5px}.day-events>.event-chip.end{margin-left:-6px;border-radius:0 5px 5px 0}.day-events>.event-chip.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important;opacity:.75;text-decoration:line-through}.day-events>.event-chip.middle.completed{text-decoration:none}.day-events>.event-chip.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.day>i{position:absolute;right:5px;bottom:3px}.selected-list{display:flex;margin:0;flex-direction:column}.selected-list>h3{flex:0 0 auto;margin:0;padding:16px;border-bottom:1px solid #edf0f5;font-size:16px}.selected-scroll{min-height:0;flex:1;overflow-y:auto;padding:0 14px 16px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c5d5 transparent}.selected-list article{display:flex;margin-top:10px;padding:12px 10px;border:0;border-left:4px solid var(--event-color);border-radius:9px;background:color-mix(in srgb,var(--event-bg) 55%,#fff)}.selected-list .empty{margin-top:14px}.selected-list article.completed{--event-color:#858c96!important;--event-bg:#e5e7eb!important}.selected-list article.missed{--event-color:#a15a5a!important;--event-bg:#f3dfdf!important}.event-location{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.event-location a{display:inline-flex;padding:3px 8px;border:1px solid #cbd7eb;border-radius:999px;color:#315ca8;background:#f3f7ff;font-size:12px;font-weight:700;text-decoration:none}.event-location a:hover{border-color:#7998ce;background:#e9f1ff}
+.calendar-entering .calendar-grid .day,
+.calendar-month-changing .calendar-grid .day { animation:calendar-week-in 380ms ease-out both; animation-delay:var(--calendar-week-delay); }
+.calendar-entering .day-events > .event-chip,
+.calendar-month-changing .day-events > .event-chip { transform-origin:left center; animation:calendar-chip-draw 340ms cubic-bezier(.22,.7,.25,1) both; animation-delay:calc(760ms + var(--calendar-week-delay) + var(--calendar-entry-delay)); }
+.calendar-month-changing .calendar-grid .day { animation-duration:220ms; animation-delay:var(--calendar-month-delay); }
+.calendar-month-changing .day-events > .event-chip { animation-duration:250ms; animation-delay:calc(200ms + var(--calendar-month-delay) + var(--calendar-entry-delay)); }
+.agenda-entering .selected-scroll :is(article,.empty),
+.agenda-date-changing .selected-scroll :is(article,.empty) { animation:calendar-agenda-in 360ms ease-out both; animation-delay:calc(1050ms + var(--agenda-delay, 0ms)); }
+.agenda-date-changing .selected-scroll :is(article,.empty) { animation-delay:var(--agenda-delay, 0ms); }
+@keyframes calendar-week-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes calendar-chip-draw { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes calendar-agenda-in { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .calendar-entering .calendar-grid .day { animation-duration:180ms; animation-delay:var(--calendar-month-delay); }
+  .calendar-entering .day-events > .event-chip { animation-duration:160ms; animation-delay:calc(290ms + var(--calendar-month-delay) + var(--calendar-entry-delay)); }
+  .calendar-month-changing .calendar-grid .day { animation-duration:140ms; }
+  .calendar-month-changing .day-events > .event-chip { animation-duration:140ms; }
+  .agenda-entering .selected-scroll :is(article,.empty),
+  .agenda-date-changing .selected-scroll :is(article,.empty) { animation-duration:180ms; }
+  .agenda-entering .selected-scroll :is(article,.empty) { animation-delay:calc(450ms + var(--agenda-delay, 0ms)); }
+}
 @media(min-width:821px) and (min-height:620px){.event-sandbox{display:block;height:calc(100vh - 20px);min-height:0;margin-top:12px!important;overflow:hidden}.event-sandbox>.calendar-layout{height:calc(100vh - 74px)!important;min-height:0;max-height:none;margin-top:0}}
 @media (max-width: 720px) {
   .event-sandbox { width: 100%; max-width: 100%; overflow: hidden; }
