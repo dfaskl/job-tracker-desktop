@@ -4,6 +4,7 @@ import { useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { jsonFetch } from './api'
+import { classifyInterviewPositions } from './interviewClassification'
 import { useCalendarEventCapacity } from './useCalendarEventCapacity'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
@@ -287,6 +288,7 @@ async function save() {
   message.value = ''
   try {
     const current = editing.value
+    const addedReview = Boolean(current?.completed && !current.interviewQuestions?.trim() && form.interviewQuestions.trim())
     const payload = {
       applicationId: form.applicationId,
       type: form.type,
@@ -306,6 +308,7 @@ async function save() {
     message.value = current ? '日程已更新，并已生成变更前备份' : '日程已新增，并已同步岗位进度'
     resetForm()
     await store.refresh()
+    if (addedReview) void classifyInterviewPositions().catch(() => { /* The workbench offers a retry when AI is unavailable. */ })
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '保存日程失败'
   } finally {

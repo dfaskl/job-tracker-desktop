@@ -4,11 +4,13 @@ import ProductDataManagement from './ProductDataManagement.vue'
 import BackupManagement from './BackupManagement.vue'
 import MailAccountSettings from './MailAccountSettings.vue'
 import AccountManagement from './AccountManagement.vue'
+import ResumeSettings from './ResumeSettings.vue'
 </script>
 <template>
   <div class="profile-workspace">
     <div class="settings-column">
       <AccountManagement />
+      <ResumeSettings />
       <MailAccountSettings />
       <ProductPreferences />
       <ProductDataManagement />

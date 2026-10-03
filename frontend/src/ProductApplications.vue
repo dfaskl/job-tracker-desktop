@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
 import { api, apiCached, invalidateApiCache } from './api'
+import { classifyInterviewPositions } from './interviewClassification'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -398,10 +399,12 @@ async function saveEvent(){
   busy.value=true;error.value='';message.value=''
   try{
     const current=editingEvent.value
+    const addedReview=Boolean(current?.completed&&!String(current.interviewQuestions||'').trim()&&eventForm.interviewQuestions.trim())
     if(eventForm.timeMode==='range'&&!eventForm.endsAt){error.value='时间段日程必须填写结束时间';return}
     if(eventForm.timeMode==='range'&&new Date(eventForm.endsAt).getTime()<=new Date(eventForm.startsAt).getTime()){error.value='结束时间必须晚于开始时间';return}
     await api(current?`/api/poc/event-sandbox/events/${encodeURIComponent(current.id)}`:'/api/poc/event-sandbox/events',{method:current?'PUT':'POST',body:JSON.stringify({applicationId:selected.value.id,type:eventForm.type,title:eventForm.title,startsAt:eventForm.startsAt.replace('T',' '),endsAt:eventForm.timeMode==='range'?eventForm.endsAt.replace('T',' '):'',location:eventForm.location,notes:eventForm.notes,...(current?.completed&&!current.missed&&!current.abandoned?{interviewQuestions:eventForm.interviewQuestions}:{}),expectedUpdatedAt:current?eventVersion(current):''})})
     eventEditor.value=false;editingEvent.value=null;await refreshSelected();message.value=current?'日程已更新':'关联日程已创建'
+    if(addedReview)void classifyInterviewPositions().catch(()=>{ /* The workbench offers a retry when AI is unavailable. */ })
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存日程失败'}finally{busy.value=false}
 }
 async function resolveEvent(item:JobEvent,action:'complete'|'abandon'|'restore'){
