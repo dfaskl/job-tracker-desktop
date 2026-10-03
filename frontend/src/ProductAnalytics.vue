@@ -26,24 +26,32 @@ const byStage = computed(() => stages.map(name => ({ name, count: count(item => 
 const byChannel = computed(() => grouped('channel'))
 const stageColors = ['#5b6dd6', '#9470c5', '#d39331', '#34959c', '#35a36b', '#87909e']
 const channelColors = ['#39966f', '#6575d1', '#d49537', '#4795ad', '#9870ba', '#c66f73', '#7b9852', '#7b8599']
+const donutCircumference = 2 * Math.PI * 38
 type DistributionItem = { name: string; count: number }
 function distribution(items: DistributionItem[], colors: string[]) {
   const total = items.reduce((sum, item) => sum + item.count, 0)
   let position = 0
+  let elapsed = 0
+  let reducedElapsed = 0
   const slices = items.map((item, index) => {
     const start = position
     position += total ? item.count / total * 100 : 0
     const color = colors[index] || `hsl(${Math.round((index * 137.508) % 360)} 55% 50%)`
     const angle = (start + (position - start) / 2) * 3.6 - 90
     const radians = angle * Math.PI / 180
+    const duration = item.count ? Math.max(115, item.count / total * 1050) : 0
+    const reducedDuration = item.count ? Math.max(30, item.count / total * 260) : 0
+    const delay = elapsed
+    const reducedDelay = reducedElapsed
+    elapsed += duration
+    reducedElapsed += reducedDuration
     return { ...item, color, showOnRing: item.count > 0 && position - start >= 13,
       x: `${50 + Math.cos(radians) * 40}%`, y: `${50 + Math.sin(radians) * 40}%`,
-      stop: position }
+      startAngle: start * 3.6 - 90, arcLength: item.count / (total || 1) * donutCircumference,
+      duration: `${duration}ms`, delay: `${delay}ms`, labelDelay: `${delay + duration * .7}ms`,
+      reducedDuration: `${reducedDuration}ms`, reducedDelay: `${reducedDelay}ms`, reducedLabelDelay: `${reducedDelay + reducedDuration * .7}ms` }
   })
-  const gradient = total
-    ? `conic-gradient(${slices.filter(item => item.count > 0).map((item, index, active) => `${item.color} ${index ? active[index - 1].stop : 0}% ${item.stop}%`).join(', ')})`
-    : 'var(--color-muted)'
-  return { total, slices, gradient }
+  return { total, slices, centerDelay: `${Math.max(0, elapsed - 180)}ms`, reducedCenterDelay: `${Math.max(0, reducedElapsed - 70)}ms` }
 }
 const stageDistribution = computed(() => distribution(byStage.value, stageColors))
 const channelDistribution = computed(() => distribution(byChannel.value, channelColors))
@@ -229,24 +237,32 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
       <section class="card distribution-card" aria-labelledby="stage-distribution-title">
         <h2 id="stage-distribution-title">阶段分布</h2>
         <div class="distribution-content">
-          <div class="donut-chart" role="img" :aria-label="`阶段分布，共 ${stageDistribution.total} 条；${stageDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，')}`" :style="{'--donut-fill':stageDistribution.gradient}">
-            <span v-for="item in stageDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y}">{{ item.count }}</span>
+          <div class="donut-chart" role="img" :aria-label="`阶段分布，共 ${stageDistribution.total} 条；${stageDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，')}`" :style="{'--donut-circumference':donutCircumference,'--donut-center-delay':stageDistribution.centerDelay,'--donut-center-delay-reduced':stageDistribution.reducedCenterDelay}">
+            <svg class="donut-ring" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="donut-track" cx="50" cy="50" r="38" />
+              <circle v-for="item in stageDistribution.slices.filter(slice => slice.count > 0)" :key="item.name" class="donut-slice" cx="50" cy="50" r="38" :stroke="item.color" :stroke-dasharray="`${item.arcLength} ${donutCircumference}`" :transform="`rotate(${item.startAngle} 50 50)`" :style="{'--slice-length':item.arcLength,'--slice-duration':item.duration,'--slice-delay':item.delay,'--slice-reduced-duration':item.reducedDuration,'--slice-reduced-delay':item.reducedDelay}" />
+            </svg>
+            <span v-for="item in stageDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y,'--slice-label-delay':item.labelDelay,'--slice-label-delay-reduced':item.reducedLabelDelay}">{{ item.count }}</span>
             <span class="donut-center" aria-hidden="true"><strong>{{ stageDistribution.total }}</strong><small>条投递</small></span>
           </div>
           <ul class="distribution-legend" aria-label="各阶段数量">
-            <li v-for="item in stageDistribution.slices" :key="item.name"><i :style="{background:item.color}" aria-hidden="true" /><span :class="{notranslate:item.name==='Offer'}" :translate="item.name==='Offer'?'no':undefined" :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
+            <li v-for="item in stageDistribution.slices" :key="item.name" :style="{'--slice-label-delay':item.labelDelay,'--slice-label-delay-reduced':item.reducedLabelDelay}"><i :style="{background:item.color}" aria-hidden="true" /><span :class="{notranslate:item.name==='Offer'}" :translate="item.name==='Offer'?'no':undefined" :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
           </ul>
         </div>
       </section>
       <section class="card distribution-card" aria-labelledby="channel-distribution-title">
         <h2 id="channel-distribution-title">渠道分布</h2>
         <div class="distribution-content">
-          <div class="donut-chart" role="img" :aria-label="`渠道分布，共 ${channelDistribution.total} 条；${channelDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，') || '暂无数据'}`" :style="{'--donut-fill':channelDistribution.gradient}">
-            <span v-for="item in channelDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y}">{{ item.count }}</span>
+          <div class="donut-chart" role="img" :aria-label="`渠道分布，共 ${channelDistribution.total} 条；${channelDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，') || '暂无数据'}`" :style="{'--donut-circumference':donutCircumference,'--donut-center-delay':channelDistribution.centerDelay,'--donut-center-delay-reduced':channelDistribution.reducedCenterDelay}">
+            <svg class="donut-ring" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="donut-track" cx="50" cy="50" r="38" />
+              <circle v-for="item in channelDistribution.slices.filter(slice => slice.count > 0)" :key="item.name" class="donut-slice" cx="50" cy="50" r="38" :stroke="item.color" :stroke-dasharray="`${item.arcLength} ${donutCircumference}`" :transform="`rotate(${item.startAngle} 50 50)`" :style="{'--slice-length':item.arcLength,'--slice-duration':item.duration,'--slice-delay':item.delay,'--slice-reduced-duration':item.reducedDuration,'--slice-reduced-delay':item.reducedDelay}" />
+            </svg>
+            <span v-for="item in channelDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y,'--slice-label-delay':item.labelDelay,'--slice-label-delay-reduced':item.reducedLabelDelay}">{{ item.count }}</span>
             <span class="donut-center" aria-hidden="true"><strong>{{ channelDistribution.total }}</strong><small>条投递</small></span>
           </div>
           <ul v-if="channelDistribution.slices.length" class="distribution-legend" aria-label="各渠道数量">
-            <li v-for="item in channelDistribution.slices" :key="item.name"><i :style="{background:item.color}" aria-hidden="true" /><span :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
+            <li v-for="item in channelDistribution.slices" :key="item.name" :style="{'--slice-label-delay':item.labelDelay,'--slice-label-delay-reduced':item.reducedLabelDelay}"><i :style="{background:item.color}" aria-hidden="true" /><span :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
           </ul>
           <p v-else class="distribution-empty">暂无数据</p>
         </div>
@@ -286,10 +302,13 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 .two-column>.card { min-height:286px; }
 .card h2 { margin:0 0 22px; font-size:19px; }
 .distribution-card { min-width:0; }
+.distribution-card:nth-child(2) { --donut-offset:140ms; --donut-offset-reduced:60ms; }
 .distribution-card h2 { margin-bottom:18px; }
 .distribution-content { display:grid; grid-template-columns:minmax(128px,170px) minmax(0,1fr); align-items:center; gap:18px; }
 .donut-chart { position:relative; width:100%; max-width:170px; aspect-ratio:1; border-radius:50%; }
-.donut-chart::before { position:absolute; inset:0; border-radius:50%; background:var(--donut-fill); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-border) 35%,transparent); content:""; }
+.donut-ring { display:block; width:100%; height:100%; overflow:visible; }
+.donut-ring circle { fill:none; stroke-width:24; stroke-linecap:butt; }
+.donut-track { stroke:var(--color-muted); opacity:.65; }
 .donut-center { position:absolute; z-index:1; inset:26%; display:flex; align-items:center; justify-content:center; flex-direction:column; border-radius:50%; color:var(--color-foreground); background:var(--color-background); box-shadow:0 0 0 1px color-mix(in srgb,var(--color-border) 50%,transparent); }
 .donut-center strong { font-size:25px; line-height:1.1; font-variant-numeric:tabular-nums; }
 .donut-center small { margin-top:2px; color:var(--color-muted-foreground); font-size:10px; white-space:nowrap; }
@@ -303,14 +322,11 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 .analytics-revealing .metrics article strong { animation:analytics-number-appear 600ms ease-out both; }
 .analytics-revealing .metrics article:nth-child(2) strong { animation-delay:120ms; }
 .analytics-revealing .metrics article:nth-child(3) strong { animation-delay:240ms; }
-.analytics-revealing .donut-chart::before { animation:analytics-donut-enter 980ms cubic-bezier(.18,.8,.25,1) both; animation-delay:260ms; }
-.analytics-revealing .distribution-card:nth-child(2) .donut-chart::before { animation-delay:400ms; }
-.analytics-revealing .donut-center,.analytics-revealing .donut-value { animation:analytics-detail-appear 420ms ease-out both; animation-delay:730ms; }
-.analytics-revealing .distribution-card:nth-child(2) .donut-center,.analytics-revealing .distribution-card:nth-child(2) .donut-value { animation-delay:870ms; }
-.analytics-revealing .distribution-legend { animation:analytics-detail-appear 480ms ease-out both; animation-delay:620ms; }
-.analytics-revealing .distribution-card:nth-child(2) .distribution-legend { animation-delay:760ms; }
+.analytics-revealing .donut-slice { animation:analytics-donut-slice var(--slice-duration) linear both; animation-delay:calc(260ms + var(--donut-offset, 0ms) + var(--slice-delay)); }
+.analytics-revealing .donut-value,.analytics-revealing .distribution-legend li { animation:analytics-detail-appear 320ms ease-out both; animation-delay:calc(260ms + var(--donut-offset, 0ms) + var(--slice-label-delay)); }
+.analytics-revealing .donut-center { animation:analytics-detail-appear 360ms ease-out both; animation-delay:calc(260ms + var(--donut-offset, 0ms) + var(--donut-center-delay)); }
 @keyframes analytics-number-appear { from { opacity:.08; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-@keyframes analytics-donut-enter { from { opacity:0; transform:rotate(-105deg) scale(.72); } to { opacity:1; transform:rotate(0) scale(1); } }
+@keyframes analytics-donut-slice { from { stroke-dasharray:0 var(--donut-circumference); } to { stroke-dasharray:var(--slice-length) var(--donut-circumference); } }
 @keyframes analytics-detail-appear { from { opacity:0; } to { opacity:1; } }
 .section-head { display:flex; align-items:center; justify-content:space-between; }
 .section-head h2 { margin-bottom:4px; }
@@ -337,12 +353,10 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 @media(prefers-reduced-motion:reduce){
   .analytics-revealing .metrics article strong { animation-duration:220ms; animation-delay:0ms; }
   .analytics-revealing .metrics article:nth-child(2) strong,.analytics-revealing .metrics article:nth-child(3) strong { animation-delay:0ms; }
-  .analytics-revealing .donut-chart::before { animation-name:analytics-donut-enter-reduced; animation-duration:300ms; animation-delay:80ms; }
-  .analytics-revealing .distribution-card:nth-child(2) .donut-chart::before { animation-delay:80ms; }
-  .analytics-revealing .donut-center,.analytics-revealing .donut-value,.analytics-revealing .distribution-legend { animation-duration:200ms; animation-delay:180ms; }
-  .analytics-revealing .distribution-card:nth-child(2) .donut-center,.analytics-revealing .distribution-card:nth-child(2) .donut-value,.analytics-revealing .distribution-card:nth-child(2) .distribution-legend { animation-delay:180ms; }
+  .analytics-revealing .donut-slice { animation-duration:var(--slice-reduced-duration); animation-delay:calc(80ms + var(--donut-offset-reduced, 0ms) + var(--slice-reduced-delay)); }
+  .analytics-revealing .donut-value,.analytics-revealing .distribution-legend li { animation-duration:150ms; animation-delay:calc(80ms + var(--donut-offset-reduced, 0ms) + var(--slice-label-delay-reduced)); }
+  .analytics-revealing .donut-center { animation-duration:160ms; animation-delay:calc(80ms + var(--donut-offset-reduced, 0ms) + var(--donut-center-delay-reduced)); }
   .analytics-revealing .trend i { animation-duration:300ms; animation-delay:180ms; }
   .analytics-revealing .trend b { animation-duration:180ms; animation-delay:300ms; }
 }
-@keyframes analytics-donut-enter-reduced { from { opacity:.35; transform:rotate(-18deg) scale(.94); } to { opacity:1; transform:rotate(0) scale(1); } }
 </style>
