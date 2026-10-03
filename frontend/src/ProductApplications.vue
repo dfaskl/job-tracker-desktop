@@ -11,6 +11,9 @@ const props = defineProps<{ focusApplicationId?: string }>()
 const query = ref('')
 const applicationGrid = ref<HTMLElement | null>(null)
 const highlightedApplicationId = ref('')
+const revealActive = ref(false)
+let revealObserver: IntersectionObserver | null = null
+let nextRevealStart = 0
 let focusFrame = 0
 let highlightTimer = 0
 let lastFocusedId = ''
@@ -63,6 +66,7 @@ watch(store.applicationDetailRequest, request => {
 async function focusApplicationInList() {
   const id = props.focusApplicationId
   if (!id || id === lastFocusedId || id === pendingFocusId) return
+  stopApplicationReveal()
   pendingFocusId = id
   query.value = ''
   stageFilter.value = '全部'
@@ -101,10 +105,56 @@ async function focusApplicationInList() {
   }
   focusFrame = requestAnimationFrame(step)
 }
-onActivated(() => { void focusApplicationInList() })
+function stopApplicationReveal() {
+  revealObserver?.disconnect()
+  revealObserver = null
+  revealActive.value = false
+  applicationGrid.value?.querySelectorAll<HTMLElement>('.application-fade-in').forEach(card => {
+    card.classList.remove('application-fade-in')
+    card.style.removeProperty('--application-reveal-delay')
+  })
+}
+function observeApplicationCards() {
+  const grid = applicationGrid.value
+  if (!grid || !revealObserver || !revealActive.value) return
+  revealObserver.disconnect()
+  grid.querySelectorAll<HTMLElement>('.application:not(.application-fade-in)').forEach(card => revealObserver?.observe(card))
+}
+async function startApplicationReveal() {
+  stopApplicationReveal()
+  if (props.focusApplicationId) return
+  revealActive.value = true
+  await nextTick()
+  const grid = applicationGrid.value
+  if (!grid || !revealActive.value || typeof IntersectionObserver === 'undefined') {
+    revealActive.value = false
+    return
+  }
+  const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 180 : 520
+  const interval = duration * .3
+  grid.style.setProperty('--application-reveal-duration', `${duration}ms`)
+  nextRevealStart = performance.now()
+  const scrollRoot = grid.scrollHeight > grid.clientHeight + 2 ? grid : null
+  revealObserver = new IntersectionObserver(entries => {
+    const cards = Array.from(grid.querySelectorAll('.application'))
+    const visible = entries.filter(entry => entry.isIntersecting)
+      .sort((left, right) => cards.indexOf(left.target) - cards.indexOf(right.target))
+    const now = performance.now()
+    nextRevealStart = Math.max(now, Math.min(nextRevealStart, now + duration))
+    visible.forEach(entry => {
+      const card = entry.target as HTMLElement
+      card.style.setProperty('--application-reveal-delay', `${Math.max(0, nextRevealStart - now)}ms`)
+      card.classList.add('application-fade-in')
+      nextRevealStart += interval
+      revealObserver?.unobserve(card)
+    })
+  }, { root: scrollRoot, threshold: .05 })
+  observeApplicationCards()
+}
+onActivated(() => { window.addEventListener('resize', stopApplicationReveal); void startApplicationReveal(); void focusApplicationInList() })
 function stopFocusAnimation() { cancelAnimationFrame(focusFrame); window.clearTimeout(highlightTimer); highlightedApplicationId.value = ''; lastFocusedId = ''; pendingFocusId = '' }
-onDeactivated(stopFocusAnimation)
-onBeforeUnmount(stopFocusAnimation)
+onDeactivated(() => { window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
+onBeforeUnmount(() => { window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
 
 const filtered = computed(() => {
   const keyword=query.value.trim().toLowerCase()
@@ -112,6 +162,14 @@ const filtered = computed(() => {
     && (!keyword || Object.values(item).join(' ').toLowerCase().includes(keyword)))
     .sort(compareApplications)
 })
+watch(filtered, () => {
+  if (!revealActive.value) return
+  void nextTick(() => {
+    if (!applicationGrid.value) stopApplicationReveal()
+    else observeApplicationCards()
+  })
+})
+watch([query, stageFilter], stopApplicationReveal)
 watch([() => props.focusApplicationId, () => filtered.value.some(item => item.id === props.focusApplicationId)], ([id, found]) => {
   if (!id) { lastFocusedId = ''; return }
   if (found) void focusApplicationInList()
@@ -375,7 +433,7 @@ async function removeEvent(item:JobEvent){
   </div>
 </Teleport>
 <section class="card workspace">
-  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid">
+  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :class="{ 'application-revealing': revealActive }">
     <button v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]" @click="selected=item">
       <div class="application-overview"><div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><i>·</i><span>{{text(item.position,'未填写岗位')}}</span><i>·</i><small>{{text(item.city,'地点未填')}}</small><i>·</i><small>{{text(item.channel,'渠道未填')}}</small></div><span v-if="String(item.notes||'').trim()" class="application-note" :title="text(item.notes)"><b>备注：</b>{{text(item.notes)}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div>
       <div class="flow" :style="{'--flow-slots':flowSlots}" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span></div>
