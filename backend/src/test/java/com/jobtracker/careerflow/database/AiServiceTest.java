@@ -1,20 +1,59 @@
 package com.jobtracker.careerflow.database;
 
 import com.jobtracker.careerflow.ai.AiEndpointPolicy;
+import com.jobtracker.careerflow.application.ApplicationDocumentMutator;
 import com.jobtracker.careerflow.compat.LegacySecretCrypto;
 import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
+import com.jobtracker.careerflow.compat.LegacyPasswordVerifier;
+import com.jobtracker.careerflow.config.DatabaseSchemaInitializer;
 import org.junit.jupiter.api.Test;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AiServiceTest {
+    @Test
+    void revealsOnlyTheOwnersSavedKeyAndStopsAfterClearingIt() throws Exception {
+        Path directory = Path.of("target", "ai-key-tests").toAbsolutePath();
+        Files.createDirectories(directory);
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("APP_DATABASE_URL", "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db"))
+            .withProperty("ALLOW_REGISTRATION", "true")
+            .withProperty("POC_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef");
+        new DatabaseSchemaInitializer(environment).run(null);
+        ObjectMapper mapper = new ObjectMapper();
+        ApplicationService applications = new ApplicationService(
+            environment, mapper, new ApplicationDocumentMutator(mapper)
+        );
+        AccountService accounts = new AccountService(environment, applications, new LegacyPasswordVerifier());
+        accounts.register("owner@example.com", "correct-horse-battery", "");
+        accounts.register("other@example.com", "correct-horse-battery", "");
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(environment, sandbox);
+
+        service.saveConfig("owner@example.com", "https://api.deepseek.com", "deepseek-chat", "private-key-1234", false);
+
+        assertThat(service.revealApiKey("owner@example.com")).isEqualTo("private-key-1234");
+        assertThat(service.config("owner@example.com").lastFour()).isEqualTo("1234");
+        assertThatThrownBy(() -> service.revealApiKey("other@example.com"))
+            .isInstanceOf(AiService.AiValidationException.class);
+
+        service.saveConfig("owner@example.com", "https://api.deepseek.com", "deepseek-chat", "", true);
+        assertThatThrownBy(() -> service.revealApiKey("owner@example.com"))
+            .isInstanceOf(AiService.AiValidationException.class);
+    }
+
     @Test
     void keepsExternalCallsDisabledWithoutEveryExplicitGate() {
         MockEnvironment environment = new MockEnvironment()

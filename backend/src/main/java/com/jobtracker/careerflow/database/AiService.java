@@ -97,6 +97,18 @@ public class AiService {
         }
     }
 
+    public String revealApiKey(String email) throws Exception {
+        requireSandbox();
+        ConfigRow config;
+        try (Connection connection = openConnection()) {
+            long userId = sandboxUserId(connection, email);
+            config = configRow(connection, userId).filter(value -> value.encryptedApiKey() != null)
+                .orElseThrow(() -> new AiValidationException("当前账号尚未配置 API Key"));
+        }
+        requireEncryption();
+        return crypto.decrypt(encryptionKey(), config.encryptedApiKey(), config.iv(), config.authTag());
+    }
+
     public ConfigView saveConfig(
         String email,
         String apiUrl,

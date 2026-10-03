@@ -56,6 +56,22 @@ public class AiController {
         }
     }
 
+    @PostMapping("/config/reveal")
+    public ResponseEntity<?> revealConfig(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
+        HttpServletRequest request
+    ) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(Map.of("apiKey", sandboxService.revealApiKey(user.get().email())));
+        } catch (Exception exception) {
+            return mapException("config-reveal", exception);
+        }
+    }
+
     @PostMapping("/config")
     public ResponseEntity<?> saveConfig(
         @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
