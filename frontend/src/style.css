@@ -622,6 +622,10 @@ body { background: var(--color-background); }
 :root[data-theme="dark"] #app .selected-list .event-main strong {
   color: var(--color-foreground) !important;
 }
+:root[data-theme="dark"] #app .selected-list .event-main .event-title-link strong,
+:root[data-theme="dark"] #app .selected-list .event-main .event-title-link span {
+  color: var(--color-primary) !important;
+}
 :root[data-theme="dark"] #app .selected-list .event-main span {
   color: var(--color-muted-foreground) !important;
 }

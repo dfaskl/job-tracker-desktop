@@ -361,10 +361,11 @@ async function remove(item: EventItem) {
           <div class="selected-scroll">
             <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
               <div class="event-main">
-                <strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
+                <a v-if="locationLink(entry.event.location)" class="event-title-link" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开${entry.event.company} · ${entry.event.title || entry.event.type}的日程链接`"><strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong><span aria-hidden="true">↗</span></a>
+                <strong v-else>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
                 <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
                 <span>{{ entry.event.endsAt ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.startsAt || entry.event.recordAt) }}</span>
-                <span v-if="entry.event.location" class="event-location"><span v-if="locationText(entry.event.location)">{{ locationText(entry.event.location) }}</span><a v-if="locationLink(entry.event.location)" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer">打开链接 ↗</a></span>
+                <span v-if="locationText(entry.event.location)" class="event-location">{{ locationText(entry.event.location) }}</span>
               </div>
               <div class="event-actions">
                 <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.abandoned ? '已放弃' : entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
@@ -449,6 +450,10 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .selected-list h3 { font-size: 16px; }
 .selected-list article { align-items: flex-start; padding: 14px 0; border-top: 1px solid #edf0f5; }
 .event-main { display: grid; gap: 4px; }
+.event-title-link { display: inline-flex; width: fit-content; max-width: 100%; align-items: baseline; gap: 4px; color: var(--color-primary); text-decoration: none; }
+.event-title-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.event-title-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 2px; }
+.event-main .event-title-link > span { flex: none; color: var(--color-primary); font-size: 12px; }
 .event-main span { color: var(--color-muted-foreground); font-size: 13px; }
 .event-actions { justify-content: flex-end; flex-wrap: wrap; }
 .event-actions b { color: #7a4d0b; font-size: 12px; }
