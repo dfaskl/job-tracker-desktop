@@ -17,8 +17,29 @@ const interviewRate = computed(() => total.value ? Math.round(interviews.value /
 const offerRate = computed(() => total.value ? Math.round(offers.value / total.value * 100) : 0)
 const byStage = computed(() => stages.map(name => ({ name, count: count(item => item.stage === name) })))
 const byChannel = computed(() => grouped('channel'))
-const maxStage = computed(() => Math.max(1, ...byStage.value.map(item => item.count)))
-const maxChannel = computed(() => Math.max(1, ...byChannel.value.map(item => item.count)))
+const stageColors = ['#5b6dd6', '#9470c5', '#d39331', '#34959c', '#35a36b', '#87909e']
+const channelColors = ['#39966f', '#6575d1', '#d49537', '#4795ad', '#9870ba', '#c66f73', '#7b9852', '#7b8599']
+type DistributionItem = { name: string; count: number }
+function distribution(items: DistributionItem[], colors: string[]) {
+  const total = items.reduce((sum, item) => sum + item.count, 0)
+  let position = 0
+  const slices = items.map((item, index) => {
+    const start = position
+    position += total ? item.count / total * 100 : 0
+    const color = colors[index] || `hsl(${Math.round((index * 137.508) % 360)} 55% 50%)`
+    const angle = (start + (position - start) / 2) * 3.6 - 90
+    const radians = angle * Math.PI / 180
+    return { ...item, color, showOnRing: item.count > 0 && position - start >= 13,
+      x: `${50 + Math.cos(radians) * 40}%`, y: `${50 + Math.sin(radians) * 40}%`,
+      stop: position }
+  })
+  const gradient = total
+    ? `conic-gradient(${slices.filter(item => item.count > 0).map((item, index, active) => `${item.color} ${index ? active[index - 1].stop : 0}% ${item.stop}%`).join(', ')})`
+    : 'var(--color-muted)'
+  return { total, slices, gradient }
+}
+const stageDistribution = computed(() => distribution(byStage.value, stageColors))
+const channelDistribution = computed(() => distribution(byChannel.value, channelColors))
 const trend = computed(() => {
   const months: { key: string; label: string; count: number }[] = []
   for (let offset = 11; offset >= 0; offset--) {
@@ -136,8 +157,31 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
       <article><span>通过 / Offer 数</span><strong>{{ offers }}</strong><small>占投递总数 {{ offerRate }}%</small></article>
     </div>
     <div class="two-column">
-      <section class="card"><h2>阶段分布</h2><div v-for="item in byStage" :key="item.name" class="bar-row"><span :class="{notranslate:item.name==='Offer'}" :translate="item.name==='Offer'?'no':undefined">{{ item.name }}</span><div role="progressbar" :aria-label="`${item.name}：${item.count}`" aria-valuemin="0" :aria-valuemax="maxStage" :aria-valuenow="item.count"><i :style="{width:`${item.count/maxStage*100}%`}" /></div><b>{{ item.count }}</b></div></section>
-      <section class="card"><h2>渠道分布</h2><div v-for="item in byChannel" :key="item.name" class="bar-row"><span>{{ item.name }}</span><div role="progressbar" :aria-label="`${item.name}：${item.count}`" aria-valuemin="0" :aria-valuemax="maxChannel" :aria-valuenow="item.count"><i :style="{width:`${item.count/maxChannel*100}%`}" /></div><b>{{ item.count }}</b></div><p v-if="!byChannel.length">暂无数据。</p></section>
+      <section class="card distribution-card" aria-labelledby="stage-distribution-title">
+        <h2 id="stage-distribution-title">阶段分布</h2>
+        <div class="distribution-content">
+          <div class="donut-chart" role="img" :aria-label="`阶段分布，共 ${stageDistribution.total} 条；${stageDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，')}`" :style="{background:stageDistribution.gradient}">
+            <span v-for="item in stageDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y}">{{ item.count }}</span>
+            <span class="donut-center" aria-hidden="true"><strong>{{ stageDistribution.total }}</strong><small>条投递</small></span>
+          </div>
+          <ul class="distribution-legend" aria-label="各阶段数量">
+            <li v-for="item in stageDistribution.slices" :key="item.name"><i :style="{background:item.color}" aria-hidden="true" /><span :class="{notranslate:item.name==='Offer'}" :translate="item.name==='Offer'?'no':undefined" :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
+          </ul>
+        </div>
+      </section>
+      <section class="card distribution-card" aria-labelledby="channel-distribution-title">
+        <h2 id="channel-distribution-title">渠道分布</h2>
+        <div class="distribution-content">
+          <div class="donut-chart" role="img" :aria-label="`渠道分布，共 ${channelDistribution.total} 条；${channelDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，') || '暂无数据'}`" :style="{background:channelDistribution.gradient}">
+            <span v-for="item in channelDistribution.slices.filter(slice => slice.showOnRing)" :key="item.name" class="donut-value" :style="{left:item.x,top:item.y}">{{ item.count }}</span>
+            <span class="donut-center" aria-hidden="true"><strong>{{ channelDistribution.total }}</strong><small>条投递</small></span>
+          </div>
+          <ul v-if="channelDistribution.slices.length" class="distribution-legend" aria-label="各渠道数量">
+            <li v-for="item in channelDistribution.slices" :key="item.name"><i :style="{background:item.color}" aria-hidden="true" /><span :title="item.name">{{ item.name }}</span><strong>{{ item.count }}</strong></li>
+          </ul>
+          <p v-else class="distribution-empty">暂无数据</p>
+        </div>
+      </section>
     </div>
       <section class="card"><div class="section-head"><div><h2>近 12 个月投递趋势</h2><p>按投递日期汇总</p></div></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
     </main>
@@ -172,12 +216,20 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .two-column { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
 .two-column>.card { min-height:286px; }
 .card h2 { margin:0 0 22px; font-size:19px; }
-.bar-row { display:grid; grid-template-columns:minmax(76px,auto) minmax(100px,1fr) 38px; align-items:center; gap:12px; margin-top:15px; }
-.bar-row span { overflow:hidden; color:var(--color-muted-foreground); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
-.bar-row>div { height:8px; overflow:hidden; border-radius:2px; background:var(--color-muted); }
-.bar-row i { display:block; height:100%; border-radius:2px; background:linear-gradient(90deg,var(--color-primary),color-mix(in srgb,var(--color-primary) 68%,#51b6cc)); }
-.two-column>.card:nth-child(2) .bar-row i { background:linear-gradient(90deg,var(--color-progress),#4aa981); }
-.bar-row b { color:var(--color-foreground); font-family:"Fira Code",monospace; text-align:right; }
+.distribution-card { min-width:0; }
+.distribution-card h2 { margin-bottom:18px; }
+.distribution-content { display:grid; grid-template-columns:minmax(128px,170px) minmax(0,1fr); align-items:center; gap:18px; }
+.donut-chart { position:relative; width:100%; max-width:170px; aspect-ratio:1; border-radius:50%; box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-border) 35%,transparent); }
+.donut-center { position:absolute; inset:26%; display:flex; align-items:center; justify-content:center; flex-direction:column; border-radius:50%; color:var(--color-foreground); background:var(--color-background); box-shadow:0 0 0 1px color-mix(in srgb,var(--color-border) 50%,transparent); }
+.donut-center strong { font-size:25px; line-height:1.1; font-variant-numeric:tabular-nums; }
+.donut-center small { margin-top:2px; color:var(--color-muted-foreground); font-size:10px; white-space:nowrap; }
+.donut-value { position:absolute; z-index:1; transform:translate(-50%,-50%); color:#fff; font-size:11px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; text-shadow:0 1px 3px rgba(0,0,0,.48); pointer-events:none; }
+.distribution-legend { display:grid; gap:9px; min-width:0; margin:0; padding:0; list-style:none; }
+.distribution-legend li { display:grid; grid-template-columns:9px minmax(0,1fr) auto; align-items:center; gap:8px; min-width:0; color:var(--color-muted-foreground); font-size:12px; }
+.distribution-legend i { width:9px; height:9px; border-radius:3px; }
+.distribution-legend span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.distribution-legend strong { color:var(--color-foreground); font-size:12px; font-variant-numeric:tabular-nums; }
+.distribution-empty { margin:0; color:var(--color-muted-foreground); font-size:12px; }
 .section-head { display:flex; align-items:center; justify-content:space-between; }
 .section-head h2 { margin-bottom:4px; }
 .section-head p { margin:0; font-size:12px; }
@@ -191,6 +243,7 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .interview-panel{display:flex;height:var(--analytics-main-height,auto);min-width:0;min-height:0;margin:0;padding:18px;flex-direction:column;overflow:hidden}.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{--record-bg:#fff;display:grid;gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.compact-flow{display:grid;grid-template-columns:repeat(var(--flow-count),minmax(56px,1fr));min-width:max(100%,calc(var(--flow-count) * 62px));align-items:start;margin:2px 0;padding:4px 1px 3px;overflow-x:auto;scrollbar-width:none}.compact-flow::-webkit-scrollbar{display:none}.compact-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid;min-width:56px;justify-items:center;text-align:center}.compact-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 11px);top:11px;width:calc(100% - 22px);height:2px;background:color-mix(in srgb,var(--node-color) 24%,#dce3df)}.compact-node>i{position:relative;z-index:1;display:grid;width:23px;height:23px;place-items:center;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:8px;color:var(--node-color);background:var(--node-soft);font:800 12px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 3px var(--record-bg)}.compact-node>b{max-width:64px;margin-top:5px;overflow:hidden;color:var(--node-color);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.compact-node>small{margin-top:1px;color:#718079;font-size:9px;white-space:nowrap}.compact-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:12px;height:12px;place-items:center;border:2px solid var(--record-bg);border-radius:50%;color:#fff;background:var(--node-color);font-size:8px}.compact-node.current>i,.compact-node.upcoming>i{box-shadow:0 0 0 3px var(--record-bg),0 0 0 5px color-mix(in srgb,var(--node-color) 14%,transparent)}.compact-node.upcoming>i{border-style:dashed}.compact-node.failed>i,.compact-node.success>i{color:#fff;background:var(--node-color)}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
 @media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(300px,1fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
 @media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
-@media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.bar-row{grid-template-columns:72px 1fr 30px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
+@media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
+@media(max-width:380px){.distribution-content{grid-template-columns:120px minmax(0,1fr);gap:10px}.distribution-legend{gap:7px}}
 @media(max-width:640px){.analytics-layout{padding-top:14px}.interview-list{grid-template-columns:1fr}.interview-list footer{align-items:flex-start;flex-direction:column}.interview-list time{text-align:left}}
 </style>
