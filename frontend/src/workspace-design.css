@@ -22,7 +22,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
   outline: 2px solid var(--color-ring);
   outline-offset: 3px;
 }
-#app :is(.card, .dashboard-panel, .calendar-pane, .selected-list, .month-card, .profile-hero) {
+#app :is(.card, .dashboard-panel, .calendar-pane, .selected-list, .month-card) {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-card);
@@ -52,9 +52,6 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app :is(input, textarea)::placeholder { color: var(--color-muted-foreground); opacity: .85; }
 #app :is(.section-kicker, .eyebrow) { letter-spacing: 0; }
 #app .profile-workspace { width: min(960px,100%); padding-top: 24px; }
-#app .profile-avatar { width: 64px; height: 64px; flex-basis: 64px; box-shadow: none; font-weight: 600; }
-#app .profile-hero h1 { font-size: 24px; }
-#app .profile-hero > div:last-child > span { font-size: 12px; font-weight: 500; letter-spacing: 0; }
 #app :is(.settings-column, .settings-grid) .card { box-shadow: var(--shadow-panel); }
 
 /* The home workspace starts with the personal agenda. */
@@ -168,8 +165,6 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
   #app .dashboard-panel { padding: 18px 16px; }
   #app .home-dashboard { padding-top: 16px; }
   #app .profile-workspace { padding-top: 16px; }
-  #app .profile-hero { padding: 18px 16px; }
-  #app .profile-hero h1 { font-size: 22px; }
 }
 @media (max-width: 480px) {
   #app .schedule-list article { gap: 12px; }

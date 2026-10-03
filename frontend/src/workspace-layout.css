@@ -151,7 +151,6 @@
 
 /* Settings and administration follow the same document-like section rhythm. */
 #app .profile-workspace { width: min(980px, 100%); }
-#app .profile-hero { margin-bottom: 0; padding: 8px 0 24px; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
 #app .settings-column { gap: 0; }
 #app .settings-column > .card,
 #app .settings-column > :is(section, div).card { margin: 0; padding: 26px 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
@@ -217,7 +216,6 @@
 :root[data-theme="dark"] #app .analytics-layout .card,
 :root[data-theme="dark"] #app .analytics-main .metrics article,
 :root[data-theme="dark"] #app .interview-panel,
-:root[data-theme="dark"] #app .profile-hero,
 :root[data-theme="dark"] #app .settings-column > .card,
 :root[data-theme="dark"] #app .admin-grid :is(.card, .summary-grid article, .registration, .health-grid > div) {
   background: transparent !important;
