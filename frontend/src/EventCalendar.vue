@@ -399,7 +399,6 @@ async function remove(item: EventItem) {
                 <span>{{ entry.event.endsAt ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.startsAt || entry.event.recordAt) }}</span>
                 <span v-if="locationText(entry.event.location)" class="event-location">{{ locationText(entry.event.location) }}</span>
                 <span v-if="entry.event.notes?.trim()" class="event-note">备注：{{ entry.event.notes }}</span>
-                <span v-if="entry.event.interviewQuestions?.trim()" class="event-review">面试回顾 · 问题清单：{{ entry.event.interviewQuestions }}</span>
               </div>
               <div class="event-actions">
                 <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.abandoned ? '已放弃' : entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
@@ -494,7 +493,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .event-title-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 2px; }
 .event-main .event-title-link > span { flex: none; color: var(--color-primary); font-size: 12px; }
 .event-main span { color: var(--color-muted-foreground); font-size: 13px; }
-.event-main .event-note, .event-main .event-review { white-space: pre-wrap; overflow-wrap: anywhere; }
+.event-main .event-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 .event-actions { justify-content: flex-end; flex-wrap: wrap; }
 .event-actions b { color: #7a4d0b; font-size: 12px; }
 .event-actions b.done { color: #167647; }
