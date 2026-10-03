@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
@@ -35,6 +35,136 @@ const sharedTimelinesNotice = ref('')
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 let quoteBurstTimer: ReturnType<typeof setTimeout> | null = null
+const homeEntering = ref(false)
+const cardsRevealing = ref(false)
+const timelineVisible = ref(false)
+const adviceVisible = ref(false)
+const detailsVisible = ref(false)
+const confirmationVisible = ref(false)
+const timelineSection = ref<HTMLElement | null>(null)
+const adviceSection = ref<HTMLElement | null>(null)
+const detailsSection = ref<HTMLElement | null>(null)
+const confirmationSection = ref<HTMLElement | null>(null)
+const scheduleList = ref<HTMLElement | null>(null)
+const confirmationList = ref<HTMLElement | null>(null)
+let sectionObserver: IntersectionObserver | null = null
+let cardObserver: IntersectionObserver | null = null
+let homeViewActive = false
+let homeRevealRun = 0
+let homeRevealStartedAt = 0
+let homeSequenceScale = 1
+let nextScheduleReveal = 0
+let nextConfirmationReveal = 0
+
+function stopHomeReveal() {
+  homeRevealRun += 1
+  sectionObserver?.disconnect()
+  cardObserver?.disconnect()
+  sectionObserver = null
+  cardObserver = null
+  homeEntering.value = false
+  cardsRevealing.value = false
+  timelineVisible.value = false
+  adviceVisible.value = false
+  detailsVisible.value = false
+  confirmationVisible.value = false
+  for (const section of [timelineSection.value, adviceSection.value, detailsSection.value, confirmationSection.value]) {
+    section?.style.removeProperty('--home-section-delay')
+  }
+  for (const list of [scheduleList.value, confirmationList.value]) {
+    list?.querySelectorAll<HTMLElement>('.home-card-visible').forEach(card => {
+      card.classList.remove('home-card-visible')
+      card.style.removeProperty('--home-card-delay')
+    })
+  }
+}
+function observeHomeSections() {
+  if (!sectionObserver) return
+  for (const [element, visible] of [
+    [timelineSection.value, timelineVisible.value],
+    [adviceSection.value, adviceVisible.value],
+    [detailsSection.value, detailsVisible.value],
+    [confirmationSection.value, confirmationVisible.value]
+  ] as const) if (element && !visible) sectionObserver.observe(element)
+}
+function observeHomeCards() {
+  if (!cardObserver) return
+  cardObserver.disconnect()
+  for (const list of [scheduleList.value, confirmationList.value]) {
+    list?.querySelectorAll<HTMLElement>('article:not(.home-card-visible)').forEach(card => cardObserver?.observe(card))
+  }
+}
+async function startHomeReveal() {
+  stopHomeReveal()
+  const run = homeRevealRun
+  if (!homeViewActive || !store.user.value) return
+  await nextTick()
+  if (!homeViewActive || run !== homeRevealRun) return
+  homeEntering.value = true
+  cardsRevealing.value = typeof IntersectionObserver !== 'undefined'
+  homeRevealStartedAt = performance.now()
+  homeSequenceScale = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? .45 : 1
+  await nextTick()
+  if (!homeViewActive || run !== homeRevealRun) return
+  if (typeof IntersectionObserver === 'undefined') {
+    timelineVisible.value = adviceVisible.value = detailsVisible.value = confirmationVisible.value = true
+    return
+  }
+  sectionObserver = new IntersectionObserver(entries => {
+    if (!homeViewActive || run !== homeRevealRun) return
+    entries.filter(entry => entry.isIntersecting).forEach(entry => {
+      const section = entry.target as HTMLElement
+      const targetStart = section === timelineSection.value ? 0
+        : section === adviceSection.value ? 500
+        : section === detailsSection.value ? 650 : 1000
+      section.style.setProperty('--home-section-delay', `${Math.max(0, targetStart * homeSequenceScale - (performance.now() - homeRevealStartedAt))}ms`)
+      if (entry.target === timelineSection.value) timelineVisible.value = true
+      if (entry.target === adviceSection.value) adviceVisible.value = true
+      if (entry.target === detailsSection.value) detailsVisible.value = true
+      if (entry.target === confirmationSection.value) confirmationVisible.value = true
+      sectionObserver?.unobserve(entry.target)
+    })
+  }, { threshold:0 })
+  const duration = homeSequenceScale < 1 ? 200 : 520
+  const interval = duration * .3
+  nextScheduleReveal = nextConfirmationReveal = performance.now()
+  cardObserver = new IntersectionObserver(entries => {
+    if (!homeViewActive || run !== homeRevealRun) return
+    const reveal = (list: HTMLElement | null, schedule: boolean) => {
+      if (!list) return
+      const cards = Array.from(list.querySelectorAll('article'))
+      const visible = entries.filter(entry => entry.isIntersecting && cards.includes(entry.target as HTMLElement))
+        .sort((left, right) => cards.indexOf(left.target as HTMLElement) - cards.indexOf(right.target as HTMLElement))
+      if (!visible.length) return
+      const now = performance.now()
+      let next = schedule ? nextScheduleReveal : nextConfirmationReveal
+      const initialStart = (schedule ? 760 : 1110) * homeSequenceScale + homeRevealStartedAt
+      next = Math.max(now + 120 * homeSequenceScale, initialStart, Math.min(next, now + duration))
+      visible.forEach(entry => {
+        const card = entry.target as HTMLElement
+        card.style.setProperty('--home-card-delay', `${Math.max(0, next - now)}ms`)
+        card.classList.add('home-card-visible')
+        next += interval
+        cardObserver?.unobserve(card)
+      })
+      if (schedule) nextScheduleReveal = next
+      else nextConfirmationReveal = next
+    }
+    reveal(scheduleList.value, true)
+    reveal(confirmationList.value, false)
+  }, { threshold:.05 })
+  observeHomeSections()
+  observeHomeCards()
+}
+onActivated(() => { homeViewActive = true; void startHomeReveal() })
+onDeactivated(() => { homeViewActive = false; stopHomeReveal() })
+watch(() => store.user.value, () => { if (homeViewActive) void startHomeReveal() })
+watch([timelineSection, adviceSection, detailsSection, confirmationSection], () => {
+  if (homeEntering.value) void nextTick(observeHomeSections)
+})
+watch(adviceSection, (current, previous) => {
+  if (!current && previous) adviceVisible.value = false
+})
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
   .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
@@ -125,6 +255,9 @@ const teamConflicts=computed(()=>teamSchedule.value.conflicts)
 const teamConflictSummary=computed(()=>teamConflicts.value.length?`小组内发现 ${teamConflicts.value.length} 组日程间隔不足 1 小时，请及时协调。`:'小组内时间点日程之间均至少间隔 1 小时。')
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
   .filter(row => row.health && row.health.days >= 10).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
+watch([scheduleList, confirmationList, recentSchedules, staleApplications], () => {
+  if (cardsRevealing.value) void nextTick(observeHomeCards)
+})
 
 onMounted(async () => {
   await store.initialize()
@@ -254,30 +387,30 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
+onUnmounted(()=>{stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
 
 <template>
-  <div v-if="store.user.value" class="home-dashboard">
-    <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong :title="quote.author?`${quote.quote} — ${quote.author}`:quote.quote">{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
+  <div v-if="store.user.value" class="home-dashboard" :class="{'home-entering':homeEntering}">
+    <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading,'is-refreshed':quoteBurst,'home-quote-entering':homeEntering}" :aria-busy="quoteLoading"><span v-if="quoteBurst" :key="quoteBurst" class="quote-sparks" aria-hidden="true"><i v-for="index in 7" :key="index"></i></span><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><span class="quote-glyph" aria-hidden="true">✦</span></button><span class="quote-copy"><small>每日一语</small><strong :title="quote.author?`${quote.quote} — ${quote.author}`:quote.quote">{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
     <section class="dashboard-panel">
-      <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
+      <section ref="timelineSection" class="timeline-column team-timeline" :class="{'home-visible':timelineVisible}" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
-        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
+        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="(item,index) in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color,'--home-node-delay':`${Math.min(index,8)*75}ms`,'--home-node-short-delay':`${Math.min(index,8)*30}ms`}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
         <div v-if="teamConflicts.length" class="team-conflict-alert" role="alert"><strong>小组日程冲突</strong><span v-for="item in teamConflicts" :key="item.id">{{item.text}}</span></div>
         <div v-if="!teamTimeline.length&&sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载小组日程…</span></div>
         <p v-else-if="!teamTimeline.length&&sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>
         <div v-else-if="!teamTimeline.length" class="timeline-empty">当前小组暂无待完成的时间点日程</div>
       </section>
 
-      <section v-if="adviceLoading||scheduleAdvice||teamConflicts.length" class="schedule-advice" aria-live="polite">
+      <section v-if="adviceLoading||scheduleAdvice||teamConflicts.length" ref="adviceSection" class="schedule-advice" :class="{'home-visible':adviceVisible}" aria-live="polite">
         <div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':teamConflictSummary}}</small></div></div></div>
         <p v-if="adviceNotice&&!adviceLoading" class="advice-notice">{{adviceNotice}}</p>
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
-      <section class="details-column" aria-labelledby="my-schedule-title">
+      <section ref="detailsSection" class="details-column" :class="{'home-visible':detailsVisible}" aria-labelledby="my-schedule-title">
         <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
-        <div v-if="recentSchedules.length" class="schedule-list">
+        <div v-if="recentSchedules.length" ref="scheduleList" class="schedule-list" :class="{'home-card-revealing':cardsRevealing}">
           <article v-for="(event,index) in recentSchedules" :key="event.id">
             <button type="button" class="schedule-row-target" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" @click="focusApplication(event)"></button>
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
@@ -289,9 +422,9 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
       </section>
     </section>
 
-    <section class="dashboard-panel confirmation-panel">
+    <section ref="confirmationSection" class="dashboard-panel confirmation-panel" :class="{'home-visible':confirmationVisible}">
       <div class="panel-head"><div><h2>人工确认 <span title="面试结束较久且没有新进展的岗位">ⓘ</span></h2><p>面试结束达到 10 天仍无进展的岗位，请确认是否标记为未通过。</p></div><b v-if="staleApplications.length">{{staleApplications.length}} 个待确认</b></div>
-      <div v-if="staleApplications.length" class="confirmation-list"><article v-for="row in staleApplications" :key="row.item.id"><div><strong>{{row.item.company||'未填写公司'}}</strong><span>{{row.item.position||'未填写岗位'}}</span></div><div class="progress-line"><i>已投递</i><span>→</span><i>测评 / 笔试</i><span>→</span><i>面试</i><span>→</span><i class="current">等待结果</i></div><em>{{row.health?.days}}天无进展</em><button :disabled="busyId===row.item.id||store.readOnly.value" @click="markRejected(row.item)">标记未通过</button></article></div>
+      <div v-if="staleApplications.length" ref="confirmationList" class="confirmation-list" :class="{'home-card-revealing':cardsRevealing}"><article v-for="row in staleApplications" :key="row.item.id"><div><strong>{{row.item.company||'未填写公司'}}</strong><span>{{row.item.position||'未填写岗位'}}</span></div><div class="progress-line"><i>已投递</i><span>→</span><i>测评 / 笔试</i><span>→</span><i>面试</i><span>→</span><i class="current">等待结果</i></div><em>{{row.health?.days}}天无进展</em><button :disabled="busyId===row.item.id||store.readOnly.value" @click="markRejected(row.item)">标记未通过</button></article></div>
       <div v-else class="empty">目前没有需要人工确认的岗位。</div>
     </section>
   </div>
@@ -821,11 +954,48 @@ onUnmounted(()=>{if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearT
   box-shadow: 0 12px 34px rgba(20,35,54,.16);
 }
 
+.quote-strip.home-quote-entering:not(.is-refreshing) .quote-trigger { animation:home-quote-light 420ms ease-out both; }
+.quote-strip.home-quote-entering .quote-copy { animation:home-section-in 400ms ease-out 100ms both; }
+.home-entering :is(.team-timeline,.schedule-advice,.details-column,.confirmation-panel):not(.home-visible) { opacity:0; }
+.home-entering :is(.team-timeline,.details-column,.confirmation-panel).home-visible { animation:home-section-in 340ms ease-out both; animation-delay:var(--home-section-delay,0ms); }
+.home-entering .team-timeline.home-visible .member-legend { animation:home-section-in 300ms ease-out 140ms both; }
+.home-entering .team-timeline.home-visible .team-timeline-list::before { transform-origin:left center; animation:home-track-draw 600ms ease-out 190ms both; }
+.home-entering .team-timeline.home-visible .team-timeline-list article { animation:home-node-in 380ms ease-out both; animation-delay:calc(400ms + var(--home-node-delay)); }
+.home-entering .schedule-advice:not(.home-visible) { animation:none; }
+.home-entering .schedule-advice.home-visible { animation:home-advice-in 420ms ease-out both; animation-delay:var(--home-section-delay,0ms); }
+.home-entering .details-column { overflow-x:clip; }
+.home-entering .details-column.home-visible > .column-heading { animation:home-section-in 300ms ease-out both; }
+.home-card-revealing article:not(.home-card-visible) { opacity:0; }
+.home-card-revealing.schedule-list article.home-card-visible { animation:home-schedule-fly 520ms cubic-bezier(.18,.76,.24,1) both; animation-delay:var(--home-card-delay,0ms); }
+.home-card-revealing.confirmation-list article.home-card-visible { animation:home-node-in 520ms ease-out both; animation-delay:var(--home-card-delay,0ms); }
+.home-entering .confirmation-panel.home-visible .panel-head { animation:home-section-in 300ms ease-out both; }
+.home-entering :is(.details-column,.confirmation-panel).home-visible > .empty { animation:home-section-in 320ms ease-out 140ms both; }
+@keyframes home-quote-light { from { opacity:.35; transform:scale(.9); } 70% { opacity:1; transform:scale(1.055); } to { opacity:1; transform:scale(1); } }
+@keyframes home-section-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes home-track-draw { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes home-node-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes home-advice-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+@keyframes home-schedule-fly { from { opacity:0; transform:translateX(64px) scale(.985); } to { opacity:1; transform:translateX(0) scale(1); } }
 @keyframes track-reveal {
   from { opacity: 0; transform: translateY(8px) scale(.995); }
   to { opacity: 1; transform: none; }
 }
 @keyframes timeline-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .quote-strip.home-quote-entering:not(.is-refreshing) .quote-trigger { animation-name:home-quote-light-reduced; animation-duration:220ms; }
+  .quote-strip.home-quote-entering .quote-copy { animation-name:home-subtle-in; animation-duration:220ms; animation-delay:50ms; }
+  .home-entering :is(.team-timeline,.details-column,.confirmation-panel).home-visible,
+  .home-entering .schedule-advice.home-visible { animation-name:home-subtle-in; animation-duration:200ms; }
+  .home-entering .team-timeline.home-visible .member-legend { animation-name:home-subtle-in; animation-duration:180ms; animation-delay:60ms; }
+  .home-entering .team-timeline.home-visible .team-timeline-list::before { animation-duration:240ms; animation-delay:100ms; }
+  .home-entering .team-timeline.home-visible .team-timeline-list article { animation-name:home-subtle-in; animation-duration:180ms; animation-delay:calc(190ms + var(--home-node-short-delay)); }
+  .home-card-revealing.schedule-list article.home-card-visible { animation-name:home-schedule-fly-reduced; animation-duration:200ms; }
+  .home-card-revealing.confirmation-list article.home-card-visible { animation-name:home-subtle-in; animation-duration:200ms; }
+  .home-entering :is(.details-column.home-visible > .column-heading,.confirmation-panel.home-visible .panel-head,.details-column.home-visible > .empty,.confirmation-panel.home-visible > .empty) { animation-name:home-subtle-in; }
+}
+@keyframes home-schedule-fly-reduced { from { opacity:.35; transform:translateX(8px); } to { opacity:1; transform:translateX(0); } }
+@keyframes home-quote-light-reduced { from { opacity:.5; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
+@keyframes home-subtle-in { from { opacity:.35; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width: 1180px) {
   .schedule-workspace { grid-template-columns: 1fr; }
 }
