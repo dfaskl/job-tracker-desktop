@@ -361,7 +361,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 @keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.96}100%{opacity:0;transform:translate(10px,-12px) scale(1.28)}}
 @keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
 @media (min-width: 901px) and (max-width: 1200px) { .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); grid-template-rows:minmax(150px,.34fr) minmax(0,1fr); } .inbox-panel { grid-column: 1 / -1; height:100%; overflow:hidden; } .compose-panel, .review-panel { min-height:0; height:100%; } }
-@media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { min-height: 340px; } }
+@media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { flex: none; height: clamp(160px, 24dvh, 240px); min-height: 160px; overflow-y: auto; resize: vertical; } }
 @media (max-width: 650px) {
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
