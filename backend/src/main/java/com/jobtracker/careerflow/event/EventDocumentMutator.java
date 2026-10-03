@@ -41,6 +41,9 @@ public class EventDocumentMutator {
     public Mutation create(String json, EventInput input) throws Exception {
         BusinessDocument document = document(json);
         EventInput clean = validate(input);
+        if (clean.interviewQuestions() != null && !clean.interviewQuestions().isEmpty()) {
+            throw new ValidationException("面试回顾只能在日程完成后填写");
+        }
         ObjectNode application = application(document.applications(), clean.applicationId());
         String now = now();
         ObjectNode event = objectMapper.createObjectNode();
@@ -62,6 +65,12 @@ public class EventDocumentMutator {
         ObjectNode previous = requireObject(document.events().get(index), "日程不是 JSON 对象");
         assertVersion(previous, expectedUpdatedAt);
         EventInput clean = validate(input);
+        if (clean.interviewQuestions() != null && !clean.interviewQuestions().isEmpty()
+            && (!previous.path("completed").asBoolean(false)
+                || previous.path("missed").asBoolean(false)
+                || previous.path("abandoned").asBoolean(false))) {
+            throw new ValidationException("面试回顾只能填写在已完成的日程中");
+        }
         if (!clean.applicationId().equals(text(previous, "applicationId"))) {
             throw new ValidationException("编辑日程时不能更换关联岗位");
         }
@@ -200,7 +209,8 @@ public class EventDocumentMutator {
         }
         return new EventInput(
             applicationId, type, title, startsAt, endsAt,
-            optional(input.location(), 1_000), optional(input.notes(), 4_000)
+            optional(input.location(), 1_000), optional(input.notes(), 4_000),
+            input.interviewQuestions() == null ? null : optional(input.interviewQuestions(), 8_000)
         );
     }
 
@@ -213,6 +223,7 @@ public class EventDocumentMutator {
         else event.put("endsAt", input.endsAt());
         event.put("location", input.location());
         event.put("notes", input.notes());
+        if (input.interviewQuestions() != null) event.put("interviewQuestions", input.interviewQuestions());
         event.put("company", text(application, "company"));
         event.put("position", text(application, "position"));
     }
@@ -284,6 +295,7 @@ public class EventDocumentMutator {
         return new EventView(
             text(event, "id"), text(event, "applicationId"), text(event, "type"), text(event, "title"),
             text(event, "startsAt"), text(event, "endsAt"), text(event, "location"), text(event, "notes"),
+            text(event, "interviewQuestions"),
             text(event, "company"), text(event, "position"), event.path("completed").asBoolean(false),
             event.path("missed").asBoolean(false), event.path("abandoned").asBoolean(false), text(event, "completedAt"), text(event, "createdAt"),
             version(event), recordAt(event)
@@ -385,8 +397,14 @@ public class EventDocumentMutator {
         String startsAt,
         String endsAt,
         String location,
-        String notes
-    ) {}
+        String notes,
+        String interviewQuestions
+    ) {
+        public EventInput(String applicationId, String type, String title, String startsAt,
+                          String endsAt, String location, String notes) {
+            this(applicationId, type, title, startsAt, endsAt, location, notes, null);
+        }
+    }
 
     public record EventView(
         String id,
@@ -397,6 +415,7 @@ public class EventDocumentMutator {
         String endsAt,
         String location,
         String notes,
+        String interviewQuestions,
         String company,
         String position,
         boolean completed,
@@ -406,7 +425,15 @@ public class EventDocumentMutator {
         String createdAt,
         String updatedAt,
         String recordAt
-    ) {}
+    ) {
+        public EventView(String id, String applicationId, String type, String title, String startsAt,
+                         String endsAt, String location, String notes, String company, String position,
+                         boolean completed, boolean missed, boolean abandoned, String completedAt,
+                         String createdAt, String updatedAt, String recordAt) {
+            this(id, applicationId, type, title, startsAt, endsAt, location, notes, "", company,
+                position, completed, missed, abandoned, completedAt, createdAt, updatedAt, recordAt);
+        }
+    }
 
     public record ApplicationOption(String id, String company, String position, String appliedDate) {}
     public record EventPage(List<EventView> events, List<ApplicationOption> applications, int total, boolean truncated) {}

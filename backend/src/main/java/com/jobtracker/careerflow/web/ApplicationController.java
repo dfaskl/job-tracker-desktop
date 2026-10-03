@@ -128,7 +128,7 @@ public class ApplicationController {
         if (body == null) return null;
         return new ApplicationInput(
             body.company(), body.position(), body.city(), body.channel(), body.appliedDate(),
-            body.stage(), body.status(), body.notes()
+            body.stage(), body.status(), body.notes(), body.jobDescription()
         );
     }
 
@@ -182,6 +182,7 @@ public class ApplicationController {
         String stage,
         String status,
         String notes,
+        String jobDescription,
         String expectedUpdatedAt,
         String scheduleType,
         String scheduleTitle,
@@ -189,7 +190,17 @@ public class ApplicationController {
         String scheduleEndsAt,
         String scheduleLocation,
         String scheduleNotes
-    ) {}
+    ) {
+        public ApplicationWriteRequest(String company, String position, String city, String channel,
+                                       String appliedDate, String stage, String status, String notes,
+                                       String expectedUpdatedAt, String scheduleType, String scheduleTitle,
+                                       String scheduleStartsAt, String scheduleEndsAt, String scheduleLocation,
+                                       String scheduleNotes) {
+            this(company, position, city, channel, appliedDate, stage, status, notes, null,
+                expectedUpdatedAt, scheduleType, scheduleTitle, scheduleStartsAt, scheduleEndsAt,
+                scheduleLocation, scheduleNotes);
+        }
+    }
 
     public record DeleteRequest(String expectedUpdatedAt) {}
     public record ApplicationsResponse(List<ApplicationView> applications, int total, boolean truncated, boolean sandbox) {}

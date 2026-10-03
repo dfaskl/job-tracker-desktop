@@ -55,6 +55,21 @@ class ApplicationDocumentMutatorTest {
     }
 
     @Test
+    void savesJobDescriptionSeparatelyAndPreservesItForOlderClients() throws Exception {
+        var created = mutator.create("{\"applications\":[],\"events\":[]}",
+            new ApplicationDocumentMutator.ApplicationInput(
+                "Example", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果",
+                "个人备注", "岗位职责：开发服务端\n任职要求：Java"
+            ));
+        assertThat(created.application().jobDescription()).contains("岗位职责");
+        assertThat(created.application().notes()).isEqualTo("个人备注");
+
+        var updated = mutator.update(created.documentJson(), created.application().id(),
+            input("Example", "Engineer", "面试", "等待结果"), created.application().updatedAt());
+        assertThat(updated.application().jobDescription()).isEqualTo(created.application().jobDescription());
+    }
+
+    @Test
     void rejectsAStaleUpdate() {
         String source = """
             {"applications":[{"id":"app-1","updatedAt":"newer"}],"events":[]}

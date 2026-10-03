@@ -17,6 +17,7 @@ type EventItem = {
   endsAt: string
   location: string
   notes: string
+  interviewQuestions: string
   company: string
   position: string
   completed: boolean
@@ -36,6 +37,7 @@ type EventForm = {
   endsAt: string
   location: string
   notes: string
+  interviewQuestions: string
 }
 type CalendarEvent = { event: EventItem; position: 'point' | 'start' | 'middle' | 'end'; lane: number; color: number }
 type CalendarCell = { key: string; day: number; inMonth: boolean; events: CalendarEvent[] }
@@ -59,7 +61,7 @@ const events = computed<EventItem[]>(() => store.events.value.map(item => {
   const completed = Boolean(item.completed) || abandoned
   const completedAt = String(item.completedAt || '')
   return {
-    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, createdAt:'', updatedAt:'',
+    applicationId:'', type:'', title:'', location:'', notes:'', interviewQuestions:'', missed:false, createdAt:'', updatedAt:'',
     ...item,
     id:String(item.id), startsAt, endsAt, completed, abandoned, completedAt,
     company:String(item.company || application?.company || '未关联公司'),
@@ -153,7 +155,7 @@ function tomorrowAtNine() {
   return `${dateKey(date)}T09:00`
 }
 function emptyForm(): EventForm {
-  return { applicationId: '', type: '面试', title: '', timeMode: 'point', startsAt: tomorrowAtNine(), endsAt: '', location: '', notes: '' }
+  return { applicationId: '', type: '面试', title: '', timeMode: 'point', startsAt: tomorrowAtNine(), endsAt: '', location: '', notes: '', interviewQuestions: '' }
 }
 function toInputTime(value: string) { return value ? value.replace(' ', 'T').slice(0, 16) : '' }
 function toApiTime(value: string) { return value ? value.replace('T', ' ').slice(0, 16) : '' }
@@ -265,7 +267,8 @@ function edit(item: EventItem) {
     startsAt: toInputTime(item.startsAt),
     endsAt: toInputTime(item.endsAt),
     location: item.location,
-    notes: item.notes
+    notes: item.notes,
+    interviewQuestions: item.interviewQuestions
   })
   message.value = ''
   error.value = ''
@@ -292,6 +295,7 @@ async function save() {
       endsAt: form.timeMode === 'range' ? toApiTime(form.endsAt) : '',
       location: form.location,
       notes: form.notes,
+      ...(current?.completed && !current.missed && !current.abandoned ? { interviewQuestions: form.interviewQuestions } : {}),
       expectedUpdatedAt: current?.updatedAt || ''
     }
     const result = await requestJson(
@@ -390,6 +394,8 @@ async function remove(item: EventItem) {
                 <span>{{ entry.event.position }} · {{ entry.event.type }}</span>
                 <span>{{ entry.event.endsAt ? `${formatTime(entry.event.startsAt)} 至 ${formatTime(entry.event.endsAt)}` : formatTime(entry.event.startsAt || entry.event.recordAt) }}</span>
                 <span v-if="locationText(entry.event.location)" class="event-location">{{ locationText(entry.event.location) }}</span>
+                <span v-if="entry.event.notes?.trim()" class="event-note">备注：{{ entry.event.notes }}</span>
+                <span v-if="entry.event.interviewQuestions?.trim()" class="event-review">面试回顾 · 问题清单：{{ entry.event.interviewQuestions }}</span>
               </div>
               <div class="event-actions">
                 <b :class="{ missed: entry.event.missed, done: entry.event.completed && !entry.event.missed }">{{ entry.event.abandoned ? '已放弃' : entry.event.missed ? '已错过' : entry.event.completed ? '已完成' : '待完成' }}</b>
@@ -417,6 +423,7 @@ async function remove(item: EventItem) {
           <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" required /></label>
           <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
           <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
+          <label v-if="editing.completed && !editing.missed && !editing.abandoned" class="wide"><span>面试回顾 · 面试官问题清单</span><textarea v-model="form.interviewQuestions" maxlength="8000" rows="6" placeholder="每行记录一个面试官提出的问题" /><small>与日程备注分开保存。</small></label>
           <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="resetForm">取消</button></div>
         </form>
       </div>
@@ -479,6 +486,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .event-title-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 2px; }
 .event-main .event-title-link > span { flex: none; color: var(--color-primary); font-size: 12px; }
 .event-main span { color: var(--color-muted-foreground); font-size: 13px; }
+.event-main .event-note, .event-main .event-review { white-space: pre-wrap; overflow-wrap: anywhere; }
 .event-actions { justify-content: flex-end; flex-wrap: wrap; }
 .event-actions b { color: #7a4d0b; font-size: 12px; }
 .event-actions b.done { color: #167647; }

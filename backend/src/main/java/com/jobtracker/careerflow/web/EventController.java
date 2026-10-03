@@ -163,7 +163,7 @@ public class EventController {
         if (body == null) return null;
         return new EventInput(
             body.applicationId(), body.type(), body.title(), body.startsAt(), body.endsAt(),
-            body.location(), body.notes()
+            body.location(), body.notes(), body.interviewQuestions()
         );
     }
 
@@ -216,8 +216,14 @@ public class EventController {
         String endsAt,
         String location,
         String notes,
+        String interviewQuestions,
         String expectedUpdatedAt
-    ) {}
+    ) {
+        public EventWriteRequest(String applicationId, String type, String title, String startsAt,
+                                 String endsAt, String location, String notes, String expectedUpdatedAt) {
+            this(applicationId, type, title, startsAt, endsAt, location, notes, null, expectedUpdatedAt);
+        }
+    }
 
     public record ResolutionRequest(String action, String expectedUpdatedAt) {}
     public record DeleteRequest(String expectedUpdatedAt) {}

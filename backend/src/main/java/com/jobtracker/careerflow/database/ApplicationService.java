@@ -191,6 +191,7 @@ public class ApplicationService {
                 text(item, "id", 160), text(item, "company", 240), text(item, "position", 240),
                 text(item, "city", 160), text(item, "channel", 120), text(item, "appliedDate", 40),
                 text(item, "stage", 80), text(item, "status", 80), text(item, "notes", 4_000),
+                text(item, "jobDescription", 20_000),
                 text(item, "createdAt", 80), text(item, "updatedAt", 80)
             ));
         }

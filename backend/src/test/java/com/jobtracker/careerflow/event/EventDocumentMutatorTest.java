@@ -87,6 +87,28 @@ class EventDocumentMutatorTest {
     }
 
     @Test
+    void savesInterviewQuestionsOnlyAfterCompletionAndSeparatelyFromNotes() throws Exception {
+        var created = mutator.create(document(), input("面试", "一面", "2026-09-05 09:00", ""));
+        var recap = new EventDocumentMutator.EventInput(
+            "app-1", "面试", "一面", "2026-09-05 09:00", "", "线上", "日程备注", "项目中如何处理并发？"
+        );
+        assertThrows(EventDocumentMutator.ValidationException.class, () ->
+            mutator.update(created.documentJson(), created.event().id(), recap, created.event().updatedAt())
+        );
+
+        var completed = mutator.resolve(created.documentJson(), created.event().id(),
+            EventDocumentMutator.Resolution.COMPLETE, created.event().updatedAt());
+        var saved = mutator.update(completed.documentJson(), completed.event().id(), recap,
+            completed.event().updatedAt());
+        assertThat(saved.event().interviewQuestions()).isEqualTo("项目中如何处理并发？");
+        assertThat(saved.event().notes()).isEqualTo("日程备注");
+
+        var legacyUpdate = mutator.update(saved.documentJson(), saved.event().id(),
+            input("面试", "一面", "2026-09-05 09:00", ""), saved.event().updatedAt());
+        assertThat(legacyUpdate.event().interviewQuestions()).isEqualTo(recap.interviewQuestions());
+    }
+
+    @Test
     void updatesKnownFieldsAndPreservesUnknownEventFields() throws Exception {
         String source = """
             {"applications":[{"id":"app-1","company":"Example","position":"Engineer"}],
