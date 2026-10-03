@@ -1,36 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
-import { api, ApiError } from './api'
-import { classifyInterviewPositions } from './interviewClassification'
+import { api } from './api'
+import { summarizeInterviewReviews } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
-type Category = { id: string; name: string; applicationIds: string[] }
-type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questions: string[] }
+type Topic = { name: string; count: number; kind: 'project' | 'knowledge'; summary: string; questions: string[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
-type Workbench = { sourceKey: string; classification?: { sourceKey: string; categories: Category[] }; summaries?: Record<string, Summary> }
+type Workbench = { sourceKey: string; overallSummary?: Summary }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
 
 const emit = defineEmits<{ navigate: [page: 'profile'] }>()
 const store = useJobTrackerStore()
 const state = ref<Workbench | null>(null)
-const selectedCategoryId = ref('')
 const loading = ref(false)
-const classifying = ref(false)
 const summarizing = ref(false)
 const error = ref('')
 const message = ref('')
 const selectedReviewId = ref('')
 const reviewDialog = ref<HTMLDialogElement | null>(null)
 let autoAttemptedKey = ''
-
-async function aiPost<T>(url: string): Promise<T> {
-  try { return await api<T>(url, { method: 'POST' }) }
-  catch (cause) {
-    if (!(cause instanceof ApiError) || cause.status !== 429) throw cause
-    await new Promise(resolve => window.setTimeout(resolve, 3200))
-    return api<T>(url, { method: 'POST' })
-  }
-}
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
 const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
@@ -39,53 +27,40 @@ const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
   if (!questions || !event.completed || event.missed || event.abandoned || !application) return []
   return [{ event, application, company: String(application.company || '未填写公司'), position: String(application.position || '未填写岗位'), title: String(event.title || event.type || '面试'), questions }]
 }).sort((a, b) => String(b.event.startsAt || b.event.date || '').localeCompare(String(a.event.startsAt || a.event.date || ''))))
-const reviewSignature = computed(() => reviews.value.map(item => `${item.event.id}|${item.application.id}|${item.company}|${item.position}`).sort().join('\n'))
-const categories = computed(() => state.value?.classification?.categories || [])
-const classificationCurrent = computed(() => !!state.value?.sourceKey && state.value.classification?.sourceKey === state.value.sourceKey)
-const selectedCategory = computed(() => categories.value.find(item => item.id === selectedCategoryId.value) || null)
-const categoryReviews = computed(() => {
-  const ids = new Set(selectedCategory.value?.applicationIds || [])
-  return reviews.value.filter(item => ids.has(item.application.id))
-})
-const selectedSummary = computed(() => selectedCategoryId.value ? state.value?.summaries?.[selectedCategoryId.value] : undefined)
+const reviewSignature = computed(() => reviews.value.map(item => `${item.event.id}|${item.application.id}|${item.company}|${item.position}|${item.title}|${item.questions}`).sort().join('\n'))
+const summary = computed(() => state.value?.overallSummary)
+const projectTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'project').sort((a, b) => b.count - a.count))
+const knowledgeTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'knowledge').sort((a, b) => b.count - a.count))
+const topicGroups = computed(() => [
+  { kind: 'project', label: '项目考点', topics: projectTopics.value },
+  { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value }
+])
 const selectedReview = computed(() => reviews.value.find(item => item.event.id === selectedReviewId.value) || null)
 const hasResume = computed(() => {
   const resume = (store.data.value.settings?.interviewWorkbench as { resume?: { internships?: unknown[]; projects?: unknown[] } } | undefined)?.resume
   return !!(resume?.internships?.length || resume?.projects?.length)
 })
 
-async function loadState(autoClassify = true) {
+async function loadState(autoSummarize = true) {
   if (loading.value) return
   loading.value = true
   try {
     state.value = await api<Workbench>('/api/poc/interview-workbench')
-    if (categories.value.length && !categories.value.some(item => item.id === selectedCategoryId.value)) selectedCategoryId.value = categories.value[0].id
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取面试总结失败' }
   finally { loading.value = false }
-  if (autoClassify && state.value && reviews.value.length && !classificationCurrent.value && state.value.sourceKey !== autoAttemptedKey) {
+  if (autoSummarize && state.value && reviews.value.length && (!summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
     autoAttemptedKey = state.value.sourceKey
-    await classify(true)
+    await summarize(true)
   }
 }
 
-async function classify(automatic = false) {
-  if (classifying.value || !reviews.value.length) return
-  classifying.value = true; error.value = ''; message.value = ''
-  try {
-    state.value = await classifyInterviewPositions<Workbench>()
-    if (!categories.value.some(item => item.id === selectedCategoryId.value)) selectedCategoryId.value = categories.value[0]?.id || ''
-    autoAttemptedKey = state.value.sourceKey
-    message.value = automatic ? '新面试回顾已自动重新分类' : '岗位分类已更新'
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '岗位分类失败' }
-  finally { classifying.value = false }
-}
-
-async function summarize() {
-  if (!selectedCategory.value || summarizing.value || !classificationCurrent.value) return
+async function summarize(automatic = false) {
+  if (!reviews.value.length || summarizing.value) return
   summarizing.value = true; error.value = ''; message.value = ''
   try {
-    state.value = await aiPost<Workbench>(`/api/poc/interview-workbench/categories/${encodeURIComponent(selectedCategory.value.id)}/summarize`)
-    message.value = '考点汇总已更新'
+    state.value = await summarizeInterviewReviews<Workbench>()
+    autoAttemptedKey = state.value.sourceKey
+    message.value = automatic ? '面试回顾已自动汇总' : '考点汇总已更新'
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '考点汇总失败' }
   finally { summarizing.value = false }
 }
@@ -107,7 +82,7 @@ watch(reviewSignature, (next, previous) => { if (previous && next !== previous) 
 
 <template>
   <section class="interview-summary" aria-labelledby="interview-summary-title">
-    <header class="page-heading"><div><span class="eyebrow">面试复盘</span><h1 id="interview-summary-title">面试总结</h1><p>从已完成日程中的面试回顾整理问题，按岗位方向归类并汇总考点。</p></div><button type="button" class="primary-action" :disabled="classifying || !reviews.length" @click="classify(false)">{{ classifying ? '正在分类…' : 'AI 整理岗位类别' }}</button></header>
+    <header class="page-heading"><div><span class="eyebrow">面试复盘</span><h1 id="interview-summary-title">面试总结</h1><p>汇总所有已完成日程中的面试问题，按出现频率整理项目考点和八股考点。</p></div><button type="button" class="primary-action" :disabled="summarizing || !reviews.length" @click="summarize(false)">{{ summarizing ? '正在汇总…' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button></header>
     <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
     <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="emit('navigate', 'profile')">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
     <div class="summary-columns">
@@ -116,17 +91,12 @@ watch(reviewSignature, (next, previous) => { if (previous && next !== previous) 
         <p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
         <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol>
       </section>
-      <section class="category-column" aria-labelledby="category-title">
-        <div class="section-heading"><div><small>分类副本</small><h2 id="category-title">岗位类别</h2></div><span>{{ categories.length }} 类</span></div>
-        <p v-if="!reviews.length" class="empty-state">有面试回顾后，这里会展示按岗位分类的记录。</p>
-        <p v-else-if="!categories.length || !classificationCurrent" class="empty-state">{{ classifying ? '正在根据公司和岗位名称分类…' : '岗位分类待生成。点击上方按钮可重试。' }}</p>
-        <template v-else><nav class="category-directory" aria-label="岗位类别"><button v-for="category in categories" :key="category.id" type="button" :class="{ selected: selectedCategoryId === category.id }" :aria-pressed="selectedCategoryId === category.id" @click="selectedCategoryId = category.id">{{ category.name }}<span>{{ reviews.filter(item => category.applicationIds.includes(item.application.id)).length }}</span></button></nav>
-          <div v-if="selectedCategory" class="category-content"><div class="category-actions"><h3>{{ selectedCategory.name }}</h3><button type="button" class="primary-action" :disabled="summarizing || classifying || !categoryReviews.length" @click="summarize">{{ summarizing ? '正在汇总…' : selectedSummary ? '重新汇总考点' : 'AI 汇总考点' }}</button></div>
-            <ol class="review-list compact"><li v-for="item in categoryReviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol>
-            <section v-if="selectedSummary && !selectedSummary.stale" class="topic-section" aria-label="考点汇总"><div class="section-heading"><div><small>AI 汇总</small><h3>高频考点</h3></div><span>按频率排序</span></div><ol class="topic-list"><li v-for="topic in selectedSummary.topics" :key="topic.name"><div class="topic-heading"><strong>{{ topic.name }}</strong><span>{{ topic.count }} 次 · {{ topic.kind === 'project' ? '简历项目 / 实习' : topic.kind === 'knowledge' ? '通用知识' : '其他' }}</span></div><p>{{ topic.summary }}</p><ul v-if="topic.questions?.length"><li v-for="question in topic.questions" :key="question">{{ question }}</li></ul></li></ol></section>
-            <p v-else class="summary-note">{{ selectedSummary?.stale ? '回顾或简历已更新，请重新汇总考点。' : '选择此类别的“AI 汇总考点”，查看按出现频率排序的问题。' }}</p>
-          </div>
-        </template>
+      <section class="topic-column" aria-labelledby="topic-title">
+        <div class="section-heading"><div><small>AI 归纳</small><h2 id="topic-title">高频考点</h2></div><span>各类按频率排序</span></div>
+        <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳所有问题的考点。</p>
+        <p v-else-if="summarizing && (!summary || summary.stale)" class="empty-state" role="status">正在归纳全部面试问题…</p>
+        <p v-else-if="!summary || summary.stale" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
+        <template v-else><section v-for="group in topicGroups" :key="group.kind" class="topic-section" :aria-label="group.label"><div class="section-heading"><h3>{{ group.label }}</h3><span>{{ group.topics.length }} 个考点</span></div><ol v-if="group.topics.length" class="topic-list"><li v-for="topic in group.topics" :key="topic.name"><div class="topic-heading"><strong>{{ topic.name }}</strong><span>{{ topic.count }} 次</span></div><p>{{ topic.summary }}</p><ul v-if="topic.questions?.length"><li v-for="question in topic.questions" :key="question">{{ question }}</li></ul></li></ol><p v-else class="empty-state">暂无{{ group.label }}。</p></section></template>
       </section>
     </div>
     <dialog v-if="selectedReview" ref="reviewDialog" class="review-dialog" aria-labelledby="review-dialog-title" @close="selectedReviewId = ''" @click="onReviewDialogClick"><div class="review-dialog-header"><div><span class="eyebrow">面试回顾 · 问题清单</span><h2 id="review-dialog-title">{{ selectedReview.company }} · {{ selectedReview.title }}</h2><p>{{ selectedReview.position }}</p></div><button type="button" class="secondary" @click="closeReview">关闭</button></div><div class="review-dialog-content">{{ selectedReview.questions }}</div></dialog>
@@ -139,4 +109,6 @@ watch(reviewSignature, (next, previous) => { if (previous && next !== previous) 
 @media(max-width:620px){.interview-summary{padding:22px 0 48px}.page-heading{align-items:start;flex-direction:column}.page-heading>button{width:100%}.category-actions{align-items:start;flex-direction:column}.category-actions>button{width:100%}}
 .resume-hint button,.category-directory button,.category-actions>button{min-height:44px}.category-directory button{transition:background .18s ease,border-color .18s ease}
 :global(#app) button.review-card{color:var(--color-foreground)}
+.topic-column{min-width:0;padding-left:32px;border-left:1px solid var(--color-border)}.topic-column>.section-heading{margin-bottom:18px}.topic-column .topic-section{padding-top:0;margin-top:0;border-top:0}.topic-column .topic-section+.topic-section{padding-top:24px;margin-top:24px;border-top:1px solid var(--color-border)}.topic-column .topic-section .section-heading{align-items:center;margin-bottom:12px}.topic-column .topic-list>li:first-child{border-top:0}.topic-column .topic-list>li{padding:15px 0}.topic-column .topic-list strong{overflow-wrap:anywhere}
+@media(max-width:900px){.topic-column{padding:28px 0 0;border-left:0;border-top:1px solid var(--color-border)}}
 </style>

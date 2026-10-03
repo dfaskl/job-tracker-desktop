@@ -15,7 +15,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -39,20 +38,14 @@ public class InterviewWorkbenchService {
         try (Connection connection = open()) {
             Document document = read(connection, email, false);
             ObjectNode result = workbench(document.root()).deepCopy();
+            result.remove("classification");
+            result.remove("summaries");
             ArrayNode allReviews = reviews(document.root());
             String currentKey = sourceKey(allReviews);
             result.put("sourceKey", currentKey);
-            JsonNode classification = result.path("classification");
-            JsonNode summaries = result.path("summaries");
-            if (summaries instanceof ObjectNode saved) {
-                for (JsonNode group : classification.path("categories")) {
-                    String id = group.path("id").asText("");
-                    if (!(saved.path(id) instanceof ObjectNode summary)) continue;
-                    ArrayNode selected = summaryInput(allReviews, group);
-                    String fingerprint = digest(selected.toString() + result.path("resume").toString());
-                    summary.put("stale", !currentKey.equals(classification.path("sourceKey").asText(""))
-                        || !fingerprint.equals(summary.path("sourceKey").asText("")));
-                }
+            if (result.path("overallSummary") instanceof ObjectNode summary) {
+                String fingerprint = digest(summaryInput(allReviews).toString() + result.path("resume").toString());
+                summary.put("stale", !fingerprint.equals(summary.path("sourceKey").asText("")));
             }
             return result;
         }
@@ -64,7 +57,10 @@ public class InterviewWorkbenchService {
             connection.setAutoCommit(false);
             try {
                 Document document = read(connection, email, true);
-                workbench(document.root()).set("resume", resume);
+                ObjectNode workbench = workbench(document.root());
+                workbench.remove("classification");
+                workbench.remove("summaries");
+                workbench.set("resume", resume);
                 write(connection, document);
                 connection.commit();
             } catch (Exception exception) { connection.rollback(); throw exception; }
@@ -72,47 +68,16 @@ public class InterviewWorkbenchService {
         return state(email);
     }
 
-    public ObjectNode classify(String email) throws Exception {
-        Document snapshot;
-        try (Connection connection = open()) { snapshot = read(connection, email, false); }
-        ArrayNode reviews = reviews(snapshot.root());
-        if (reviews.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
-        ArrayNode positions = positions(reviews);
-        if (positions.size() > 200) throw new AiValidationException("有回顾的岗位超过 200 个，暂不支持一次分类");
-        String key = sourceKey(reviews);
-        JsonNode result = ai.classifyInterviewPositions(email, positions);
-        ObjectNode classification = cleanClassification(result, positions);
-        classification.put("sourceKey", key);
-        try (Connection connection = open()) {
-            connection.setAutoCommit(false);
-            try {
-                Document current = read(connection, email, true);
-                if (!key.equals(sourceKey(reviews(current.root())))) throw new WorkbenchConflictException("面试回顾已更新，请重新分类");
-                ObjectNode workbench = workbench(current.root());
-                workbench.set("classification", classification);
-                workbench.set("summaries", mapper.createObjectNode());
-                write(connection, current);
-                connection.commit();
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-        return state(email);
-    }
-
-    public ObjectNode summarize(String email, String categoryId) throws Exception {
+    public ObjectNode summarize(String email) throws Exception {
         Document snapshot;
         try (Connection connection = open()) { snapshot = read(connection, email, false); }
         ObjectNode workbench = workbench(snapshot.root());
         ArrayNode allReviews = reviews(snapshot.root());
-        String key = sourceKey(allReviews);
-        JsonNode classification = workbench.path("classification");
-        if (!key.equals(classification.path("sourceKey").asText(""))) throw new WorkbenchConflictException("岗位分类已过期，请先重新分类");
-        JsonNode category = category(classification, categoryId);
-        if (category == null) throw new AiValidationException("请选择有效的岗位类别");
-        ArrayNode selected = summaryInput(allReviews, category);
+        ArrayNode selected = summaryInput(allReviews);
         int size = 0;
         for (JsonNode item : selected) size += item.toString().length();
-        if (selected.isEmpty()) throw new AiValidationException("这个类别暂时没有面试回顾");
-        if (size > 35_000) throw new AiValidationException("该类别的回顾内容过长，请缩减后再汇总");
+        if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
+        if (size > 100_000) throw new AiValidationException("面试回顾内容超过本次汇总上限，请精简过长的记录后重试");
         JsonNode resume = workbench.path("resume");
         String summaryKey = digest(selected.toString() + resume.toString());
         JsonNode result = ai.summarizeInterviewReviews(email, selected, resume);
@@ -123,13 +88,13 @@ public class InterviewWorkbenchService {
             try {
                 Document current = read(connection, email, true);
                 ObjectNode currentWorkbench = workbench(current.root());
-                if (!key.equals(sourceKey(reviews(current.root())))
-                    || !currentWorkbench.path("resume").equals(resume)
-                    || category(currentWorkbench.path("classification"), categoryId) == null) {
+                if (!summaryKey.equals(digest(summaryInput(reviews(current.root())).toString()
+                    + currentWorkbench.path("resume").toString()))) {
                     throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
                 }
-                ObjectNode summaries = currentWorkbench.path("summaries") instanceof ObjectNode object ? object : currentWorkbench.putObject("summaries");
-                summaries.set(categoryId, summary);
+                currentWorkbench.remove("classification");
+                currentWorkbench.remove("summaries");
+                currentWorkbench.set("overallSummary", summary);
                 write(connection, current);
                 connection.commit();
             } catch (Exception exception) { connection.rollback(); throw exception; }
@@ -162,48 +127,15 @@ public class InterviewWorkbenchService {
         }
     }
 
-    private ObjectNode cleanClassification(JsonNode response, ArrayNode positions) {
-        if (!response.path("categories").isArray()) throw new AiResponseException("AI 未返回岗位类别");
-        Set<String> valid = new HashSet<>();
-        for (JsonNode position : positions) valid.add(position.path("id").asText(""));
-        Set<String> assigned = new HashSet<>();
-        ObjectNode result = mapper.createObjectNode();
-        ArrayNode categories = result.putArray("categories");
-        for (JsonNode candidate : response.path("categories")) {
-            if (categories.size() >= 8) break;
-            String name = candidate.path("name").asText("").trim();
-            if (name.isBlank() || name.length() > 30 || !candidate.path("applicationIds").isArray()) continue;
-            String categoryId = "category-" + (categories.size() + 1);
-            ObjectNode group = categories.addObject().put("id", categoryId).put("name", name);
-            ArrayNode ids = group.putArray("applicationIds");
-            for (JsonNode item : candidate.path("applicationIds")) {
-                String id = item.asText("");
-                if (valid.contains(id) && assigned.add(id)) ids.add(id);
-            }
-            if (ids.isEmpty()) categories.remove(categories.size() - 1);
-        }
-        if (assigned.size() < valid.size()) {
-            ObjectNode other = categories.addObject().put("id", "category-other").put("name", "其他岗位");
-            ArrayNode ids = other.putArray("applicationIds");
-            for (JsonNode position : positions) {
-                String id = position.path("id").asText("");
-                if (assigned.add(id)) ids.add(id);
-            }
-        }
-        if (categories.isEmpty()) throw new AiResponseException("AI 未返回有效岗位类别");
-        return result;
-    }
-
     private ObjectNode cleanSummary(JsonNode result) {
         if (!result.path("topics").isArray()) throw new AiResponseException("AI 未返回考点总结");
         ObjectNode clean = mapper.createObjectNode();
         ArrayNode topics = clean.putArray("topics");
         for (JsonNode topic : result.path("topics")) {
-            if (topics.size() >= 20) break;
             String name = topic.path("name").asText("").trim();
             if (name.isEmpty()) continue;
-            String kind = topic.path("kind").asText("other");
-            if (!Set.of("project", "knowledge", "other").contains(kind)) kind = "other";
+            String kind = topic.path("kind").asText("knowledge");
+            if (!Set.of("project", "knowledge").contains(kind)) kind = "knowledge";
             ObjectNode item = topics.addObject().put("name", limit(name, 100))
                 .put("count", Math.max(1, Math.min(1000, topic.path("count").asInt(1))))
                 .put("kind", kind).put("summary", limit(topic.path("summary").asText(""), 500));
@@ -243,25 +175,9 @@ public class InterviewWorkbenchService {
         return reviews;
     }
 
-    private ArrayNode positions(ArrayNode reviews) {
-        Map<String, JsonNode> distinct = new java.util.LinkedHashMap<>();
-        for (JsonNode review : reviews) {
-            String id = review.path("applicationId").asText("");
-            if (!id.isBlank()) distinct.putIfAbsent(id, review);
-        }
-        ArrayNode result = mapper.createArrayNode();
-        distinct.forEach((id, review) -> result.addObject().put("id", id)
-            .put("company", review.path("company").asText(""))
-            .put("position", review.path("position").asText("")));
-        return result;
-    }
-
-    private ArrayNode summaryInput(ArrayNode allReviews, JsonNode category) {
-        Set<String> ids = new HashSet<>();
-        for (JsonNode id : category.path("applicationIds")) ids.add(id.asText(""));
+    private ArrayNode summaryInput(ArrayNode allReviews) {
         ArrayNode selected = mapper.createArrayNode();
         for (JsonNode review : allReviews) {
-            if (!ids.contains(review.path("applicationId").asText(""))) continue;
             ObjectNode item = selected.addObject();
             for (String field : new String[]{"company", "position", "title", "questions"}) item.put(field, review.path(field).asText(""));
         }
@@ -270,21 +186,13 @@ public class InterviewWorkbenchService {
 
     private String sourceKey(ArrayNode reviews) throws Exception {
         var signatures = new java.util.ArrayList<String>();
-        for (JsonNode review : reviews) signatures.add(review.path("eventId").asText("") + "|"
-            + review.path("applicationId").asText("") + "|" + review.path("company").asText("") + "|"
-            + review.path("position").asText(""));
+        for (JsonNode review : reviews) signatures.add(review.toString());
         signatures.sort(String::compareTo);
         return signatures.isEmpty() ? "" : digest(String.join("\n", signatures));
     }
 
     private String digest(String value) throws Exception {
         return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-    }
-
-    private JsonNode category(JsonNode classification, String id) {
-        if (!classification.path("categories").isArray()) return null;
-        for (JsonNode item : classification.path("categories")) if (id != null && id.equals(item.path("id").asText(""))) return item;
-        return null;
     }
 
     private ObjectNode workbench(ObjectNode root) {

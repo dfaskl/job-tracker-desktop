@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,8 +60,8 @@ public class InterviewWorkbenchController {
         } catch (Exception exception) { return mapException("resume", exception); }
     }
 
-    @PostMapping("/classify")
-    public ResponseEntity<?> classify(
+    @PostMapping("/summarize")
+    public ResponseEntity<?> summarize(
         @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
         HttpServletRequest request
     ) {
@@ -70,20 +69,7 @@ public class InterviewWorkbenchController {
         try {
             Optional<LegacyUser> user = auth.authenticatedUser(token);
             if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workbench.classify(user.get().email()));
-        } catch (Exception exception) { return mapException("classify", exception); }
-    }
-
-    @PostMapping("/categories/{id}/summarize")
-    public ResponseEntity<?> summarize(
-        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
-        @PathVariable String id, HttpServletRequest request
-    ) {
-        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
-        try {
-            Optional<LegacyUser> user = auth.authenticatedUser(token);
-            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workbench.summarize(user.get().email(), id));
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workbench.summarize(user.get().email()));
         } catch (Exception exception) { return mapException("summarize", exception); }
     }
 

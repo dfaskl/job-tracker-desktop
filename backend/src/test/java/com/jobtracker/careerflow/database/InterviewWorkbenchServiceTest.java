@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 
 class InterviewWorkbenchServiceTest {
     @Test
-    void classifiesOnlyPositionMetadataAndSummarizesReviewsWithSavedResume() throws Exception {
+    void summarizesAllReviewsWithoutPositionClassificationAndMarksChangesStale() throws Exception {
         Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
         Files.createDirectories(directory);
         String jdbc = "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db");
@@ -35,9 +35,13 @@ class InterviewWorkbenchServiceTest {
         new AccountService(environment, applications, new LegacyPasswordVerifier())
             .register("reviewer@example.com", "correct-horse-battery", "");
         String document = """
-            {"applications":[{"id":"job-1","company":"甲公司","position":"Java开发工程师"}],
+            {"applications":[{"id":"job-1","company":"甲公司","position":"Java开发工程师"},
+                             {"id":"job-2","company":"乙公司","position":"AI开发工程师"}],
              "events":[{"id":"event-1","applicationId":"job-1","type":"面试","title":"一面","completed":true,
-               "interviewQuestions":"解释线程池参数"}],"settings":{}}
+               "interviewQuestions":"解释线程池参数"},
+               {"id":"event-2","applicationId":"job-2","type":"面试","title":"二面","completed":true,
+               "interviewQuestions":"介绍项目甲的架构"}],
+             "settings":{"interviewWorkbench":{"classification":{"categories":[{"name":"旧岗位分类"}]},"summaries":{}}}}
             """;
         try (var connection = DriverManager.getConnection(jdbc);
              var statement = connection.prepareStatement("UPDATE user_data SET data=? WHERE user_id=(SELECT id FROM users WHERE email=?)")) {
@@ -45,31 +49,32 @@ class InterviewWorkbenchServiceTest {
             statement.executeUpdate();
         }
         AiService ai = mock(AiService.class);
-        when(ai.classifyInterviewPositions(eq("reviewer@example.com"), any())).thenReturn(mapper.readTree(
-            "{\"categories\":[{\"name\":\"后端开发\",\"applicationIds\":[\"job-1\"]}] }"));
         when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
-            "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questions\":[\"解释线程池参数\"]}]}"));
+            "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questions\":[\"解释线程池参数\"]},"
+                + "{\"name\":\"项目架构\",\"count\":2,\"kind\":\"project\",\"summary\":\"项目追问\",\"questions\":[\"介绍项目甲的架构\"]}]}"));
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[],\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));
 
-        JsonNode classified = service.classify("reviewer@example.com");
-        ArgumentCaptor<JsonNode> positions = ArgumentCaptor.forClass(JsonNode.class);
-        verify(ai).classifyInterviewPositions(eq("reviewer@example.com"), positions.capture());
-        assertThat(positions.getValue().toString()).contains("甲公司", "Java开发工程师").doesNotContain("线程池", "interviewQuestions");
-        assertThat(classified.path("classification").path("categories").get(0).path("name").asText()).isEqualTo("后端开发");
-
-        JsonNode summarized = service.summarize("reviewer@example.com", "category-1");
+        JsonNode summarized = service.summarize("reviewer@example.com");
         ArgumentCaptor<JsonNode> reviews = ArgumentCaptor.forClass(JsonNode.class);
         ArgumentCaptor<JsonNode> resume = ArgumentCaptor.forClass(JsonNode.class);
         verify(ai).summarizeInterviewReviews(eq("reviewer@example.com"), reviews.capture(), resume.capture());
-        assertThat(reviews.getValue().toString()).contains("解释线程池参数");
+        assertThat(reviews.getValue().toString()).contains("解释线程池参数", "介绍项目甲的架构", "甲公司", "乙公司");
         assertThat(resume.getValue().toString()).contains("项目甲");
-        assertThat(summarized.path("summaries").path("category-1").path("topics").get(0).path("name").asText()).isEqualTo("线程池");
-        assertThat(summarized.path("summaries").path("category-1").path("stale").asBoolean()).isFalse();
+        assertThat(summarized.has("classification")).isFalse();
+        assertThat(summarized.has("summaries")).isFalse();
+        assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目架构");
+        assertThat(summarized.path("overallSummary").path("stale").asBoolean()).isFalse();
+
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE user_data SET data=json_set(data, '$.events[0].interviewQuestions', '解释线程池实现')");
+        }
+        assertThat(service.state("reviewer@example.com").path("overallSummary").path("stale").asBoolean()).isTrue();
 
         JsonNode changedResume = service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[],\"projects\":[{\"name\":\"项目乙\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));
-        assertThat(changedResume.path("summaries").path("category-1").path("stale").asBoolean()).isTrue();
+        assertThat(changedResume.path("overallSummary").path("stale").asBoolean()).isTrue();
     }
 }
