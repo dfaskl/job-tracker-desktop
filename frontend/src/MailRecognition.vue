@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -33,6 +33,7 @@ const smokingMailIds = ref(new Set<number>())
 const processingMailIds = new Set<number>()
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
+const entranceActive = ref(false)
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
@@ -58,6 +59,8 @@ onMounted(async () => {
   await store.initialize()
   await Promise.all([checkStatus(), loadInbox(true)])
 })
+onActivated(() => { entranceActive.value = true })
+onDeactivated(() => { entranceActive.value = false })
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
 function companyKey(value: unknown) { return normalize(value).replace(/股份有限公司|有限责任公司|有限公司|集团|公司$/g, '') }
 function textSimilarity(left: unknown, right: unknown) {
@@ -248,7 +251,7 @@ async function saveResult() {
 </script>
 
 <template>
-  <section class="mail-page">
+  <section class="mail-page" :class="{'mail-entering':entranceActive}">
     <div class="mail-grid">
       <section class="card inbox-panel">
         <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
@@ -329,6 +332,12 @@ async function saveResult() {
 .result-form .wide { grid-column: 1 / -1; }
 .application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:var(--color-muted-foreground);font-weight:400}
 .mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(260px, .82fr) minmax(300px, 1fr) minmax(380px, 1.28fr); gap: 16px; padding-bottom: 18px; }
+.mail-entering .inbox-panel { animation:mail-inbox-unfold 680ms cubic-bezier(.2,.72,.22,1) both; }
+.mail-entering .compose-panel { animation:mail-panel-pop 820ms cubic-bezier(.19,.75,.26,1) 130ms both; }
+.mail-entering .review-panel { animation:mail-panel-pop 820ms cubic-bezier(.19,.75,.26,1) 980ms both; }
+.mail-entering :is(.inbox-panel,.compose-panel,.review-panel):focus-within { animation:none; opacity:1; transform:none; clip-path:none; }
+@keyframes mail-inbox-unfold { from { opacity:.45; clip-path:inset(0 0 100% 0); } to { opacity:1; clip-path:inset(0); } }
+@keyframes mail-panel-pop { 0% { opacity:0; transform:scale(.3); } 58% { opacity:1; transform:scale(1.055); } 78% { transform:scale(.977); } 90% { transform:scale(1.012); } 100% { opacity:1; transform:scale(1); } }
 .inbox-panel, .compose-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
 .inbox-panel, .compose-panel { display: flex; flex-direction: column; }
 .review-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
@@ -361,6 +370,12 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:1fr 1fr}.sync-button,.process-all-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
+@media (prefers-reduced-motion: reduce) {
+  .mail-entering .inbox-panel { animation-duration:260ms; }
+  .mail-entering .compose-panel { animation-name:mail-panel-pop-reduced; animation-duration:320ms; animation-delay:90ms; }
+  .mail-entering .review-panel { animation-name:mail-panel-pop-reduced; animation-duration:320ms; animation-delay:430ms; }
+}
+@keyframes mail-panel-pop-reduced { 0% { opacity:.3; transform:scale(.94); } 70% { opacity:1; transform:scale(1.012); } 100% { opacity:1; transform:scale(1); } }
 </style>
 <style scoped>
 :global(:root[data-theme="dark"] .step) {
