@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
 import ProductAnalytics from './ProductAnalytics.vue'
+import ProductInterviewSummary from './ProductInterviewSummary.vue'
 import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
 import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MailRecognition from './MailRecognition.vue'
@@ -9,7 +10,7 @@ import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
-type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'profile' | 'admin'
+type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'interview-summary' | 'profile' | 'admin'
 
 const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6H9.5v6H5a1.5 1.5 0 0 1-1.5-1.5Z' },
@@ -17,6 +18,7 @@ const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'calendar', label: '日程', icon: 'M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2ZM8 2v4m8-4v4M3 9h18M7 13h3m4 0h3m-10 4h3m4 0h3' },
   { id: 'mail', label: '邮件识别', icon: 'M3 5h14v12H3ZM3 6l7 6 7-6M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm2.2 5.2L22 21' },
   { id: 'stats', label: '统计', icon: 'M4 4v16h16M7 16l4-5 3 3 5-7M16 7h3v3' },
+  { id: 'interview-summary', label: '面试总结', icon: 'M5 3.5h10l4 4V20H5a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Zm9 0V8h5M7 12h9M7 16h6' },
   { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2' }
 ]
 
@@ -26,6 +28,7 @@ const pageComponents: Record<Page, Component> = {
   calendar: ProductCalendarWorkspace,
   mail: MailRecognition,
   stats: ProductAnalytics,
+  'interview-summary': ProductInterviewSummary,
   profile: ProductSettingsWorkspace,
   admin: AdminDashboard
 }
@@ -155,7 +158,7 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats' }">
-        <KeepAlive :max="7">
+        <KeepAlive :max="8">
           <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" />
         </KeepAlive>
       </div>
