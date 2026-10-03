@@ -40,7 +40,7 @@ async function save() {
       <div class="group-heading project-heading"><h3>项目经历</h3><button type="button" class="secondary" :disabled="resume.projects.length >= 10" @click="resume.projects.push({ name: '', description: '', coreWork: '' })">＋ 添加项目</button></div>
       <p v-if="!resume.projects.length" class="empty">还没有添加项目经历。</p>
       <div v-for="(item, index) in resume.projects" :key="index" class="resume-entry"><div class="entry-title"><strong>项目 {{ index + 1 }}</strong><button type="button" class="remove" :aria-label="`删除第 ${index + 1} 个项目`" :title="`删除第 ${index + 1} 个项目`" @click="resume.projects.splice(index, 1)">删除</button></div><label>项目名称<input v-model.trim="item.name" maxlength="120" placeholder="项目名称"></label><label>项目简介<textarea v-model.trim="item.description" maxlength="1000" rows="2" placeholder="目标、背景和系统作用"></textarea></label><label>核心工作<textarea v-model.trim="item.coreWork" maxlength="2000" rows="3" placeholder="你负责的部分与实现方式"></textarea></label></div>
-      <button class="save-button" :disabled="saving">{{ saving ? '正在保存…' : '保存简历内容' }}</button>
+      <button class="save-button primary-action" :disabled="saving">{{ saving ? '正在保存…' : '保存简历内容' }}</button>
     </form>
     <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
   </section>
