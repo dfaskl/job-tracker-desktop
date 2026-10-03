@@ -730,3 +730,18 @@ body { background: var(--color-background); }
     overflow: hidden;
   }
 }
+html:has(#app .interview-summary-page),
+body:has(#app .interview-summary-page) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#app:has(.interview-summary-page),
+#app:has(.interview-summary-page) .app-stage,
+#app:has(.interview-summary-page) .product-shell {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
