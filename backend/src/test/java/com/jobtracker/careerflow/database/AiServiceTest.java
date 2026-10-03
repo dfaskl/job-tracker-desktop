@@ -7,6 +7,7 @@ import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
 import com.jobtracker.careerflow.compat.LegacyPasswordVerifier;
 import com.jobtracker.careerflow.config.DatabaseSchemaInitializer;
 import org.junit.jupiter.api.Test;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -195,5 +196,26 @@ class AiServiceTest {
             new AiEndpointPolicy(environment),
             mapper
         );
+    }
+
+    @Test
+    void disablesDeepSeekThinkingForInterviewSummaryAndExplainsTruncatedResponses() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+        ObjectMapper mapper = new ObjectMapper();
+        var request = service.reviewSummaryRequestBody("", mapper.createArrayNode(), mapper.createObjectNode());
+        service.prepareInterviewAnalysisRequest(request, URI.create("https://api.deepseek.com/chat/completions"), "deepseek-v4-flash");
+        assertThat(request.path("thinking").path("type").asText()).isEqualTo("disabled");
+        assertThat(request.path("response_format").path("type").asText()).isEqualTo("json_object");
+        var otherProvider = service.reviewSummaryRequestBody("", mapper.createArrayNode(), mapper.createObjectNode());
+        service.prepareInterviewAnalysisRequest(otherProvider, URI.create("https://api.openai.com/v1/chat/completions"), "test-model");
+        assertThat(otherProvider.has("thinking")).isFalse();
+        assertThatThrownBy(() -> service.parseInterviewAnalysisResponse(mapper.readTree(
+            "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"content\":\"\"}}]}")))
+            .isInstanceOf(AiService.AiResponseException.class).hasMessageContaining("截断");
+        assertThat(service.parseInterviewAnalysisResponse(mapper.readTree(
+            "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"{\\\"topics\\\":[]}\"}}]}"))
+            .path("topics").isArray()).isTrue();
     }
 }
