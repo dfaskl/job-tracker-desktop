@@ -414,14 +414,15 @@ async function remove(item: EventItem) {
         <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
           <button type="button" class="modal-close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="resetForm"><AppIcon name="close" /></button>
           <h3 id="event-editor-title" class="wide">编辑日程</h3>
-          <ScheduleTimeModeNotice class="wide" :mode="form.timeMode" />
+          <ScheduleTimeModeNotice class="wide" :mode="form.timeMode" selectable @select="form.timeMode=$event" />
           <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>
           <label><span>类型</span><BaseSelect v-model="form.type" :options="eventTypes" /></label>
           <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>
-          <label><span>时间类型</span><BaseSelect v-model="form.timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
-          <label><span>开始时间 *</span><input v-model="form.startsAt" type="datetime-local" required /></label>
-          <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" required /></label>
-          <label><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
+          <div class="schedule-time-fields wide" :class="{ 'is-point':form.timeMode==='point' }">
+            <label><span>{{form.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="form.startsAt" type="datetime-local" required /></label>
+            <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" :min="form.startsAt" required /></label>
+          </div>
+          <label class="wide"><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
           <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
           <label v-if="editing.completed && !editing.missed && !editing.abandoned" class="wide"><span>面试回顾 · 面试官问题清单</span><textarea v-model="form.interviewQuestions" maxlength="8000" rows="6" placeholder="每行记录一个面试官提出的问题" /><small>与日程备注分开保存。</small></label>
           <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="resetForm">取消</button></div>
@@ -447,6 +448,9 @@ async function remove(item: EventItem) {
 .event-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 22px 0; }
 .event-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .event-form .wide { grid-column: 1 / -1; }
+.schedule-time-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; min-width:0; }
+.schedule-time-fields.is-point { grid-template-columns:minmax(0,1fr); }
+.schedule-time-fields input { min-width:0; width:100%; }
 select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; }
 .form-actions { justify-content: flex-start; }
 .calendar-head { margin: 24px 0 12px; padding-top: 18px; border-top: 1px solid #edf0f5; }
@@ -531,6 +535,7 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .selected-scroll { overflow: visible; }
   .event-form { grid-template-columns: 1fr; }
   .event-form .wide { grid-column: auto; }
+  .schedule-time-fields { grid-template-columns:minmax(0,1fr); }
   .day { min-width: 0; min-height: 60px; padding: 3px; }
   .day-number, .day.today > .day-number { top: 4px; left: 4px; width: 20px; height: 20px; font-size: 11px; }
   .day-events { min-height: 0; margin-top: 21px; grid-template-rows: repeat(3, 9px); row-gap: 2px; }
