@@ -158,7 +158,7 @@ async function startHomeReveal() {
 }
 onActivated(() => { homeViewActive = true; void startHomeReveal() })
 onDeactivated(() => { homeViewActive = false; stopHomeReveal() })
-watch(() => store.user.value, () => { if (homeViewActive) void startHomeReveal() })
+watch(() => store.user.value?.id, () => { if (homeViewActive) void startHomeReveal() })
 watch([timelineSection, adviceSection, detailsSection, confirmationSection], () => {
   if (homeEntering.value) void nextTick(observeHomeSections)
 })
