@@ -18,13 +18,14 @@ import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 public class MailInboxService {
     private final Environment environment;
     private final LegacySecretCrypto crypto;
     private final LegacySecretCryptoWriter cryptoWriter;
-    private final Set<Long> syncingAccounts=ConcurrentHashMap.newKeySet();
+    private final Map<Long,ReentrantLock> syncLocks=new ConcurrentHashMap<>();
 
     public MailInboxService(Environment environment, LegacySecretCrypto crypto, LegacySecretCryptoWriter cryptoWriter) {
         this.environment=environment; this.crypto=crypto; this.cryptoWriter=cryptoWriter;
@@ -47,7 +48,7 @@ public class MailInboxService {
     }
     public void removeAccount(String email,long id)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("DELETE FROM mail_accounts WHERE id=? AND user_id=?")){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}
     public InboxView sync(String email)throws Exception{
-        for(AccountRow account:accounts(email)){try{syncAccount(account);}catch(Exception ignored){}}
+        for(AccountRow account:accounts(email)){try{syncAccount(account,true);}catch(Exception ignored){}}
         return inbox(email);
     }
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
@@ -57,17 +58,19 @@ public class MailInboxService {
     @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:15000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:15000}")
     public void syncAll(){
         if(encryptionKey().length()<32)return;
-        try{for(AccountRow account:accounts()){try{syncAccount(account);}catch(Exception ignored){}}}catch(Exception ignored){}
+        try{for(AccountRow account:accounts()){try{syncAccount(account,false);}catch(Exception ignored){}}}catch(Exception ignored){}
     }
 
     private void updateMessage(String email,long id,boolean delete)throws Exception{try(Connection c=open()){String sql=delete?"DELETE FROM collected_mails WHERE id=? AND user_id=?":"UPDATE collected_mails SET processed_at=NOW() WHERE id=? AND user_id=?";try(PreparedStatement s=c.prepareStatement(sql)){s.setLong(1,id);s.setLong(2,userId(c,email));s.executeUpdate();}}}
-    private void syncAccount(AccountRow account)throws Exception{
-        if(!syncingAccounts.add(account.id()))return;
+    private void syncAccount(AccountRow account,boolean manual)throws Exception{
+        ReentrantLock lock=syncLocks.computeIfAbsent(account.id(),ignored->new ReentrantLock());
+        if(manual)lock.lock();
+        else if(!lock.tryLock())return;
         try{
             SyncResult result=fetch(account);
             persist(account,result);
         }catch(Exception e){persistError(account.id(),connectionFailure(account.provider(),e));throw e;
-        }finally{syncingAccounts.remove(account.id());}
+        }finally{lock.unlock();}
     }
     private SyncResult fetch(AccountRow account)throws Exception{
         String password=crypto.decrypt(encryptionKey(),account.encrypted(),account.iv(),account.tag());long newest=account.lastUid();List<FetchedMail> fetched=new ArrayList<>();

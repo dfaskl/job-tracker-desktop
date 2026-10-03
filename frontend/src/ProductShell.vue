@@ -40,6 +40,7 @@ const sidebarDisplayName = computed(() => store.user.value?.displayName || store
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
 function syncViewport() { mobileViewport.value = window.matchMedia('(max-width: 820px)').matches }
 let workspaceRefreshTimer: number | undefined
+let lastBusinessRefresh = 0
 
 function routeFromHash() {
   const [pageValue, query = ''] = window.location.hash.replace(/^#\/?/, '').split('?')
@@ -88,20 +89,28 @@ function toggleTheme() {
   try { localStorage.setItem('job-tracker-theme', nextTheme) } catch { /* Keep the selected theme for this session. */ }
 }
 
-function refreshWorkspaceData(syncMail = false) {
-  if (!store.user.value) return
-  void Promise.all([store.refresh(false, false, false), store.refreshMailInbox(syncMail, false)])
+function refreshWorkspaceData(forceBusiness = false) {
+  if (!store.user.value || document.visibilityState === 'hidden') return
+  const now = Date.now()
+  if (forceBusiness || now - lastBusinessRefresh >= 60_000) {
+    lastBusinessRefresh = now
+    void store.refresh(false, false, false)
+  }
+  void store.refreshMailInbox()
 }
 function handleWindowFocus() { refreshWorkspaceData(true) }
+function handleVisibilityChange() { if (document.visibilityState === 'visible') refreshWorkspaceData(true) }
 
 onMounted(async () => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('resize', syncViewport)
   await store.initialize()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
+  lastBusinessRefresh = Date.now()
   syncHash()
   workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
 })
@@ -110,6 +119,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('resize', syncViewport)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
 })

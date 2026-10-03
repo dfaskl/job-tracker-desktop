@@ -183,9 +183,9 @@ async function startAnalyticsReveal() {
   nextInterviewRevealStart = performance.now()
   const scrollRoot = list.scrollHeight > list.clientHeight + 2 ? list : null
   interviewRevealObserver = new IntersectionObserver(entries => {
-    const cards = Array.from(list.querySelectorAll('article'))
+    const cards = Array.from(list.querySelectorAll<HTMLElement>('article'))
     const visible = entries.filter(entry => entry.isIntersecting)
-      .sort((left, right) => cards.indexOf(left.target) - cards.indexOf(right.target))
+      .sort((left, right) => cards.indexOf(left.target as HTMLElement) - cards.indexOf(right.target as HTMLElement))
     const now = performance.now()
     nextInterviewRevealStart = Math.max(now, Math.min(nextInterviewRevealStart, now + duration))
     visible.forEach(entry => {

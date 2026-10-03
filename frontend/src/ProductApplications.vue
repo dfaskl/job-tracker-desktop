@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
-import { api, apiCached } from './api'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
+import { api, apiCached, invalidateApiCache } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -64,7 +64,7 @@ watch(store.applicationDetailRequest, request => {
 }, { immediate: true })
 
 async function focusApplicationInList() {
-  const id = props.focusApplicationId
+  const id = props.focusApplicationId || ''
   if (!id || id === lastFocusedId || id === pendingFocusId) return
   stopApplicationReveal()
   pendingFocusId = id
@@ -151,7 +151,7 @@ async function startApplicationReveal() {
   }, { root: scrollRoot, threshold: .05 })
   observeApplicationCards()
 }
-onActivated(() => { window.addEventListener('resize', stopApplicationReveal); void startApplicationReveal(); void focusApplicationInList() })
+onActivated(() => { window.addEventListener('resize', stopApplicationReveal); void startApplicationReveal(); void focusApplicationInList(); void loadCompanyLinks() })
 function stopFocusAnimation() { cancelAnimationFrame(focusFrame); window.clearTimeout(highlightTimer); highlightedApplicationId.value = ''; lastFocusedId = ''; pendingFocusId = '' }
 onDeactivated(() => { window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
 onBeforeUnmount(() => { window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
@@ -207,7 +207,7 @@ const officialMatchStatus = computed(() => {
   if(officialMatches.value.some(item=>item.exact))return '已找到该公司的官网链接'
   return officialMatches.value.length?`找到 ${officialMatches.value.length} 个相近公司链接，可选择或手动填写`:'官网库暂无该公司链接，请手动填写'
 })
-onMounted(async()=>{try{const result=await apiCached<{items:{company:string;url:string}[]}>('/api/poc/company-links');companyLinks.value=result.items||[]}catch{/* 登录前使用搜索兜底 */}})
+async function loadCompanyLinks(){try{const result=await apiCached<{items:{company:string;url:string}[]}>('/api/poc/company-links');companyLinks.value=result.items||[]}catch{/* 官网搜索仍可用 */}}
 function applicationMonthValue(date:Date){return date.getFullYear()*12+date.getMonth()}
 function applicationDateKey(date:Date){const pad=(value:number)=>String(value).padStart(2,'0');return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`}
 function clampApplicationMonth(date:Date,bounds=applicationMonthBounds.value){const value=applicationMonthValue(date);return value<applicationMonthValue(bounds.first)?bounds.first:value>applicationMonthValue(bounds.last)?bounds.last:date}
@@ -314,6 +314,7 @@ async function saveSelectedOfficialLink(){
     const items=companyLinks.value.filter(item=>normalizeCompanyName(item.company)!==key&&Boolean(item.company.trim())&&/^https?:\/\//i.test(item.url.trim())).map(item=>({company:item.company.trim(),url:item.url.trim()}))
     items.push({company,url})
     const result=await api<{items:{company:string;url:string}[]}>('/api/poc/company-links',{method:'POST',body:JSON.stringify({items:items.sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))})})
+    invalidateApiCache('/api/poc/company-links')
     companyLinks.value=result.items||items;officialLinkEditing.value=false;officialLinkDraft.value='';message.value='公司官网链接已更新'
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存公司官网链接失败'}finally{busy.value=false}
 }
@@ -340,6 +341,7 @@ async function saveCompanyOfficialLink(){
   const items=companyLinks.value.filter(item=>normalizeCompanyName(item.company)!==key&&Boolean(item.company.trim())&&/^https?:\/\//i.test(item.url.trim())).map(item=>({company:item.company.trim(),url:item.url.trim()}))
   items.push({company,url})
   const result=await api<{items:{company:string;url:string}[]}>('/api/poc/company-links',{method:'POST',body:JSON.stringify({items:items.sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))})})
+  invalidateApiCache('/api/poc/company-links')
   companyLinks.value=result.items||items
 }
 async function saveApplication(){

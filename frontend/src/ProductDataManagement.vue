@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { api, apiCached, ApiError } from './api'
+import { computed, onActivated, onMounted, ref } from 'vue'
+import { api, apiCached, ApiError, invalidateApiCache } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
 import { formatShanghaiDateTime } from './shanghaiTime'
 import { exportRawBusinessData, exportReadableBusinessData } from './businessDataExport'
@@ -42,9 +42,9 @@ const exactNewLink = computed(() => {
 const similarNewLinks = computed(() => findSimilarCompanies(newCompany.value).filter(item => item !== exactNewLink.value))
 
 onMounted(() => {
-  loadLinks()
   loadSandbox()
 })
+onActivated(() => { void loadLinks() })
 
 async function loadLinks() {
   error.value = ''
@@ -70,6 +70,7 @@ async function saveLinks(next: CompanyLink[]) {
   loading.value = true; error.value = ''; message.value = ''
   try {
     const result = await api<CompanyLinkResponse>('/api/poc/company-links', { method: 'POST', body: JSON.stringify({ items: next }) })
+    invalidateApiCache('/api/poc/company-links')
     links.value = result.items || []; linksUpdatedAt.value = result.updatedAt || ''; message.value = '公司官网库已保存'
     return true
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存公司链接失败'; return false }

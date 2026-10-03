@@ -28,7 +28,19 @@ const pendingMailCount = computed(() => mailInbox.value.pendingCount)
 const newApplicationRequest = ref(0)
 const applicationDetailRequest = ref({ applicationId: '', sequence: 0 })
 let refreshPromise: Promise<void> | null = null
-let mailInboxPromise: Promise<void> | null = null
+let mailInboxReadPromise: Promise<void> | null = null
+let mailInboxSyncPromise: Promise<void> | null = null
+let mailInboxRequestId = 0
+let sessionGeneration = 0
+
+function resetSessionRequests() {
+  sessionGeneration += 1
+  mailInboxRequestId += 1
+  loading.value = false
+  refreshPromise = null
+  mailInboxReadPromise = null
+  mailInboxSyncPromise = null
+}
 
 const applications = computed(() => data.value.applications || [])
 const events = computed(() => data.value.events || [])
@@ -36,14 +48,18 @@ const events = computed(() => data.value.events || [])
 function refresh(throwOnError = false, reportError = true, showLocalLoading = true) {
   if (refreshPromise) return refreshPromise
   if (showLocalLoading) loading.value = true
-  refreshPromise = (async () => {
+  const generation = sessionGeneration
+  let request!: Promise<void>
+  request = (async () => {
     try {
       const result = await api<{ user: User; exists: boolean; data: BusinessData | null; readOnly: boolean }>('/api/poc/data')
+      if (generation !== sessionGeneration) return
       user.value = result.user
       data.value = result.data || { applications: [], events: [] }
       readOnly.value = result.readOnly
       error.value = ''
     } catch (cause) {
+      if (generation !== sessionGeneration) return
       if (cause instanceof ApiError && cause.status === 401) {
         user.value = null
         data.value = { applications: [], events: [] }
@@ -54,12 +70,15 @@ function refresh(throwOnError = false, reportError = true, showLocalLoading = tr
       if (reportError) error.value = cause instanceof Error ? cause.message : '读取业务数据失败'
       if (throwOnError) throw cause
     } finally {
-      if (showLocalLoading) loading.value = false
-      initialized.value = true
-      refreshPromise = null
+      if (refreshPromise === request) {
+        if (showLocalLoading) loading.value = false
+        initialized.value = true
+        refreshPromise = null
+      }
     }
   })()
-  return refreshPromise
+  refreshPromise = request
+  return request
 }
 
 async function initialize() {
@@ -67,19 +86,31 @@ async function initialize() {
   await refresh()
 }
 
-function refreshMailInbox(sync = false) {
-  if (mailInboxPromise) return mailInboxPromise
-  mailInboxPromise = (async () => {
+function refreshMailInbox(sync = false, throwOnError = false) {
+  if (mailInboxSyncPromise) return mailInboxSyncPromise
+  if (!sync && mailInboxReadPromise) return mailInboxReadPromise
+  const requestId = ++mailInboxRequestId
+  const generation = sessionGeneration
+  let request!: Promise<void>
+  request = (async () => {
     try {
       const result = await api<MailInbox>(sync ? '/api/poc/mail-inbox/sync' : '/api/poc/mail-inbox', sync ? { method: 'POST' } : {})
-      mailInbox.value = { accounts: result.accounts || [], messages: result.messages || [], pendingCount: Math.max(0, Number(result.pendingCount) || 0) }
+      if (requestId === mailInboxRequestId && generation === sessionGeneration) {
+        mailInbox.value = { accounts: result.accounts || [], messages: result.messages || [], pendingCount: Math.max(0, Number(result.pendingCount) || 0) }
+      }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 401) mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
+      if (cause instanceof ApiError && cause.status === 401 && requestId === mailInboxRequestId && generation === sessionGeneration) {
+        mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }
+      }
+      if (throwOnError) throw cause
     } finally {
-      mailInboxPromise = null
+      if (sync && mailInboxSyncPromise === request) mailInboxSyncPromise = null
+      else if (!sync && mailInboxReadPromise === request) mailInboxReadPromise = null
     }
   })()
-  return mailInboxPromise
+  if (sync) mailInboxSyncPromise = request
+  else mailInboxReadPromise = request
+  return request
 }
 
 async function login(email: string, password: string) {
@@ -88,6 +119,7 @@ async function login(email: string, password: string) {
   await api<{ user: User; readOnly: boolean }>('/api/poc/auth/login', {
     method: 'POST', body: JSON.stringify({ email, password })
   })
+  resetSessionRequests()
   await refresh(true)
   await refreshMailInbox()
 }
@@ -98,6 +130,7 @@ async function register(email: string, password: string, registrationCode: strin
   await api<{ user: User; readOnly: boolean }>('/api/poc/auth/register', {
     method: 'POST', body: JSON.stringify({ email, password, registrationCode })
   })
+  resetSessionRequests()
   await refresh(true)
   await refreshMailInbox()
 }
@@ -112,6 +145,7 @@ function requestApplicationDetail(applicationId: string) {
 async function logout() {
   await api('/api/poc/auth/logout', { method: 'POST' })
   clearApiCache()
+  resetSessionRequests()
   user.value = null
   data.value = { applications: [], events: [] }
   mailInbox.value = { accounts: [], messages: [], pendingCount: 0 }

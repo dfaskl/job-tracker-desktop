@@ -59,7 +59,7 @@ const events = computed<EventItem[]>(() => store.events.value.map(item => {
   const completed = Boolean(item.completed) || abandoned
   const completedAt = String(item.completedAt || '')
   return {
-    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, abandoned:false, createdAt:'', updatedAt:'',
+    applicationId:'', type:'', title:'', location:'', notes:'', missed:false, createdAt:'', updatedAt:'',
     ...item,
     id:String(item.id), startsAt, endsAt, completed, abandoned, completedAt,
     company:String(item.company || application?.company || '未关联公司'),

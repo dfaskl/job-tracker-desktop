@@ -152,7 +152,7 @@ const EyeBall = defineComponent({
       const angle = Math.atan2(dy, dx)
       return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance }
     })
-    return () => h('i', { ref: element, class: 'auth-eye', style: { width: `${eyeProps.size}px`, height: eyeProps.blinking ? '2px' : `${eyeProps.size}px` } }, eyeProps.blinking ? null : h('b', { style: { width: `${eyeProps.pupilSize}px`, height: `${eyeProps.pupilSize}px`, transform: `translate(${offset.value.x}px, ${offset.value.y}px)` } }))
+    return () => h('i', { ref: element, class: 'auth-eye', style: { width: `${eyeProps.size}px`, height: eyeProps.blinking ? '2px' : `${eyeProps.size}px` } }, eyeProps.blinking ? undefined : h('b', { style: { width: `${eyeProps.pupilSize}px`, height: `${eyeProps.pupilSize}px`, transform: `translate(${offset.value.x}px, ${offset.value.y}px)` } }))
   }
 })
 

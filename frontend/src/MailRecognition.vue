@@ -49,8 +49,8 @@ const actionSummary = computed(() => hasResult.value
 watch(selectedApplicationId, () => {
   const matched = matchedApplication.value
   if (!matched) return
-  result.company = matched.company
-  result.position = matched.position
+  result.company = String(matched.company || '')
+  result.position = String(matched.position || '')
 })
 watch(timeMode, mode => { if (mode === 'point') result.endsAt = ''; scheduleError.value = '' })
 watch([()=>result.startsAt,()=>result.endsAt],()=>{scheduleError.value=''})
@@ -99,8 +99,13 @@ async function checkStatus() {
 }
 async function loadInbox(sync = false) {
   syncing.value = sync
+  if (sync) error.value = ''
   try {
-    await store.refreshMailInbox(sync)
+    await store.refreshMailInbox(sync, true)
+    if (sync) {
+      const failed = inbox.value.accounts.filter(account => account.lastError)
+      if (failed.length) error.value = failed.map(account => `${account.email}：${account.lastError}`).join('；')
+    }
   } catch (cause) {
     if (!(cause instanceof ApiError && cause.status === 401)) error.value = failure(cause, '读取邮件收集箱失败')
   } finally { syncing.value = false }
