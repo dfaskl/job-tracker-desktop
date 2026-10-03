@@ -579,9 +579,11 @@
   .schedule-list article { grid-template-columns: max-content minmax(0,1fr) max-content; align-items: start; column-gap: 8px; row-gap: 12px; }
   :global(#app .schedule-list article) { column-gap: 8px; }
   .schedule-list article.has-date-range { grid-template-columns: minmax(0,1fr) max-content; }
-  .date-block { width: max-content; align-self: start; }
+  .date-block { width: 70px; min-width: 70px; align-self: start; padding: 8px 7px; }
+  .date-block strong { font-size: 15px; }
+  .date-block small { font-size: 12px; }
   .date-range { grid-column: 1 / -1; width: max-content; max-width: 100%; }
-  .date-range > .date-block { width: max-content; }
+  .date-range > .date-block { width: 70px; min-width: 70px; }
   .schedule-copy { grid-column: 2; }
   .schedule-copy p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .schedule-actions { grid-column: 3; align-self: start; gap: 6px; flex-wrap: nowrap; }
