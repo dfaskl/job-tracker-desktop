@@ -39,8 +39,12 @@ async function toggleKeyVisibility() {
     hideStoredKey()
     return
   }
+  if (showTypedKey.value) {
+    showTypedKey.value = false
+    return
+  }
   if (form.apiKey || !config.value?.hasApiKey) {
-    showTypedKey.value = !showTypedKey.value
+    showTypedKey.value = true
     return
   }
   revealing.value = true
@@ -84,7 +88,7 @@ async function saveConfig() {
       <label><span>API Key {{ config?.hasApiKey ? '（已配置，末四位 ' + config.lastFour + '）' : '' }}</span>
         <span class="api-key-field">
           <input v-if="showStoredKey" :value="storedKey" type="text" readonly aria-label="已保存的 API Key" autocomplete="off" />
-          <input v-else v-model="form.apiKey" :type="showTypedKey ? 'text' : 'password'" autocomplete="off" :placeholder="config?.hasApiKey ? '留空则保留现有密钥' : '输入 API Key'" />
+          <input v-else v-model="form.apiKey" :type="showTypedKey ? 'text' : 'password'" :class="{ 'saved-key-mask': config?.hasApiKey && !form.apiKey }" autocomplete="off" :placeholder="config?.hasApiKey ? '••••••••••••' : '输入 API Key'" />
           <button type="button" class="key-visibility icon-button compact-icon" :disabled="revealing || loading" :aria-label="showStoredKey || showTypedKey ? '隐藏 API Key' : '显示 API Key'" :title="showStoredKey || showTypedKey ? '隐藏 API Key' : '显示 API Key'" :aria-pressed="showStoredKey || showTypedKey" @click="toggleKeyVisibility"><AppIcon :name="showStoredKey || showTypedKey ? 'eye-off' : 'eye'" /></button>
         </span>
       </label>
@@ -110,6 +114,7 @@ async function saveConfig() {
 .check input { flex: none; width: 18px; }
 .api-key-field { display: flex; min-width: 0; }
 .api-key-field input { min-width: 0; flex: 1; border-radius: 8px 0 0 8px; }
+.api-key-field input.saved-key-mask::placeholder { color: var(--color-foreground); opacity: 1; letter-spacing: .12em; }
 .api-key-field .key-visibility { width: 46px; min-height: 42px; flex: none; padding: 0; border: 1px solid var(--color-border); border-left: 0; border-radius: 0 8px 8px 0; color: var(--color-primary); background: var(--color-muted); }
 .api-key-field .key-visibility:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .api-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 2px; }
