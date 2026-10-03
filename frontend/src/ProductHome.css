@@ -576,14 +576,18 @@
   .timeline-list article { scroll-snap-align: start; }
   .panel-head, .advice-head { align-items: flex-start; }
   .advice-head { flex-direction: column; }
-  .schedule-list article { grid-template-columns: max-content minmax(0,1fr); align-items: start; gap: 12px; }
-  .schedule-list article.has-date-range { grid-template-columns: 1fr; }
+  .schedule-list article { grid-template-columns: max-content minmax(0,1fr) max-content; align-items: start; column-gap: 8px; row-gap: 12px; }
+  :global(#app .schedule-list article) { column-gap: 8px; }
+  .schedule-list article.has-date-range { grid-template-columns: minmax(0,1fr) max-content; }
   .date-block { width: max-content; align-self: start; }
-  .date-range { width: max-content; max-width: 100%; }
+  .date-range { grid-column: 1 / -1; width: max-content; max-width: 100%; }
   .date-range > .date-block { width: max-content; }
   .schedule-copy { grid-column: 2; }
-  .schedule-actions { grid-column: 2; }
-  .has-date-range .schedule-copy, .has-date-range .schedule-actions { grid-column: 1; }
+  .schedule-copy p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .schedule-actions { grid-column: 3; align-self: start; gap: 6px; flex-wrap: nowrap; }
+  .schedule-actions button { width: 40px; min-width: 40px; height: 40px; padding: 0; }
+  .has-date-range .schedule-copy { grid-column: 1; }
+  .has-date-range .schedule-actions { grid-column: 2; }
   .confirmation-list article { align-items: stretch; flex-direction: column; }
   .progress-line { width: 100%; overflow-x: auto; }
 }
