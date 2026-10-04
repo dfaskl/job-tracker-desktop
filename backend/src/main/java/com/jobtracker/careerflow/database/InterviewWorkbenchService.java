@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "importance-prioritized-review-v10-batched";
+    private static final String SUMMARY_VERSION = "importance-prioritized-review-v11-grouped-questions";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -151,8 +151,10 @@ public class InterviewWorkbenchService {
                 String resumeRef = topic.path("resumeRef").asText("");
                 JsonNode relevantResume = resumeForReference(resume, resumeRef);
                 IncrementalInterviewJsonParser parser = new IncrementalInterviewJsonParser(mapper, node -> {
+                    JsonNode metadata = findAnswer(answers, node.path("question").asText());
                     ObjectNode event = mapper.createObjectNode().put("type", "question")
                         .put("question", node.path("question").asText()).put("answer", node.path("answer").asText())
+                        .put("frequency", metadata == null ? 1 : metadata.path("frequency").asInt(1))
                         .put("topic", topic.path("name").asText());
                     onQuestion.accept(event);
                 });
@@ -180,7 +182,7 @@ public class InterviewWorkbenchService {
             StringBuilder chunkText = new StringBuilder(); int questionCount = 0;
             for (String rawLine : lines) {
                 String line = rawLine.trim(); if (line.isEmpty()) continue;
-                if (questionCount >= 8 || chunkText.length() + line.length() > 6_000) {
+                if (questionCount >= 16 || chunkText.length() + line.length() > 7_000) {
                     if (!chunkText.isEmpty()) {
                         ObjectNode piece = reviewPiece(review, chunkText.toString());
                         int itemSize = piece.toString().length();
@@ -272,20 +274,39 @@ public class InterviewWorkbenchService {
             for (JsonNode question : candidate.path("questions")) {
                 String text = limit(question.path("question").asText("").trim(), 500); if (text.isEmpty()) continue;
                 JsonNode existing = findAnswer(questionAnswers, text);
-                String eventId = question.path("eventId").asText("");
+                ArrayNode sources = mapper.createArrayNode();
+                if (question.path("sourceQuestions").isArray()) {
+                    for (JsonNode source : question.path("sourceQuestions")) sources.add(source.deepCopy());
+                } else {
+                    ObjectNode source = mapper.createObjectNode().put("question", text);
+                    String legacyEventId = question.path("eventId").asText("");
+                    if (!legacyEventId.isBlank()) source.put("eventId", legacyEventId);
+                    sources.add(source);
+                }
+                int sourceCount = Math.max(1, sources.size());
                 if (existing instanceof ObjectNode existingQuestion) {
-                    existingQuestion.put("frequency", existing.path("frequency").asInt(1) + 1);
-                    if (!eventId.isBlank() && existingQuestion.path("sourceEventIds") instanceof ArrayNode sources) {
-                        boolean seen = false; for (JsonNode sourceId : sources) if (sourceId.asText().equals(eventId)) { seen = true; break; }
-                        if (!seen) sources.add(eventId);
+                    existingQuestion.put("frequency", existing.path("frequency").asInt(1) + sourceCount);
+                    if (existingQuestion.path("sourceEventIds") instanceof ArrayNode sourceIds) {
+                        for (JsonNode source : sources) {
+                            String eventId = source.path("eventId").asText("");
+                            if (!eventId.isBlank() && !containsText(sourceIds, eventId)) sourceIds.add(eventId);
+                        }
                     }
-                    topic.put("count", topic.path("count").asInt() + 1);
+                    if (existingQuestion.path("sourceQuestions") instanceof ArrayNode originals)
+                        for (JsonNode source : sources) originals.add(source.deepCopy());
+                    topic.put("count", topic.path("count").asInt() + sourceCount);
                     continue;
                 }
                 ObjectNode item = questionAnswers.addObject().put("question", text).put("answer", "")
-                    .put("answerStatus", "pending").put("frequency", 1).put("eventId", eventId);
-                ArrayNode sourceIds = item.putArray("sourceEventIds"); if (!eventId.isBlank()) sourceIds.add(eventId);
-                topic.put("count", topic.path("count").asInt() + 1);
+                    .put("answerStatus", "pending").put("frequency", sourceCount);
+                ArrayNode sourceIds = item.putArray("sourceEventIds");
+                for (JsonNode source : sources) {
+                    String eventId = source.path("eventId").asText("");
+                    if (!eventId.isBlank() && !containsText(sourceIds, eventId)) sourceIds.add(eventId);
+                }
+                item.set("sourceQuestions", sources);
+                if (!sourceIds.isEmpty()) item.put("eventId", sourceIds.get(0).asText());
+                topic.put("count", topic.path("count").asInt() + sourceCount);
             }
             String description = candidate.path("summary").asText("").trim();
             if (!description.isEmpty()) topic.put("summary", limit(description, 500));
@@ -337,6 +358,11 @@ public class InterviewWorkbenchService {
         if (!answers.isArray()) return null;
         for (JsonNode item : answers) if (item.path("question").asText("").equalsIgnoreCase(question)) return item;
         return null;
+    }
+
+    private boolean containsText(ArrayNode items, String value) {
+        for (JsonNode item : items) if (item.asText().equals(value)) return true;
+        return false;
     }
     private void updateAnswer(ArrayNode answers, String question, String answer) {
         for (JsonNode item : answers) if (item instanceof ObjectNode object && item.path("question").asText("").equalsIgnoreCase(question)) { object.put("answer", limit(answer.trim(), 5_000)); object.put("answerStatus", "completed"); return; }

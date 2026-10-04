@@ -117,8 +117,9 @@ class InterviewWorkbenchServiceTest {
                 + "{\"name\":\"自我介绍与动机\",\"kind\":\"other\",\"summary\":\"个人经历表达\",\"questions\":[{\"question\":\"请做一个自我介绍\",\"eventId\":\"event-1\"}]},"
                 + "{\"name\":\"项目甲\",\"resumeRef\":\"project-1\",\"kind\":\"project\",\"summary\":\"项目追问\",\"questions\":["
                 + "{\"question\":\"介绍项目甲的架构\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"如何解析并标准化不同厂商的 MQTT 故障报文？\",\"sourceQuestions\":["
                 + "{\"question\":\"MQTT 接收报文后如何处理\",\"eventId\":\"event-2\"},"
-                + "{\"question\":\"CSV 映射和位域解码如何实现\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"CSV 映射和位域解码如何实现\",\"eventId\":\"event-2\"}]},"
                 + "{\"question\":\"如何验证 16-bit 小端解析\",\"eventId\":\"event-2\"},"
                 + "{\"question\":\"如何隔离不同厂商协议\",\"eventId\":\"event-2\"}]}]}"));
         when(ai.streamInterviewAnswerBatch(eq("reviewer@example.com"), any(), any(), any(), any())).thenAnswer(invocation -> {
@@ -147,7 +148,7 @@ class InterviewWorkbenchServiceTest {
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目甲");
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answer").asText())
             .contains("项目甲");
-        assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(5);
+        assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(4);
         assertThat(summarized.path("overallSummary").path("topics").toString())
             .contains("\"kind\":\"other\"", "\"kind\":\"knowledge\"", "\"kind\":\"project\"");
         JsonNode projectTopics = mapper.createArrayNode();
@@ -157,6 +158,9 @@ class InterviewWorkbenchServiceTest {
         assertThat(projectTopics.size()).isEqualTo(3);
         assertThat(projectTopics.get(0).path("name").asText()).isEqualTo("项目甲");
         assertThat(projectTopics.get(0).path("count").asInt()).isEqualTo(5);
+        JsonNode mergedProjectQuestion = projectTopics.get(0).path("questionAnswers").get(1);
+        assertThat(mergedProjectQuestion.path("frequency").asInt()).isEqualTo(2);
+        assertThat(mergedProjectQuestion.path("sourceQuestions").size()).isEqualTo(2);
         assertThat(projectTopics.get(1).path("name").asText()).isEqualTo("实习公司 · Java 实习生（实习）");
         assertThat(projectTopics.get(2).path("name").asText()).isEqualTo("项目乙");
         assertThat(projectTopics.get(2).path("count").asInt()).isZero();

@@ -15,7 +15,7 @@ export function summarizeInterviewReviews<T>(): Promise<T> {
 export type InterviewSummaryStreamEvent =
   | { type: 'progress'; message: string }
   | { type: 'classified'; summary: { sourceKey: string; stale?: boolean; topics: unknown[] } }
-  | { type: 'question'; question: string; answer: string }
+  | { type: 'question'; question: string; answer: string; frequency?: number }
 
 export async function summarizeInterviewReviewsStream(
   onEvent: (event: InterviewSummaryStreamEvent) => void,
@@ -53,7 +53,7 @@ export async function summarizeInterviewReviewsStream(
       const payload = JSON.parse(data.join('\n')) as Record<string, unknown>
       if (name === 'progress') onEvent({ type: 'progress', message: String(payload.message || '正在生成面试复习内容…') })
       else if (name === 'classified') onEvent({ type: 'classified', summary: payload.summary as { sourceKey: string; stale?: boolean; topics: unknown[] } })
-      else if (name === 'question') onEvent({ type: 'question', question: String(payload.question || ''), answer: String(payload.answer || '') })
+      else if (name === 'question') onEvent({ type: 'question', question: String(payload.question || ''), answer: String(payload.answer || ''), frequency: Number(payload.frequency) || 1 })
       else if (name === 'error') throw new Error(String(payload.message || '面试总结失败'))
       else if (name === 'complete') completed = true
     }
