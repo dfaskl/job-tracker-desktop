@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "topics-with-answers-v3";
+    private static final String SUMMARY_VERSION = "topics-with-study-guides-v4";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -147,7 +147,7 @@ public class InterviewWorkbenchService {
                 if (questionAnswers.size() >= 4) break;
                 String question = limit((sourceQuestion.isObject()
                     ? sourceQuestion.path("question").asText("") : sourceQuestion.asText("")).trim(), 500);
-                String answer = limit(sourceQuestion.path("answer").asText("").trim(), 2_000);
+                String answer = limit(sourceQuestion.path("answer").asText("").trim(), 5_000);
                 if (question.isEmpty()) continue;
                 if (answer.isEmpty()) throw new AiResponseException("AI 未返回完整的问题回答，请重新汇总");
                 questionAnswers.addObject().put("question", question).put("answer", answer);

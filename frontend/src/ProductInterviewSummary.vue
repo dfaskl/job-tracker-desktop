@@ -127,7 +127,7 @@ watch(topicEntries, entries => {
         <div ref="workbenchScroll" class="pane-scroll workbench-content"><p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
           <p v-else-if="summarizing && (!summary || summary.stale)" class="empty-state" role="status">正在归纳全部面试问题…</p>
           <p v-else-if="!summary || summary.stale" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <div v-else-if="selectedTopic" class="topic-detail"><div class="topic-detail-heading"><div><span class="detail-kind">{{ selectedTopic.group }}</span><h3>{{ selectedTopic.topic.name }}</h3></div><span class="detail-frequency">出现 {{ selectedTopic.topic.count }} 次</span></div><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类回答可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="emit('navigate', 'profile')">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>面试问题与参考回答 <span>{{ selectedTopic.topic.questionAnswers.length }} 题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${index}:${item.question}`" class="question-answer"><h5><span>问题 {{ index + 1 }}</span>{{ item.question }}</h5><div class="reference-answer"><strong>参考回答</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
+          <div v-else-if="selectedTopic" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="emit('navigate', 'profile')">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${index}:${item.question}`" class="question-answer"><h5><span>问题 {{ index + 1 }}</span>{{ item.question }}</h5><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
           <p v-else class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
         </div>
       </section>
@@ -172,18 +172,18 @@ watch(topicEntries, entries => {
 .topic-choice span{min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .topic-choice strong{flex:none;color:var(--color-primary);font-size:12px;white-space:nowrap}
 .topic-column-heading{align-items:center}
-.topic-kind-switch{position:relative;display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));flex:none;min-width:156px;border-bottom:1px solid var(--color-border)}
-.topic-kind-switch button{position:relative;z-index:1;min-width:78px;min-height:44px;padding:8px 7px 10px;border:0;border-radius:0;color:var(--color-foreground);background:transparent;font-size:13px;font-weight:600;white-space:nowrap;transition:font-weight .18s ease}
+.topic-kind-switch{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(2,minmax(86px,1fr));flex:none;min-width:188px;padding:4px;overflow:hidden;border:1px solid color-mix(in srgb,var(--color-foreground) 16%,transparent);border-radius:13px;background:color-mix(in srgb,var(--color-foreground) 5%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--color-foreground) 10%,transparent),0 5px 18px color-mix(in srgb,#000 12%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.topic-kind-switch button{position:relative;z-index:1;min-width:86px;min-height:40px;padding:8px 10px;border:0;border-radius:10px;color:var(--color-muted-foreground);background:transparent;font-size:13px;font-weight:600;white-space:nowrap;transition:color .2s ease,font-weight .2s ease}
 .topic-kind-switch button:hover{color:var(--color-foreground)}
 .topic-kind-switch button[aria-pressed="true"]{color:var(--color-foreground);font-weight:800}
-.topic-kind-indicator{position:absolute;z-index:2;bottom:-1px;left:0;width:50%;height:3px;border-radius:999px;background:var(--color-primary);transform:translateX(0);transition:transform .34s cubic-bezier(.22,1,.36,1)}
+.topic-kind-indicator{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border:1px solid color-mix(in srgb,var(--color-primary) 55%,transparent);border-radius:10px;background:color-mix(in srgb,var(--color-primary) 22%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 18%,transparent),0 3px 12px color-mix(in srgb,var(--color-primary) 20%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transform:translateX(0);transition:transform .34s cubic-bezier(.22,1,.36,1)}
 .topic-kind-indicator.is-knowledge{transform:translateX(100%)}
 .topic-kind-switch button:focus-visible{outline:2px solid var(--color-primary);outline-offset:-3px}
 .topic-content-enter-active{transition:opacity .22s ease,transform .22s ease}
 .topic-content-leave-active{transition:opacity .15s ease,transform .15s ease}
 .topic-content-enter-from{opacity:0;transform:translateY(8px)}
 .topic-content-leave-to{opacity:0;transform:translateY(-5px)}
-@media(prefers-reduced-motion:reduce){.topic-kind-indicator,.topic-content-enter-active,.topic-content-leave-active{transition:none}}
+@media(prefers-reduced-motion:reduce){.topic-kind-indicator,.topic-kind-switch button,.topic-content-enter-active,.topic-content-leave-active{transition:none}}
 .detail-kind{color:var(--color-primary);font-size:12px;font-weight:700}
 .topic-detail h3{margin:8px 0 10px;overflow-wrap:anywhere;font-size:clamp(20px,2vw,26px);line-height:1.35}
 .detail-frequency{display:inline-block;padding:5px 9px;border-radius:6px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card));font-size:12px;font-weight:700}
@@ -212,7 +212,7 @@ watch(topicEntries, entries => {
 .summary-pane+.summary-pane{padding-left:22px}
 .workbench-column{padding-right:0!important}
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
-.workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:46px}
+.workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
 .workbench-heading h2{margin-top:4px}
 .topic-tags{display:flex;align-items:center;gap:8px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:12px 1px 2px;scrollbar-width:thin}
 .topic-tag{display:inline-flex;align-items:center;gap:9px;flex:none;max-width:240px;min-height:38px;padding:6px 11px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
@@ -223,8 +223,6 @@ watch(topicEntries, entries => {
 .topic-tag-empty,.topic-tags-placeholder{color:var(--color-muted-foreground);font-size:13px}
 .workbench-content{padding-right:12px}
 .topic-detail{max-width:1000px;padding:2px 2px 28px}
-.topic-detail-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:8px 0 18px}
-.topic-detail-heading h3{margin-top:7px;overflow-wrap:anywhere;font-size:clamp(21px,2vw,28px)}
 .detail-frequency{flex:none}
 .detail-section{margin-top:16px;padding-top:18px}
 .detail-section h4{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -250,7 +248,6 @@ watch(topicEntries, entries => {
   .workbench-heading{align-items:flex-start;flex-direction:column;gap:6px}
   .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
   .topic-kind-switch button{min-width:0}
-  .topic-detail-heading{align-items:flex-start;flex-direction:column}
   .question-answer{padding:13px}
 }
 @media(prefers-reduced-motion:reduce){.topic-tag{transition:none}}
