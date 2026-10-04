@@ -316,7 +316,7 @@ watch(topicEntries, entries => {
 @keyframes interview-stream-spin{to{transform:rotate(360deg)}}
 @keyframes interview-pane-enter-left{from{transform:translateX(-52px) scale(.975)}to{transform:translateX(0) scale(1)}}
 @keyframes interview-pane-enter-right{from{transform:translateX(52px) scale(.975)}to{transform:translateX(0) scale(1)}}
-.summary-columns.is-entered .review-card{animation:interview-review-card-enter .56s cubic-bezier(.2,.72,.25,1) both;animation-delay:calc(var(--review-index,0)*168ms)}
+.summary-columns.is-entered .review-card{animation:interview-review-card-enter .56s cubic-bezier(.2,.72,.25,1) both;animation-delay:calc(var(--review-index,0)*280ms)}
 .summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
 @keyframes interview-review-card-enter{0%{transform:translateY(20px) scale(.97);opacity:.04;filter:brightness(.42)}65%{opacity:.72;filter:brightness(.82)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
 .topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition:transform .48s cubic-bezier(.2,.75,.25,1),opacity .48s ease;transform-origin:center center}
@@ -362,7 +362,7 @@ watch(topicEntries, entries => {
   .workbench-flip-enter-from{transform:rotateY(-18deg);opacity:0}
   .workbench-flip-leave-to{transform:rotateY(18deg);opacity:0}
   .stream-spinner{animation-duration:1.2s}
-  .summary-columns.is-entered .review-card{animation-duration:.26s;animation-delay:calc(var(--review-index,0)*78ms)}
+  .summary-columns.is-entered .review-card{animation-duration:.26s;animation-delay:calc(var(--review-index,0)*130ms)}
   .summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active{animation-duration:.2s}
   @keyframes interview-review-card-enter{0%{transform:translateY(10px) scale(.99);opacity:.15;filter:brightness(.65)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
   @keyframes interview-pane-enter-right{from{transform:translateX(16px)}to{transform:translateX(0)}}
