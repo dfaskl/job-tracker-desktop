@@ -25,8 +25,11 @@ const activeTopicKind = ref<'project' | 'knowledge' | 'other'>('project')
 const activePane = ref<'reviews' | 'workbench'>('reviews')
 const workbenchScroll = ref<HTMLElement | null>(null)
 const pageEntered = ref(false)
+const topicKindSettling = ref(false)
 let autoAttemptedKey = ''
 let pageEnterFrame = 0
+let topicKindFrame = 0
+let topicKindTimer = 0
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
 const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
@@ -128,6 +131,26 @@ function stopPageEntrance() {
   pageEnterFrame = 0
   pageEntered.value = false
 }
+function stopTopicKindMotion() {
+  if (topicKindFrame) cancelAnimationFrame(topicKindFrame)
+  if (topicKindTimer) window.clearTimeout(topicKindTimer)
+  topicKindFrame = 0
+  topicKindTimer = 0
+  topicKindSettling.value = false
+}
+function animateTopicKindChange() {
+  stopTopicKindMotion()
+  void nextTick(() => {
+    topicKindFrame = requestAnimationFrame(() => {
+      topicKindFrame = 0
+      topicKindSettling.value = true
+      topicKindTimer = window.setTimeout(() => {
+        topicKindSettling.value = false
+        topicKindTimer = 0
+      }, 850)
+    })
+  })
+}
 async function openReview(id: string) {
   selectedReviewId.value = id
   await nextTick()
@@ -146,11 +169,12 @@ function switchTopicKind(kind: 'project' | 'knowledge' | 'other') {
   if (activeTopicKind.value === kind) return
   activeTopicKind.value = kind
   selectedTopicKey.value = ''
+  animateTopicKindChange()
   workbenchScroll.value?.scrollTo({ top: 0 })
 }
 onActivated(() => { startPageEntrance(); activate() })
-onDeactivated(() => { stopPageEntrance(); closeReview() })
-onBeforeUnmount(stopPageEntrance)
+onDeactivated(() => { stopPageEntrance(); stopTopicKindMotion(); closeReview() })
+onBeforeUnmount(() => { stopPageEntrance(); stopTopicKindMotion() })
 watch(reviewSignature, (next, previous) => { if (previous && next !== previous) void loadState() })
 watch(topicEntries, entries => {
   if (!entries.some(item => item.key === selectedTopicKey.value)) selectedTopicKey.value = entries[0]?.key || ''
@@ -169,7 +193,7 @@ watch(topicEntries, entries => {
       <section class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
-          <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
+          <ol v-else class="review-list"><li v-for="(item, index) in reviews" :key="item.event.id"><button type="button" class="review-card" :style="{ '--review-index': Math.min(index, 8) }" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
@@ -177,7 +201,7 @@ watch(topicEntries, entries => {
           <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
-        <div ref="workbenchScroll" class="pane-scroll workbench-content">
+        <div ref="workbenchScroll" class="pane-scroll workbench-content" :class="{ 'topic-workspace-settling': topicKindSettling }">
           <section v-if="summarizing" class="stream-preview" aria-label="实时生成的复习内容">
             <div class="stream-status" role="status" aria-live="polite" aria-atomic="true"><span class="stream-spinner" aria-hidden="true"></span><span>{{ streamingStatus }}</span><span v-if="streamingQuestions.length" class="stream-count">已生成 {{ streamingQuestions.length }} 题</span></div>
             <div v-if="streamingBatch" class="batch-progress" role="progressbar" :aria-label="`当前第 ${streamingBatch.current} 批，共 ${streamingBatch.total} 批`" :aria-valuemin="1" :aria-valuemax="streamingBatch.total" :aria-valuenow="streamingBatch.current"><span class="batch-progress-label">第 {{ streamingBatch.current }} 批 / 共 {{ streamingBatch.total }} 批</span><span class="batch-progress-track" aria-hidden="true"><span :style="{ width: `${streamingBatch.percent}%` }"></span></span></div>
@@ -186,7 +210,7 @@ watch(topicEntries, entries => {
           </section>
           <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
           <p v-else-if="(!summary || summary.stale) && !summarizing" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <Transition v-else-if="selectedTopic" name="topic-detail" mode="out-in"><div :key="selectedTopic.key" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${index}:${item.question}`" class="question-answer"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div></Transition>
+          <div v-else-if="selectedTopic" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><TransitionGroup appear tag="ol" name="answer-slide" class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer" :style="{ '--answer-index': Math.min(index, 8) }"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></TransitionGroup></section></div>
           <p v-else-if="!summarizing" class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
         </div>
       </section>
@@ -313,8 +337,14 @@ watch(topicEntries, entries => {
 @keyframes interview-stream-spin{to{transform:rotate(360deg)}}
 @keyframes interview-pane-enter-left{from{transform:translateX(-52px) scale(.975)}to{transform:translateX(0) scale(1)}}
 @keyframes interview-pane-enter-right{from{transform:translateX(52px) scale(.975)}to{transform:translateX(0) scale(1)}}
-.summary-columns.is-entered .review-column{animation:interview-pane-enter-left .36s cubic-bezier(.2,.75,.25,1) both}
+.summary-columns.is-entered .review-card{animation:interview-review-card-enter .48s cubic-bezier(.2,.75,.25,1) both;animation-delay:calc(var(--review-index,0)*76ms)}
 .summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
+@keyframes interview-review-card-enter{0%{transform:translateX(-76px) scale(.96)}72%{transform:translateX(6px) scale(1.01)}100%{transform:translateX(0) scale(1)}}
+@keyframes topic-workspace-settle{0%{transform:translateX(0)}12%{transform:translateX(-12px)}25%{transform:translateX(10px)}39%{transform:translateX(-7px)}54%{transform:translateX(5px)}68%{transform:translateX(-3px)}83%{transform:translateX(1.5px)}100%{transform:translateX(0)}}
+.workbench-content.topic-workspace-settling{animation:topic-workspace-settle .82s cubic-bezier(.2,.65,.3,1) both}
+.answer-slide-enter-active,.answer-slide-appear-active{transition:transform .48s cubic-bezier(.2,.75,.25,1);transition-delay:calc(var(--answer-index,0)*58ms)}
+.answer-slide-enter-from,.answer-slide-appear-from{transform:translateX(72px)}
+.answer-slide-enter-to,.answer-slide-appear-to{transform:translateX(0)}
 .topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move{transition:opacity .18s ease,transform .18s ease,border-color .18s ease,background-color .18s ease}
 .topic-chip-enter-from,.topic-chip-leave-to{opacity:0;transform:translateY(5px) scale(.98)}
 .topic-chip-leave-active{position:absolute}
@@ -327,7 +357,6 @@ watch(topicEntries, entries => {
   .summary-columns{display:block;overflow:hidden}
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
   .summary-pane.mobile-pane-active{display:flex}
-  .review-column.mobile-pane-active{animation:interview-pane-enter-left .32s cubic-bezier(.2,.75,.25,1) both}
   .workbench-column.mobile-pane-active{animation:interview-pane-enter-right .32s cubic-bezier(.2,.75,.25,1) both}
   .mobile-pane-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .workbench-header{padding-bottom:10px}
@@ -340,8 +369,8 @@ watch(topicEntries, entries => {
   .question-answer{padding:13px}
 }
 @media(prefers-reduced-motion:reduce){
-  .topic-tag,.batch-progress-track>span,.topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move,.topic-detail-enter-active,.topic-detail-leave-active,.stream-question-enter-active,.stream-question-leave-active,.stream-question-move{transition:none}
+  .topic-tag,.batch-progress-track>span,.topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move,.topic-detail-enter-active,.topic-detail-leave-active,.stream-question-enter-active,.stream-question-leave-active,.stream-question-move,.answer-slide-enter-active,.answer-slide-appear-active{transition:none}
   .stream-spinner{animation:none}
-  .summary-columns.is-entered .review-column,.summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active{animation:none}
+  .summary-columns.is-entered .review-card,.summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active,.workbench-content.topic-workspace-settling{animation:none}
 }
 </style>
