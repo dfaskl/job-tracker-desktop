@@ -210,7 +210,7 @@ watch(topicEntries, entries => {
           </section>
           <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
           <p v-else-if="(!summary || summary.stale) && !summarizing" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <div v-else-if="selectedTopic" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><TransitionGroup appear tag="ol" name="answer-slide" class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer" :style="{ '--answer-index': Math.min(index, 8) }"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></TransitionGroup></section></div>
+          <Transition v-else-if="selectedTopic" name="topic-detail-zoom" mode="out-in"><div :key="selectedTopic.key" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div></Transition>
           <p v-else-if="!summarizing" class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
         </div>
       </section>
@@ -340,11 +340,12 @@ watch(topicEntries, entries => {
 .summary-columns.is-entered .review-card{animation:interview-review-card-enter .48s cubic-bezier(.2,.75,.25,1) both;animation-delay:calc(var(--review-index,0)*76ms)}
 .summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
 @keyframes interview-review-card-enter{0%{transform:translateX(-76px) scale(.96)}72%{transform:translateX(6px) scale(1.01)}100%{transform:translateX(0) scale(1)}}
-@keyframes topic-workspace-settle{0%{transform:translateX(0)}12%{transform:translateX(-12px)}25%{transform:translateX(10px)}39%{transform:translateX(-7px)}54%{transform:translateX(5px)}68%{transform:translateX(-3px)}83%{transform:translateX(1.5px)}100%{transform:translateX(0)}}
-.workbench-content.topic-workspace-settling{animation:topic-workspace-settle .82s cubic-bezier(.2,.65,.3,1) both}
-.answer-slide-enter-active,.answer-slide-appear-active{transition:transform .48s cubic-bezier(.2,.75,.25,1);transition-delay:calc(var(--answer-index,0)*58ms)}
-.answer-slide-enter-from,.answer-slide-appear-from{transform:translateX(72px)}
-.answer-slide-enter-to,.answer-slide-appear-to{transform:translateX(0)}
+@keyframes topic-workspace-zoom{0%{transform:scale(.84);opacity:.2}72%{transform:scale(1.025);opacity:1}100%{transform:scale(1);opacity:1}}
+.workbench-content.topic-workspace-settling{transform-origin:center center;animation:topic-workspace-zoom .52s cubic-bezier(.2,.75,.25,1) both}
+.topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition:transform .48s cubic-bezier(.2,.75,.25,1),opacity .48s ease;transform-origin:center center}
+.topic-detail-zoom-enter-from{transform:scale(.82);opacity:.15}
+.topic-detail-zoom-enter-to,.topic-detail-zoom-leave-from{transform:scale(1);opacity:1}
+.topic-detail-zoom-leave-to{transform:scale(.94);opacity:0}
 .topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move{transition:opacity .18s ease,transform .18s ease,border-color .18s ease,background-color .18s ease}
 .topic-chip-enter-from,.topic-chip-leave-to{opacity:0;transform:translateY(5px) scale(.98)}
 .topic-chip-leave-active{position:absolute}
@@ -370,14 +371,15 @@ watch(topicEntries, entries => {
 }
 @media(prefers-reduced-motion:reduce){
   .topic-tag,.batch-progress-track>span,.topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move,.topic-detail-enter-active,.topic-detail-leave-active,.stream-question-enter-active,.stream-question-leave-active,.stream-question-move{transition:none}
-  .answer-slide-enter-active,.answer-slide-appear-active{transition-duration:.22s;transition-delay:calc(var(--answer-index,0)*28ms)}
-  .answer-slide-enter-from,.answer-slide-appear-from{transform:translateX(18px)}
+  .topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition-duration:.24s}
+  .topic-detail-zoom-enter-from{transform:scale(.94);opacity:.5}
+  .topic-detail-zoom-leave-to{transform:scale(.98);opacity:0}
   .stream-spinner{animation-duration:1.2s}
   .summary-columns.is-entered .review-card{animation-duration:.22s;animation-delay:calc(var(--review-index,0)*38ms)}
   .summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active{animation-duration:.2s}
   .workbench-content.topic-workspace-settling{animation-duration:.4s}
   @keyframes interview-review-card-enter{0%{transform:translateX(-20px) scale(.99)}78%{transform:translateX(2px)}100%{transform:translateX(0)}}
-  @keyframes topic-workspace-settle{0%{transform:translateX(0)}18%{transform:translateX(-5px)}36%{transform:translateX(4px)}56%{transform:translateX(-2px)}76%{transform:translateX(1px)}100%{transform:translateX(0)}}
+  @keyframes topic-workspace-zoom{0%{transform:scale(.94);opacity:.5}100%{transform:scale(1);opacity:1}}
   @keyframes interview-pane-enter-right{from{transform:translateX(16px)}to{transform:translateX(0)}}
 }
 </style>
