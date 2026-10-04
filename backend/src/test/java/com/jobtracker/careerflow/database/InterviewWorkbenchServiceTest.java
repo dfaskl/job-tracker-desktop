@@ -54,6 +54,7 @@ class InterviewWorkbenchServiceTest {
         AiService ai = mock(AiService.class);
         when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
             "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questionAnswers\":[{\"question\":\"解释线程池参数\",\"answer\":\"线程池通过核心线程数、最大线程数和任务队列控制并发与资源。\"}]},"
+                + "{\"name\":\"自我介绍与动机\",\"count\":1,\"kind\":\"other\",\"summary\":\"个人经历表达\",\"questionAnswers\":[{\"question\":\"请做一个自我介绍\",\"answer\":\"按背景、经历和求职动机组织内容。\"}]},"
                 + "{\"name\":\"项目架构\",\"resumeRef\":\"project-1\",\"count\":5,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":["
                 + "{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"},"
                 + "{\"question\":\"MQTT 接收报文后如何处理\",\"answer\":\"先校验报文，再按协议解码并转换为平台模型。\"},"
@@ -79,6 +80,8 @@ class InterviewWorkbenchServiceTest {
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answer").asText())
             .contains("项目甲");
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(5);
+        assertThat(summarized.path("overallSummary").path("topics").toString())
+            .contains("\"kind\":\"other\"", "\"kind\":\"knowledge\"", "\"kind\":\"project\"");
         JsonNode projectTopics = mapper.createArrayNode();
         for (JsonNode topic : summarized.path("overallSummary").path("topics")) {
             if (topic.path("kind").asText().equals("project")) ((tools.jackson.databind.node.ArrayNode) projectTopics).add(topic);

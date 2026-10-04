@@ -226,9 +226,9 @@ class AiServiceTest {
         AiService service = service(new MockEnvironment(), sandbox);
         var request = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(), new ObjectMapper().createObjectNode());
         String instruction = request.path("messages").get(0).path("content").asText();
-        assertThat(instruction).contains("宽泛主题", "八股主题最多 8 个", "每个原始问题只计入一个", "覆盖的原始问题数",
-            "全部不同原始问题", "不得只选代表题", "供用户复习、理解和自学", "分步骤解释核心原理", "结合简历", "questionAnswers",
-            "每一段实习和每一个项目各自成为一个独立类别", "resumeRef", "正好有 3 个类别");
+        assertThat(instruction).contains("宽泛主题", "knowledge", "project", "other", "全部不同原始问题", "不得只选代表题",
+            "面向复习和学习", "不少于 250 个汉字", "不少于 300 个汉字", "禁止写成面试口述稿", "简历已知事实",
+            "每一段实习和每个项目各自成为独立类别", "resumeRef", "kind 只能为 project、knowledge 或 other");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(16_000);
         var resumeRequest = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(),
             new ObjectMapper().readTree("{\"internships\":[{\"company\":\"甲公司\",\"role\":\"实习生\"}],\"projects\":[{\"name\":\"项目甲\"}]}"));

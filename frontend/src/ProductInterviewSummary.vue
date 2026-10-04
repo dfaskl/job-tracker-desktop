@@ -4,7 +4,7 @@ import { api } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
-type Topic = { name: string; count: number; kind: 'project' | 'knowledge'; summary: string; questionAnswers: { question: string; answer: string }[] }
+type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
 type Workbench = { sourceKey: string; overallSummary?: Summary }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
@@ -19,7 +19,7 @@ const message = ref('')
 const selectedReviewId = ref('')
 const reviewDialog = ref<HTMLDialogElement | null>(null)
 const selectedTopicKey = ref('')
-const activeTopicKind = ref<'project' | 'knowledge'>('project')
+const activeTopicKind = ref<'project' | 'knowledge' | 'other'>('project')
 const activePane = ref<'reviews' | 'workbench'>('reviews')
 const workbenchScroll = ref<HTMLElement | null>(null)
 let autoAttemptedKey = ''
@@ -35,9 +35,11 @@ const reviewSignature = computed(() => reviews.value.map(item => `${item.event.i
 const summary = computed(() => state.value?.overallSummary)
 const projectTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'project').sort((a, b) => b.count - a.count))
 const knowledgeTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'knowledge').sort((a, b) => b.count - a.count))
+const otherTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'other').sort((a, b) => b.count - a.count))
 const topicGroups = computed(() => [
   { kind: 'project', label: '项目考点', topics: projectTopics.value },
-  { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value }
+  { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value },
+  { kind: 'other', label: '其他问题', topics: otherTopics.value }
 ])
 const activeTopicGroup = computed(() => topicGroups.value.find(group => group.kind === activeTopicKind.value)!)
 const activeTopics = computed(() => activeTopicGroup.value.topics)
@@ -90,7 +92,7 @@ async function selectTopic(key: string) {
   await nextTick()
   workbenchScroll.value?.scrollTo({ top: 0 })
 }
-function switchTopicKind(kind: 'project' | 'knowledge') {
+function switchTopicKind(kind: 'project' | 'knowledge' | 'other') {
   if (activeTopicKind.value === kind) return
   activeTopicKind.value = kind
   selectedTopicKey.value = ''
@@ -120,7 +122,7 @@ watch(topicEntries, entries => {
       </section>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
-          <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目考点</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股考点</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge' }" aria-hidden="true"></span></div></div>
+          <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目考点</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股考点</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
           <div v-if="summary && !summary.stale" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></div>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
@@ -172,12 +174,13 @@ watch(topicEntries, entries => {
 .topic-choice span{min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .topic-choice strong{flex:none;color:var(--color-primary);font-size:12px;white-space:nowrap}
 .topic-column-heading{align-items:center}
-.topic-kind-switch{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(2,minmax(86px,1fr));flex:none;min-width:188px;padding:4px;overflow:hidden;border:1px solid color-mix(in srgb,var(--color-foreground) 16%,transparent);border-radius:13px;background:color-mix(in srgb,var(--color-foreground) 5%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--color-foreground) 10%,transparent),0 5px 18px color-mix(in srgb,#000 12%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.topic-kind-switch button{position:relative;z-index:1;min-width:86px;min-height:40px;padding:8px 10px;border:0;border-radius:10px;color:var(--color-muted-foreground);background:transparent;font-size:13px;font-weight:600;white-space:nowrap;transition:color .42s ease,font-weight .42s ease}
+.topic-kind-switch{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(3,minmax(76px,1fr));flex:none;min-width:246px;padding:4px;overflow:hidden;border:1px solid color-mix(in srgb,var(--color-foreground) 16%,transparent);border-radius:13px;background:color-mix(in srgb,var(--color-foreground) 5%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--color-foreground) 10%,transparent),0 5px 18px color-mix(in srgb,#000 12%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.topic-kind-switch button{position:relative;z-index:1;min-width:76px;min-height:40px;padding:8px 8px;border:0;border-radius:10px;color:var(--color-muted-foreground);background:transparent;font-size:13px;font-weight:600;white-space:nowrap;transition:color .42s ease,font-weight .42s ease}
 .topic-kind-switch button:hover{color:var(--color-foreground)}
 .topic-kind-switch button[aria-pressed="true"]{color:var(--color-foreground);font-weight:800}
-.topic-kind-indicator{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border:1px solid color-mix(in srgb,var(--color-primary) 55%,transparent);border-radius:10px;background:color-mix(in srgb,var(--color-primary) 22%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 18%,transparent),0 3px 12px color-mix(in srgb,var(--color-primary) 20%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transform:translateX(0);transition:transform .62s cubic-bezier(.2,.85,.25,1),background-color .38s ease,box-shadow .38s ease}
+.topic-kind-indicator{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:calc(33.333% - 2.67px);border:1px solid color-mix(in srgb,var(--color-primary) 55%,transparent);border-radius:10px;background:color-mix(in srgb,var(--color-primary) 22%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 18%,transparent),0 3px 12px color-mix(in srgb,var(--color-primary) 20%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transform:translateX(0);transition:transform .62s cubic-bezier(.2,.85,.25,1),background-color .38s ease,box-shadow .38s ease}
 .topic-kind-indicator.is-knowledge{transform:translateX(100%)}
+.topic-kind-indicator.is-other{transform:translateX(200%)}
 .topic-kind-switch button:focus-visible{outline:2px solid var(--color-primary);outline-offset:-3px}
 .topic-content-enter-active{transition:opacity .22s ease,transform .22s ease}
 .topic-content-leave-active{transition:opacity .15s ease,transform .15s ease}

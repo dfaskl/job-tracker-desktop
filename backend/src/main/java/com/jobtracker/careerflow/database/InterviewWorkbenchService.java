@@ -23,7 +23,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "resume-experience-topics-v6";
+    private static final String SUMMARY_VERSION = "detailed-answers-with-other-v7";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -140,7 +140,7 @@ public class InterviewWorkbenchService {
             String name = topic.path("name").asText("").trim();
             if (name.isEmpty()) continue;
             String kind = topic.path("kind").asText("knowledge");
-            if (!Set.of("project", "knowledge").contains(kind)) kind = "knowledge";
+            if (!Set.of("project", "knowledge", "other").contains(kind)) kind = "other";
             ObjectNode item;
             if (kind.equals("project")) {
                 item = projectTopics.get(topic.path("resumeRef").asText(""));
