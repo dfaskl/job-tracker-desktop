@@ -155,7 +155,8 @@ class InterviewWorkbenchServiceTest {
         });
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
-            "{\"internships\":[{\"company\":\"实习公司\",\"role\":\"Java 实习生\",\"description\":\"实习简介\",\"coreWork\":\"实习工作\"}],"
+            "{\"education\":[{\"school\":\"示例大学\",\"major\":\"计算机科学\",\"period\":\"2022.09 - 2026.06\"}],"
+                + "\"internships\":[{\"company\":\"实习公司\",\"role\":\"Java 实习生\",\"description\":\"实习简介\",\"coreWork\":\"实习工作\"}],"
                 + "\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"},"
                 + "{\"name\":\"项目乙\",\"description\":\"简介乙\",\"coreWork\":\"核心工作乙\"}]}"));
 
@@ -165,6 +166,7 @@ class InterviewWorkbenchServiceTest {
         verify(ai).classifyInterviewReviewBatch(eq("reviewer@example.com"), reviews.capture(), resume.capture(), any());
         assertThat(reviews.getValue().toString()).contains("解释线程池参数", "介绍项目甲的架构", "甲公司", "乙公司");
         assertThat(resume.getValue().toString()).contains("项目甲");
+        assertThat(resume.getValue().path("education").get(0).path("school").asText()).isEqualTo("示例大学");
         assertThat(resume.getValue().path("projects").get(0).path("name").asText()).isEqualTo("项目甲");
         assertThat(summarized.has("classification")).isFalse();
         assertThat(summarized.has("summaries")).isFalse();

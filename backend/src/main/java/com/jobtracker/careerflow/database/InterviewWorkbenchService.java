@@ -541,8 +541,10 @@ public class InterviewWorkbenchService {
     private ObjectNode cleanResume(JsonNode source) {
         if (source == null || !source.isObject()) throw new AiValidationException("简历内容格式无效");
         ObjectNode clean = mapper.createObjectNode();
+        ArrayNode education = clean.putArray("education");
         ArrayNode internships = clean.putArray("internships");
         ArrayNode projects = clean.putArray("projects");
+        if (source.has("education")) copyResumeItems(source.path("education"), education, new String[]{"school", "major", "period"});
         copyResumeItems(source.path("internships"), internships, new String[]{"company", "role", "description", "coreWork"});
         copyResumeItems(source.path("projects"), projects, new String[]{"name", "description", "coreWork"});
         if (clean.toString().length() > 20_000) throw new AiValidationException("简历内容不能超过 20000 个字符");

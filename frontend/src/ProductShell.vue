@@ -43,6 +43,7 @@ const sidebarDisplayName = computed(() => store.user.value?.displayName || store
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
 function syncViewport() { mobileViewport.value = window.matchMedia('(max-width: 820px)').matches }
 let workspaceRefreshTimer: number | undefined
+let resumeFocusTimer: number | undefined
 let lastBusinessRefresh = 0
 
 function routeFromHash() {
@@ -78,6 +79,23 @@ function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focu
   activePage.value = page
   focusApplicationId.value = page === 'applications' && behavior === 'focus' ? applicationId || '' : ''
   window.scrollTo({ top: 0, behavior: 'auto' })
+}
+
+async function focusResumeSettings() {
+  if (activePage.value !== 'profile') navigate('profile')
+  await nextTick()
+  await nextTick()
+  const resumeSection = document.getElementById('resume-settings')
+  if (!resumeSection) return
+  resumeSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  resumeSection.classList.remove('resume-highlight')
+  void resumeSection.offsetWidth
+  resumeSection.classList.add('resume-highlight')
+  if (resumeFocusTimer !== undefined) window.clearTimeout(resumeFocusTimer)
+  resumeFocusTimer = window.setTimeout(() => {
+    resumeSection.classList.remove('resume-highlight')
+    resumeFocusTimer = undefined
+  }, 1500)
 }
 
 function handleGlobalKeydown(event: KeyboardEvent) {
@@ -125,6 +143,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('resize', syncViewport)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
+  if (resumeFocusTimer !== undefined) window.clearTimeout(resumeFocusTimer)
 })
 </script>
 
@@ -159,7 +178,7 @@ onBeforeUnmount(() => {
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
-          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" @focus-resume="focusResumeSettings" />
         </KeepAlive>
       </div>
     </main>
