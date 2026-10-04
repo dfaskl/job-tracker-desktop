@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Consumer;
 
 @Component
 public class InterviewWorkbenchService {
@@ -94,6 +95,43 @@ public class InterviewWorkbenchService {
                     currentWorkbench.path("resume")))) {
                     throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
                 }
+                currentWorkbench.remove("classification");
+                currentWorkbench.remove("summaries");
+                currentWorkbench.set("overallSummary", summary);
+                write(connection, current);
+                connection.commit();
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+        return state(email);
+    }
+
+    public ObjectNode summarizeStreaming(String email, Consumer<ObjectNode> onQuestion) throws Exception {
+        Document snapshot;
+        try (Connection connection = open()) { snapshot = read(connection, email, false); }
+        ObjectNode workbench = workbench(snapshot.root());
+        ArrayNode selected = summaryInput(reviews(snapshot.root()));
+        int size = 0;
+        for (JsonNode item : selected) size += item.toString().length();
+        if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
+        if (size > 100_000) throw new AiValidationException("面试回顾内容超过本次汇总上限，请精简过长的记录后重试");
+        JsonNode resume = workbench.path("resume");
+        String summaryKey = summaryFingerprint(selected, resume);
+        IncrementalInterviewJsonParser parser = new IncrementalInterviewJsonParser(mapper, node -> {
+            ObjectNode question = mapper.createObjectNode();
+            question.put("question", node.path("question").asText());
+            question.put("answer", node.path("answer").asText());
+            onQuestion.accept(question);
+        });
+        JsonNode result = ai.streamSummarizeInterviewReviews(email, selected, resume, parser::accept);
+        ObjectNode summary = cleanSummary(result, resume);
+        summary.put("sourceKey", summaryKey);
+        try (Connection connection = open()) {
+            connection.setAutoCommit(false);
+            try {
+                Document current = read(connection, email, true);
+                ObjectNode currentWorkbench = workbench(current.root());
+                if (!summaryKey.equals(summaryFingerprint(summaryInput(reviews(current.root())), currentWorkbench.path("resume"))))
+                    throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
                 currentWorkbench.remove("classification");
                 currentWorkbench.remove("summaries");
                 currentWorkbench.set("overallSummary", summary);

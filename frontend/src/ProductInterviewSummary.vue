@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { api } from './api'
-import { summarizeInterviewReviews } from './interviewSummary'
+import { summarizeInterviewReviewsStream } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string }[] }
@@ -14,6 +14,8 @@ const store = useJobTrackerStore()
 const state = ref<Workbench | null>(null)
 const loading = ref(false)
 const summarizing = ref(false)
+const streamingQuestions = ref<{ question: string; answer: string }[]>([])
+const streamingStatus = ref('')
 const error = ref('')
 const message = ref('')
 const selectedReviewId = ref('')
@@ -69,12 +71,18 @@ async function loadState(autoSummarize = true) {
 async function summarize(automatic = false) {
   if (!reviews.value.length || summarizing.value) return
   summarizing.value = true; error.value = ''; message.value = ''
+  streamingQuestions.value = []
+  streamingStatus.value = '正在准备面试回顾…'
   try {
-    state.value = await summarizeInterviewReviews<Workbench>()
+    await summarizeInterviewReviewsStream(event => {
+      if (event.type === 'progress') streamingStatus.value = event.message
+      else streamingQuestions.value.push({ question: event.question, answer: event.answer })
+    })
+    state.value = await api<Workbench>('/api/poc/interview-workbench')
     autoAttemptedKey = state.value.sourceKey
     message.value = automatic ? '面试回顾已自动汇总' : '考点汇总已更新'
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '考点汇总失败' }
-  finally { summarizing.value = false }
+  finally { summarizing.value = false; streamingStatus.value = '' }
 }
 
 function activate() { void store.refresh(false, false, false).then(() => loadState()) }
@@ -126,11 +134,16 @@ watch(topicEntries, entries => {
           <div v-if="summary && !summary.stale" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></div>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
-        <div ref="workbenchScroll" class="pane-scroll workbench-content"><p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
-          <p v-else-if="summarizing && (!summary || summary.stale)" class="empty-state" role="status">正在归纳全部面试问题…</p>
-          <p v-else-if="!summary || summary.stale" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
+        <div ref="workbenchScroll" class="pane-scroll workbench-content">
+          <section v-if="summarizing" class="stream-preview" aria-label="实时生成的复习内容">
+            <div class="stream-status" role="status" aria-live="polite" aria-atomic="true"><span class="stream-spinner" aria-hidden="true"></span><span>{{ streamingStatus }}</span><span v-if="streamingQuestions.length" class="stream-count">已生成 {{ streamingQuestions.length }} 题</span></div>
+            <ol v-if="streamingQuestions.length" class="stream-question-list"><li v-for="(item, index) in streamingQuestions" :key="`${index}:${item.question}`" class="question-answer"><h5><span>问题 {{ index + 1 }}</span>{{ item.question }}</h5><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol>
+            <p v-else class="stream-waiting">AI 正在整理问题并撰写详细讲解，完成一题后会立即显示在这里。</p>
+          </section>
+          <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
+          <p v-else-if="(!summary || summary.stale) && !summarizing" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
           <div v-else-if="selectedTopic" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="emit('navigate', 'profile')">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${index}:${item.question}`" class="question-answer"><h5><span>问题 {{ index + 1 }}</span>{{ item.question }}</h5><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
-          <p v-else class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
+          <p v-else-if="!summarizing" class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
         </div>
       </section>
     </div>
@@ -239,6 +252,13 @@ watch(topicEntries, entries => {
 .reference-answer p{margin:7px 0 0;color:var(--color-foreground);line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
 .project-resume-hint{padding:12px 14px;border-radius:8px;color:var(--color-muted-foreground);background:color-mix(in srgb,var(--color-primary) 6%,var(--color-card));font-size:13px;line-height:1.6}
 .project-resume-hint button{display:inline;padding:0;border:0;color:var(--color-primary);background:transparent;font-weight:700}
+.stream-preview{padding:4px 0 18px}
+.stream-status{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:10px;min-height:42px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--color-primary) 28%,var(--color-border));border-radius:9px;color:var(--color-primary);background:color-mix(in srgb,var(--color-card) 94%,transparent);backdrop-filter:blur(10px);font-size:13px;font-weight:600}
+.stream-spinner{width:15px;height:15px;flex:none;border:2px solid color-mix(in srgb,var(--color-primary) 25%,transparent);border-top-color:var(--color-primary);border-radius:50%;animation:interview-stream-spin .8s linear infinite}
+.stream-count{margin-left:auto;color:var(--color-muted-foreground);font-size:12px;font-weight:500;white-space:nowrap}
+.stream-waiting{padding:14px 4px;color:var(--color-muted-foreground);font-size:13px;line-height:1.7}
+.stream-question-list{display:grid;gap:14px;margin:14px 0 0;padding:0;list-style:none}
+@keyframes interview-stream-spin{to{transform:rotate(360deg)}}
 @media(max-width:900px){
   .summary-columns{display:block;overflow:hidden}
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
@@ -254,4 +274,5 @@ watch(topicEntries, entries => {
   .question-answer{padding:13px}
 }
 @media(prefers-reduced-motion:reduce){.topic-tag{transition:none}}
+@media(prefers-reduced-motion:reduce){.stream-spinner{animation:none}}
 </style>

@@ -13,7 +13,10 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,6 +35,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 @Component
 public class AiService {
@@ -266,6 +270,62 @@ public class AiService {
 
     public JsonNode summarizeInterviewReviews(String email, JsonNode reviews, JsonNode resume) throws Exception {
         return interviewAnalysis(email, reviewSummaryRequestBody("", reviews, resume));
+    }
+
+    public JsonNode streamSummarizeInterviewReviews(String email, JsonNode reviews, JsonNode resume,
+                                                     Consumer<String> onChunk) throws Exception {
+        requireCalls();
+        enforceRateLimit(email);
+        ConfigRow config;
+        try (Connection connection = openConnection()) {
+            long userId = sandboxUserId(connection, email);
+            config = configRow(connection, userId).filter(value -> value.encryptedApiKey() != null)
+                .orElseThrow(() -> new AiValidationException("请先在个人主页配置大模型 API Key"));
+        }
+        requireEncryption();
+        String key = crypto.decrypt(encryptionKey(), config.encryptedApiKey(), config.iv(), config.authTag());
+        URI endpoint = endpointPolicy.endpoint(config.apiUrl());
+        ObjectNode requestBody = reviewSummaryRequestBody(config.model(), reviews, resume);
+        requestBody.put("stream", true);
+        HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5))
+            .header("Content-Type", "application/json").header("Authorization", "Bearer " + key)
+            .header("Accept", "text/event-stream")
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody))).build();
+        HttpResponse<InputStream> response = sendTimed(request, HttpResponse.BodyHandlers.ofInputStream());
+        try (InputStream body = response.body()) {
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new AiResponseException("AI 请求失败（" + response.statusCode() + "）");
+            }
+            StringBuilder content = new StringBuilder();
+            String finishReason = "";
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.startsWith("data:")) continue;
+                    String data = line.substring(5).trim();
+                    if (data.isEmpty()) continue;
+                    if ("[DONE]".equals(data)) break;
+                    JsonNode frame;
+                    try { frame = objectMapper.readTree(data); }
+                    catch (Exception ignored) { continue; }
+                    JsonNode choice = frame.path("choices").path(0);
+                    String reason = choice.path("finish_reason").asText("");
+                    if (!reason.isBlank()) finishReason = reason;
+                    JsonNode delta = choice.path("delta").path("content");
+                    if (!delta.isTextual() || delta.asText().isEmpty()) continue;
+                    String chunk = delta.asText();
+                    content.append(chunk);
+                    if (content.length() > MAX_AI_RESPONSE_BYTES)
+                        throw new AiResponseException("AI 响应过大");
+                    onChunk.accept(chunk);
+                }
+            }
+            if ("length".equals(finishReason))
+                throw new AiResponseException("AI 总结输出被截断，请稍后重试或将较长的面试回顾拆分");
+            if (content.isEmpty()) throw new AiResponseException("AI 没有返回总结正文，请重试");
+            try { return parseModelJson(content.toString()); }
+            catch (Exception exception) { throw new AiResponseException("AI 返回的总结格式不完整，请重试"); }
+        }
     }
 
     ObjectNode reviewSummaryRequestBody(String model, JsonNode reviews, JsonNode resume) {
