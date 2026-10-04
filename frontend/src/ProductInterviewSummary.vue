@@ -244,7 +244,7 @@ watch(topicEntries, entries => {
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
 .workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
 .workbench-heading h2{margin-top:4px}
-.topic-tags{display:flex;align-items:center;gap:8px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:12px 1px 2px;scrollbar-width:thin}
+.topic-tags{display:flex;align-items:center;flex-wrap:wrap;gap:8px;max-width:100%;overflow:visible;padding:12px 1px 2px}
 .topic-tag{display:inline-flex;align-items:center;gap:9px;flex:none;max-width:240px;min-height:38px;padding:6px 11px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
 .topic-tag:hover{border-color:var(--color-border-strong);background:var(--surface-hover)}
 .topic-tag.selected{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
