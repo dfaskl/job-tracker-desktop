@@ -15,6 +15,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -22,7 +23,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "topics-with-all-questions-v5";
+    private static final String SUMMARY_VERSION = "resume-experience-topics-v6";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -82,7 +83,7 @@ public class InterviewWorkbenchService {
         JsonNode resume = workbench.path("resume");
         String summaryKey = summaryFingerprint(selected, resume);
         JsonNode result = ai.summarizeInterviewReviews(email, selected, resume);
-        ObjectNode summary = cleanSummary(result);
+        ObjectNode summary = cleanSummary(result, resume);
         summary.put("sourceKey", summaryKey);
         try (Connection connection = open()) {
             connection.setAutoCommit(false);
@@ -128,19 +129,35 @@ public class InterviewWorkbenchService {
         }
     }
 
-    private ObjectNode cleanSummary(JsonNode result) {
+    private ObjectNode cleanSummary(JsonNode result, JsonNode resume) {
         if (!result.path("topics").isArray()) throw new AiResponseException("AI 未返回考点总结");
         ObjectNode clean = mapper.createObjectNode();
         ArrayNode topics = clean.putArray("topics");
+        Map<String, ObjectNode> projectTopics = new LinkedHashMap<>();
+        addResumeTopics(resume.path("internships"), "internship-", "internship", projectTopics);
+        addResumeTopics(resume.path("projects"), "project-", "project", projectTopics);
         for (JsonNode topic : result.path("topics")) {
             String name = topic.path("name").asText("").trim();
             if (name.isEmpty()) continue;
             String kind = topic.path("kind").asText("knowledge");
             if (!Set.of("project", "knowledge").contains(kind)) kind = "knowledge";
-            ObjectNode item = topics.addObject().put("name", limit(name, 100))
-                .put("count", Math.max(1, Math.min(1000, topic.path("count").asInt(1))))
-                .put("kind", kind).put("summary", limit(topic.path("summary").asText(""), 500));
-            ArrayNode questionAnswers = item.putArray("questionAnswers");
+            ObjectNode item;
+            if (kind.equals("project")) {
+                item = projectTopics.get(topic.path("resumeRef").asText(""));
+                if (item == null) continue;
+                item.put("count", Math.min(1000, item.path("count").asInt() + Math.max(0, topic.path("count").asInt())));
+                String summary = topic.path("summary").asText("").trim();
+                if (!summary.isEmpty() && !item.path("summary").asText("").contains(summary)) {
+                    String previous = item.path("summary").asText("");
+                    item.put("summary", limit(previous.isEmpty() ? summary : previous + " " + summary, 500));
+                }
+            } else {
+                item = topics.addObject().put("name", limit(name, 100))
+                    .put("count", Math.max(1, Math.min(1000, topic.path("count").asInt(1))))
+                    .put("kind", kind).put("summary", limit(topic.path("summary").asText(""), 500));
+                item.putArray("questionAnswers");
+            }
+            ArrayNode questionAnswers = (ArrayNode) item.path("questionAnswers");
             JsonNode sourceQuestions = topic.path("questionAnswers").isArray()
                 ? topic.path("questionAnswers") : topic.path("questions");
             if (sourceQuestions.isArray()) for (JsonNode sourceQuestion : sourceQuestions) {
@@ -149,9 +166,15 @@ public class InterviewWorkbenchService {
                 String answer = limit(sourceQuestion.path("answer").asText("").trim(), 5_000);
                 if (question.isEmpty()) continue;
                 if (answer.isEmpty()) throw new AiResponseException("AI 未返回完整的问题回答，请重新汇总");
+                boolean duplicate = false;
+                for (JsonNode existing : questionAnswers) {
+                    if (existing.path("question").asText("").equalsIgnoreCase(question)) { duplicate = true; break; }
+                }
+                if (duplicate) continue;
                 questionAnswers.addObject().put("question", question).put("answer", answer);
             }
         }
+        for (ObjectNode projectTopic : projectTopics.values()) topics.add(projectTopic);
         if (topics.isEmpty()) throw new AiResponseException("AI 未返回有效考点");
         var sorted = new java.util.ArrayList<JsonNode>();
         for (JsonNode item : topics) sorted.add(item);
@@ -159,6 +182,30 @@ public class InterviewWorkbenchService {
         topics.removeAll();
         for (JsonNode item : sorted) topics.add(item);
         return clean;
+    }
+
+    private void addResumeTopics(JsonNode entries, String prefix, String type, Map<String, ObjectNode> topics) {
+        if (!entries.isArray()) return;
+        for (int index = 0; index < entries.size(); index++) {
+            JsonNode entry = entries.get(index);
+            String reference = prefix + (index + 1);
+            String name;
+            if (type.equals("internship")) {
+                String company = entry.path("company").asText("").trim();
+                String role = entry.path("role").asText("").trim();
+                name = String.join(" · ", java.util.stream.Stream.of(company, role)
+                    .filter(value -> !value.isBlank()).toList());
+                if (name.isBlank()) name = "实习经历 " + (index + 1);
+                else name += "（实习）";
+            } else {
+                name = entry.path("name").asText("").trim();
+                if (name.isBlank()) name = "项目经历 " + (index + 1);
+            }
+            ObjectNode topic = mapper.createObjectNode().put("name", limit(name, 100))
+                .put("count", 0).put("kind", "project").put("summary", "");
+            topic.putArray("questionAnswers");
+            topics.put(reference, topic);
+        }
     }
 
     private ArrayNode reviews(ObjectNode root) {

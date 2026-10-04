@@ -54,7 +54,7 @@ class InterviewWorkbenchServiceTest {
         AiService ai = mock(AiService.class);
         when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
             "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questionAnswers\":[{\"question\":\"解释线程池参数\",\"answer\":\"线程池通过核心线程数、最大线程数和任务队列控制并发与资源。\"}]},"
-                + "{\"name\":\"项目架构\",\"count\":5,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":["
+                + "{\"name\":\"项目架构\",\"resumeRef\":\"project-1\",\"count\":5,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":["
                 + "{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"},"
                 + "{\"question\":\"MQTT 接收报文后如何处理\",\"answer\":\"先校验报文，再按协议解码并转换为平台模型。\"},"
                 + "{\"question\":\"CSV 映射和位域解码如何实现\",\"answer\":\"用映射配置描述字段，并通过掩码和移位解析位域。\"},"
@@ -62,7 +62,9 @@ class InterviewWorkbenchServiceTest {
                 + "{\"question\":\"如何隔离不同厂商协议\",\"answer\":\"通过适配器和独立解析器隔离厂商差异，对外提供统一模型。\"}]}]}"));
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
-            "{\"internships\":[],\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));
+            "{\"internships\":[{\"company\":\"实习公司\",\"role\":\"Java 实习生\",\"description\":\"实习简介\",\"coreWork\":\"实习工作\"}],"
+                + "\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"},"
+                + "{\"name\":\"项目乙\",\"description\":\"简介乙\",\"coreWork\":\"核心工作乙\"}]}"));
 
         JsonNode summarized = service.summarize("reviewer@example.com");
         ArgumentCaptor<JsonNode> reviews = ArgumentCaptor.forClass(JsonNode.class);
@@ -70,12 +72,23 @@ class InterviewWorkbenchServiceTest {
         verify(ai).summarizeInterviewReviews(eq("reviewer@example.com"), reviews.capture(), resume.capture());
         assertThat(reviews.getValue().toString()).contains("解释线程池参数", "介绍项目甲的架构", "甲公司", "乙公司");
         assertThat(resume.getValue().toString()).contains("项目甲");
+        assertThat(resume.getValue().path("projects").get(0).path("name").asText()).isEqualTo("项目甲");
         assertThat(summarized.has("classification")).isFalse();
         assertThat(summarized.has("summaries")).isFalse();
-        assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目架构");
+        assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目甲");
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answer").asText())
             .contains("项目甲");
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(5);
+        JsonNode projectTopics = mapper.createArrayNode();
+        for (JsonNode topic : summarized.path("overallSummary").path("topics")) {
+            if (topic.path("kind").asText().equals("project")) ((tools.jackson.databind.node.ArrayNode) projectTopics).add(topic);
+        }
+        assertThat(projectTopics.size()).isEqualTo(3);
+        assertThat(projectTopics.get(0).path("name").asText()).isEqualTo("项目甲");
+        assertThat(projectTopics.get(0).path("count").asInt()).isEqualTo(5);
+        assertThat(projectTopics.get(1).path("name").asText()).isEqualTo("实习公司 · Java 实习生（实习）");
+        assertThat(projectTopics.get(2).path("name").asText()).isEqualTo("项目乙");
+        assertThat(projectTopics.get(2).path("count").asInt()).isZero();
         assertThat(summarized.path("overallSummary").path("stale").asBoolean()).isFalse();
         String previousFormatKey = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
             .digest((reviews.getValue().toString() + resume.getValue().toString()).getBytes(StandardCharsets.UTF_8)));
