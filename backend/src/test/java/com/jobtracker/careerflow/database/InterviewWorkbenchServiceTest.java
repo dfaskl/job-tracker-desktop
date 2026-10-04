@@ -43,7 +43,7 @@ class InterviewWorkbenchServiceTest {
              "events":[{"id":"event-1","applicationId":"job-1","type":"面试","title":"一面","completed":true,
                "interviewQuestions":"解释线程池参数"},
                {"id":"event-2","applicationId":"job-2","type":"面试","title":"二面","completed":true,
-               "interviewQuestions":"介绍项目甲的架构"}],
+               "interviewQuestions":"介绍项目甲的架构\\nMQTT 接收报文后如何处理\\nCSV 映射和位域解码如何实现\\n如何验证 16-bit 小端解析\\n如何隔离不同厂商协议"}],
              "settings":{"interviewWorkbench":{"classification":{"categories":[{"name":"旧岗位分类"}]},"summaries":{}}}}
             """;
         try (var connection = DriverManager.getConnection(jdbc);
@@ -54,7 +54,12 @@ class InterviewWorkbenchServiceTest {
         AiService ai = mock(AiService.class);
         when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
             "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questionAnswers\":[{\"question\":\"解释线程池参数\",\"answer\":\"线程池通过核心线程数、最大线程数和任务队列控制并发与资源。\"}]},"
-                + "{\"name\":\"项目架构\",\"count\":2,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":[{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"}]}]}"));
+                + "{\"name\":\"项目架构\",\"count\":5,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":["
+                + "{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"},"
+                + "{\"question\":\"MQTT 接收报文后如何处理\",\"answer\":\"先校验报文，再按协议解码并转换为平台模型。\"},"
+                + "{\"question\":\"CSV 映射和位域解码如何实现\",\"answer\":\"用映射配置描述字段，并通过掩码和移位解析位域。\"},"
+                + "{\"question\":\"如何验证 16-bit 小端解析\",\"answer\":\"按低字节在前的规则构造边界样例，验证组合值和符号扩展。\"},"
+                + "{\"question\":\"如何隔离不同厂商协议\",\"answer\":\"通过适配器和独立解析器隔离厂商差异，对外提供统一模型。\"}]}]}"));
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[],\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));
@@ -70,6 +75,7 @@ class InterviewWorkbenchServiceTest {
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目架构");
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answer").asText())
             .contains("项目甲");
+        assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(5);
         assertThat(summarized.path("overallSummary").path("stale").asBoolean()).isFalse();
         String previousFormatKey = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
             .digest((reviews.getValue().toString() + resume.getValue().toString()).getBytes(StandardCharsets.UTF_8)));

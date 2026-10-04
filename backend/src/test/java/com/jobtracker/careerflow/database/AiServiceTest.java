@@ -227,7 +227,7 @@ class AiServiceTest {
         var request = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(), new ObjectMapper().createObjectNode());
         String instruction = request.path("messages").get(0).path("content").asText();
         assertThat(instruction).contains("宽泛主题", "最多归纳 8 个主题", "每个原始问题只计入一个", "覆盖的原始问题数",
-            "供用户复习、理解和自学", "分步骤解释核心原理", "结合简历", "questionAnswers");
-        assertThat(request.path("max_tokens").asInt()).isEqualTo(12_000);
+            "全部不同原始问题", "不得只选代表题", "供用户复习、理解和自学", "分步骤解释核心原理", "结合简历", "questionAnswers");
+        assertThat(request.path("max_tokens").asInt()).isEqualTo(16_000);
     }
 }

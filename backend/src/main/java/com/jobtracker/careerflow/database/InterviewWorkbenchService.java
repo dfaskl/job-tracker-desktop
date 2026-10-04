@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "topics-with-study-guides-v4";
+    private static final String SUMMARY_VERSION = "topics-with-all-questions-v5";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -144,7 +144,6 @@ public class InterviewWorkbenchService {
             JsonNode sourceQuestions = topic.path("questionAnswers").isArray()
                 ? topic.path("questionAnswers") : topic.path("questions");
             if (sourceQuestions.isArray()) for (JsonNode sourceQuestion : sourceQuestions) {
-                if (questionAnswers.size() >= 4) break;
                 String question = limit((sourceQuestion.isObject()
                     ? sourceQuestion.path("question").asText("") : sourceQuestion.asText("")).trim(), 500);
                 String answer = limit(sourceQuestion.path("answer").asText("").trim(), 5_000);
