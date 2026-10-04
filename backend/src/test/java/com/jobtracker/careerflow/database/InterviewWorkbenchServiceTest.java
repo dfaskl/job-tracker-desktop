@@ -47,7 +47,7 @@ class InterviewWorkbenchServiceTest {
             statement.setString(1, document); statement.setString(2, "batch@example.com"); statement.executeUpdate();
         }
         AiService ai = mock(AiService.class);
-        when(ai.classifyInterviewReviewBatch(eq("batch@example.com"), any(), any())).thenAnswer(invocation -> {
+        when(ai.classifyInterviewReviewBatch(eq("batch@example.com"), any(), any(), any())).thenAnswer(invocation -> {
             JsonNode batch = invocation.getArgument(1);
             var topics = mapper.createObjectNode().putArray("topics");
             for (JsonNode review : batch) {
@@ -74,7 +74,7 @@ class InterviewWorkbenchServiceTest {
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         var streamed = new java.util.ArrayList<ObjectNode>();
         JsonNode result = service.summarizeStreaming("batch@example.com", streamed::add);
-        verify(ai, org.mockito.Mockito.times(3)).classifyInterviewReviewBatch(eq("batch@example.com"), any(), any());
+        verify(ai, org.mockito.Mockito.times(3)).classifyInterviewReviewBatch(eq("batch@example.com"), any(), any(), any());
         verify(ai, org.mockito.Mockito.times(2)).streamInterviewAnswerBatch(eq("batch@example.com"), any(), any(), any(), any());
         assertThat(result.path("overallSummary").path("topics").get(0).path("count").asInt()).isEqualTo(6);
         assertThat(result.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(4);
@@ -83,6 +83,29 @@ class InterviewWorkbenchServiceTest {
         assertThat(result.path("summaryJob").path("stage").asText()).isEqualTo("completed");
         assertThat(streamed).anyMatch(event -> event.path("type").asText().equals("classified"));
         assertThat(streamed).anyMatch(event -> event.path("type").asText().equals("question"));
+
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.prepareStatement("UPDATE user_data SET data=json_set(data, '$.events[2].interviewQuestions', ?) WHERE user_id=(SELECT id FROM users WHERE email=?)")) {
+            statement.setString(1, "线程池队列应该如何选择？\n新增的一次面试追问");
+            statement.setString(2, "batch@example.com"); statement.executeUpdate();
+        }
+        JsonNode incrementallyUpdated = service.summarizeStreaming("batch@example.com", ignored -> { });
+        ArgumentCaptor<JsonNode> incrementalBatches = ArgumentCaptor.forClass(JsonNode.class);
+        verify(ai, org.mockito.Mockito.times(4)).classifyInterviewReviewBatch(eq("batch@example.com"), incrementalBatches.capture(), any(), any());
+        verify(ai, org.mockito.Mockito.times(3)).streamInterviewAnswerBatch(eq("batch@example.com"), any(), any(), any(), any());
+        assertThat(incrementalBatches.getAllValues().get(3).toString()).contains("e3", "线程池队列应该如何选择")
+            .doesNotContain("e1", "e2");
+        assertThat(incrementallyUpdated.path("overallSummary").path("topics").get(0).path("count").asInt()).isEqualTo(6);
+        assertThat(incrementallyUpdated.path("overallSummary").path("reviewFingerprints").isObject()).isTrue();
+
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE user_data SET data=json_remove(data, '$.events[1]') WHERE user_id=(SELECT id FROM users WHERE email='batch@example.com')");
+        }
+        JsonNode afterDeletion = service.summarizeStreaming("batch@example.com", ignored -> { });
+        verify(ai, org.mockito.Mockito.times(4)).classifyInterviewReviewBatch(eq("batch@example.com"), any(), any(), any());
+        verify(ai, org.mockito.Mockito.times(3)).streamInterviewAnswerBatch(eq("batch@example.com"), any(), any(), any(), any());
+        assertThat(afterDeletion.path("overallSummary").path("topics").get(0).path("count").asInt()).isEqualTo(4);
     }
 
     @Test
@@ -112,7 +135,7 @@ class InterviewWorkbenchServiceTest {
             statement.executeUpdate();
         }
         AiService ai = mock(AiService.class);
-        when(ai.classifyInterviewReviewBatch(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
+        when(ai.classifyInterviewReviewBatch(eq("reviewer@example.com"), any(), any(), any())).thenReturn(mapper.readTree(
             "{\"topics\":[{\"name\":\"Java 并发与线程池\",\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questions\":[{\"question\":\"解释线程池参数\",\"eventId\":\"event-1\"}]},"
                 + "{\"name\":\"自我介绍与动机\",\"kind\":\"other\",\"summary\":\"个人经历表达\",\"questions\":[{\"question\":\"请做一个自我介绍\",\"eventId\":\"event-1\"}]},"
                 + "{\"name\":\"项目甲\",\"resumeRef\":\"project-1\",\"kind\":\"project\",\"summary\":\"项目追问\",\"questions\":["
@@ -139,7 +162,7 @@ class InterviewWorkbenchServiceTest {
         JsonNode summarized = service.summarize("reviewer@example.com");
         ArgumentCaptor<JsonNode> reviews = ArgumentCaptor.forClass(JsonNode.class);
         ArgumentCaptor<JsonNode> resume = ArgumentCaptor.forClass(JsonNode.class);
-        verify(ai).classifyInterviewReviewBatch(eq("reviewer@example.com"), reviews.capture(), resume.capture());
+        verify(ai).classifyInterviewReviewBatch(eq("reviewer@example.com"), reviews.capture(), resume.capture(), any());
         assertThat(reviews.getValue().toString()).contains("解释线程池参数", "介绍项目甲的架构", "甲公司", "乙公司");
         assertThat(resume.getValue().toString()).contains("项目甲");
         assertThat(resume.getValue().path("projects").get(0).path("name").asText()).isEqualTo("项目甲");

@@ -6,7 +6,7 @@ import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTra
 
 type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string; answerStatus?: string; frequency?: number; sourceQuestions?: { question: string; eventId?: string }[] }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
-type Workbench = { sourceKey: string; overallSummary?: Summary; summaryJob?: { stage?: string; classificationBatches?: { status: string }[] } }
+type Workbench = { sourceKey: string; requiresFullRebuild?: boolean; overallSummary?: Summary; summaryJob?: { stage?: string; classificationBatches?: { status: string }[] } }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
 
 const emit = defineEmits<{ navigate: [page: 'profile'] }>()
@@ -64,7 +64,8 @@ async function loadState(autoSummarize = true) {
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取面试总结失败' }
   finally { loading.value = false }
   const unfinishedJob = !!state.value?.summaryJob && state.value.summaryJob.stage !== 'completed'
-  if (autoSummarize && state.value && reviews.value.length && (unfinishedJob || !summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
+  const fullRebuildNeedsConfirmation = !!summary.value?.stale && !!state.value?.requiresFullRebuild
+  if (autoSummarize && (unfinishedJob || !fullRebuildNeedsConfirmation) && state.value && reviews.value.length && (unfinishedJob || !summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
     autoAttemptedKey = state.value.sourceKey
     await summarize(true)
   }
@@ -89,6 +90,13 @@ async function summarize(automatic = false, force = false) {
     message.value = automatic ? '面试回顾已自动汇总' : '考点汇总已更新'
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '考点汇总失败' }
   finally { summarizing.value = false; streamingStatus.value = '' }
+}
+
+function onSummarizeClick() {
+  const requiresFullRebuild = !!summary.value && (state.value?.requiresFullRebuild || !summary.value.stale && !hasIncompleteAnswers.value)
+  if (!requiresFullRebuild) { void summarize(false); return }
+  const confirmed = window.confirm('全量重建会重新分类所有面试回顾，并重新生成所有复习答案，耗时和 AI 用量都会增加。确定继续全量更新吗？')
+  if (confirmed) void summarize(false, true)
 }
 
 function activate() { void store.refresh(false, false, false).then(() => loadState()) }
@@ -125,7 +133,7 @@ watch(topicEntries, entries => {
     <div class="page-notices">
       <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
       <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="emit('navigate', 'profile')">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
-      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="summarize(false, !!summary && !summary.stale && !hasIncompleteAnswers)">{{ summarizing ? '正在分批整理…' : summary?.stale ? '重新汇总全部考点' : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
+      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="onSummarizeClick">{{ summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button></nav>
     <div class="summary-columns">

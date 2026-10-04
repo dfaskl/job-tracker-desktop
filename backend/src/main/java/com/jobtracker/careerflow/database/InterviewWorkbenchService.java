@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "importance-prioritized-review-v11-grouped-questions";
+    private static final String SUMMARY_VERSION = "importance-prioritized-review-v12-incremental";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -54,6 +54,8 @@ public class InterviewWorkbenchService {
             if (result.path("overallSummary") instanceof ObjectNode summary) {
                 String fingerprint = summaryFingerprint(summaryInput(allReviews), result.path("resume"));
                 summary.put("stale", !fingerprint.equals(summary.path("sourceKey").asText("")));
+                result.put("requiresFullRebuild", !summary.path("reviewFingerprints").isObject()
+                    || !digest(result.path("resume").toString()).equals(summary.path("resumeFingerprint").asText("")));
             }
             return result;
         }
@@ -102,10 +104,29 @@ public class InterviewWorkbenchService {
         String summaryKey = summaryFingerprint(selected, resume);
         boolean resumableJob = !force && workbench.path("summaryJob") instanceof ObjectNode savedJob
             && summaryKey.equals(savedJob.path("sourceKey").asText());
+        ObjectNode previousSummary = workbench.path("overallSummary") instanceof ObjectNode old ? old : null;
+        String resumeKey = digest(resume.toString());
+        boolean incrementalCompatible = !force && !resumableJob && previousSummary != null
+            && previousSummary.path("reviewFingerprints").isObject()
+            && resumeKey.equals(previousSummary.path("resumeFingerprint").asText());
+        ArrayNode changedReviews = incrementalCompatible ? changedReviews(selected, previousSummary.path("reviewFingerprints")) : selected;
+        ArrayNode removedEventIds = incrementalCompatible ? removedEventIds(selected, previousSummary.path("reviewFingerprints")) : mapper.createArrayNode();
+        boolean incremental = resumableJob
+            ? "incremental".equals(workbench.path("summaryJob").path("mode").asText())
+            : incrementalCompatible && (!changedReviews.isEmpty() || !removedEventIds.isEmpty());
+        if (!force && !resumableJob && incrementalCompatible && changedReviews.isEmpty() && removedEventIds.isEmpty()) {
+            previousSummary.put("sourceKey", summaryKey).put("stale", false);
+            ObjectNode unchanged = newSummaryJob(summaryKey, "incremental", mapper.createArrayNode(), mapper.createArrayNode());
+            unchanged.put("stage", "completed").put("completedAt", java.time.Instant.now().toString());
+            persistJob(email, summaryKey, unchanged, previousSummary);
+            return state(email);
+        }
         ObjectNode job = resumableJob && workbench.path("summaryJob") instanceof ObjectNode saved
-            && summaryKey.equals(saved.path("sourceKey").asText()) ? saved.deepCopy() : newSummaryJob(summaryKey);
+            ? saved.deepCopy() : newSummaryJob(summaryKey, incremental ? "incremental" : "full",
+                incremental ? changedReviews : selected, incremental ? removedEventIds : mapper.createArrayNode());
+        ArrayNode classificationInput = job.path("classificationInput") instanceof ArrayNode savedInput ? savedInput : selected;
         ArrayNode classificationBatches = (ArrayNode) job.path("classificationBatches");
-        ArrayNode reviewBatches = reviewBatches(selected, 12_000);
+        ArrayNode reviewBatches = reviewBatches(classificationInput, 12_000);
         if (classificationBatches.size() != reviewBatches.size()) {
             classificationBatches.removeAll();
             for (int i = 0; i < reviewBatches.size(); i++) classificationBatches.addObject().put("status", "pending");
@@ -114,19 +135,27 @@ public class InterviewWorkbenchService {
         for (int index = 0; index < reviewBatches.size(); index++) {
             ObjectNode batchState = (ObjectNode) classificationBatches.get(index);
             if ("completed".equals(batchState.path("status").asText())) continue;
-            onQuestion.accept(progress("正在识别面试回顾（第 " + (index + 1) + "/" + reviewBatches.size() + " 批）…"));
+            onQuestion.accept(progress((incremental ? "正在识别变更的面试回顾（" : "正在识别全部面试回顾（") + (index + 1) + "/" + reviewBatches.size() + " 批）…"));
             batchState.put("status", "running"); persistJob(email, summaryKey, job, null);
-            JsonNode candidate = classifyWithRateLimitRetry(email, reviewBatches.get(index), resume);
+            JsonNode context = incremental ? compactExistingTopics(previousSummary == null ? workbench.path("overallSummary") : previousSummary) : mapper.createArrayNode();
+            JsonNode candidate = classifyWithRateLimitRetry(email, reviewBatches.get(index), resume, context);
             if (!candidate.path("topics").isArray()) throw new AiResponseException("AI 未返回第 " + (index + 1) + " 批问题分类");
             batchState.set("topics", candidate.path("topics").deepCopy()); batchState.put("status", "completed");
             persistJob(email, summaryKey, job, null);
         }
 
         ObjectNode summary;
-        JsonNode previousSummary = workbench.path("overallSummary");
-        if (resumableJob && previousSummary instanceof ObjectNode savedSummary && summaryKey.equals(savedSummary.path("sourceKey").asText())
+        JsonNode persistedSummary = workbench.path("overallSummary");
+        if (resumableJob && persistedSummary instanceof ObjectNode savedSummary && summaryKey.equals(savedSummary.path("sourceKey").asText())
             && savedSummary.path("topics").isArray()) summary = savedSummary.deepCopy();
+        else if (incremental && previousSummary != null)
+            summary = mergeIncremental(previousSummary, classificationBatches, resume, job.path("removedEventIds"));
         else summary = mergeClassifications(classificationBatches, resume);
+        for (JsonNode topic : summary.path("topics")) if (topic instanceof ObjectNode object) {
+            for (JsonNode question : object.path("questionAnswers")) if (question instanceof ObjectNode item) item.remove("mergeInto");
+        }
+        summary.set("reviewFingerprints", fingerprintMap(selected));
+        summary.put("resumeFingerprint", resumeKey);
         summary.put("sourceKey", summaryKey).put("stale", false);
         for (JsonNode batch : classificationBatches) if (batch instanceof ObjectNode batchObject) batchObject.remove("topics");
         job.put("stage", "answers");
@@ -212,16 +241,17 @@ public class InterviewWorkbenchService {
         piece.put("questions", questions); return piece;
     }
 
-    private ObjectNode newSummaryJob(String key) {
-        ObjectNode job = mapper.createObjectNode().put("sourceKey", key).put("stage", "classification");
+    private ObjectNode newSummaryJob(String key, String mode, ArrayNode input, ArrayNode removed) {
+        ObjectNode job = mapper.createObjectNode().put("sourceKey", key).put("stage", "classification").put("mode", mode);
+        job.set("classificationInput", input.deepCopy()); job.set("removedEventIds", removed.deepCopy());
         job.putArray("classificationBatches"); return job;
     }
 
     private ObjectNode progress(String message) { return mapper.createObjectNode().put("type", "progress").put("message", message); }
 
-    private JsonNode classifyWithRateLimitRetry(String email, JsonNode reviews, JsonNode resume) throws Exception {
+    private JsonNode classifyWithRateLimitRetry(String email, JsonNode reviews, JsonNode resume, JsonNode existingTopics) throws Exception {
         for (int attempt = 0; ; attempt++) {
-            try { return ai.classifyInterviewReviewBatch(email, reviews, resume); }
+            try { return ai.classifyInterviewReviewBatch(email, reviews, resume, existingTopics); }
             catch (AiRateLimitException exception) {
                 if (attempt >= 3) throw exception;
                 Thread.sleep(3_100L);
@@ -252,6 +282,141 @@ public class InterviewWorkbenchService {
                 write(connection, current); connection.commit();
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
+    }
+
+    private ObjectNode fingerprintMap(ArrayNode reviews) throws Exception {
+        ObjectNode result = mapper.createObjectNode();
+        for (JsonNode review : reviews) result.put(review.path("eventId").asText(), digest(review.toString()));
+        return result;
+    }
+
+    private ArrayNode changedReviews(ArrayNode reviews, JsonNode previousFingerprints) throws Exception {
+        ArrayNode changed = mapper.createArrayNode();
+        for (JsonNode review : reviews) {
+            String eventId = review.path("eventId").asText();
+            if (!digest(review.toString()).equals(previousFingerprints.path(eventId).asText(""))) changed.add(review.deepCopy());
+        }
+        return changed;
+    }
+
+    /** Existing source IDs that must be detached before changed reviews are classified again. */
+    private ArrayNode removedEventIds(ArrayNode reviews, JsonNode previousFingerprints) throws Exception {
+        ObjectNode current = fingerprintMap(reviews); ArrayNode removed = mapper.createArrayNode();
+        previousFingerprints.properties().forEach(entry -> {
+            if (!entry.getValue().asText().equals(current.path(entry.getKey()).asText(""))) removed.add(entry.getKey());
+        });
+        return removed;
+    }
+
+    private ArrayNode compactExistingTopics(JsonNode summary) {
+        ArrayNode result = mapper.createArrayNode(); int budget = 8_000;
+        for (JsonNode topic : summary.path("topics")) {
+            ObjectNode compact = mapper.createObjectNode().put("name", topic.path("name").asText())
+                .put("kind", topic.path("kind").asText()).put("resumeRef", topic.path("resumeRef").asText(""));
+            ArrayNode questions = compact.putArray("questions");
+            for (JsonNode question : topic.path("questionAnswers")) {
+                String text = question.path("question").asText(""); if (text.isBlank()) continue;
+                if (budget < text.length()) break;
+                questions.add(text); budget -= text.length();
+            }
+            result.add(compact); budget -= compact.path("name").asText().length() + 40;
+            if (budget <= 0) break;
+        }
+        return result;
+    }
+
+    private ObjectNode mergeIncremental(ObjectNode previous, ArrayNode batches, JsonNode resume, JsonNode affectedIds) {
+        ObjectNode result = previous.deepCopy();
+        Set<String> affected = new java.util.HashSet<>();
+        if (affectedIds.isArray()) for (JsonNode id : affectedIds) affected.add(id.asText());
+        Set<String> touchedTopics = new java.util.HashSet<>();
+        for (JsonNode node : result.path("topics")) if (node instanceof ObjectNode topic) {
+            String topicKey = topicKey(topic);
+            ArrayNode retainedQuestions = mapper.createArrayNode(); int topicCount = 0;
+            for (JsonNode sourceQuestion : topic.path("questionAnswers")) {
+                ObjectNode question = (ObjectNode) sourceQuestion.deepCopy();
+                ArrayNode originals = mapper.createArrayNode();
+                if (question.path("sourceQuestions").isArray()) {
+                    for (JsonNode original : question.path("sourceQuestions"))
+                        if (!affected.contains(original.path("eventId").asText(""))) originals.add(original.deepCopy());
+                } else if (!affected.contains(question.path("eventId").asText(""))) {
+                    originals.addObject().put("question", question.path("question").asText("")).put("eventId", question.path("eventId").asText(""));
+                }
+                if (originals.isEmpty()) { touchedTopics.add(topicKey); continue; }
+                ArrayNode sourceIds = mapper.createArrayNode();
+                for (JsonNode original : originals) {
+                    String id = original.path("eventId").asText("");
+                    if (!id.isBlank() && !containsText(sourceIds, id)) sourceIds.add(id);
+                }
+                question.set("sourceQuestions", originals); question.set("sourceEventIds", sourceIds);
+                question.put("frequency", originals.size());
+                if (!sourceIds.isEmpty()) question.put("eventId", sourceIds.get(0).asText());
+                retainedQuestions.add(question); topicCount += originals.size();
+                if (originals.size() != sourceQuestion.path("sourceQuestions").size()) touchedTopics.add(topicKey);
+            }
+            topic.set("questionAnswers", retainedQuestions); topic.put("count", topicCount);
+            if (touchedTopics.contains(topicKey)) topic.put("summary", "");
+        }
+        ArrayNode retainedTopics = mapper.createArrayNode();
+        for (JsonNode topic : result.path("topics"))
+            if (topic.path("count").asInt() > 0 || "project".equals(topic.path("kind").asText())) retainedTopics.add(topic.deepCopy());
+        result.set("topics", retainedTopics);
+
+        ObjectNode delta;
+        if (batches.isEmpty()) { delta = mapper.createObjectNode(); delta.putArray("topics"); }
+        else delta = mergeClassifications(batches, resume);
+        Map<String, ObjectNode> existingTopics = new LinkedHashMap<>();
+        for (JsonNode node : result.path("topics")) if (node instanceof ObjectNode topic) existingTopics.put(topicKey(topic), topic);
+        for (JsonNode deltaNode : delta.path("topics")) if (deltaNode instanceof ObjectNode deltaTopic) {
+            String key = topicKey(deltaTopic);
+            ObjectNode targetTopic = existingTopics.get(key);
+            if (targetTopic == null) {
+                targetTopic = deltaTopic.deepCopy(); result.withArray("topics").add(targetTopic); existingTopics.put(key, targetTopic);
+            } else {
+                String description = deltaTopic.path("summary").asText("");
+                if (!description.isBlank()) targetTopic.put("summary", limit(description, 500));
+                ArrayNode targetQuestions = (ArrayNode) targetTopic.path("questionAnswers");
+                for (JsonNode newQuestion : deltaTopic.path("questionAnswers")) {
+                    String mergeTarget = newQuestion.path("mergeInto").asText("");
+                    JsonNode existing = mergeTarget.isBlank() ? findAnswer(targetQuestions, newQuestion.path("question").asText())
+                        : findAnswer(targetQuestions, mergeTarget);
+                    ArrayNode incomingSources = newQuestion.path("sourceQuestions").isArray()
+                        ? (ArrayNode) newQuestion.path("sourceQuestions") : mapper.createArrayNode();
+                    if (existing instanceof ObjectNode existingQuestion) {
+                        ArrayNode originals = existingQuestion.path("sourceQuestions") instanceof ArrayNode value ? value : existingQuestion.putArray("sourceQuestions");
+                        for (JsonNode source : incomingSources) originals.add(source.deepCopy());
+                        ArrayNode ids = mapper.createArrayNode();
+                        for (JsonNode source : originals) {
+                            String id = source.path("eventId").asText(""); if (!id.isBlank() && !containsText(ids, id)) ids.add(id);
+                        }
+                        existingQuestion.set("sourceEventIds", ids); existingQuestion.put("frequency", originals.size());
+                        existingQuestion.put("answer", "").put("answerStatus", "pending");
+                    } else {
+                        ObjectNode added = (ObjectNode) newQuestion.deepCopy(); added.remove("mergeInto");
+                        added.put("answer", "").put("answerStatus", "pending"); targetQuestions.add(added);
+                    }
+                }
+                int count = 0; for (JsonNode question : targetQuestions) count += question.path("frequency").asInt(1);
+                targetTopic.put("count", count);
+            }
+        }
+        for (JsonNode topic : result.path("topics")) if (topic instanceof ObjectNode object) {
+            object.remove("mergeInto");
+            for (JsonNode question : object.path("questionAnswers")) if (question instanceof ObjectNode item) item.remove("mergeInto");
+        }
+        result.set("topics", sortedTopics((ArrayNode) result.path("topics")));
+        return result;
+    }
+
+    private String topicKey(JsonNode topic) {
+        String kind = topic.path("kind").asText("other");
+        return kind + ":" + (kind.equals("project") ? topic.path("resumeRef").asText("") : normalizeTopic(topic.path("name").asText("")));
+    }
+
+    private ArrayNode sortedTopics(ArrayNode topics) {
+        var sorted = new java.util.ArrayList<JsonNode>(); for (JsonNode topic : topics) sorted.add(topic);
+        sorted.sort((left, right) -> Integer.compare(right.path("count").asInt(), left.path("count").asInt()));
+        ArrayNode result = mapper.createArrayNode(); sorted.forEach(result::add); return result;
     }
 
     private ObjectNode mergeClassifications(ArrayNode batches, JsonNode resume) {
@@ -299,6 +464,8 @@ public class InterviewWorkbenchService {
                 }
                 ObjectNode item = questionAnswers.addObject().put("question", text).put("answer", "")
                     .put("answerStatus", "pending").put("frequency", sourceCount);
+                String mergeInto = question.path("mergeInto").asText("");
+                if (!mergeInto.isBlank()) item.put("mergeInto", limit(mergeInto, 500));
                 ArrayNode sourceIds = item.putArray("sourceEventIds");
                 for (JsonNode source : sources) {
                     String eventId = source.path("eventId").asText("");
