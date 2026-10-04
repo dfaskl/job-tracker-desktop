@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "broad-topics-v2";
+    private static final String SUMMARY_VERSION = "topics-with-answers-v3";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
@@ -140,11 +140,17 @@ public class InterviewWorkbenchService {
             ObjectNode item = topics.addObject().put("name", limit(name, 100))
                 .put("count", Math.max(1, Math.min(1000, topic.path("count").asInt(1))))
                 .put("kind", kind).put("summary", limit(topic.path("summary").asText(""), 500));
-            ArrayNode questions = item.putArray("questions");
-            if (topic.path("questions").isArray()) for (JsonNode question : topic.path("questions")) {
-                if (questions.size() >= 5) break;
-                String text = limit(question.asText("").trim(), 300);
-                if (!text.isEmpty()) questions.add(text);
+            ArrayNode questionAnswers = item.putArray("questionAnswers");
+            JsonNode sourceQuestions = topic.path("questionAnswers").isArray()
+                ? topic.path("questionAnswers") : topic.path("questions");
+            if (sourceQuestions.isArray()) for (JsonNode sourceQuestion : sourceQuestions) {
+                if (questionAnswers.size() >= 4) break;
+                String question = limit((sourceQuestion.isObject()
+                    ? sourceQuestion.path("question").asText("") : sourceQuestion.asText("")).trim(), 500);
+                String answer = limit(sourceQuestion.path("answer").asText("").trim(), 2_000);
+                if (question.isEmpty()) continue;
+                if (answer.isEmpty()) throw new AiResponseException("AI 未返回完整的问题回答，请重新汇总");
+                questionAnswers.addObject().put("question", question).put("answer", answer);
             }
         }
         if (topics.isEmpty()) throw new AiResponseException("AI 未返回有效考点");

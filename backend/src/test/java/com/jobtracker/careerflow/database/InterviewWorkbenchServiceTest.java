@@ -53,8 +53,8 @@ class InterviewWorkbenchServiceTest {
         }
         AiService ai = mock(AiService.class);
         when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
-            "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questions\":[\"解释线程池参数\"]},"
-                + "{\"name\":\"项目架构\",\"count\":2,\"kind\":\"project\",\"summary\":\"项目追问\",\"questions\":[\"介绍项目甲的架构\"]}]}"));
+            "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questionAnswers\":[{\"question\":\"解释线程池参数\",\"answer\":\"线程池通过核心线程数、最大线程数和任务队列控制并发与资源。\"}]},"
+                + "{\"name\":\"项目架构\",\"count\":2,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":[{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"}]}]}"));
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[],\"projects\":[{\"name\":\"项目甲\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));
@@ -68,6 +68,8 @@ class InterviewWorkbenchServiceTest {
         assertThat(summarized.has("classification")).isFalse();
         assertThat(summarized.has("summaries")).isFalse();
         assertThat(summarized.path("overallSummary").path("topics").get(0).path("name").asText()).isEqualTo("项目架构");
+        assertThat(summarized.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answer").asText())
+            .contains("项目甲");
         assertThat(summarized.path("overallSummary").path("stale").asBoolean()).isFalse();
         String previousFormatKey = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
             .digest((reviews.getValue().toString() + resume.getValue().toString()).getBytes(StandardCharsets.UTF_8)));

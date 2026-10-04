@@ -4,7 +4,7 @@ import { api } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
-type Topic = { name: string; count: number; kind: 'project' | 'knowledge'; summary: string; questions: string[] }
+type Topic = { name: string; count: number; kind: 'project' | 'knowledge'; summary: string; questionAnswers: { question: string; answer: string }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
 type Workbench = { sourceKey: string; overallSummary?: Summary }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
@@ -20,9 +20,8 @@ const selectedReviewId = ref('')
 const reviewDialog = ref<HTMLDialogElement | null>(null)
 const selectedTopicKey = ref('')
 const activeTopicKind = ref<'project' | 'knowledge'>('project')
-const activePane = ref<'reviews' | 'topics' | 'detail'>('reviews')
-const detailScroll = ref<HTMLElement | null>(null)
-const detailHeading = ref<HTMLElement | null>(null)
+const activePane = ref<'reviews' | 'workbench'>('reviews')
+const workbenchScroll = ref<HTMLElement | null>(null)
 let autoAttemptedKey = ''
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
@@ -41,9 +40,10 @@ const topicGroups = computed(() => [
   { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value }
 ])
 const activeTopicGroup = computed(() => topicGroups.value.find(group => group.kind === activeTopicKind.value)!)
-const topicEntries = computed(() => summary.value?.stale ? [] : topicGroups.value.flatMap(group =>
-  group.topics.map((topic, index) => ({ key: `${group.kind}:${index}:${topic.name}`, group: group.label, topic }))
-))
+const activeTopics = computed(() => activeTopicGroup.value.topics)
+const topicEntries = computed(() => summary.value?.stale ? [] : activeTopics.value.map((topic, index) => ({
+  key: `${activeTopicKind.value}:${index}:${topic.name}`, group: activeTopicGroup.value.label, topic
+})))
 const selectedTopic = computed(() => topicEntries.value.find(item => item.key === selectedTopicKey.value) || null)
 const selectedReview = computed(() => reviews.value.find(item => item.event.id === selectedReviewId.value) || null)
 const hasResume = computed(() => {
@@ -87,22 +87,20 @@ function onReviewDialogClick(event: MouseEvent) {
 }
 async function selectTopic(key: string) {
   selectedTopicKey.value = key
-  activePane.value = 'detail'
   await nextTick()
-  detailScroll.value?.scrollTo({ top: 0 })
-  detailHeading.value?.focus()
+  workbenchScroll.value?.scrollTo({ top: 0 })
 }
 function switchTopicKind(kind: 'project' | 'knowledge') {
   if (activeTopicKind.value === kind) return
   activeTopicKind.value = kind
   selectedTopicKey.value = ''
-  detailScroll.value?.scrollTo({ top: 0 })
+  workbenchScroll.value?.scrollTo({ top: 0 })
 }
 onActivated(activate)
 onDeactivated(closeReview)
 watch(reviewSignature, (next, previous) => { if (previous && next !== previous) void loadState() })
 watch(topicEntries, entries => {
-  if (!entries.some(item => item.key === selectedTopicKey.value)) selectedTopicKey.value = ''
+  if (!entries.some(item => item.key === selectedTopicKey.value)) selectedTopicKey.value = entries[0]?.key || ''
 })
 </script>
 
@@ -113,26 +111,24 @@ watch(topicEntries, entries => {
       <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="emit('navigate', 'profile')">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
       <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="summarize(false)">{{ summarizing ? '正在汇总…' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
-    <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'topics'" @click="activePane = 'topics'">考点分类</button><button type="button" :aria-pressed="activePane === 'detail'" @click="activePane = 'detail'">考点详情</button></nav>
+    <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button></nav>
     <div class="summary-columns">
       <section class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
           <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
-      <section class="topic-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'topics' }" aria-labelledby="topic-title">
-        <div class="section-heading topic-column-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点分类</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button></div></div>
-        <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳所有问题的考点。</p>
+      <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
+        <div class="workbench-header">
+          <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目考点</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股考点</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge' }" aria-hidden="true"></span></div></div>
+          <div v-if="summary && !summary.stale" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></div>
+          <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
+        </div>
+        <div ref="workbenchScroll" class="pane-scroll workbench-content"><p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
           <p v-else-if="summarizing && (!summary || summary.stale)" class="empty-state" role="status">正在归纳全部面试问题…</p>
           <p v-else-if="!summary || summary.stale" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <template v-else><section class="topic-section" :aria-label="activeTopicGroup.label"><div class="section-heading"><h3>{{ activeTopicGroup.label }}</h3><span>{{ activeTopicGroup.topics.length }} 类 · 按频次排序</span></div><ol v-if="activeTopicGroup.topics.length" class="topic-list"><li v-for="(topic, index) in activeTopicGroup.topics" :key="`${activeTopicGroup.kind}:${index}:${topic.name}`"><button type="button" class="topic-choice" :class="{ selected: selectedTopicKey === `${activeTopicGroup.kind}:${index}:${topic.name}` }" :aria-pressed="selectedTopicKey === `${activeTopicGroup.kind}:${index}:${topic.name}`" @click="selectTopic(`${activeTopicGroup.kind}:${index}:${topic.name}`)"><span>{{ topic.name }}</span><strong>{{ topic.count }} 次</strong></button></li></ol><p v-else class="empty-state">暂无{{ activeTopicGroup.label }}。</p></section></template>
-        </div>
-      </section>
-      <section class="detail-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'detail' }" aria-labelledby="detail-title">
-        <div class="section-heading"><div><small>考点内容</small><h2 id="detail-title">考点详情</h2></div></div>
-        <div ref="detailScroll" class="pane-scroll">
-          <div v-if="selectedTopic" class="topic-detail"><span class="detail-kind">{{ selectedTopic.group }}</span><h3 ref="detailHeading" tabindex="-1">{{ selectedTopic.topic.name }}</h3><span class="detail-frequency">出现 {{ selectedTopic.topic.count }} 次</span><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questions?.length" class="detail-section"><h4>相关面试问题</h4><ol><li v-for="(question, index) in selectedTopic.topic.questions" :key="`${index}:${question}`">{{ question }}</li></ol></section></div>
-          <p v-else class="empty-state">{{ summary && !summary.stale ? '从中间选择一个考点，查看详细内容。' : '完成考点汇总后，在中间选择类别查看详细内容。' }}</p>
+          <div v-else-if="selectedTopic" class="topic-detail"><div class="topic-detail-heading"><div><span class="detail-kind">{{ selectedTopic.group }}</span><h3>{{ selectedTopic.topic.name }}</h3></div><span class="detail-frequency">出现 {{ selectedTopic.topic.count }} 次</span></div><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类回答可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="emit('navigate', 'profile')">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>面试问题与参考回答 <span>{{ selectedTopic.topic.questionAnswers.length }} 题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${index}:${item.question}`" class="question-answer"><h5><span>问题 {{ index + 1 }}</span>{{ item.question }}</h5><div class="reference-answer"><strong>参考回答</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
+          <p v-else class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
         </div>
       </section>
     </div>
@@ -176,11 +172,18 @@ watch(topicEntries, entries => {
 .topic-choice span{min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .topic-choice strong{flex:none;color:var(--color-primary);font-size:12px;white-space:nowrap}
 .topic-column-heading{align-items:center}
-.topic-kind-switch{display:inline-flex;flex:none;gap:2px;padding:3px;border:1px solid var(--color-border);border-radius:9px;background:var(--color-card)}
-.topic-kind-switch button{min-width:46px;min-height:44px;padding:5px 9px;border:0;border-radius:6px;color:var(--color-muted-foreground);background:transparent;font-size:12px;font-weight:700}
-.topic-kind-switch button:hover{color:var(--color-foreground);background:var(--surface-hover)}
-.topic-kind-switch button[aria-pressed="true"]{color:var(--color-on-primary);background:var(--color-primary)}
-.topic-kind-switch button:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px}
+.topic-kind-switch{position:relative;display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));flex:none;min-width:156px;border-bottom:1px solid var(--color-border)}
+.topic-kind-switch button{position:relative;z-index:1;min-width:78px;min-height:44px;padding:8px 7px 10px;border:0;border-radius:0;color:var(--color-foreground);background:transparent;font-size:13px;font-weight:600;white-space:nowrap;transition:font-weight .18s ease}
+.topic-kind-switch button:hover{color:var(--color-foreground)}
+.topic-kind-switch button[aria-pressed="true"]{color:var(--color-foreground);font-weight:800}
+.topic-kind-indicator{position:absolute;z-index:2;bottom:-1px;left:0;width:50%;height:3px;border-radius:999px;background:var(--color-primary);transform:translateX(0);transition:transform .34s cubic-bezier(.22,1,.36,1)}
+.topic-kind-indicator.is-knowledge{transform:translateX(100%)}
+.topic-kind-switch button:focus-visible{outline:2px solid var(--color-primary);outline-offset:-3px}
+.topic-content-enter-active{transition:opacity .22s ease,transform .22s ease}
+.topic-content-leave-active{transition:opacity .15s ease,transform .15s ease}
+.topic-content-enter-from{opacity:0;transform:translateY(8px)}
+.topic-content-leave-to{opacity:0;transform:translateY(-5px)}
+@media(prefers-reduced-motion:reduce){.topic-kind-indicator,.topic-content-enter-active,.topic-content-leave-active{transition:none}}
 .detail-kind{color:var(--color-primary);font-size:12px;font-weight:700}
 .topic-detail h3{margin:8px 0 10px;overflow-wrap:anywhere;font-size:clamp(20px,2vw,26px);line-height:1.35}
 .detail-frequency{display:inline-block;padding:5px 9px;border-radius:6px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card));font-size:12px;font-weight:700}
@@ -204,4 +207,51 @@ watch(topicEntries, entries => {
   .summary-pane,.topic-column,.summary-pane+.summary-pane{display:none;height:100%;padding:14px 0 0;border-left:0;border-top:0}
   .summary-pane.mobile-pane-active{display:flex}
 }
+/* Keep reviews beside one unified topic workspace; only the workspace body scrolls. */
+.summary-columns{grid-template-columns:minmax(240px,.78fr) minmax(0,2fr)}
+.summary-pane+.summary-pane{padding-left:22px}
+.workbench-column{padding-right:0!important}
+.workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
+.workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:46px}
+.workbench-heading h2{margin-top:4px}
+.topic-tags{display:flex;align-items:center;gap:8px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:12px 1px 2px;scrollbar-width:thin}
+.topic-tag{display:inline-flex;align-items:center;gap:9px;flex:none;max-width:240px;min-height:38px;padding:6px 11px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
+.topic-tag:hover{border-color:var(--color-border-strong);background:var(--surface-hover)}
+.topic-tag.selected{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
+.topic-tag span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topic-tag strong{flex:none;font-size:12px}
+.topic-tag-empty,.topic-tags-placeholder{color:var(--color-muted-foreground);font-size:13px}
+.workbench-content{padding-right:12px}
+.topic-detail{max-width:1000px;padding:2px 2px 28px}
+.topic-detail-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:8px 0 18px}
+.topic-detail-heading h3{margin-top:7px;overflow-wrap:anywhere;font-size:clamp(21px,2vw,28px)}
+.detail-frequency{flex:none}
+.detail-section{margin-top:16px;padding-top:18px}
+.detail-section h4{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.detail-section h4 span{color:var(--color-muted-foreground);font-size:12px;font-weight:500}
+.question-answer-list{display:grid;gap:14px;margin:0;padding:0;list-style:none}
+.question-answer{padding:16px;border:1px solid var(--color-border);border-radius:10px;background:color-mix(in srgb,var(--color-card) 85%,transparent)}
+.question-answer h5{display:flex;align-items:flex-start;gap:10px;margin:0;font-size:15px;line-height:1.6;overflow-wrap:anywhere}
+.question-answer h5 span{flex:none;padding:2px 7px;border-radius:5px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 11%,var(--color-card));font-size:11px}
+.reference-answer{margin:14px 0 0;padding:13px 15px;border-left:3px solid var(--color-primary);border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--color-primary) 5%,var(--color-card))}
+.reference-answer strong{color:var(--color-primary);font-size:12px}
+.reference-answer p{margin:7px 0 0;color:var(--color-foreground);line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+.project-resume-hint{padding:12px 14px;border-radius:8px;color:var(--color-muted-foreground);background:color-mix(in srgb,var(--color-primary) 6%,var(--color-card));font-size:13px;line-height:1.6}
+.project-resume-hint button{display:inline;padding:0;border:0;color:var(--color-primary);background:transparent;font-weight:700}
+@media(max-width:900px){
+  .summary-columns{display:block;overflow:hidden}
+  .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
+  .summary-pane.mobile-pane-active{display:flex}
+  .mobile-pane-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workbench-header{padding-bottom:10px}
+  .topic-tags{padding-top:9px}
+}
+@media(max-width:620px){
+  .workbench-heading{align-items:flex-start;flex-direction:column;gap:6px}
+  .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+  .topic-kind-switch button{min-width:0}
+  .topic-detail-heading{align-items:flex-start;flex-direction:column}
+  .question-answer{padding:13px}
+}
+@media(prefers-reduced-motion:reduce){.topic-tag{transition:none}}
 </style>

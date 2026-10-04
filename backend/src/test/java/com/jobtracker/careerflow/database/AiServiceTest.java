@@ -226,6 +226,7 @@ class AiServiceTest {
         AiService service = service(new MockEnvironment(), sandbox);
         var request = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(), new ObjectMapper().createObjectNode());
         String instruction = request.path("messages").get(0).path("content").asText();
-        assertThat(instruction).contains("宽泛的知识主题", "最多归纳 8 个主题", "每个原始问题只计入一个", "覆盖的原始问题数");
+        assertThat(instruction).contains("宽泛主题", "最多归纳 8 个主题", "每个原始问题只计入一个", "覆盖的原始问题数",
+            "详细、完整", "结合输入简历", "questionAnswers");
     }
 }
