@@ -8,10 +8,9 @@ import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
 import MailRecognition from './MailRecognition.vue'
 import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
-import ProductGuide from './ProductGuide.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
-type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'interview-summary' | 'profile' | 'admin' | 'guide'
+type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'interview-summary' | 'profile' | 'admin'
 
 const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'home', label: '首页', icon: 'M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6H9.5v6H5a1.5 1.5 0 0 1-1.5-1.5Z' },
@@ -20,8 +19,7 @@ const pages: { id: Page; label: string; icon: string }[] = [
   { id: 'mail', label: '邮件识别', icon: 'M3 5h14v12H3ZM3 6l7 6 7-6M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm2.2 5.2L22 21' },
   { id: 'stats', label: '统计', icon: 'M4 4v16h16M7 16l4-5 3 3 5-7M16 7h3v3' },
   { id: 'interview-summary', label: '面试总结', icon: 'M5 3.5h10l4 4V20H5a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Zm9 0V8h5M7 12h9M7 16h6' },
-  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2' },
-  { id: 'guide', label: '使用指引', icon: 'M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5Zm0 0V21m4-15h8m-8 4h8m-8 4h5' }
+  { id: 'admin', label: '管理员', icon: 'M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2' }
 ]
 
 const pageComponents: Record<Page, Component> = {
@@ -32,8 +30,7 @@ const pageComponents: Record<Page, Component> = {
   stats: ProductAnalytics,
   'interview-summary': ProductInterviewSummary,
   profile: ProductSettingsWorkspace,
-  admin: AdminDashboard,
-  guide: ProductGuide
+  admin: AdminDashboard
 }
 
 const activePage = ref<Page>('home')
@@ -172,14 +169,14 @@ onBeforeUnmount(() => {
       <div class="sidebar-account" :inert="mobileViewport && !mobileMenuOpen"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
-    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary', 'guide-page-shell': activePage === 'guide' }">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary' }">
       <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
         <button v-if="activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary', 'guide-content': activePage === 'guide' }">
+      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
           <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" @focus-resume="focusResumeSettings" />
         </KeepAlive>
@@ -245,7 +242,6 @@ nav button.active::before { content: ''; position: absolute; left: -1px; top: 13
 .application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
-.page-content.guide-content { width: 100%; max-width: none; }
 .page-content.stats-content { display: flow-root; }
 .product-main.interview-summary-page{height:100dvh;min-height:0;padding-bottom:0;overflow:hidden}
 .page-content.interview-summary-content{width:100%;max-width:none;height:100%;min-height:0}
