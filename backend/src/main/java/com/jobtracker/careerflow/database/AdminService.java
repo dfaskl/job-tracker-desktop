@@ -51,6 +51,21 @@ public class AdminService {
         return new AdminStatus(true, true, true, "管理员功能已开启");
     }
 
+    public boolean isAdmin(String email) throws Exception {
+        if (!status().enabled()) return false;
+        String normalizedEmail = normalizeEmail(email);
+        String configuredAdminEmail = normalizeEmail(environment.getProperty("ADMIN_EMAIL"));
+        boolean configuredAdmin = !configuredAdminEmail.isBlank() && configuredAdminEmail.equals(normalizedEmail);
+        try (Connection connection = openConnection(); PreparedStatement statement = connection.prepareStatement(
+            "SELECT is_admin FROM users WHERE lower(email)=? AND disabled_at IS NULL"
+        )) {
+            statement.setString(1, normalizedEmail);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && (result.getBoolean("is_admin") || configuredAdmin);
+            }
+        }
+    }
+
     public Overview overview(String adminEmail) throws Exception {
         try (Connection connection = openConnection()) {
             AdminIdentity admin = requireAdmin(connection, adminEmail);

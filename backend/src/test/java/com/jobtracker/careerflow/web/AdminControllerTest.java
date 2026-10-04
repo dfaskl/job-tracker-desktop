@@ -25,6 +25,22 @@ import static org.mockito.Mockito.when;
 
 class AdminControllerTest {
     @Test
+    void reportsOnlyWhetherTheAuthenticatedAccountHasAdminAccess() throws Exception {
+        AuthController auth = mock(AuthController.class);
+        AdminService service = mock(AdminService.class);
+        LegacyUser user = new LegacyUser(1, "admin@example.com", "salt", "hash", false);
+        when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));
+        when(service.isAdmin("admin@example.com")).thenReturn(true);
+        AdminController controller = new AdminController(auth, service);
+
+        var response = controller.access("token");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(java.util.Map.of("isAdmin", true));
+        verify(service).isAdmin("admin@example.com");
+    }
+
+    @Test
     void exportsAUsersBusinessDataForAnAuthenticatedAdmin() throws Exception {
         AuthController auth = mock(AuthController.class);
         AdminService service = mock(AdminService.class);

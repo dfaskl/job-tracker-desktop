@@ -9,6 +9,7 @@ import MailRecognition from './MailRecognition.vue'
 import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
+import { api } from './api'
 
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'interview-summary' | 'profile' | 'admin'
 
@@ -34,6 +35,9 @@ const pageComponents: Record<Page, Component> = {
 }
 
 const activePage = ref<Page>('home')
+const isAdmin = ref(false)
+const adminAccessLoaded = ref(false)
+const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || isAdmin.value))
 const focusApplicationId = ref('')
 const mobileMenuOpen = ref(false)
 const mainContent = ref<HTMLElement | null>(null)
@@ -56,6 +60,12 @@ function routeFromHash() {
 
 function syncHash() {
   const route = routeFromHash()
+  if (route.page === 'admin' && (!adminAccessLoaded.value || !isAdmin.value)) {
+    if (adminAccessLoaded.value) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/home`)
+    activePage.value = 'home'
+    focusApplicationId.value = ''
+    return
+  }
   activePage.value = route.page
   focusApplicationId.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('focus') || '' : ''
   if (route.applicationId) store.requestApplicationDetail(route.applicationId)
@@ -69,6 +79,7 @@ async function createApplication() {
   store.requestNewApplication()
 }
 function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focus' = 'detail') {
+  if (page === 'admin' && !isAdmin.value) return
   mobileMenuOpen.value = false
   const targetHash = page === 'applications' && applicationId ? `applications?${behavior === 'focus' ? 'focus' : 'application'}=${encodeURIComponent(applicationId)}` : page
   if (window.location.hash.replace(/^#\/?/, '') === targetHash) {
@@ -130,6 +141,12 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('resize', syncViewport)
   await store.initialize()
+  if (store.user.value) {
+    try { isAdmin.value = (await api<{ isAdmin: boolean }>('/api/poc/admin-sandbox/access')).isAdmin === true }
+    catch { isAdmin.value = false }
+  }
+  adminAccessLoaded.value = true
+  syncHash()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
   lastBusinessRefresh = Date.now()
   syncHash()
@@ -161,7 +178,7 @@ onBeforeUnmount(() => {
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
       <nav id="primary-navigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
-        <button v-for="item in pages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
+        <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
       </nav>

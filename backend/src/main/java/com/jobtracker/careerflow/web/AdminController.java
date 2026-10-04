@@ -44,6 +44,19 @@ public class AdminController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(adminService.status());
     }
 
+    @GetMapping("/access")
+    public ResponseEntity<?> access(
+        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token
+    ) {
+        try {
+            Optional<LegacyUser> user = authController.authenticatedUser(token);
+            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+            return ok(Map.of("isAdmin", adminService.isAdmin(user.get().email())));
+        } catch (Exception exception) {
+            return mapException("access", exception);
+        }
+    }
+
     @GetMapping("/overview")
     public ResponseEntity<?> overview(
         @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token

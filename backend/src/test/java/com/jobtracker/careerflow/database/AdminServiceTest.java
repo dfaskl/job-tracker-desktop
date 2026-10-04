@@ -35,6 +35,15 @@ class AdminServiceTest {
     }
 
     @Test
+    void doesNotGrantAdminAccessWhenAdminFeaturesAreDisabled() throws Exception {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("APP_DATABASE_URL", "postgres://db.example.com/main")
+            .withProperty("ADMIN_ENABLED", "false")
+            .withProperty("ADMIN_EMAIL", "admin@example.com");
+        assertThat(service(environment).isAdmin("admin@example.com")).isFalse();
+    }
+
+    @Test
     void mapsApplicationTimelineAndEventsWithoutReturningSecrets() throws Exception {
         AdminService service = service(new MockEnvironment());
         String document = """
