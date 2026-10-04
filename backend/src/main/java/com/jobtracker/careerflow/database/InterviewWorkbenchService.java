@@ -1,6 +1,7 @@
 package com.jobtracker.careerflow.database;
 
 import com.jobtracker.careerflow.database.AiService.AiResponseException;
+import com.jobtracker.careerflow.database.AiService.AiRateLimitException;
 import com.jobtracker.careerflow.database.AiService.AiValidationException;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -20,15 +21,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "importance-prioritized-review-v9";
+    private static final String SUMMARY_VERSION = "importance-prioritized-review-v10-batched";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;
     private final AiService ai;
+    private final ConcurrentMap<String, ReentrantLock> summaryLocks = new ConcurrentHashMap<>();
 
     public InterviewWorkbenchService(Environment environment, ApplicationService applications, ObjectMapper mapper, AiService ai) {
         this.environment = environment;
@@ -72,74 +77,272 @@ public class InterviewWorkbenchService {
     }
 
     public ObjectNode summarize(String email) throws Exception {
-        Document snapshot;
-        try (Connection connection = open()) { snapshot = read(connection, email, false); }
-        ObjectNode workbench = workbench(snapshot.root());
-        ArrayNode allReviews = reviews(snapshot.root());
-        ArrayNode selected = summaryInput(allReviews);
-        int size = 0;
-        for (JsonNode item : selected) size += item.toString().length();
-        if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
-        if (size > 100_000) throw new AiValidationException("面试回顾内容超过本次汇总上限，请精简过长的记录后重试");
-        JsonNode resume = workbench.path("resume");
-        String summaryKey = summaryFingerprint(selected, resume);
-        JsonNode result = ai.summarizeInterviewReviews(email, selected, resume);
-        ObjectNode summary = cleanSummary(result, resume);
-        summary.put("sourceKey", summaryKey);
-        try (Connection connection = open()) {
-            connection.setAutoCommit(false);
-            try {
-                Document current = read(connection, email, true);
-                ObjectNode currentWorkbench = workbench(current.root());
-                if (!summaryKey.equals(summaryFingerprint(summaryInput(reviews(current.root())),
-                    currentWorkbench.path("resume")))) {
-                    throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
-                }
-                currentWorkbench.remove("classification");
-                currentWorkbench.remove("summaries");
-                currentWorkbench.set("overallSummary", summary);
-                write(connection, current);
-                connection.commit();
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-        return state(email);
+        return summarizeStreaming(email, ignored -> { });
     }
 
     public ObjectNode summarizeStreaming(String email, Consumer<ObjectNode> onQuestion) throws Exception {
+        return summarizeStreaming(email, onQuestion, false);
+    }
+
+    public ObjectNode summarizeStreaming(String email, Consumer<ObjectNode> onQuestion, boolean force) throws Exception {
+        String lockKey = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        ReentrantLock lock = summaryLocks.computeIfAbsent(lockKey, ignored -> new ReentrantLock());
+        lock.lock();
+        try { return summarizeStreamingLocked(email, onQuestion, force); }
+        finally { lock.unlock(); }
+    }
+
+    private ObjectNode summarizeStreamingLocked(String email, Consumer<ObjectNode> onQuestion, boolean force) throws Exception {
         Document snapshot;
         try (Connection connection = open()) { snapshot = read(connection, email, false); }
         ObjectNode workbench = workbench(snapshot.root());
         ArrayNode selected = summaryInput(reviews(snapshot.root()));
-        int size = 0;
-        for (JsonNode item : selected) size += item.toString().length();
         if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
-        if (size > 100_000) throw new AiValidationException("面试回顾内容超过本次汇总上限，请精简过长的记录后重试");
         JsonNode resume = workbench.path("resume");
         String summaryKey = summaryFingerprint(selected, resume);
-        IncrementalInterviewJsonParser parser = new IncrementalInterviewJsonParser(mapper, node -> {
-            ObjectNode question = mapper.createObjectNode();
-            question.put("question", node.path("question").asText());
-            question.put("answer", node.path("answer").asText());
-            onQuestion.accept(question);
-        });
-        JsonNode result = ai.streamSummarizeInterviewReviews(email, selected, resume, parser::accept);
-        ObjectNode summary = cleanSummary(result, resume);
-        summary.put("sourceKey", summaryKey);
+        boolean resumableJob = !force && workbench.path("summaryJob") instanceof ObjectNode savedJob
+            && summaryKey.equals(savedJob.path("sourceKey").asText());
+        ObjectNode job = resumableJob && workbench.path("summaryJob") instanceof ObjectNode saved
+            && summaryKey.equals(saved.path("sourceKey").asText()) ? saved.deepCopy() : newSummaryJob(summaryKey);
+        ArrayNode classificationBatches = (ArrayNode) job.path("classificationBatches");
+        ArrayNode reviewBatches = reviewBatches(selected, 12_000);
+        if (classificationBatches.size() != reviewBatches.size()) {
+            classificationBatches.removeAll();
+            for (int i = 0; i < reviewBatches.size(); i++) classificationBatches.addObject().put("status", "pending");
+        }
+        persistJob(email, summaryKey, job, null);
+        for (int index = 0; index < reviewBatches.size(); index++) {
+            ObjectNode batchState = (ObjectNode) classificationBatches.get(index);
+            if ("completed".equals(batchState.path("status").asText())) continue;
+            onQuestion.accept(progress("正在识别面试回顾（第 " + (index + 1) + "/" + reviewBatches.size() + " 批）…"));
+            batchState.put("status", "running"); persistJob(email, summaryKey, job, null);
+            JsonNode candidate = classifyWithRateLimitRetry(email, reviewBatches.get(index), resume);
+            if (!candidate.path("topics").isArray()) throw new AiResponseException("AI 未返回第 " + (index + 1) + " 批问题分类");
+            batchState.set("topics", candidate.path("topics").deepCopy()); batchState.put("status", "completed");
+            persistJob(email, summaryKey, job, null);
+        }
+
+        ObjectNode summary;
+        JsonNode previousSummary = workbench.path("overallSummary");
+        if (resumableJob && previousSummary instanceof ObjectNode savedSummary && summaryKey.equals(savedSummary.path("sourceKey").asText())
+            && savedSummary.path("topics").isArray()) summary = savedSummary.deepCopy();
+        else summary = mergeClassifications(classificationBatches, resume);
+        summary.put("sourceKey", summaryKey).put("stale", false);
+        for (JsonNode batch : classificationBatches) if (batch instanceof ObjectNode batchObject) batchObject.remove("topics");
+        job.put("stage", "answers");
+        persistJob(email, summaryKey, job, summary);
+        ObjectNode classifiedEvent = mapper.createObjectNode().put("type", "classified");
+        classifiedEvent.set("summary", summary.deepCopy()); onQuestion.accept(classifiedEvent);
+        ArrayNode topics = (ArrayNode) summary.path("topics");
+        int totalBatches = countAnswerBatches(topics);
+        int batchNumber = 0;
+        for (JsonNode topicNode : topics) {
+            ObjectNode topic = (ObjectNode) topicNode;
+            ArrayNode answers = (ArrayNode) topic.path("questionAnswers");
+            ArrayNode pending = mapper.createArrayNode();
+            for (JsonNode item : answers) if (item.path("answer").asText("").isBlank()) pending.add(item.deepCopy());
+            for (int from = 0; from < pending.size(); from += 3) {
+                ArrayNode batch = mapper.createArrayNode();
+                for (int i = from; i < Math.min(from + 3, pending.size()); i++) batch.add(pending.get(i).deepCopy());
+                batchNumber++;
+                onQuestion.accept(progress("正在生成「" + topic.path("name").asText() + "」的学习讲解（第 " + batchNumber + "/" + totalBatches + " 批）…"));
+                for (JsonNode item : batch) setAnswerStatus(answers, item.path("question").asText(), "running");
+                persistJob(email, summaryKey, job, summary);
+                String resumeRef = topic.path("resumeRef").asText("");
+                JsonNode relevantResume = resumeForReference(resume, resumeRef);
+                IncrementalInterviewJsonParser parser = new IncrementalInterviewJsonParser(mapper, node -> {
+                    ObjectNode event = mapper.createObjectNode().put("type", "question")
+                        .put("question", node.path("question").asText()).put("answer", node.path("answer").asText())
+                        .put("topic", topic.path("name").asText());
+                    onQuestion.accept(event);
+                });
+                JsonNode result = streamAnswersWithRateLimitRetry(email, topic, batch, relevantResume, parser::accept);
+                JsonNode generated = result.path("questionAnswers");
+                if (!generated.isArray()) throw new AiResponseException("AI 未返回完整的问题回答");
+                for (JsonNode item : batch) {
+                    JsonNode answer = findAnswer(generated, item.path("question").asText());
+                    String answerText = answer == null ? "" : answer.path("answer").asText("").trim();
+                    if (answerText.isBlank()) throw new AiResponseException("AI 未完成问题「" + item.path("question").asText() + "」的回答");
+                    updateAnswer(answers, item.path("question").asText(), answerText);
+                }
+                persistJob(email, summaryKey, job, summary);
+            }
+        }
+        job.put("stage", "completed"); job.put("completedAt", java.time.Instant.now().toString());
+        persistJob(email, summaryKey, job, summary);
+        return state(email);
+    }
+
+    private ArrayNode reviewBatches(ArrayNode reviews, int maximumChars) {
+        ArrayNode batches = mapper.createArrayNode(); ArrayNode batch = mapper.createArrayNode(); int size = 0;
+        for (JsonNode review : reviews) {
+            String[] lines = review.path("questions").asText("").split("\\R");
+            StringBuilder chunkText = new StringBuilder(); int questionCount = 0;
+            for (String rawLine : lines) {
+                String line = rawLine.trim(); if (line.isEmpty()) continue;
+                if (questionCount >= 8 || chunkText.length() + line.length() > 6_000) {
+                    if (!chunkText.isEmpty()) {
+                        ObjectNode piece = reviewPiece(review, chunkText.toString());
+                        int itemSize = piece.toString().length();
+                        if (!batch.isEmpty() && size + itemSize > maximumChars) { batches.add(batch); batch = mapper.createArrayNode(); size = 0; }
+                        batch.add(piece); size += itemSize;
+                    }
+                    chunkText.setLength(0); questionCount = 0;
+                }
+                if (!chunkText.isEmpty()) chunkText.append('\n');
+                chunkText.append(line); questionCount++;
+            }
+            if (!chunkText.isEmpty()) {
+                ObjectNode piece = reviewPiece(review, chunkText.toString());
+                int itemSize = piece.toString().length();
+                if (!batch.isEmpty() && size + itemSize > maximumChars) { batches.add(batch); batch = mapper.createArrayNode(); size = 0; }
+                batch.add(piece); size += itemSize;
+            }
+        }
+        if (!batch.isEmpty()) batches.add(batch);
+        return batches;
+    }
+
+    private ObjectNode reviewPiece(JsonNode review, String questions) {
+        ObjectNode piece = mapper.createObjectNode();
+        for (String field : new String[]{"eventId", "applicationId", "company", "position", "title"})
+            piece.put(field, review.path(field).asText(""));
+        piece.put("questions", questions); return piece;
+    }
+
+    private ObjectNode newSummaryJob(String key) {
+        ObjectNode job = mapper.createObjectNode().put("sourceKey", key).put("stage", "classification");
+        job.putArray("classificationBatches"); return job;
+    }
+
+    private ObjectNode progress(String message) { return mapper.createObjectNode().put("type", "progress").put("message", message); }
+
+    private JsonNode classifyWithRateLimitRetry(String email, JsonNode reviews, JsonNode resume) throws Exception {
+        for (int attempt = 0; ; attempt++) {
+            try { return ai.classifyInterviewReviewBatch(email, reviews, resume); }
+            catch (AiRateLimitException exception) {
+                if (attempt >= 3) throw exception;
+                Thread.sleep(3_100L);
+            }
+        }
+    }
+
+    private JsonNode streamAnswersWithRateLimitRetry(String email, JsonNode topic, JsonNode questions,
+                                                       JsonNode resume, Consumer<String> onChunk) throws Exception {
+        for (int attempt = 0; ; attempt++) {
+            try { return ai.streamInterviewAnswerBatch(email, topic, questions, resume, onChunk); }
+            catch (AiRateLimitException exception) {
+                if (attempt >= 3) throw exception;
+                Thread.sleep(3_100L);
+            }
+        }
+    }
+
+    private void persistJob(String email, String key, ObjectNode job, ObjectNode summary) throws Exception {
         try (Connection connection = open()) {
             connection.setAutoCommit(false);
             try {
-                Document current = read(connection, email, true);
-                ObjectNode currentWorkbench = workbench(current.root());
-                if (!summaryKey.equals(summaryFingerprint(summaryInput(reviews(current.root())), currentWorkbench.path("resume"))))
+                Document current = read(connection, email, true); ObjectNode wb = workbench(current.root());
+                if (!key.equals(summaryFingerprint(summaryInput(reviews(current.root())), wb.path("resume"))))
                     throw new WorkbenchConflictException("面试回顾或简历已更新，请重新汇总");
-                currentWorkbench.remove("classification");
-                currentWorkbench.remove("summaries");
-                currentWorkbench.set("overallSummary", summary);
-                write(connection, current);
-                connection.commit();
+                wb.set("summaryJob", job.deepCopy());
+                if (summary != null) wb.set("overallSummary", summary.deepCopy());
+                write(connection, current); connection.commit();
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
-        return state(email);
+    }
+
+    private ObjectNode mergeClassifications(ArrayNode batches, JsonNode resume) {
+        ObjectNode merged = mapper.createObjectNode(); ArrayNode topics = merged.putArray("topics");
+        Map<String, ObjectNode> byKey = new LinkedHashMap<>();
+        for (int b = 0; b < batches.size(); b++) for (JsonNode candidate : batches.get(b).path("topics")) {
+            String kind = candidate.path("kind").asText("other");
+            if (!Set.of("project", "knowledge", "other").contains(kind)) kind = "other";
+            String ref = candidate.path("resumeRef").asText("");
+            if (kind.equals("project") && !validResumeReference(resume, ref)) continue;
+            String name = kind.equals("project") ? resumeName(resume, ref) : limit(candidate.path("name").asText("其他问题").trim(), 100);
+            String key = kind + ":" + (kind.equals("project") ? ref : normalizeTopic(name));
+            final String topicKind = kind, topicRef = ref, topicName = name;
+            ObjectNode topic = byKey.computeIfAbsent(key, ignored -> {
+                ObjectNode created = mapper.createObjectNode().put("name", topicName).put("count", 0).put("kind", topicKind)
+                    .put("resumeRef", topicKind.equals("project") ? topicRef : "").put("summary", "");
+                created.putArray("questionAnswers"); topics.add(created); return created;
+            });
+            ArrayNode questionAnswers = (ArrayNode) topic.path("questionAnswers");
+            for (JsonNode question : candidate.path("questions")) {
+                String text = limit(question.path("question").asText("").trim(), 500); if (text.isEmpty()) continue;
+                JsonNode existing = findAnswer(questionAnswers, text);
+                String eventId = question.path("eventId").asText("");
+                if (existing instanceof ObjectNode existingQuestion) {
+                    existingQuestion.put("frequency", existing.path("frequency").asInt(1) + 1);
+                    if (!eventId.isBlank() && existingQuestion.path("sourceEventIds") instanceof ArrayNode sources) {
+                        boolean seen = false; for (JsonNode sourceId : sources) if (sourceId.asText().equals(eventId)) { seen = true; break; }
+                        if (!seen) sources.add(eventId);
+                    }
+                    topic.put("count", topic.path("count").asInt() + 1);
+                    continue;
+                }
+                ObjectNode item = questionAnswers.addObject().put("question", text).put("answer", "")
+                    .put("answerStatus", "pending").put("frequency", 1).put("eventId", eventId);
+                ArrayNode sourceIds = item.putArray("sourceEventIds"); if (!eventId.isBlank()) sourceIds.add(eventId);
+                topic.put("count", topic.path("count").asInt() + 1);
+            }
+            String description = candidate.path("summary").asText("").trim();
+            if (!description.isEmpty()) topic.put("summary", limit(description, 500));
+        }
+        // Project directories always mirror the user's resume, including experiences with no matching questions.
+        Map<String, ObjectNode> resumeTopics = new LinkedHashMap<>();
+        addResumeTopics(resume.path("internships"), "internship-", "internship", resumeTopics);
+        addResumeTopics(resume.path("projects"), "project-", "project", resumeTopics);
+        for (Map.Entry<String, ObjectNode> entry : resumeTopics.entrySet()) {
+            String key = "project:" + entry.getKey();
+            if (!byKey.containsKey(key)) topics.add(entry.getValue());
+        }
+        if (topics.isEmpty()) throw new AiResponseException("没有识别出可整理的问题");
+        var sortedTopics = new java.util.ArrayList<JsonNode>();
+        for (JsonNode topic : topics) sortedTopics.add(topic);
+        sortedTopics.sort((left, right) -> Integer.compare(right.path("count").asInt(), left.path("count").asInt()));
+        topics.removeAll(); for (JsonNode topic : sortedTopics) topics.add(topic);
+        return merged;
+    }
+
+    private boolean validResumeReference(JsonNode resume, String reference) {
+        return reference.startsWith("internship-") && indexExists(resume.path("internships"), reference, "internship-")
+            || reference.startsWith("project-") && indexExists(resume.path("projects"), reference, "project-");
+    }
+    private boolean indexExists(JsonNode entries, String reference, String prefix) {
+        try { int index = Integer.parseInt(reference.substring(prefix.length())) - 1; return entries.isArray() && index >= 0 && index < entries.size(); }
+        catch (NumberFormatException exception) { return false; }
+    }
+    private String resumeName(JsonNode resume, String reference) {
+        boolean internship = reference.startsWith("internship-"); JsonNode entries = resume.path(internship ? "internships" : "projects");
+        int index = Integer.parseInt(reference.substring(internship ? 11 : 8)) - 1; JsonNode item = entries.path(index);
+        if (!internship) return limit(item.path("name").asText("项目经历 " + (index + 1)), 100);
+        String company = item.path("company").asText(""); String role = item.path("role").asText("");
+        String value = String.join(" · ", java.util.stream.Stream.of(company, role).filter(v -> !v.isBlank()).toList());
+        return limit(value.isBlank() ? "实习经历 " + (index + 1) : value + "（实习）", 100);
+    }
+    private String normalizeTopic(String value) { return value.toLowerCase(Locale.ROOT).replaceAll("[\\s，。、“”‘’：:;；、/_-]+", ""); }
+    private JsonNode resumeForReference(JsonNode resume, String reference) {
+        if (!validResumeReference(resume, reference)) return mapper.createObjectNode();
+        boolean internship = reference.startsWith("internship-"); int index = Integer.parseInt(reference.substring(internship ? 11 : 8)) - 1;
+        ObjectNode result = mapper.createObjectNode(); result.set(internship ? "internship" : "project", resume.path(internship ? "internships" : "projects").get(index).deepCopy());
+        return result;
+    }
+    private int countAnswerBatches(ArrayNode topics) {
+        int count = 0; for (JsonNode topic : topics) { int pending = 0; for (JsonNode q : topic.path("questionAnswers")) if (q.path("answer").asText("").isBlank()) pending++; count += (pending + 2) / 3; }
+        return Math.max(1, count);
+    }
+    private JsonNode findAnswer(JsonNode answers, String question) {
+        if (!answers.isArray()) return null;
+        for (JsonNode item : answers) if (item.path("question").asText("").equalsIgnoreCase(question)) return item;
+        return null;
+    }
+    private void updateAnswer(ArrayNode answers, String question, String answer) {
+        for (JsonNode item : answers) if (item instanceof ObjectNode object && item.path("question").asText("").equalsIgnoreCase(question)) { object.put("answer", limit(answer.trim(), 5_000)); object.put("answerStatus", "completed"); return; }
+    }
+    private void setAnswerStatus(ArrayNode answers, String question, String status) {
+        for (JsonNode item : answers) if (item instanceof ObjectNode object && item.path("question").asText("").equalsIgnoreCase(question)) { object.put("answerStatus", status); return; }
     }
 
     private ObjectNode cleanResume(JsonNode source) {
@@ -270,7 +473,7 @@ public class InterviewWorkbenchService {
         ArrayNode selected = mapper.createArrayNode();
         for (JsonNode review : allReviews) {
             ObjectNode item = selected.addObject();
-            for (String field : new String[]{"company", "position", "title", "questions"}) item.put(field, review.path(field).asText(""));
+            for (String field : new String[]{"eventId", "company", "position", "title", "questions"}) item.put(field, review.path(field).asText(""));
         }
         return selected;
     }

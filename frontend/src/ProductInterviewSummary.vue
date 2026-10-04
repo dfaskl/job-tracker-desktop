@@ -4,9 +4,9 @@ import { api } from './api'
 import { summarizeInterviewReviewsStream } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
-type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string }[] }
+type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string; answerStatus?: string; frequency?: number }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
-type Workbench = { sourceKey: string; overallSummary?: Summary }
+type Workbench = { sourceKey: string; overallSummary?: Summary; summaryJob?: { stage?: string; classificationBatches?: { status: string }[] } }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
 
 const emit = defineEmits<{ navigate: [page: 'profile'] }>()
@@ -35,6 +35,7 @@ const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
 }).sort((a, b) => String(b.event.startsAt || b.event.date || '').localeCompare(String(a.event.startsAt || a.event.date || ''))))
 const reviewSignature = computed(() => reviews.value.map(item => `${item.event.id}|${item.application.id}|${item.company}|${item.position}|${item.title}|${item.questions}`).sort().join('\n'))
 const summary = computed(() => state.value?.overallSummary)
+const hasIncompleteAnswers = computed(() => (summary.value?.topics || []).some(topic => topic.questionAnswers.some(item => !item.answer)))
 const projectTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'project').sort((a, b) => b.count - a.count))
 const knowledgeTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'knowledge').sort((a, b) => b.count - a.count))
 const otherTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'other').sort((a, b) => b.count - a.count))
@@ -62,13 +63,14 @@ async function loadState(autoSummarize = true) {
     state.value = await api<Workbench>('/api/poc/interview-workbench')
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取面试总结失败' }
   finally { loading.value = false }
-  if (autoSummarize && state.value && reviews.value.length && (!summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
+  const unfinishedJob = !!state.value?.summaryJob && state.value.summaryJob.stage !== 'completed'
+  if (autoSummarize && state.value && reviews.value.length && (unfinishedJob || !summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
     autoAttemptedKey = state.value.sourceKey
     await summarize(true)
   }
 }
 
-async function summarize(automatic = false) {
+async function summarize(automatic = false, force = false) {
   if (!reviews.value.length || summarizing.value) return
   summarizing.value = true; error.value = ''; message.value = ''
   streamingQuestions.value = []
@@ -76,8 +78,12 @@ async function summarize(automatic = false) {
   try {
     await summarizeInterviewReviewsStream(event => {
       if (event.type === 'progress') streamingStatus.value = event.message
+      else if (event.type === 'classified') {
+        state.value = { ...state.value, sourceKey: state.value?.sourceKey || '', overallSummary: event.summary as Summary }
+        streamingStatus.value = '分类已完成，正在逐批生成学习讲解…'
+      }
       else streamingQuestions.value.push({ question: event.question, answer: event.answer })
-    })
+    }, force)
     state.value = await api<Workbench>('/api/poc/interview-workbench')
     autoAttemptedKey = state.value.sourceKey
     message.value = automatic ? '面试回顾已自动汇总' : '考点汇总已更新'
@@ -119,7 +125,7 @@ watch(topicEntries, entries => {
     <div class="page-notices">
       <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
       <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="emit('navigate', 'profile')">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
-      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="summarize(false)">{{ summarizing ? '正在汇总…' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
+      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="summarize(false, !!summary && !summary.stale && !hasIncompleteAnswers)">{{ summarizing ? '正在分批整理…' : summary?.stale ? '重新汇总全部考点' : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button></nav>
     <div class="summary-columns">

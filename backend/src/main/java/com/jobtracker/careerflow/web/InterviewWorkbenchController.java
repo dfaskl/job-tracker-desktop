@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.JsonNode;
@@ -79,7 +80,8 @@ public class InterviewWorkbenchController {
     @PostMapping(value = "/summarize/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<?> summarizeStream(
         @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
-        HttpServletRequest request
+        HttpServletRequest request,
+        @RequestParam(defaultValue = "false") boolean force
     ) {
         if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
         Optional<LegacyUser> user;
@@ -87,7 +89,7 @@ public class InterviewWorkbenchController {
         catch (Exception exception) { return mapException("summarize stream", exception); }
         if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
 
-        SseEmitter emitter = new SseEmitter(300_000L);
+        SseEmitter emitter = new SseEmitter(3_600_000L);
         Thread.startVirtualThread(() -> {
             AtomicBoolean finished = new AtomicBoolean();
             Thread heartbeat = Thread.startVirtualThread(() -> {
@@ -103,10 +105,14 @@ public class InterviewWorkbenchController {
             });
             try {
                 emitter.send(SseEmitter.event().name("progress").data(Map.of("message", "正在连接 AI 并分析面试问题…")));
-                workbench.summarizeStreaming(user.get().email(), question -> {
-                    try { emitter.send(SseEmitter.event().name("question").data(question)); }
+                workbench.summarizeStreaming(user.get().email(), update -> {
+                    try {
+                        String eventName = update.path("type").asText("question");
+                        update.remove("type");
+                        emitter.send(SseEmitter.event().name(eventName).data(update));
+                    }
                     catch (Exception exception) { throw new StreamDisconnectedException(exception); }
-                });
+                }, force);
                 emitter.send(SseEmitter.event().name("complete").data(Map.of("saved", true)));
                 emitter.complete();
             } catch (Exception exception) {

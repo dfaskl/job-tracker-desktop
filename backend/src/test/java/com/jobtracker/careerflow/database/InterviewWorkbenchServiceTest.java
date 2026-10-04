@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,65 @@ import static org.mockito.Mockito.when;
 
 class InterviewWorkbenchServiceTest {
     @Test
+    void classifiesReviewsInSavedBatchesThenStreamsAndPersistsAnswersBySmallBatches() throws Exception {
+        Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
+        Files.createDirectories(directory);
+        String jdbc = "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db");
+        MockEnvironment environment = new MockEnvironment().withProperty("APP_DATABASE_URL", jdbc)
+            .withProperty("ALLOW_REGISTRATION", "true");
+        new DatabaseSchemaInitializer(environment).run(null);
+        ObjectMapper mapper = new ObjectMapper();
+        ApplicationService applications = new ApplicationService(environment, mapper, new ApplicationDocumentMutator(mapper));
+        new AccountService(environment, applications, new LegacyPasswordVerifier()).register("batch@example.com", "correct-horse-battery", "");
+        String longReview = "解释线程池的核心线程数、最大线程数、队列和拒绝策略。" + "面试追问背景。".repeat(900);
+        String document = "{\"applications\":[{\"id\":\"job\",\"company\":\"甲公司\",\"position\":\"Java 工程师\"}],\"events\":["
+            + "{\"id\":\"e1\",\"applicationId\":\"job\",\"type\":\"面试\",\"title\":\"一面\",\"completed\":true,\"interviewQuestions\":" + mapper.writeValueAsString(longReview) + "},"
+            + "{\"id\":\"e2\",\"applicationId\":\"job\",\"type\":\"面试\",\"title\":\"二面\",\"completed\":true,\"interviewQuestions\":" + mapper.writeValueAsString(longReview) + "},"
+            + "{\"id\":\"e3\",\"applicationId\":\"job\",\"type\":\"面试\",\"title\":\"三面\",\"completed\":true,\"interviewQuestions\":" + mapper.writeValueAsString(longReview) + "}]}";
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.prepareStatement("UPDATE user_data SET data=? WHERE user_id=(SELECT id FROM users WHERE email=?)")) {
+            statement.setString(1, document); statement.setString(2, "batch@example.com"); statement.executeUpdate();
+        }
+        AiService ai = mock(AiService.class);
+        when(ai.classifyInterviewReviewBatch(eq("batch@example.com"), any(), any())).thenAnswer(invocation -> {
+            JsonNode batch = invocation.getArgument(1);
+            var topics = mapper.createObjectNode().putArray("topics");
+            for (JsonNode review : batch) {
+                ObjectNode topic = topics.addObject().put("name", "线程池与并发").put("kind", "knowledge")
+                    .put("summary", "线程池并发控制");
+                var questions = topic.putArray("questions");
+                questions.addObject().put("question", "解释线程池参数").put("eventId", review.path("eventId").asText());
+                questions.addObject().put("question", "如何验证线程池边界：" + review.path("title").asText()).put("eventId", review.path("eventId").asText());
+            }
+            return topics.size() == 0 ? mapper.createObjectNode() : mapper.createObjectNode().set("topics", topics);
+        });
+        when(ai.streamInterviewAnswerBatch(eq("batch@example.com"), any(), any(), any(), any())).thenAnswer(invocation -> {
+            JsonNode questions = invocation.getArgument(2);
+            StringBuilder json = new StringBuilder("{\"questionAnswers\":[");
+            for (int i = 0; i < questions.size(); i++) {
+                if (i > 0) json.append(',');
+                json.append(mapper.writeValueAsString(mapper.createObjectNode().put("question", questions.get(i).path("question").asText())
+                    .put("answer", "完整的线程池复习讲解与实践细节。")));
+            }
+            json.append("]}"); String output = json.toString();
+            invocation.<java.util.function.Consumer<String>>getArgument(4).accept(output);
+            return mapper.readTree(output);
+        });
+        InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
+        var streamed = new java.util.ArrayList<ObjectNode>();
+        JsonNode result = service.summarizeStreaming("batch@example.com", streamed::add);
+        verify(ai, org.mockito.Mockito.times(3)).classifyInterviewReviewBatch(eq("batch@example.com"), any(), any());
+        verify(ai, org.mockito.Mockito.times(2)).streamInterviewAnswerBatch(eq("batch@example.com"), any(), any(), any(), any());
+        assertThat(result.path("overallSummary").path("topics").get(0).path("count").asInt()).isEqualTo(6);
+        assertThat(result.path("overallSummary").path("topics").get(0).path("questionAnswers").size()).isEqualTo(4);
+        assertThat(result.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("frequency").asInt()).isEqualTo(3);
+        assertThat(result.path("overallSummary").path("topics").get(0).path("questionAnswers").get(0).path("answerStatus").asText()).isEqualTo("completed");
+        assertThat(result.path("summaryJob").path("stage").asText()).isEqualTo("completed");
+        assertThat(streamed).anyMatch(event -> event.path("type").asText().equals("classified"));
+        assertThat(streamed).anyMatch(event -> event.path("type").asText().equals("question"));
+    }
+
+    @Test
     void summarizesAllReviewsWithoutPositionClassificationAndMarksChangesStale() throws Exception {
         Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
         Files.createDirectories(directory);
@@ -41,7 +101,7 @@ class InterviewWorkbenchServiceTest {
             {"applications":[{"id":"job-1","company":"甲公司","position":"Java开发工程师"},
                              {"id":"job-2","company":"乙公司","position":"AI开发工程师"}],
              "events":[{"id":"event-1","applicationId":"job-1","type":"面试","title":"一面","completed":true,
-               "interviewQuestions":"解释线程池参数"},
+               "interviewQuestions":"解释线程池参数\\n请做一个自我介绍"},
                {"id":"event-2","applicationId":"job-2","type":"面试","title":"二面","completed":true,
                "interviewQuestions":"介绍项目甲的架构\\nMQTT 接收报文后如何处理\\nCSV 映射和位域解码如何实现\\n如何验证 16-bit 小端解析\\n如何隔离不同厂商协议"}],
              "settings":{"interviewWorkbench":{"classification":{"categories":[{"name":"旧岗位分类"}]},"summaries":{}}}}
@@ -52,15 +112,23 @@ class InterviewWorkbenchServiceTest {
             statement.executeUpdate();
         }
         AiService ai = mock(AiService.class);
-        when(ai.summarizeInterviewReviews(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
-            "{\"topics\":[{\"name\":\"线程池\",\"count\":1,\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questionAnswers\":[{\"question\":\"解释线程池参数\",\"answer\":\"线程池通过核心线程数、最大线程数和任务队列控制并发与资源。\"}]},"
-                + "{\"name\":\"自我介绍与动机\",\"count\":1,\"kind\":\"other\",\"summary\":\"个人经历表达\",\"questionAnswers\":[{\"question\":\"请做一个自我介绍\",\"answer\":\"按背景、经历和求职动机组织内容。\"}]},"
-                + "{\"name\":\"项目架构\",\"resumeRef\":\"project-1\",\"count\":5,\"kind\":\"project\",\"summary\":\"项目追问\",\"questionAnswers\":["
-                + "{\"question\":\"介绍项目甲的架构\",\"answer\":\"结合项目甲的核心工作，说明模块边界、数据流和技术取舍。\"},"
-                + "{\"question\":\"MQTT 接收报文后如何处理\",\"answer\":\"先校验报文，再按协议解码并转换为平台模型。\"},"
-                + "{\"question\":\"CSV 映射和位域解码如何实现\",\"answer\":\"用映射配置描述字段，并通过掩码和移位解析位域。\"},"
-                + "{\"question\":\"如何验证 16-bit 小端解析\",\"answer\":\"按低字节在前的规则构造边界样例，验证组合值和符号扩展。\"},"
-                + "{\"question\":\"如何隔离不同厂商协议\",\"answer\":\"通过适配器和独立解析器隔离厂商差异，对外提供统一模型。\"}]}]}"));
+        when(ai.classifyInterviewReviewBatch(eq("reviewer@example.com"), any(), any())).thenReturn(mapper.readTree(
+            "{\"topics\":[{\"name\":\"Java 并发与线程池\",\"kind\":\"knowledge\",\"summary\":\"并发知识\",\"questions\":[{\"question\":\"解释线程池参数\",\"eventId\":\"event-1\"}]},"
+                + "{\"name\":\"自我介绍与动机\",\"kind\":\"other\",\"summary\":\"个人经历表达\",\"questions\":[{\"question\":\"请做一个自我介绍\",\"eventId\":\"event-1\"}]},"
+                + "{\"name\":\"项目甲\",\"resumeRef\":\"project-1\",\"kind\":\"project\",\"summary\":\"项目追问\",\"questions\":["
+                + "{\"question\":\"介绍项目甲的架构\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"MQTT 接收报文后如何处理\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"CSV 映射和位域解码如何实现\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"如何验证 16-bit 小端解析\",\"eventId\":\"event-2\"},"
+                + "{\"question\":\"如何隔离不同厂商协议\",\"eventId\":\"event-2\"}]}]}"));
+        when(ai.streamInterviewAnswerBatch(eq("reviewer@example.com"), any(), any(), any(), any())).thenAnswer(invocation -> {
+            JsonNode batch = invocation.getArgument(2);
+            ObjectNode response = mapper.createObjectNode(); var generated = response.putArray("questionAnswers");
+            for (JsonNode question : batch) generated.addObject().put("question", question.path("question").asText())
+                .put("answer", "结合项目甲与核心原理、执行流程、方案取舍和验证方法展开的完整学习讲解，并说明关键实现边界与实践细节。");
+            String output = response.toString(); invocation.<java.util.function.Consumer<String>>getArgument(4).accept(output);
+            return response;
+        });
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
         service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[{\"company\":\"实习公司\",\"role\":\"Java 实习生\",\"description\":\"实习简介\",\"coreWork\":\"实习工作\"}],"
@@ -70,7 +138,7 @@ class InterviewWorkbenchServiceTest {
         JsonNode summarized = service.summarize("reviewer@example.com");
         ArgumentCaptor<JsonNode> reviews = ArgumentCaptor.forClass(JsonNode.class);
         ArgumentCaptor<JsonNode> resume = ArgumentCaptor.forClass(JsonNode.class);
-        verify(ai).summarizeInterviewReviews(eq("reviewer@example.com"), reviews.capture(), resume.capture());
+        verify(ai).classifyInterviewReviewBatch(eq("reviewer@example.com"), reviews.capture(), resume.capture());
         assertThat(reviews.getValue().toString()).contains("解释线程池参数", "介绍项目甲的架构", "甲公司", "乙公司");
         assertThat(resume.getValue().toString()).contains("项目甲");
         assertThat(resume.getValue().path("projects").get(0).path("name").asText()).isEqualTo("项目甲");
