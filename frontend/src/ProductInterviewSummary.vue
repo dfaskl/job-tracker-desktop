@@ -348,7 +348,7 @@ watch(topicEntries, entries => {
 }
 @media(max-width:620px){
   .workbench-heading{align-items:flex-start;flex-direction:column;gap:6px}
-  .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+  .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
   .topic-kind-switch button{min-width:0}
   .question-answer{padding:13px}
 }
