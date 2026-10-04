@@ -311,9 +311,10 @@ watch(topicEntries, entries => {
 .stream-waiting{padding:14px 4px;color:var(--color-muted-foreground);font-size:13px;line-height:1.7}
 .stream-question-list{display:grid;gap:14px;margin:14px 0 0;padding:0;list-style:none}
 @keyframes interview-stream-spin{to{transform:rotate(360deg)}}
-@keyframes interview-pane-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.summary-columns.is-entered .review-column{animation:interview-pane-enter .22s ease-out both}
-.summary-columns.is-entered .workbench-column{animation:interview-pane-enter .24s ease-out .06s both}
+@keyframes interview-pane-enter-left{from{transform:translateX(-52px) scale(.975)}to{transform:translateX(0) scale(1)}}
+@keyframes interview-pane-enter-right{from{transform:translateX(52px) scale(.975)}to{transform:translateX(0) scale(1)}}
+.summary-columns.is-entered .review-column{animation:interview-pane-enter-left .36s cubic-bezier(.2,.75,.25,1) both}
+.summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
 .topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move{transition:opacity .18s ease,transform .18s ease,border-color .18s ease,background-color .18s ease}
 .topic-chip-enter-from,.topic-chip-leave-to{opacity:0;transform:translateY(5px) scale(.98)}
 .topic-chip-leave-active{position:absolute}
@@ -325,7 +326,9 @@ watch(topicEntries, entries => {
 @media(max-width:900px){
   .summary-columns{display:block;overflow:hidden}
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
-  .summary-pane.mobile-pane-active{display:flex;animation:interview-pane-enter .2s ease-out both}
+  .summary-pane.mobile-pane-active{display:flex}
+  .review-column.mobile-pane-active{animation:interview-pane-enter-left .32s cubic-bezier(.2,.75,.25,1) both}
+  .workbench-column.mobile-pane-active{animation:interview-pane-enter-right .32s cubic-bezier(.2,.75,.25,1) both}
   .mobile-pane-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .workbench-header{padding-bottom:10px}
   .topic-tags{padding-top:9px}
