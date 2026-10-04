@@ -227,7 +227,8 @@ class AiServiceTest {
         var request = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(), new ObjectMapper().createObjectNode());
         String instruction = request.path("messages").get(0).path("content").asText();
         assertThat(instruction).contains("宽泛主题", "knowledge", "project", "other", "全部不同原始问题", "不得只选代表题",
-            "面向复习和学习", "不少于 250 个汉字", "不少于 300 个汉字", "禁止写成面试口述稿", "简历已知事实",
+            "深入学习材料和高质量示范解法", "大胆展开", "不必拘泥于简历中明确写出的事实", "400–700 个汉字",
+            "端到端步骤", "失败处理", "完整、深入、可用于学习复习的参考解法",
             "每一段实习和每个项目各自成为独立类别", "resumeRef", "kind 只能为 project、knowledge 或 other");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(16_000);
         var resumeRequest = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(),
