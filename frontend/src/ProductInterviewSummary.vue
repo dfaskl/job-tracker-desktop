@@ -169,7 +169,7 @@ watch(topicEntries, entries => {
       <section class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
-          <ol v-else class="review-list"><li v-for="(item, index) in reviews" :key="item.event.id"><button type="button" class="review-card" :style="{ '--review-index': Math.min(index, 8) }" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
+          <ol v-else class="review-list"><li v-for="(item, index) in reviews" :key="item.event.id"><button type="button" class="review-card" :style="{ '--review-index': index }" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
@@ -316,9 +316,9 @@ watch(topicEntries, entries => {
 @keyframes interview-stream-spin{to{transform:rotate(360deg)}}
 @keyframes interview-pane-enter-left{from{transform:translateX(-52px) scale(.975)}to{transform:translateX(0) scale(1)}}
 @keyframes interview-pane-enter-right{from{transform:translateX(52px) scale(.975)}to{transform:translateX(0) scale(1)}}
-.summary-columns.is-entered .review-card{animation:interview-review-card-enter .48s cubic-bezier(.2,.75,.25,1) both;animation-delay:calc(var(--review-index,0)*76ms)}
+.summary-columns.is-entered .review-card{animation:interview-review-card-enter .56s cubic-bezier(.2,.72,.25,1) both;animation-delay:calc(var(--review-index,0)*168ms)}
 .summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
-@keyframes interview-review-card-enter{0%{transform:translateX(-76px) scale(.96)}72%{transform:translateX(6px) scale(1.01)}100%{transform:translateX(0) scale(1)}}
+@keyframes interview-review-card-enter{0%{transform:translateY(20px) scale(.97);opacity:.04;filter:brightness(.42)}65%{opacity:.72;filter:brightness(.82)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
 .topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition:transform .48s cubic-bezier(.2,.75,.25,1),opacity .48s ease;transform-origin:center center}
 .topic-detail-zoom-enter-from{transform:scale(.82);opacity:.15}
 .topic-detail-zoom-enter-to,.topic-detail-zoom-leave-from{transform:scale(1);opacity:1}
@@ -362,9 +362,9 @@ watch(topicEntries, entries => {
   .workbench-flip-enter-from{transform:rotateY(-18deg);opacity:0}
   .workbench-flip-leave-to{transform:rotateY(18deg);opacity:0}
   .stream-spinner{animation-duration:1.2s}
-  .summary-columns.is-entered .review-card{animation-duration:.22s;animation-delay:calc(var(--review-index,0)*38ms)}
+  .summary-columns.is-entered .review-card{animation-duration:.26s;animation-delay:calc(var(--review-index,0)*78ms)}
   .summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active{animation-duration:.2s}
-  @keyframes interview-review-card-enter{0%{transform:translateX(-20px) scale(.99)}78%{transform:translateX(2px)}100%{transform:translateX(0)}}
+  @keyframes interview-review-card-enter{0%{transform:translateY(10px) scale(.99);opacity:.15;filter:brightness(.65)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
   @keyframes interview-pane-enter-right{from{transform:translateX(16px)}to{transform:translateX(0)}}
 }
 </style>
