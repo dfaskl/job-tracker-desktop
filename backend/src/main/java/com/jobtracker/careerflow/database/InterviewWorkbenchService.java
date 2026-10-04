@@ -23,7 +23,7 @@ import java.util.Set;
 
 @Component
 public class InterviewWorkbenchService {
-    private static final String SUMMARY_VERSION = "expanded-reference-answers-v8";
+    private static final String SUMMARY_VERSION = "importance-prioritized-review-v9";
     private final Environment environment;
     private final ApplicationService applications;
     private final ObjectMapper mapper;

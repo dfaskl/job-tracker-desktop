@@ -229,6 +229,8 @@ class AiServiceTest {
         assertThat(instruction).contains("宽泛主题", "knowledge", "project", "other", "全部不同原始问题", "不得只选代表题",
             "深入学习材料和高质量示范解法", "大胆展开", "不必拘泥于简历中明确写出的事实", "400–700 个汉字",
             "端到端步骤", "失败处理", "完整、深入、可用于学习复习的参考解法",
+            "先判断每个问题的考察价值", "低优先级的工具/环境/背景确认归为 other", "低优先级问题仍保留在 other",
+            "孤立的工具/软件/语言/运行环境确认", "不要因为问题只出现一次就认定它不重要", "80–180 字",
             "每一段实习和每个项目各自成为独立类别", "resumeRef", "kind 只能为 project、knowledge 或 other");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(16_000);
         var resumeRequest = service.reviewSummaryRequestBody("", new ObjectMapper().createArrayNode(),
