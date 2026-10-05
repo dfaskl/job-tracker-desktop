@@ -40,7 +40,6 @@ const adminAccessLoaded = ref(false)
 const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || isAdmin.value))
 const mobilePages = computed(() => visiblePages.value.filter(item => item.id !== 'admin'))
 const focusApplicationId = ref('')
-const mobileMenuOpen = ref(false)
 const primaryNavigation = ref<HTMLElement | null>(null)
 const navIndicatorStyle = ref<Record<string, string>>({ width: '0px', height: '0px', transform: 'translate3d(0,0,0)', opacity: '0' })
 const mainContent = ref<HTMLElement | null>(null)
@@ -128,7 +127,6 @@ async function createApplication() {
 }
 function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focus' = 'detail') {
   if (page === 'admin' && !isAdmin.value) return
-  mobileMenuOpen.value = false
   const targetHash = page === 'applications' && applicationId ? `applications?${behavior === 'focus' ? 'focus' : 'application'}=${encodeURIComponent(applicationId)}` : page
   if (window.location.hash.replace(/^#\/?/, '') === targetHash) {
     if (applicationId && behavior === 'detail') store.requestApplicationDetail(applicationId)
@@ -155,10 +153,6 @@ async function focusResumeSettings() {
     resumeSection.classList.remove('resume-highlight')
     resumeFocusTimer = undefined
   }, 1500)
-}
-
-function handleGlobalKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') mobileMenuOpen.value = false
 }
 
 function toggleTheme() {
@@ -226,7 +220,6 @@ function handleStoredNotice(event: StorageEvent) {
 onMounted(async () => {
   syncHash()
   window.addEventListener('hashchange', syncHash)
-  window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('resize', handleWindowResize)
@@ -263,10 +256,9 @@ watch(activePage, async page => {
   if (page === 'mail') dismissMailBadge()
   if (page === 'interview-summary') dismissSummaryBadge()
 })
-watch([visiblePages, mobileMenuOpen], () => { void nextTick(syncNavIndicator) }, { flush: 'post' })
+watch(visiblePages, () => { void nextTick(syncNavIndicator) }, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
-  window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('resize', handleWindowResize)
@@ -280,15 +272,15 @@ onBeforeUnmount(() => {
 <template>
   <div class="product-shell">
     <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
-    <aside class="sidebar" :class="{ 'menu-open': mobileMenuOpen }">
+    <aside class="sidebar">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
         <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>CareerFlow</strong><small>求职进度本</small></div>
       </button>
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
       </button>
-      <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起账户设置' : '打开账户设置'" aria-controls="account-menu" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
-        <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+      <button v-if="store.user.value" type="button" class="profile-shortcut" :class="{ active: activePage === 'profile' }" aria-label="个人设置" title="个人设置" :aria-current="activePage === 'profile' ? 'page' : undefined" @click="navigate('profile')">
+        <img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" />
       </button>
       <button v-if="isAdmin" type="button" class="admin-shortcut" :class="{ active: activePage === 'admin' }" aria-label="管理员" title="管理员" :aria-current="activePage === 'admin' ? 'page' : undefined" @click="navigate('admin')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2" /></svg>
@@ -302,7 +294,7 @@ onBeforeUnmount(() => {
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
-      <div id="account-menu" class="sidebar-account" :inert="mobileViewport && !mobileMenuOpen"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
+      <div class="sidebar-account" :inert="mobileViewport"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary' }">
@@ -364,6 +356,7 @@ nav button.active::before { content: none; }
 .profile-entry-copy strong { overflow: hidden; color: var(--color-foreground); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .profile-entry-copy small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 .menu-toggle { display: none; }
+.profile-shortcut { display: none; }
 .admin-shortcut { display: none; }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; }
 .topbar {
@@ -468,15 +461,14 @@ nav button.active::before { content: none; }
   .brand small { display: none; }
   .brand strong { font-size: 17px; }
   .theme-toggle { position: static; width: 44px; height: 44px; min-height: 44px; }
-  .menu-toggle { display: grid; width: 44px; height: 44px; place-content: center; gap: 5px; border: 1px solid var(--color-border); background: var(--color-card); }
+  .profile-shortcut { display: grid; position: relative; width: 44px; height: 44px; place-items: center; padding: 0; border: 1px solid var(--color-border); border-radius: 10px; color: #fff; background: var(--color-card); }
+  .profile-shortcut img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+  .profile-shortcut.active { color: var(--color-primary); border-color: color-mix(in srgb,var(--color-primary) 55%,var(--color-border)); }
+  .profile-shortcut.active::after { position: absolute; bottom: 2px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
   .admin-shortcut { display: grid; position: relative; width: 44px; height: 44px; place-items: center; padding: 0; border: 1px solid var(--color-border); color: #fff; background: var(--color-card); }
   .admin-shortcut svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .admin-shortcut.active { color: var(--color-primary); }
   .admin-shortcut.active::after { position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
-  .menu-toggle span { display: block; width: 18px; height: 2px; background: currentColor; transition: transform .18s, opacity .18s; }
-  .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-  .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
-  .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
   .sidebar nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; width: 100%; min-height: 64px; grid-template-columns: repeat(6,minmax(0,1fr)); align-content: center; gap: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); border-bottom: 0; background: color-mix(in srgb,var(--color-card) 94%,transparent); backdrop-filter: blur(18px); overflow: visible; opacity: 1; }
   .nav-active-indicator { display: none; }
   #app .sidebar nav button { display: grid; min-width: 0; min-height: 48px; height: 48px; grid-template-rows: 1fr; place-items: center; gap: 0; padding: 4px 0 7px; border: 0; color: #fff; background: transparent; }
@@ -487,8 +479,7 @@ nav button.active::before { content: none; }
   .nav-icon svg { width: 22px; height: 22px; }
   .nav-badge { position: absolute; top: 1px; right: calc(50% - 20px); min-width: 17px; height: 17px; padding-inline: 3px; font-size: 10px; }
   .nav-status-dot { position: absolute; top: 2px; right: calc(50% - 19px); width: 8px; height: 8px; margin: 0; }
-  .sidebar-account { grid-column: 1/-1; display: none; margin-top: 12px; }
-  .menu-open .sidebar-account { display: block; }
+  .sidebar-account { display: none; }
   .profile-entry { max-width: 100%; }
   .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
   .product-main.interview-summary-page{height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom));overflow:hidden}
