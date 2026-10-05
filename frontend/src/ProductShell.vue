@@ -296,7 +296,7 @@ onBeforeUnmount(() => {
       <button v-if="isAdmin" type="button" class="admin-shortcut" :class="{ active: activePage === 'admin' }" aria-label="管理员" title="管理员" :aria-current="activePage === 'admin' ? 'page' : undefined" @click="navigate('admin')">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2" /></svg>
       </button>
-      <nav id="primary-navigation" ref="primaryNavigation" aria-label="主要导航">
+      <nav id="primary-navigation" ref="primaryNavigation" :class="{ 'guide-nav-suppressed': activePage === 'guide' }" aria-label="主要导航">
         <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
         <button v-for="item in navigationItems" :key="item.id" type="button" :data-guide="item.id === 'guide' ? '' : undefined" :class="{ active: activePage === item.id, 'guide-nav-item': item.id === 'guide', 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span>
@@ -485,6 +485,7 @@ nav button.active::before { content: none; }
   .admin-shortcut.active { color: var(--color-primary); }
   .admin-shortcut.active::after { position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
   .sidebar nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; width: 100%; min-height: 64px; grid-template-columns: repeat(7,minmax(0,1fr)); align-content: center; gap: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); border-bottom: 0; background: color-mix(in srgb,var(--color-card) 94%,transparent); backdrop-filter: blur(18px); overflow: visible; opacity: 1; }
+  .sidebar nav.guide-nav-suppressed { display: none; }
   .nav-active-indicator { display: none; }
   #app .sidebar nav button { display: grid; min-width: 0; min-height: 48px; height: 48px; grid-template-rows: 1fr; place-items: center; gap: 0; padding: 4px 0 7px; border: 0; color: #fff; background: transparent; }
   #app .sidebar nav button:hover, #app .sidebar nav button.active { color: var(--color-primary); background: transparent; }
