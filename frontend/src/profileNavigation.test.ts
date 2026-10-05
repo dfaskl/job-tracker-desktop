@@ -10,6 +10,8 @@ describe('profileSectionScrollTarget', () => {
   it('returns only an explicitly requested non-default subsection', () => {
     expect(profileSectionScrollTarget('#/profile?section=resume')).toBe('resume')
     expect(profileSectionScrollTarget('#/settings?section=ai')).toBe('ai')
+    expect(profileSectionScrollTarget('#/profile?section=mail')).toBe('mail')
+    expect(profileSectionScrollTarget('#/profile?section=data')).toBe('data')
     expect(profileSectionScrollTarget('#/profile?section=unknown')).toBeNull()
     expect(profileSectionScrollTarget('#/home?section=resume')).toBeNull()
   })

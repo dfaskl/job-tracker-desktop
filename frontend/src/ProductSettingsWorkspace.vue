@@ -9,11 +9,12 @@ import BackupManagement from './BackupManagement.vue'
 import AppIcon from './AppIcon.vue'
 import { profileSectionScrollTarget } from './profileNavigation'
 
-type SectionId = 'center' | 'resume' | 'ai' | 'data'
+type SectionId = 'center' | 'resume' | 'ai' | 'mail' | 'data'
 const sections: { id: SectionId; label: string; icon: string }[] = [
   { id: 'center', label: '个人中心', icon: 'user' },
   { id: 'resume', label: '我的简历', icon: 'file-spreadsheet' },
   { id: 'ai', label: '大模型 API', icon: 'info' },
+  { id: 'mail', label: '邮件配置', icon: 'mail' },
   { id: 'data', label: '数据管理', icon: 'database' }
 ]
 function sectionFromHash(): SectionId {
@@ -89,7 +90,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="profile-workspace">
     <header class="settings-heading">
-      <div><span>账户与偏好</span><h1>个人主页</h1><p>集中管理个人资料、面试简历、模型连接和数据安全。</p></div>
+      <div><span>账户与偏好</span><h1>个人主页</h1><p>集中管理个人资料、面试简历、模型和邮箱连接及数据安全。</p></div>
     </header>
     <div class="settings-layout">
       <nav class="settings-nav" aria-label="个人主页分区">
@@ -110,10 +111,13 @@ onBeforeUnmount(() => {
           <div class="section-title"><h2>大模型 API</h2><p>配置兼容接口、模型和 API Key。</p></div>
           <ProductPreferences />
         </section>
-        <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
-          <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理邮件来源与历史备份。</p></div>
-          <ProductDataManagement />
+        <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('mail', element as Element | null)" class="profile-section mail-settings-section">
+          <div class="section-title"><h2>邮件配置</h2><p>连接邮箱，让系统识别邮件并辅助创建求职日程。</p></div>
           <MailAccountSettings />
+        </section>
+        <section :id="`profile-section-${sections[4].id}`" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
+          <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理历史备份。</p></div>
+          <ProductDataManagement />
           <BackupManagement />
         </section>
       </main>
@@ -129,4 +133,9 @@ onBeforeUnmount(() => {
 .profile-section>*{grid-area:auto!important;width:100%;min-width:0}
 @media(max-width:900px){.profile-workspace{padding-top:20px}.settings-layout{gap:18px}.settings-nav{top:76px;padding:6px}.settings-nav a{min-height:46px}}
 @media(max-width:560px){.profile-workspace{padding:14px 0 22px}.settings-heading{margin-bottom:16px}.settings-nav{top:74px;gap:4px}.settings-nav a{gap:6px;padding:8px 5px;font-size:12px}.settings-nav a :deep(svg){width:16px;height:16px}.section-title h2{font-size:18px}.settings-content{gap:22px}.data-sections :deep(.data-card),.data-sections :deep(.mail-account-card),.data-sections :deep(.backup-card){padding:16px}}
+</style>
+<style scoped>
+.settings-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+.mail-settings-section :deep(.mail-account-card){grid-area:auto;padding:20px}
+@media(max-width:560px){.settings-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.mail-settings-section :deep(.mail-account-card){padding:16px}}
 </style>

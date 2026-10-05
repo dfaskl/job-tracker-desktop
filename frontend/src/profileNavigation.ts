@@ -1,4 +1,4 @@
-const profileSections = new Set(['center', 'resume', 'ai', 'data'])
+const profileSections = new Set(['center', 'resume', 'ai', 'mail', 'data'])
 
 /** The default profile section is the page entry point, so keep the page heading visible. */
 export function profileSectionScrollTarget(hash: string): string | null {
