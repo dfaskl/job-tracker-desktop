@@ -88,11 +88,11 @@ async function saveConfig() {
       <label><span>API Key {{ config?.hasApiKey ? '（已配置，末四位 ' + config.lastFour + '）' : '' }}</span>
         <span class="api-key-field">
           <input v-if="showStoredKey" :value="storedKey" type="text" readonly aria-label="已保存的 API Key" autocomplete="off" />
-          <input v-else v-model="form.apiKey" :type="showTypedKey ? 'text' : 'password'" :class="{ 'saved-key-mask': config?.hasApiKey && !form.apiKey }" autocomplete="off" :placeholder="config?.hasApiKey ? '••••••••••••' : '输入 API Key'" />
+          <input v-else v-model="form.apiKey" :type="showTypedKey ? 'text' : 'password'" :class="{ 'saved-key-mask': config?.hasApiKey && !form.apiKey }" autocomplete="off" :placeholder="config?.hasApiKey ? '******' : '输入 API Key'" />
           <button type="button" class="key-visibility icon-button compact-icon" :disabled="revealing || loading" :aria-label="showStoredKey || showTypedKey ? '隐藏 API Key' : '显示 API Key'" :title="showStoredKey || showTypedKey ? '隐藏 API Key' : '显示 API Key'" :aria-pressed="showStoredKey || showTypedKey" @click="toggleKeyVisibility"><AppIcon :name="showStoredKey || showTypedKey ? 'eye-off' : 'eye'" /></button>
         </span>
       </label>
-      <div class="api-actions wide"><label v-if="config?.hasApiKey" class="check"><input v-model="form.clearApiKey" type="checkbox" /><span>清除现有 API Key</span></label><span v-else></span><button :disabled="loading || revealing">{{ loading ? '保存中…' : '保存配置' }}</button></div>
+      <div class="api-actions wide"><label v-if="config?.hasApiKey" class="check"><input v-model="form.clearApiKey" type="checkbox" /><span>清除现有 API Key</span></label><span v-else></span><button class="primary-action" :disabled="loading || revealing">{{ loading ? '保存中…' : '保存配置' }}</button></div>
     </form>
     <p v-if="message" class="success">{{ message }}</p>
     <p v-if="error" class="danger" role="alert">{{ error }}</p>

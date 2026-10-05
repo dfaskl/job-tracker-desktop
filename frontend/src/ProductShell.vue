@@ -140,6 +140,7 @@ function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focu
 
 async function focusResumeSettings() {
   if (activePage.value !== 'profile') navigate('profile')
+  window.location.hash = '/profile?section=resume'
   await nextTick()
   await nextTick()
   const resumeSection = document.getElementById('resume-settings')

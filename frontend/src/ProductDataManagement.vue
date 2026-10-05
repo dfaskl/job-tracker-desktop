@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onMounted, ref } from 'vue'
 import { api, apiCached, ApiError, invalidateApiCache } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
 import { formatShanghaiDateTime } from './shanghaiTime'
@@ -21,8 +21,12 @@ const editingLink = ref<CompanyLink | null>(null)
 const editingCompany = ref('')
 const editingUrl = ref('')
 const sandbox = ref<SandboxStatus | null>(null)
-const clearConfirmation = ref('')
+const clearDialog = ref<HTMLDialogElement | null>(null)
+const clearSlider = ref(0)
+const clearDialogError = ref('')
+const clearSliderInput = ref<HTMLInputElement | null>(null)
 const importFileName = ref('')
+const importFileInput = ref<HTMLInputElement | null>(null)
 const importData = ref<BusinessData | null>(null)
 const loading = ref(false)
 const exporting = ref<'raw' | 'readable' | ''>('')
@@ -210,23 +214,51 @@ async function importIntoSandbox() {
 }
 
 async function clearSandbox() {
-  if (!sandbox.value?.enabled || clearConfirmation.value !== '清空') return
+  if (!sandbox.value?.enabled || clearSlider.value !== 100) return
   loading.value = true
   message.value = ''
   error.value = ''
+  clearDialogError.value = ''
   try {
     await api<ImportResult>('/api/poc/backup-sandbox/clear', {
       method: 'POST',
-      body: JSON.stringify({ confirmation: clearConfirmation.value })
+      body: JSON.stringify({ confirmation: '清空' })
     })
     message.value = '已清空业务数据'
-    clearConfirmation.value = ''
+    clearSlider.value = 0
+    clearDialog.value?.close()
     await store.refresh()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '清空失败'
+    clearDialogError.value = cause instanceof Error ? cause.message : '清空失败'
   } finally {
     loading.value = false
   }
+}
+
+async function openClearDialog() {
+  if (!sandbox.value?.enabled || loading.value) return
+  clearSlider.value = 0
+  clearDialogError.value = ''
+  clearDialog.value?.showModal()
+  await nextTick()
+  clearSliderInput.value?.focus()
+}
+function closeClearDialog() {
+  if (loading.value) return
+  clearDialog.value?.close()
+  clearSlider.value = 0
+  clearDialogError.value = ''
+}
+function closeClearFromBackdrop(event: MouseEvent) {
+  if (event.target === clearDialog.value) closeClearDialog()
+}
+function handleClearCancel(event: Event) {
+  if (loading.value) event.preventDefault()
+  else { clearSlider.value = 0; clearDialogError.value = '' }
+}
+function openCompanyLinks() {
+  linkDetailsOpen.value = true
+  void loadLinks()
 }
 
 function formatDate(value: string) {
@@ -239,7 +271,7 @@ function formatDate(value: string) {
   <section class="card data-card">
     <div class="section-head">
       <div><span class="section-kicker">数据管理</span><h2>公司官网库与业务数据</h2></div>
-      <button class="secondary" type="button" @click="linkDetailsOpen=true;loadLinks()">官网库详情</button>
+      <button class="secondary" type="button" @click="openCompanyLinks">{{ links.length ? '官网库详情' : '＋ 添加第一条公司链接' }}</button>
     </div>
 
     <div class="metrics-row">
@@ -247,6 +279,7 @@ function formatDate(value: string) {
       <div><strong>{{ store.applications.value.length }}</strong><span>投递记录</span></div>
       <div><strong>{{ store.events.value.length }}</strong><span>日程事件</span></div>
     </div>
+    <div v-if="!store.applications.value.length && !store.events.value.length" class="empty-data-state"><span aria-hidden="true"><AppIcon name="database" :size="19" /></span><div><strong>还没有业务记录</strong><p>可以从备份导入已有数据，或前往投递记录开始添加。</p></div><button type="button" class="secondary" :disabled="!sandbox?.enabled" @click="importFileInput?.click()">导入备份数据</button></div>
 
     <div class="data-grid">
       <div class="tool-box">
@@ -258,7 +291,7 @@ function formatDate(value: string) {
       <div class="tool-box">
         <h3>导入数据</h3>
         <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
-        <label class="file-picker"><span class="file-button">选择文件</span><input type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" /><small>{{ importFileName || '未选择任何文件' }}</small></label>
+        <label class="file-picker"><span class="file-button">选择文件</span><input ref="importFileInput" type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" /><small>{{ importFileName || '未选择任何文件' }}</small></label>
         <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">确认导入</button>
 
       </div>
@@ -266,8 +299,7 @@ function formatDate(value: string) {
       <div class="tool-box danger-zone">
         <h3>清空业务数据</h3>
         <p>{{ sandbox?.enabled ? '清空前会自动备份当前数据。' : '当前数据暂时不可修改。' }}</p>
-        <label><span>输入“清空”确认</span><input v-model="clearConfirmation" :disabled="!sandbox?.enabled" placeholder="清空" /></label>
-        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled || clearConfirmation !== '清空'" @click="clearSandbox">清空全部数据</button>
+        <button type="button" class="danger-button" :disabled="loading || !sandbox?.enabled" @click="openClearDialog">清空全部数据</button>
       </div>
     </div>
 
@@ -304,6 +336,18 @@ function formatDate(value: string) {
     </section>
   </div>
   </Teleport>
+
+  <dialog ref="clearDialog" class="clear-dialog" aria-labelledby="clear-dialog-title" @click="closeClearFromBackdrop" @cancel="handleClearCancel">
+    <div class="clear-dialog-content">
+      <button type="button" class="modal-close icon-button" :disabled="loading" aria-label="关闭清空确认窗口" title="关闭" @click="closeClearDialog"><AppIcon name="close" /></button>
+      <span class="clear-warning-icon"><AppIcon name="trash" :size="20" /></span>
+      <header><span class="section-kicker">不可撤销操作</span><h2 id="clear-dialog-title">确认清空全部业务数据？</h2><p>这会删除 {{ store.applications.value.length }} 条投递记录和 {{ store.events.value.length }} 项日程。系统会在清空前自动备份当前数据。</p></header>
+      <label class="clear-slider-label" for="clear-confirm-slider"><span>将滑块拖到最右侧以确认</span><strong>{{ clearSlider === 100 ? '已确认' : '待确认' }}</strong></label>
+      <input id="clear-confirm-slider" ref="clearSliderInput" v-model.number="clearSlider" class="clear-slider" type="range" min="0" max="100" step="1" :disabled="loading" aria-valuetext="将滑块拖到最右侧确认清空" />
+      <p v-if="clearDialogError" class="danger" role="alert">{{ clearDialogError }}</p>
+      <div class="clear-dialog-actions"><button type="button" class="secondary" :disabled="loading" @click="closeClearDialog">取消</button><button type="button" class="danger-button" :disabled="loading || clearSlider !== 100" @click="clearSandbox">{{ loading ? '正在清空…' : '确认清空全部数据' }}</button></div>
+    </div>
+  </dialog>
 </template>
 
 <style scoped>
@@ -352,6 +396,8 @@ function formatDate(value: string) {
 .tool-box > button:last-of-type { width: 100%; margin-top: auto; }
 .danger-zone { border-color: #f0c7c7; background: #fff8f8; }
 .danger-button { color: #fff; background: #b43232; }
+.empty-data-state{display:flex;align-items:center;gap:13px;padding:15px;border:1px dashed var(--color-border);border-radius:11px;background:var(--color-muted)}.empty-data-state>span{display:grid;width:40px;height:40px;flex:none;place-items:center;border-radius:10px;color:var(--color-primary);background:var(--color-card)}.empty-data-state>div{flex:1}.empty-data-state strong{font-size:13px}.empty-data-state p{margin:3px 0 0;color:var(--color-muted-foreground);font-size:12px}.empty-data-state button{min-height:38px}
+.clear-dialog{width:min(510px,calc(100vw - 28px));padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:var(--color-card);box-shadow:var(--shadow-lg)}.clear-dialog::backdrop{background:rgba(8,9,11,.66);backdrop-filter:blur(4px)}.clear-dialog-content{position:relative;display:grid;gap:16px;padding:28px}.clear-dialog .modal-close{position:absolute;top:14px;right:14px;width:42px;height:42px;padding:0}.clear-warning-icon{display:grid;width:44px;height:44px;place-items:center;border-radius:12px;color:#a52d2d;background:#fff0ef}.clear-dialog header{padding-right:30px}.clear-dialog header h2{margin:4px 0 8px;font-size:20px}.clear-dialog header p{margin:0;color:var(--color-muted-foreground);font-size:13px;line-height:1.6}.clear-slider-label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}.clear-slider-label strong{color:var(--color-destructive)}.clear-slider{width:100%;accent-color:var(--color-destructive)}.clear-dialog-actions{display:grid;grid-template-columns:.8fr 1.5fr;gap:10px;margin-top:4px}.clear-dialog-actions .danger-button:disabled{opacity:.45;cursor:not-allowed}
 
 @media (max-width: 900px) {
   .data-grid, .link-list, .link-editor, .inline-link-editor { grid-template-columns: 1fr; }
@@ -362,8 +408,10 @@ function formatDate(value: string) {
 @media (max-width: 640px) {
   .section-head, .toolbar { align-items: stretch; flex-direction: column; }
   .metrics-row { grid-template-columns: 1fr; }
+  .empty-data-state{align-items:flex-start;flex-wrap:wrap}.empty-data-state>div{min-width:calc(100% - 56px)}.empty-data-state button{width:100%}
   .link-backdrop { padding: 10px; }
   .link-modal { max-height: calc(100vh - 20px); min-height: calc(100vh - 20px); padding: 20px 14px; }
   .modal-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .clear-dialog-content{padding:24px 18px}.clear-dialog-actions{grid-template-columns:1fr}
 }
 </style>
