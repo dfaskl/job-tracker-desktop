@@ -7,7 +7,7 @@ import { exportRawBusinessData, exportReadableBusinessData } from './businessDat
 import { formatShanghaiDateTime } from './shanghaiTime'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
-type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;activeSessions:number;configuredApiKeys:number;registrationOpen:boolean;registrationCodeEnabled:boolean;registrationCode:string;adminEmailConfigured:boolean}
+type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;registrationOpen:boolean;registrationCodeEnabled:boolean;registrationCode:string;adminEmailConfigured:boolean}
 type User={id:string;email:string;displayName:string;avatar:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
 type InterviewGroup={id:string;name:string;memberCount:number}
 type Audit={id:string;action:string;targetEmail:string;createdAt:string}
@@ -41,7 +41,6 @@ const filteredUsers=computed(()=>{
   })
 })
 const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCount,0))
-const disabledUsers=computed(()=>users.value.filter(user=>user.disabled).length)
 const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
 const auditPages=computed(()=>Math.max(1,Math.ceil((overview.value?.audit.length||0)/auditPageSize)))
@@ -106,8 +105,6 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
           <div class="summary-grid">
         <article class="metric-users"><i>用户</i><strong>{{overview.summary.totalUsers}}</strong><small>近 30 天活跃 {{recentUsers}}</small></article>
         <article class="metric-data"><i>业务数据</i><strong>{{overview.summary.totalApplications}}</strong><small>{{totalEvents}} 项日程</small></article>
-        <article class="metric-sessions"><i>有效会话</i><strong>{{overview.summary.activeSessions}}</strong><small>{{disabledUsers}} 个停用账号</small></article>
-        <article class="metric-ai"><i>AI 配置</i><strong>{{overview.summary.configuredApiKeys}}</strong><small>已配置独立密钥</small></article>
       </div>
           <section class="card control-card">
             <div class="section-title"><div><span>访问控制</span><h3>注册与系统状态</h3></div><b :class="overview.summary.registrationOpen?'ok':'muted'">{{overview.summary.registrationOpen?'允许注册':'停止注册'}}</b></div>
@@ -123,17 +120,15 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
               <div><i :class="['dot',emptyDataUsers?'warn':'ok']"></i><span>空数据账号</span><b>{{emptyDataUsers}} 个</b></div>
             </div>
           </section>
-
-        </div>
-
-        <div class="users-column">
           <section class="card group-manager group-manager-card">
             <div><strong>面试协作小组</strong><small>同组成员会在首页共享一个时间点日程轴</small></div>
             <div class="group-create"><input v-model="newGroupName" maxlength="40" placeholder="例如：第一面试室" aria-label="新建协作小组名称" @keyup.enter="createGroup" /><button class="secondary" :disabled="busyUser==='group'||!newGroupName.trim()" @click="createGroup">新建</button></div>
             <div v-if="overview.groups.length" class="group-list"><span v-for="group in overview.groups" :key="group.id"><b>{{group.name}}</b><small>{{group.memberCount}} 人</small><button class="danger-outline icon-button compact-icon" :disabled="busyUser==='group:'+group.id" :aria-label="'删除小组 '+group.name" :title="'删除小组 '+group.name" @click="deleteGroup(group)"><AppIcon name="trash" :size="16" /></button></span></div>
             <p v-else class="hint">暂无小组，可先新建再为用户分配。</p>
           </section>
+        </div>
 
+        <div class="users-column">
           <section class="card users-card">
           <div class="section-title"><div><span>账号管理</span><h3>用户列表</h3></div><small>{{filteredUsers.length}} / {{overview.summary.totalUsers}}</small></div>
           <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户昵称或邮箱" placeholder="搜索用户昵称或邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>

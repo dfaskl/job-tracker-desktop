@@ -85,7 +85,7 @@ public class AdminService {
                 new CurrentAdmin(String.valueOf(admin.id()), admin.email()),
                 new Summary(
                     counts.totalUsers(), counts.enabledUsers(), counts.totalApplications(),
-                    counts.activeSessions(), counts.configuredApiKeys(), registrationIsOpen(connection),
+                    registrationIsOpen(connection),
                     registrationCodeIsEnabled(connection), registrationCodeValue(connection), configured("ADMIN_EMAIL")
                 ),
                 groups(connection),
@@ -513,17 +513,14 @@ public class AdminService {
 
     private SummaryCounts summaryCounts(Connection connection) throws Exception {
         String sql = "SELECT COUNT(*) AS total_users,COUNT(*) FILTER (WHERE disabled_at IS NULL) AS enabled_users,"
-            + "COALESCE(SUM(CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END),0) AS total_applications,"
-            + "(SELECT COUNT(*) FROM sessions WHERE expires_at>NOW()) AS active_sessions,"
-            + "(SELECT COUNT(*) FROM api_configs WHERE encrypted_api_key IS NOT NULL) AS configured_api_keys "
+            + "COALESCE(SUM(CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END),0) AS total_applications "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id";
         try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet result = statement.executeQuery()) {
             result.next();
             return new SummaryCounts(
                 result.getInt("total_users"), result.getInt("enabled_users"),
-                result.getInt("total_applications"), result.getInt("active_sessions"),
-                result.getInt("configured_api_keys")
+                result.getInt("total_applications")
             );
         }
     }
@@ -720,13 +717,12 @@ public class AdminService {
     private record AdminIdentity(long id, String email) {}
     private record TargetUser(long id, String email, boolean admin) {}
     private record UserDocument(long id, String email, String json) {}
-    private record SummaryCounts(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
-                                 int configuredApiKeys) {}
+    private record SummaryCounts(int totalUsers, int enabledUsers, int totalApplications) {}
 
     public record AdminStatus(boolean enabled, boolean requested, boolean sandboxEnabled, String message) {}
     public record CurrentAdmin(String id, String email) {}
-    public record Summary(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
-                          int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
+    public record Summary(int totalUsers, int enabledUsers, int totalApplications,
+                          boolean registrationOpen, boolean registrationCodeEnabled,
                           String registrationCode, boolean adminEmailConfigured) {}
     public record UserView(String id, String email, String displayName, String avatar, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
