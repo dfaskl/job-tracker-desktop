@@ -18,6 +18,10 @@ type Overview={currentUser:{id:string;email:string};summary:Summary;groups:Inter
 const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
 const query=ref(''),stateFilter=ref('all'),sortMode=ref('created-old'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
 const registrationCode=ref('')
+const registrationCodeJustSaved=ref(false)
+const adminView=ref<'overview'|'audit'>('overview')
+const auditPage=ref(1)
+const auditPageSize=10
 const newGroupName=ref('')
 const editingNameId=ref(''),displayNameDraft=ref(''),displayNameError=ref('')
 const expandedUserIds=ref<Set<string>>(new Set())
@@ -39,15 +43,18 @@ const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCoun
 const disabledUsers=computed(()=>users.value.filter(user=>user.disabled).length)
 const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
+const auditPages=computed(()=>Math.max(1,Math.ceil((overview.value?.audit.length||0)/auditPageSize)))
+const pagedAudit=computed(()=>{const items=overview.value?.audit||[];const start=(Math.min(auditPage.value,auditPages.value)-1)*auditPageSize;return items.slice(start,start+auditPageSize)})
 
 onMounted(checkStatus)
 async function requestJson(url:string,init?:RequestInit){const{response,body}=await jsonFetch<Record<string,any>>(url,{cache:'no-store',...init});if(!response.ok)throw new Error(body.message||'操作失败');return body}
 async function checkStatus(){loading.value=true;error.value='';try{status.value=await requestJson('/api/poc/admin-sandbox/status') as AdminStatus;if(status.value.enabled)await loadOverview()}catch(cause){error.value=failure(cause,'管理员服务检查失败')}finally{loading.value=false}}
-async function loadOverview(){overview.value=await requestJson('/api/poc/admin-sandbox/overview') as Overview}
+async function loadOverview(){overview.value=await requestJson('/api/poc/admin-sandbox/overview') as Overview;auditPage.value=Math.min(auditPage.value,Math.max(1,Math.ceil(overview.value.audit.length/auditPageSize)))}
 async function refresh(){loading.value=true;error.value='';message.value='';try{await loadOverview();message.value='管理员数据已刷新'}catch(cause){error.value=failure(cause,'刷新失败')}finally{loading.value=false}}
 async function toggleRegistration(){if(!overview.value)return;loading.value=true;error.value='';message.value='';const enabled=!overview.value.summary.registrationOpen;try{await requestJson('/api/poc/admin-sandbox/settings/registration',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});await loadOverview();message.value=enabled?'注册入口已开放':'注册入口已关闭'}catch(cause){error.value=failure(cause,'修改注册状态失败')}finally{loading.value=false}}
-async function saveRegistrationCode(){const code=registrationCode.value.trim();if(code.length<4){error.value='注册码至少需要 4 位';return}loading.value=true;error.value='';message.value='';try{await requestJson('/api/poc/admin-sandbox/settings/registration-code',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,clear:false})});registrationCode.value='';await loadOverview();message.value='注册码已安全更新'}catch(cause){error.value=failure(cause,'更新注册码失败')}finally{loading.value=false}}
-async function clearRegistrationCode(){if(!confirm('清除后，新用户注册将不再要求注册码。确认继续吗？'))return;loading.value=true;error.value='';message.value='';try{await requestJson('/api/poc/admin-sandbox/settings/registration-code',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear:true})});registrationCode.value='';await loadOverview();message.value='注册码已清除'}catch(cause){error.value=failure(cause,'清除注册码失败')}finally{loading.value=false}}
+async function saveRegistrationCode(){const code=registrationCode.value.trim();if(code.length<4){error.value='注册码至少需要 4 位';return}loading.value=true;error.value='';message.value='';try{await requestJson('/api/poc/admin-sandbox/settings/registration-code',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,clear:false})});registrationCode.value=code;registrationCodeJustSaved.value=true;await loadOverview();message.value='注册码已安全更新'}catch(cause){error.value=failure(cause,'更新注册码失败')}finally{loading.value=false}}
+async function clearRegistrationCode(){if(!confirm('清除后，新用户注册将不再要求注册码。确认继续吗？'))return;loading.value=true;error.value='';message.value='';try{await requestJson('/api/poc/admin-sandbox/settings/registration-code',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear:true})});registrationCode.value='';registrationCodeJustSaved.value=false;await loadOverview();message.value='注册码已清除'}catch(cause){error.value=failure(cause,'清除注册码失败')}finally{loading.value=false}}
+function groupTone(user:User){const id=Number(user.groupId)||0;return Math.abs(id)%4}
 async function openDetails(user:User){selected.value=user;detail.value=null;busyUser.value=user.id;error.value='';try{detail.value=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/details`) as UserDetails;await loadOverview()}catch(cause){selected.value=null;error.value=failure(cause,'读取用户详情失败')}finally{busyUser.value=''}}
 async function setDisabled(user:User){busyUser.value=user.id;error.value='';message.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({disabled:!user.disabled})});await loadOverview();message.value=user.disabled?'账号已启用':'账号已停用并撤销会话'}catch(cause){error.value=failure(cause,'修改账号状态失败')}finally{busyUser.value=''}}
 async function revokeSessions(user:User){if(!confirm(`确认让 ${user.email} 的所有设备重新登录吗？`))return;busyUser.value=user.id;error.value='';message.value='';try{const result=await requestJson(`/api/poc/admin-sandbox/users/${user.id}/sessions/revoke`,{method:'PATCH'});await loadOverview();message.value=`已撤销 ${Number(result.revoked||0)} 个登录会话`}catch(cause){error.value=failure(cause,'撤销会话失败')}finally{busyUser.value=''}}
@@ -86,24 +93,28 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
     <div v-if="status&&!status.enabled" class="card disabled-panel"><h2>管理员功能暂不可用</h2><p>{{status.message}}</p><small>请检查业务数据库连接与写入配置。</small></div>
     <template v-else-if="overview">
       <div class="admin-toolbar">
+        <nav class="admin-subnav" aria-label="管理员页面">
+          <button type="button" :class="{active:adminView==='overview'}" :aria-current="adminView==='overview'?'page':undefined" @click="adminView='overview'">控制台</button>
+          <button type="button" :class="{active:adminView==='audit'}" :aria-current="adminView==='audit'?'page':undefined" @click="adminView='audit';auditPage=1">操作审计 <span>{{overview.audit.length}}</span></button>
+        </nav>
         <button class="secondary icon-button" :disabled="loading" :aria-label="loading?'正在刷新管理员数据':'刷新管理员数据'" :title="loading?'正在刷新…':'刷新数据'" @click="refresh"><AppIcon name="refresh" /></button>
       </div>
 
-      <div class="admin-grid">
+      <div v-if="adminView==='overview'" class="admin-grid">
         <div class="overview-column">
           <div class="summary-grid">
-        <article><i>用户</i><strong>{{overview.summary.totalUsers}}</strong><small>近 30 天活跃 {{recentUsers}}</small></article>
-        <article><i>业务数据</i><strong>{{overview.summary.totalApplications}}</strong><small>{{totalEvents}} 项日程</small></article>
-        <article><i>有效会话</i><strong>{{overview.summary.activeSessions}}</strong><small>{{disabledUsers}} 个停用账号</small></article>
-        <article><i>AI 配置</i><strong>{{overview.summary.configuredApiKeys}}</strong><small>已配置独立密钥</small></article>
+        <article class="metric-users"><i>用户</i><strong>{{overview.summary.totalUsers}}</strong><small>近 30 天活跃 {{recentUsers}}</small></article>
+        <article class="metric-data"><i>业务数据</i><strong>{{overview.summary.totalApplications}}</strong><small>{{totalEvents}} 项日程</small></article>
+        <article class="metric-sessions"><i>有效会话</i><strong>{{overview.summary.activeSessions}}</strong><small>{{disabledUsers}} 个停用账号</small></article>
+        <article class="metric-ai"><i>AI 配置</i><strong>{{overview.summary.configuredApiKeys}}</strong><small>已配置独立密钥</small></article>
       </div>
           <section class="card control-card">
             <div class="section-title"><div><span>访问控制</span><h3>注册与系统状态</h3></div><b :class="overview.summary.registrationOpen?'ok':'muted'">{{overview.summary.registrationOpen?'允许注册':'停止注册'}}</b></div>
-            <div class="registration"><div><strong>新用户注册</strong><small>{{overview.summary.registrationCodeEnabled?'已启用注册码验证':'无需注册码'}}</small></div><button :class="overview.summary.registrationOpen?'danger-outline':''" :disabled="loading" @click="toggleRegistration">{{overview.summary.registrationOpen?'关闭':'开放'}}</button></div>
+            <div class="registration"><div><strong>新用户注册</strong><small>{{overview.summary.registrationCodeEnabled?'已启用注册码验证':'无需注册码'}}</small></div><label class="switch-control"><input type="checkbox" role="switch" :checked="overview.summary.registrationOpen" :disabled="loading" :aria-label="overview.summary.registrationOpen?'关闭新用户注册':'开放新用户注册'" @change="toggleRegistration"><span aria-hidden="true"></span></label></div>
             <div class="registration-code">
               <label for="admin-registration-code">注册码</label>
-              <div class="registration-code-row"><input id="admin-registration-code" v-model="registrationCode" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="输入 4–128 位新注册码" /><button class="secondary" :disabled="loading||registrationCode.trim().length<4" @click="saveRegistrationCode">设置</button><button v-if="overview.summary.registrationCodeEnabled" class="danger-outline" :disabled="loading" @click="clearRegistrationCode">清除</button></div>
-              <small>保存后不再显示明文；新用户注册时需要输入相同内容。</small>
+              <div class="registration-code-row"><input id="admin-registration-code" v-model="registrationCode" :class="{'saved-code':registrationCodeJustSaved}" type="text" minlength="4" maxlength="128" autocomplete="off" :placeholder="overview.summary.registrationCodeEnabled?'已设置注册码；输入新码可替换':'输入 4–128 位注册码'" @input="registrationCodeJustSaved=false" /><button class="primary" :disabled="loading||registrationCode.trim().length<4" @click="saveRegistrationCode">设置</button><button v-if="overview.summary.registrationCodeEnabled" class="clear-code-button" :disabled="loading" @click="clearRegistrationCode">清除</button></div>
+              <small>{{overview.summary.registrationCodeEnabled?'已设置注册码。为避免明文泄露，页面重新打开后不会回显原文；输入新码可替换。':'未设置注册码；留空表示无需注册码。'}}</small>
             </div>
             <div class="health-grid">
               <div><i class="dot ok"></i><span>数据库</span><b>连接正常</b></div>
@@ -132,7 +143,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
               <button type="button" class="user-summary" :aria-expanded="expandedUserIds.has(user.id)" :aria-controls="'admin-user-'+user.id" @click="toggleUser(user)">
                 <span class="avatar"><img v-if="user.avatar" :src="user.avatar" alt=""><span v-else aria-hidden="true">{{(user.displayName||user.email).slice(0,1).toUpperCase()}}</span></span>
                 <span class="summary-identity"><strong :title="user.displayName||user.email">{{user.displayName||user.email.split('@')[0]}}</strong></span>
-                <span class="group-pill">{{user.groupName||'未分组'}}</span>
+                <span class="group-pill" :class="user.groupId?`tone-${groupTone(user)}`:'unassigned'">{{user.groupName||'未分组'}}</span>
                 <span class="expand-icon" aria-hidden="true"><AppIcon name="chevron-right" :size="18" /></span>
               </button>
               <div v-if="expandedUserIds.has(user.id)" :id="'admin-user-'+user.id" class="user-expanded">
@@ -155,12 +166,12 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
           </div>
           </section>
         </div>
-
-        <section class="card audit-card">
-        <div class="section-title"><div><span>操作审计</span><h3>最近操作</h3></div><small>最近 {{overview.audit.length}} 条</small></div>
-        <div class="audit-scroll"><div v-for="item in overview.audit" :key="item.id"><i></i><span><b>{{actionLabels[item.action]||item.action}}</b><small>{{item.targetEmail||'系统设置'}}</small></span><time>{{formatDate(item.createdAt)}}</time></div><p v-if="!overview.audit.length">暂无管理操作</p></div>
-        </section>
       </div>
+      <section v-else class="card audit-card audit-page">
+        <div class="section-title"><div><span>操作记录</span><h3>操作审计</h3></div><small>{{overview.audit.length}} 条记录</small></div>
+        <div class="audit-scroll"><div v-for="item in pagedAudit" :key="item.id"><i></i><span><b>{{actionLabels[item.action]||item.action}}</b><small>{{item.targetEmail||'系统设置'}}</small></span><time>{{formatDate(item.createdAt)}}</time></div><p v-if="!overview.audit.length" class="empty">暂无管理操作</p></div>
+        <div v-if="overview.audit.length" class="audit-pagination"><button class="secondary" :disabled="auditPage<=1" @click="auditPage--">上一页</button><span>第 {{auditPage}} / {{auditPages}} 页 · 共 {{overview.audit.length}} 条</span><button class="secondary" :disabled="auditPage>=auditPages" @click="auditPage++">下一页</button></div>
+      </section>
     </template>
     <div v-else-if="loading" class="card loading-panel">正在读取管理员数据…</div>
     <p v-if="message" class="success feedback" role="status">{{message}}</p><p v-if="error" class="danger feedback" role="alert">{{error}}</p>
@@ -179,6 +190,18 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .registration-code{display:grid;gap:6px;margin-top:9px;padding:12px;border:1px solid #e6eaf1;border-radius:10px;background:#fff}.registration-code label{font-size:12px;font-weight:800}.registration-code>small{color:var(--color-muted-foreground);font-size:10px}.registration-code-row{display:flex;gap:7px}.registration-code-row input{min-width:0;flex:1}.registration-code-row button{flex:none;padding:8px 10px}@media(max-width:480px){.registration-code-row{align-items:stretch;flex-wrap:wrap}.registration-code-row input{width:100%;flex-basis:100%}}
 .overview-column .control-card{overflow:auto}
 .group-manager{display:grid;gap:9px;margin-top:12px;padding:12px;border:1px solid #dfe7eb;border-radius:10px;background:color-mix(in srgb,var(--accent,var(--color-primary)) 3%,#fff)}.group-manager>div:first-child{display:grid;gap:3px}.group-manager>div:first-child small,.group-assignment>small{color:var(--color-muted-foreground);font-size:10px}.group-create{display:flex;gap:7px}.group-create input{min-width:0;flex:1}.group-create button{flex:none}.group-list{display:grid;gap:6px}.group-list>span{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:7px 8px;border:1px solid #e6ebef;border-radius:8px;background:#fff}.group-list b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-list small{color:var(--color-muted-foreground)}.group-list button{min-height:30px;padding:4px 8px;font-size:10px}.group-assignment{display:grid;width:124px;gap:3px}.group-assignment select{width:100%;height:34px;padding:0 28px 0 9px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-card-foreground);background:var(--color-card);font:inherit;font-size:11px;font-weight:600}.group-assignment select:focus-visible{outline:3px solid color-mix(in srgb,var(--color-ring) 15%,transparent);outline-offset:1px}@media(max-width:900px){.group-assignment{width:124px}}@media(max-width:720px){.group-assignment{width:calc(100% - 48px);margin-left:48px;flex-basis:auto}}
+</style>
+
+<style scoped>
+.admin-shell{gap:12px}.admin-toolbar{justify-content:space-between}.admin-subnav{display:flex;align-items:center;gap:5px;padding:4px;border:1px solid var(--color-border);border-radius:11px;background:var(--color-muted)}.admin-subnav button{display:inline-flex;min-height:36px;align-items:center;gap:8px;padding:7px 12px;border:1px solid transparent;border-radius:8px;color:var(--color-muted-foreground);background:transparent;font-size:13px;font-weight:700}.admin-subnav button.active{border-color:var(--color-border);color:var(--color-primary);background:var(--color-card);box-shadow:var(--shadow-sm)}.admin-subnav button span{display:grid;min-width:20px;height:20px;place-items:center;padding:0 5px;border-radius:999px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:10px;font-variant-numeric:tabular-nums}.admin-grid{grid-template-columns:minmax(280px,.72fr) minmax(0,1.45fr);gap:16px}.overview-column .control-card,.group-manager-card,.users-card,.audit-page{border:1px solid var(--color-border);background:var(--color-card);box-shadow:var(--shadow-sm)}.summary-grid article{--metric:#4b70d8;border-color:color-mix(in srgb,var(--metric) 24%,var(--color-border));background:color-mix(in srgb,var(--metric) 5%,var(--color-card))}.summary-grid .metric-users{--metric:#346ed3}.summary-grid .metric-data{--metric:#23966a}.summary-grid .metric-sessions{--metric:#8463bf}.summary-grid .metric-ai{--metric:#c18632}.summary-grid i{color:var(--metric);font-weight:800}.summary-grid strong{color:var(--metric);font-variant-numeric:tabular-nums}.summary-grid small{color:var(--color-muted-foreground)}.registration{border:1px solid var(--color-border);background:var(--color-muted)}.switch-control{position:relative;display:inline-flex;width:48px;height:28px;flex:none;cursor:pointer}.switch-control input{position:absolute;width:1px;height:1px;opacity:0}.switch-control>span{width:100%;height:100%;border:1px solid var(--color-border-strong);border-radius:999px;background:var(--color-muted-foreground);transition:background .2s ease,border-color .2s ease}.switch-control>span::after{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);content:"";transition:transform .2s cubic-bezier(.2,.8,.2,1)}.switch-control input:checked+span{border-color:#27885a;background:#27885a}.switch-control input:checked+span::after{transform:translateX(20px)}.switch-control input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--color-ring) 30%,transparent);outline-offset:2px}.switch-control input:disabled+span{opacity:.55;cursor:not-allowed}.registration-code{border-color:var(--color-border);background:var(--color-muted)}.registration-code-row{grid-template-columns:minmax(0,1fr) auto auto}.registration-code-row .saved-code{color:var(--color-muted-foreground);background:var(--color-muted);font-weight:700}.registration-code-row .primary{min-width:64px}.clear-code-button{min-height:38px;padding:7px 10px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-muted-foreground);background:var(--color-card);font-weight:600}.clear-code-button:hover{color:var(--color-foreground);background:var(--color-muted)}.health-grid>div{border-color:var(--color-border);background:var(--color-card)}.user-tools{display:grid;grid-template-columns:minmax(180px,1fr) 140px 180px;gap:8px;flex:none}.user-tools input{width:100%;min-width:0}.user-tools .base-select,.user-tools .sort-select{width:100%;min-width:0}.users-card .user-scroll{min-height:0}.users-card article.user-row{border-color:var(--color-border)}.user-summary{grid-template-columns:42px minmax(0,1fr) auto 28px;align-items:center}.group-pill.tone-0{border-color:#bfcef4;color:#315cb2;background:#eaf0ff}.group-pill.tone-1{border-color:#b8e1ce;color:#23734d;background:#e8f7ef}.group-pill.tone-2{border-color:#e7d2ad;color:#8c5e18;background:#fff5df}.group-pill.tone-3{border-color:#d8c9ee;color:#704aa4;background:#f3edfc}.group-pill.unassigned{color:var(--color-muted-foreground);background:var(--color-muted)}.expand-icon{align-self:center}.audit-page{display:flex;min-height:0;flex:1;flex-direction:column}.audit-page .audit-scroll{flex:1;margin-top:12px}.audit-scroll>div{grid-template-columns:9px minmax(0,1fr) minmax(138px,auto);gap:12px;padding:13px 4px;border-color:var(--color-border)}.audit-scroll span b{color:var(--color-foreground);font-size:13px;font-weight:800}.audit-scroll small{color:var(--color-muted-foreground);font-size:11px}.audit-scroll time{color:var(--color-muted-foreground);font-size:11px;text-align:right;white-space:nowrap}.audit-pagination{display:flex;flex:none;align-items:center;justify-content:center;gap:12px;padding-top:12px;border-top:1px solid var(--color-border)}.audit-pagination button{min-height:36px;padding:7px 12px}.audit-pagination span{color:var(--color-muted-foreground);font-size:12px;font-variant-numeric:tabular-nums}
+@media(max-width:1100px){.admin-shell{height:auto;min-height:100%;overflow:visible}.admin-grid{grid-template-columns:minmax(0,1fr)}.overview-column .control-card{flex:none}.users-column{min-height:460px}.user-scroll{max-height:640px}.audit-page{min-height:420px}.admin-grid .users-card{min-height:440px}}
+@media(max-width:720px){.admin-toolbar{align-items:center}.admin-grid{gap:12px}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.user-tools{grid-template-columns:minmax(0,1fr) minmax(120px,.62fr)}.user-tools input{grid-column:1/-1}.user-tools .sort-select{grid-column:1/-1}.user-summary{grid-template-columns:42px minmax(0,1fr) auto 24px}.users-column{min-height:400px}.audit-scroll>div{grid-template-columns:8px minmax(0,1fr);gap:7px}.audit-scroll time{grid-column:2;text-align:left}.audit-pagination{gap:7px}.audit-pagination span{font-size:11px}}
+@media(max-width:420px){.admin-subnav button{padding:7px 9px;font-size:12px}.registration-code-row{grid-template-columns:minmax(0,1fr) auto}.registration-code-row input{grid-column:1/-1}.registration-code-row button{min-width:0}}
+:global(:root[data-theme="dark"] .summary-grid article){border-color:color-mix(in srgb,var(--metric) 32%,var(--color-border));background:color-mix(in srgb,var(--metric) 12%,var(--color-card))}
+:global(:root[data-theme="dark"] .summary-grid i),:global(:root[data-theme="dark"] .summary-grid strong){color:color-mix(in srgb,var(--metric) 55%,#fff)}
+:global(:root[data-theme="dark"] .registration-code-row .saved-code){color:var(--color-muted-foreground);background:var(--color-muted)}
+:global(:root[data-theme="dark"] .group-pill.tone-0){border-color:#405888;color:#b4cbff;background:#202c43}:global(:root[data-theme="dark"] .group-pill.tone-1){border-color:#35634d;color:#a9e4c3;background:#1e3027}:global(:root[data-theme="dark"] .group-pill.tone-2){border-color:#715c37;color:#f0cf91;background:#332b1d}:global(:root[data-theme="dark"] .group-pill.tone-3){border-color:#594878;color:#d2b8ff;background:#2b2439}
+@media(prefers-reduced-motion:reduce){.switch-control>span,.switch-control>span::after{transition:none}}
 </style>
 <style scoped>
 .admin-shell {
