@@ -2,6 +2,8 @@
 const props=withDefaults(defineProps<{name:string;size?:number}>(),{size:18})
 const icons:Record<string,string[]>={
   close:['M6 6l12 12','M18 6 6 18'],
+  sparkles:['m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z','m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z'],
+  'arrow-right':['M5 12h14','m13 6 6 6-6 6'],
   refresh:['M20 6v5h-5','M4 18v-5h5','M18.5 9A7 7 0 0 0 6.2 6.2L4 9','M5.5 15A7 7 0 0 0 17.8 17.8L20 15'],
   edit:['M12 20h9','M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z'],
   trash:['M3 6h18','M8 6V4h8v2','M19 6l-1 14H6L5 6','M10 10v6','M14 10v6'],
