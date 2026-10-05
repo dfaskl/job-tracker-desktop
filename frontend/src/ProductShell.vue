@@ -9,6 +9,7 @@ import MailRecognition from './MailRecognition.vue'
 import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import UserGuide from './UserGuide.vue'
+import { pageFromRoute, readHashRoute } from './routes'
 import { useJobTrackerStore } from './jobTrackerStore'
 import { api } from './api'
 
@@ -103,7 +104,9 @@ let resumeFocusTimer: number | undefined
 let lastBusinessRefresh = 0
 
 function routeFromHash() {
-  const [pageValue, query = ''] = window.location.hash.replace(/^#\/?/, '').split('?')
+  const route = readHashRoute(window.location.hash)
+  const pageValue = pageFromRoute(route)
+  const query = route.split('?')[1] || ''
   const normalizedPage = pageValue === 'settings' ? 'profile' : pageValue
   const page = Object.prototype.hasOwnProperty.call(pageComponents, normalizedPage) ? (normalizedPage as Page) : 'home'
   const applicationId = page === 'applications' ? new URLSearchParams(query).get('application') || '' : ''

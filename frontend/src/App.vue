@@ -4,26 +4,18 @@ import ProductShell from './ProductShell.vue'
 import LoginPage from './LoginPage.vue'
 import GlobalToastBridge from './GlobalToastBridge.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
+import { isSupportedRoute, pageFromRoute, readHashRoute, resolveRequestedRoute } from './routes'
 
 const store = useJobTrackerStore()
 const ready = ref(false)
-const allowedPages = new Set(['home', 'applications', 'calendar', 'mail', 'stats', 'interview-summary', 'profile', 'settings', 'admin'])
 const requestedRoute = ref(readRequestedRoute())
 function readRouteFromHash() {
-  return window.location.hash.replace(/^#\/?/, '') || 'home'
-}
-
-function pageFromRoute(route: string) {
-  return route.split('?')[0]
+  return readHashRoute(window.location.hash)
 }
 
 function readRequestedRoute() {
-  const route = readRouteFromHash()
-  const page = pageFromRoute(route)
   const fromSession = window.sessionStorage.getItem('job-tracker-requested-page') || ''
-  const sessionPage = pageFromRoute(fromSession)
-  if (page === 'login' && allowedPages.has(sessionPage)) return fromSession
-  return allowedPages.has(page) ? route : 'home'
+  return resolveRequestedRoute(window.location.hash, fromSession)
 }
 
 function replaceHash(route: string) {
@@ -35,14 +27,14 @@ function enforceAuthRoute() {
   const route = readRouteFromHash()
   const page = pageFromRoute(route)
   if (!store.user.value) {
-    if (allowedPages.has(page)) {
+    if (isSupportedRoute(page)) {
       requestedRoute.value = route
       window.sessionStorage.setItem('job-tracker-requested-page', route)
     }
     if (page !== 'login') replaceHash('login')
     return
   }
-  if (page === 'login' || !allowedPages.has(page)) {
+  if (page === 'login' || !isSupportedRoute(page)) {
     replaceHash(requestedRoute.value || 'home')
     window.sessionStorage.removeItem('job-tracker-requested-page')
   }
