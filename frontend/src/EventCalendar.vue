@@ -551,5 +551,6 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 }
 </style>
 <style scoped>
-.day-events{--calendar-event-row-height:20px;min-height:0;grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height)}@media(max-width:720px){.day-events{--calendar-event-row-height:9px;row-gap:2px}}
+.calendar-pane .calendar-grid .day{padding:8px;transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}.calendar-pane .calendar-grid .day-number{top:8px;left:8px}.calendar-pane .calendar-grid .day:not(:disabled):hover{position:relative;z-index:2;border-color:color-mix(in srgb,var(--color-primary) 52%,var(--color-border));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 34%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 9%,transparent)}.calendar-pane .calendar-grid .day:not(:disabled):hover .event-chip:not(.middle){filter:saturate(1.12) brightness(.98);box-shadow:0 2px 7px color-mix(in srgb,var(--event-color) 16%,transparent)}.day-events{--calendar-event-row-height:20px;min-height:0;grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height)}.day-events>.event-chip{padding-inline:7px}.day-events>.event-chip.middle{padding:0}@media(max-width:720px){.calendar-pane .calendar-grid .day{padding:4px}.calendar-pane .calendar-grid .day-number{top:4px;left:4px}.day-events{--calendar-event-row-height:9px;row-gap:2px}.day-events>.event-chip{padding:0}}
+@media(prefers-reduced-motion:reduce){.calendar-pane .calendar-grid .day{transition:none}}
 </style>
