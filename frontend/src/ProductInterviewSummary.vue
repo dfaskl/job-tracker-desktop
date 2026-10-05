@@ -175,7 +175,7 @@ watch(topicEntries, entries => {
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
           <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
-          <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
+          <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
         <div ref="workbenchScroll" class="pane-scroll workbench-content">
@@ -277,12 +277,13 @@ watch(topicEntries, entries => {
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
 .workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
 .workbench-heading h2{margin-top:4px}
-.topic-tags{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:8px;max-width:100%;overflow:visible;padding:12px 1px 2px}
-.topic-tag{display:inline-flex;align-items:center;gap:9px;flex:none;max-width:240px;min-height:38px;padding:6px 11px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
+.topic-tags{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:12px;max-width:100%;overflow:visible;padding:12px 1px 2px}
+.topic-tag{display:inline-flex;align-items:center;gap:10px;flex:none;max-width:280px;min-height:40px;padding:6px 9px 6px 13px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
 .topic-tag:hover{border-color:var(--color-border-strong);background:var(--surface-hover)}
 .topic-tag.selected{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
-.topic-tag span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.topic-tag strong{flex:none;font-size:12px}
+.topic-tag-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topic-tag-count{display:inline-grid;min-width:25px;height:25px;flex:none;place-items:center;padding:0 6px;border-radius:999px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 13%,var(--color-card));font-size:12px;font-variant-numeric:tabular-nums}
+.topic-tag.selected .topic-tag-count{color:var(--color-on-primary);background:var(--color-primary)}
 .topic-tag-empty,.topic-tags-placeholder{color:var(--color-muted-foreground);font-size:13px}
 .workbench-content{padding-right:12px;perspective:1400px;perspective-origin:center 18%}
 .workbench-page{min-height:100%;transform-style:preserve-3d;backface-visibility:hidden}
@@ -302,6 +303,7 @@ watch(topicEntries, entries => {
 .reference-answer{margin:14px 0 0;padding:13px 15px;border-left:3px solid var(--color-primary);border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--color-primary) 5%,var(--color-card))}
 .reference-answer strong{color:var(--color-primary);font-size:12px}
 .reference-answer p{margin:7px 0 0;color:var(--color-foreground);line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+:global(:root[data-theme="dark"] .reference-answer p){color:#f2f4f8}
 .project-resume-hint{padding:12px 14px;border-radius:8px;color:var(--color-muted-foreground);background:color-mix(in srgb,var(--color-primary) 6%,var(--color-card));font-size:13px;line-height:1.6}
 .project-resume-hint button{display:inline;padding:0;border:0;color:var(--color-primary);background:transparent;font-weight:700}
 .stream-preview{padding:4px 0 18px}
