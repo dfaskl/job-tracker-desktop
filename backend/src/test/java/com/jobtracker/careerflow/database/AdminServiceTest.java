@@ -69,6 +69,17 @@ class AdminServiceTest {
         assertThat(details.toString()).doesNotContain("must-not-be-returned");
     }
 
+    @Test
+    void reportsResumeConfiguredOnlyWhenAnEntryContainsInformation() {
+        AdminService service = service(new MockEnvironment());
+        assertThat(service.hasConfiguredResume("{\"settings\":{\"interviewWorkbench\":{\"resume\":{\"education\":[],\"internships\":[],\"projects\":[]}}}}"))
+            .isFalse();
+        assertThat(service.hasConfiguredResume("{\"settings\":{\"interviewWorkbench\":{\"resume\":{\"education\":[{\"school\":\"\",\"major\":\"\"}],\"internships\":[],\"projects\":[]}}}}"))
+            .isFalse();
+        assertThat(service.hasConfiguredResume("{\"settings\":{\"interviewWorkbench\":{\"resume\":{\"education\":[{\"school\":\"Example University\"}]}}}}"))
+            .isTrue();
+    }
+
     private AdminService service(MockEnvironment environment) {
         ObjectMapper mapper = new ObjectMapper();
         ApplicationService sandbox = new ApplicationService(

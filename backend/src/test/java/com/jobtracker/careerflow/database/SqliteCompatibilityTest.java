@@ -73,6 +73,8 @@ class SqliteCompatibilityTest {
             new LegacySecretCryptoWriter(secretCrypto));
         var adminOverview = admin.overview("admin@example.com");
         assertThat(adminOverview.users()).hasSize(1);
+        assertThat(adminOverview.users().getFirst().hasMailAccount()).isFalse();
+        assertThat(adminOverview.users().getFirst().hasResume()).isFalse();
         assertThat(adminOverview.users().getFirst().avatar()).isEqualTo(avatar);
         admin.setRegistration("admin@example.com", false);
         assertThat(accounts.registrationOpen()).isFalse();

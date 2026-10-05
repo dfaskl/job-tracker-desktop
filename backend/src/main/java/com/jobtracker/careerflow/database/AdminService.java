@@ -470,9 +470,10 @@ public class AdminService {
     private List<UserView> users(Connection connection) throws Exception {
         String sql = "SELECT u.id,u.email,u.display_name,u.is_admin,u.disabled_at,u.created_at,u.group_id,g.name AS group_name,d.data::text AS user_data,"
             + "CASE WHEN jsonb_typeof(d.data->'applications')='array' THEN jsonb_array_length(d.data->'applications') ELSE 0 END AS application_count,"
-            + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
-            + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
-            + "u.last_active_at "
+                    + "CASE WHEN jsonb_typeof(d.data->'events')='array' THEN jsonb_array_length(d.data->'events') ELSE 0 END AS event_count,"
+                    + "(c.encrypted_api_key IS NOT NULL) AS has_api_key,"
+                    + "EXISTS(SELECT 1 FROM mail_accounts m WHERE m.user_id=u.id) AS has_mail_account,"
+                    + "u.last_active_at "
             + "FROM users u LEFT JOIN user_data d ON d.user_id=u.id LEFT JOIN api_configs c ON c.user_id=u.id "
             + "LEFT JOIN interview_groups g ON g.id=u.group_id "
             + "ORDER BY u.created_at ASC,u.id ASC LIMIT ?";
@@ -489,6 +490,7 @@ public class AdminService {
                         disabledAt, instant(result, "created_at"),
                         instant(result, "last_active_at"), result.getInt("application_count"),
                         result.getInt("event_count"), result.getBoolean("has_api_key"),
+                        result.getBoolean("has_mail_account"), hasConfiguredResume(result.getString("user_data")),
                         string(result.getObject("group_id")), string(result.getObject("group_name"))
                     ));
                 }
@@ -706,6 +708,28 @@ public class AdminService {
             return "";
         }
     }
+
+    boolean hasConfiguredResume(String json) {
+        try {
+            JsonNode resume = objectMapper.readTree(json == null ? "{}" : json)
+                .path("settings").path("interviewWorkbench").path("resume");
+            for (String section : List.of("education", "internships", "projects")) {
+                JsonNode entries = resume.path(section);
+                if (!entries.isArray()) continue;
+                for (JsonNode entry : entries) {
+                    if (!entry.isObject()) continue;
+                    var fields = entry.properties().iterator();
+                    while (fields.hasNext()) {
+                        JsonNode value = fields.next().getValue();
+                        if (!value.isNull() && !value.isObject() && !value.isArray() && !value.asText("").isBlank()) return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // Invalid or legacy user data is treated as an unconfigured resume.
+        }
+        return false;
+    }
     private String string(Object value) {
         return value == null ? "" : value.toString();
     }
@@ -726,7 +750,8 @@ public class AdminService {
                           String registrationCode, boolean adminEmailConfigured) {}
     public record UserView(String id, String email, String displayName, String avatar, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
-                           boolean hasApiKey, String groupId, String groupName) {}
+                           boolean hasApiKey, boolean hasMailAccount, boolean hasResume,
+                           String groupId, String groupName) {}
     public record GroupView(String id, String name, int memberCount) {}
     public record AuditView(String id, String action, String targetEmail, String createdAt) {}
     public record Overview(CurrentAdmin currentUser, Summary summary, List<GroupView> groups, List<UserView> users,

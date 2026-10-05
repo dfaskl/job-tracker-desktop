@@ -8,7 +8,7 @@ import { formatShanghaiDateTime } from './shanghaiTime'
 
 type AdminStatus={enabled:boolean;requested:boolean;sandboxEnabled:boolean;message:string}
 type Summary={totalUsers:number;enabledUsers:number;totalApplications:number;registrationOpen:boolean;registrationCodeEnabled:boolean;registrationCode:string;adminEmailConfigured:boolean}
-type User={id:string;email:string;displayName:string;avatar:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;groupId:string;groupName:string}
+type User={id:string;email:string;displayName:string;avatar:string;isAdmin:boolean;disabled:boolean;disabledAt:string;createdAt:string;lastActiveAt:string;applicationCount:number;eventCount:number;hasApiKey:boolean;hasMailAccount:boolean;hasResume:boolean;groupId:string;groupName:string}
 type InterviewGroup={id:string;name:string;memberCount:number}
 type Audit={id:string;action:string;targetEmail:string;createdAt:string}
 type ApplicationDetail={id:string;company:string;position:string;stage:string;status:string;appliedDate:string;city:string;channel:string;flow:{at:string;title:string}[]}
@@ -43,6 +43,7 @@ const filteredUsers=computed(()=>{
 const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCount,0))
 const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
+function missingUserSetup(user:User){return [!user.hasApiKey?'API': '',!user.hasMailAccount?'邮箱': '',!user.hasResume?'简历': ''].filter(Boolean)}
 const auditPages=computed(()=>Math.max(1,Math.ceil((overview.value?.audit.length||0)/auditPageSize)))
 const pagedAudit=computed(()=>{const items=overview.value?.audit||[];const start=(Math.min(auditPage.value,auditPages.value)-1)*auditPageSize;return items.slice(start,start+auditPageSize)})
 
@@ -151,7 +152,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
                   </div>
                   <div v-else class="identity-heading"><strong :title="user.displayName">{{user.displayName||user.email.split('@')[0]}}</strong><button class="edit-name-button icon-button" :disabled="busyUser===user.id" :aria-label="'修改 '+(user.displayName||user.email)+' 的昵称'" title="修改昵称" @click="beginDisplayNameEdit(user)"><AppIcon name="edit" :size="14" /></button><small class="user-email" :title="user.email">{{user.email}}</small></div>
                   <small v-if="editingNameId===user.id" class="user-email" :title="user.email">{{user.email}}</small>
-                  <div class="identity-meta"><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span><div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div></div>
+                  <div class="identity-meta"><span><b v-if="user.isAdmin">管理员</b><b v-else-if="user.disabled" class="bad">已停用</b><b v-else class="good">正常</b> · 注册于 {{formatDate(user.createdAt)}}</span><div class="counts"><span><b>{{user.applicationCount}}</b> 投递</span><span><b>{{user.eventCount}}</b> 日程</span><span :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></div><div v-if="missingUserSetup(user).length" class="missing-config-list" aria-label="未配置项目"><span v-for="item in missingUserSetup(user)" :key="item">未配置{{item}}</span></div></div>
                 </div>
                 <label class="group-assignment"><small>协作小组</small><select :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></label>
                 <div class="actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的原始 JSON'" title="导出原始 JSON" @click="downloadUserData(user,'raw')"><AppIcon name="database" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的规范 Excel'" title="导出规范 Excel" @click="downloadUserData(user,'readable')"><AppIcon name="file-spreadsheet" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div>
@@ -437,6 +438,8 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .user-row.expanded .expand-icon{transform:rotate(90deg)}
 .user-expanded{display:grid;grid-template-columns:minmax(400px,1fr) 124px max-content;align-items:center;gap:8px;padding:9px 4px 10px 28px;border-top:1px dashed var(--color-border)}
 .user-expanded .identity{min-width:0}
+.missing-config-list{display:flex;min-width:0;align-items:center;flex-wrap:wrap;gap:5px;margin-top:3px}
+.missing-config-list>span{padding:3px 7px;border:1px solid color-mix(in srgb,var(--color-destructive) 24%,var(--color-border));border-radius:999px;color:var(--color-destructive);background:color-mix(in srgb,var(--color-destructive) 8%,var(--color-card));font-size:10px;font-weight:700;line-height:1.3}
 .user-expanded .group-assignment,.user-expanded .actions{min-width:0}
 .user-expanded .actions{justify-self:end;margin-right:46px}
 @media(max-width:720px){.user-summary{grid-template-columns:42px minmax(0,1fr) auto 24px}.group-pill{max-width:110px}.user-expanded{grid-template-columns:1fr;align-items:stretch;padding-left:58px}.user-expanded .group-assignment,.user-expanded .actions{width:100%;margin-left:0;flex-basis:auto}.user-expanded .actions{justify-content:flex-start}}
