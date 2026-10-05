@@ -51,7 +51,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 }
 #app :is(input, textarea)::placeholder { color: var(--color-muted-foreground); opacity: .85; }
 #app :is(.section-kicker, .eyebrow) { letter-spacing: 0; }
-#app .profile-workspace { width: min(960px,100%); padding-top: 24px; }
+#app .profile-workspace { width: min(1540px,100%); padding-top: 24px; }
 #app :is(.settings-column, .settings-grid) .card { box-shadow: var(--shadow-panel); }
 
 /* The home workspace starts with the personal agenda. */

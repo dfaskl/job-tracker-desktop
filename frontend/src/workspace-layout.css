@@ -152,7 +152,7 @@
 #app .interview-list article.is-ended { --record-bg: var(--color-card); }
 
 /* Settings and administration follow the same document-like section rhythm. */
-#app .profile-workspace { width: min(980px, 100%); }
+#app .profile-workspace { width: min(1540px, 100%); }
 #app .settings-column { gap: 0; }
 #app .settings-column > .card,
 #app .settings-column > :is(section, div).card { margin: 0; padding: 26px 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
