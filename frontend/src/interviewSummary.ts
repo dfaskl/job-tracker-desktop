@@ -1,12 +1,24 @@
 import { api, ApiError } from './api'
 
 let inFlight: Promise<unknown> | null = null
+const INTERVIEW_SUMMARY_UPDATED_KEY = 'careerflow:interview-summary:updated-at'
+
+export function notifyInterviewSummaryUpdated(): void {
+  let updatedAt = Date.now()
+  try {
+    updatedAt = Math.max(updatedAt, Number(localStorage.getItem(INTERVIEW_SUMMARY_UPDATED_KEY) || 0) + 1)
+    localStorage.setItem(INTERVIEW_SUMMARY_UPDATED_KEY, String(updatedAt))
+  } catch { /* Keep the in-app notice even when storage is unavailable. */ }
+  window.dispatchEvent(new CustomEvent('careerflow:interview-summary-updated', { detail: updatedAt }))
+}
 
 export function summarizeInterviewReviews<T>(): Promise<T> {
   if (inFlight) return inFlight as Promise<T>
   const request = (async () => {
     await summarizeInterviewReviewsStream(() => { /* Background refresh uses the same resumable batched pipeline. */ })
-    return api<T>('/api/poc/interview-workbench')
+    const result = await api<T>('/api/poc/interview-workbench')
+    notifyInterviewSummaryUpdated()
+    return result
   })()
   inFlight = request.finally(() => { inFlight = null })
   return inFlight as Promise<T>

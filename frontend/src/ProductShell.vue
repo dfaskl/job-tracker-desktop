@@ -44,6 +44,27 @@ const primaryNavigation = ref<HTMLElement | null>(null)
 const navIndicatorStyle = ref<Record<string, string>>({ width: '0px', height: '0px', transform: 'translate3d(0,0,0)', opacity: '0' })
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
+const MAIL_LAST_OBSERVED_KEY = 'careerflow:mail:last-observed-pending-count'
+const MAIL_NOTICE_VISIBLE_KEY = 'careerflow:mail:notice-visible'
+const SUMMARY_UPDATED_KEY = 'careerflow:interview-summary:updated-at'
+const SUMMARY_DISMISSED_KEY = 'careerflow:interview-summary:dismissed-at'
+function readStoredNumber(key: string): number | null {
+  try {
+    const value = localStorage.getItem(key)
+    if (value === null) return null
+    const number = Number(value)
+    return Number.isFinite(number) ? number : null
+  } catch { return null }
+}
+function writeStoredNumber(key: string, value: number) {
+  try { localStorage.setItem(key, String(value)) } catch { /* The navigation notice still works for this session. */ }
+}
+const mailBadgeVisible = ref(false)
+let mailNoticeReady = false
+let lastObservedMailCount = 0
+const summaryUpdatedAt = ref(readStoredNumber(SUMMARY_UPDATED_KEY) || 0)
+const summaryDismissedAt = ref(readStoredNumber(SUMMARY_DISMISSED_KEY) || 0)
+const summaryBadgeVisible = ref(summaryUpdatedAt.value > summaryDismissedAt.value)
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
 const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
@@ -152,6 +173,48 @@ function refreshWorkspaceData(forceBusiness = false) {
 }
 function handleWindowFocus() { refreshWorkspaceData(true) }
 function handleVisibilityChange() { if (document.visibilityState === 'visible') refreshWorkspaceData(true) }
+function dismissMailBadge() {
+  mailBadgeVisible.value = false
+  lastObservedMailCount = store.pendingMailCount.value
+  writeStoredNumber(MAIL_LAST_OBSERVED_KEY, lastObservedMailCount)
+  writeStoredNumber(MAIL_NOTICE_VISIBLE_KEY, 0)
+}
+function dismissSummaryBadge(updatedAt = summaryUpdatedAt.value) {
+  summaryBadgeVisible.value = false
+  summaryDismissedAt.value = Math.max(summaryDismissedAt.value, updatedAt)
+  writeStoredNumber(SUMMARY_DISMISSED_KEY, summaryDismissedAt.value)
+}
+function handleSummaryUpdated(event: Event) {
+  const updatedAt = Number((event as CustomEvent<number>).detail) || Date.now()
+  summaryUpdatedAt.value = Math.max(summaryUpdatedAt.value, updatedAt)
+  if (activePage.value === 'interview-summary') dismissSummaryBadge(summaryUpdatedAt.value)
+  else summaryBadgeVisible.value = summaryUpdatedAt.value > summaryDismissedAt.value
+}
+function initializeMailBadge() {
+  const count = store.pendingMailCount.value
+  const previouslyObserved = readStoredNumber(MAIL_LAST_OBSERVED_KEY)
+  const previouslyVisible = readStoredNumber(MAIL_NOTICE_VISIBLE_KEY) === 1
+  lastObservedMailCount = count
+  mailNoticeReady = true
+  if (activePage.value === 'mail') dismissMailBadge()
+  else if (previouslyObserved === null) mailBadgeVisible.value = count > 0
+  else if (count > previouslyObserved) mailBadgeVisible.value = count > 0
+  else mailBadgeVisible.value = previouslyVisible && count > 0
+  writeStoredNumber(MAIL_LAST_OBSERVED_KEY, count)
+  writeStoredNumber(MAIL_NOTICE_VISIBLE_KEY, mailBadgeVisible.value ? 1 : 0)
+}
+function handleStoredNotice(event: StorageEvent) {
+  if (event.key === MAIL_NOTICE_VISIBLE_KEY) mailBadgeVisible.value = event.newValue === '1' && store.pendingMailCount.value > 0
+  if (event.key === SUMMARY_UPDATED_KEY) {
+    summaryUpdatedAt.value = Number(event.newValue) || 0
+    if (activePage.value === 'interview-summary') dismissSummaryBadge(summaryUpdatedAt.value)
+    else summaryBadgeVisible.value = summaryUpdatedAt.value > summaryDismissedAt.value
+  }
+  if (event.key === SUMMARY_DISMISSED_KEY) {
+    summaryDismissedAt.value = Number(event.newValue) || 0
+    summaryBadgeVisible.value = summaryUpdatedAt.value > summaryDismissedAt.value
+  }
+}
 
 onMounted(async () => {
   syncHash()
@@ -160,6 +223,8 @@ onMounted(async () => {
   window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('resize', handleWindowResize)
+  window.addEventListener('careerflow:interview-summary-updated', handleSummaryUpdated)
+  window.addEventListener('storage', handleStoredNotice)
   await store.initialize()
   if (store.user.value) {
     try { isAdmin.value = (await api<{ isAdmin: boolean }>('/api/poc/admin-sandbox/access')).isAdmin === true }
@@ -170,11 +235,27 @@ onMounted(async () => {
   await nextTick()
   syncNavIndicator()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
+  initializeMailBadge()
   lastBusinessRefresh = Date.now()
   syncHash()
+  if (activePage.value === 'interview-summary') dismissSummaryBadge()
   workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
 })
-watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }); syncNavIndicator() })
+watch(store.pendingMailCount, count => {
+  if (!mailNoticeReady) return
+  if (count > lastObservedMailCount) mailBadgeVisible.value = count > 0
+  else if (count === 0) mailBadgeVisible.value = false
+  lastObservedMailCount = count
+  writeStoredNumber(MAIL_LAST_OBSERVED_KEY, count)
+  writeStoredNumber(MAIL_NOTICE_VISIBLE_KEY, mailBadgeVisible.value ? 1 : 0)
+})
+watch(activePage, async page => {
+  await nextTick()
+  mainContent.value?.focus({ preventScroll: true })
+  syncNavIndicator()
+  if (page === 'mail') dismissMailBadge()
+  if (page === 'interview-summary') dismissSummaryBadge()
+})
 watch([visiblePages, mobileMenuOpen], () => { void nextTick(syncNavIndicator) }, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
@@ -182,6 +263,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('resize', handleWindowResize)
+  window.removeEventListener('careerflow:interview-summary-updated', handleSummaryUpdated)
+  window.removeEventListener('storage', handleStoredNotice)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
   if (resumeFocusTimer !== undefined) window.clearTimeout(resumeFocusTimer)
 })
@@ -202,8 +285,10 @@ onBeforeUnmount(() => {
       </button>
       <nav id="primary-navigation" ref="primaryNavigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
         <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
-        <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
-          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
+        <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span>
+          <Transition name="nav-notice"><b v-if="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0" key="mail-badge" class="nav-badge" aria-hidden="true"><Transition name="nav-count-roll" mode="out-in"><span :key="store.pendingMailCount.value" class="nav-count-value">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</span></Transition></b></Transition>
+          <Transition name="nav-notice"><span v-if="item.id === 'interview-summary' && summaryBadgeVisible" key="summary-badge" class="nav-status-dot" aria-hidden="true"></span></Transition>
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
@@ -248,7 +333,15 @@ nav button.active::before { content: none; }
 .nav-copy strong { font-size: 14px; font-weight: 550; }
 .nav-arrow { display: none; }
 .nav-badge { display: grid; min-width: 22px; height: 22px; padding: 0 5px; place-items: center; border-radius: 6px; color: var(--color-on-primary); background: var(--color-primary); font-size: 11px; font-weight: 600; }
-@media (prefers-reduced-motion: reduce) { .nav-active-indicator { transition-duration: .2s,.18s,.18s,.12s; transition-timing-function: ease-out; } }
+.nav-count-value { display: block; line-height: 1; }
+.nav-status-dot { width: 9px; height: 9px; flex: none; margin-inline: 6px 4px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 42%,transparent); animation: nav-dot-breathe 1.8s ease-out infinite; }
+.nav-notice-leave-active { transition: transform .48s cubic-bezier(.2,.8,.25,1), opacity .42s ease; transform-origin: center; }
+.nav-notice-leave-to { transform: scale(.12); opacity: 0; }
+.nav-count-roll-enter-active,.nav-count-roll-leave-active { transition: transform .24s cubic-bezier(.2,.7,.3,1), opacity .2s ease; }
+.nav-count-roll-enter-from { transform: translateY(75%); opacity: 0; }
+.nav-count-roll-leave-to { transform: translateY(-75%); opacity: 0; }
+@keyframes nav-dot-breathe { 0% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 40%,transparent); transform: scale(.92); } 65% { box-shadow: 0 0 0 6px transparent; transform: scale(1); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .nav-active-indicator { transition-duration: .2s,.18s,.18s,.12s; transition-timing-function: ease-out; } .nav-status-dot { animation: none; } .nav-notice-leave-active,.nav-count-roll-enter-active,.nav-count-roll-leave-active { transition-duration: .01ms; } }
 .sr-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .theme-toggle { position: absolute; right: 14px; bottom: 90px; display: grid; width: 36px; height: 36px; min-height: 36px; place-items: center; padding: 0; border: 1px solid var(--color-border); background: var(--color-card); }
 .theme-toggle:hover { background: var(--color-muted); }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { api } from './api'
-import { summarizeInterviewReviewsStream } from './interviewSummary'
+import { notifyInterviewSummaryUpdated, summarizeInterviewReviewsStream } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string; answerStatus?: string; frequency?: number; sourceQuestions?: { question: string; eventId?: string }[] }[] }
@@ -99,6 +99,7 @@ async function summarize(automatic = false, force = false) {
       else streamingQuestions.value.push({ question: event.question, answer: event.answer, frequency: event.frequency || 1 })
     }, force)
     state.value = await api<Workbench>('/api/poc/interview-workbench')
+    notifyInterviewSummaryUpdated()
     autoAttemptedKey = state.value.sourceKey
     message.value = automatic ? '面试回顾已自动汇总' : '考点汇总已更新'
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '考点汇总失败' }
