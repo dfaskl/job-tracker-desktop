@@ -38,6 +38,7 @@ const activePage = ref<Page>('home')
 const isAdmin = ref(false)
 const adminAccessLoaded = ref(false)
 const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || isAdmin.value))
+const mobilePages = computed(() => visiblePages.value.filter(item => item.id !== 'admin'))
 const focusApplicationId = ref('')
 const mobileMenuOpen = ref(false)
 const primaryNavigation = ref<HTMLElement | null>(null)
@@ -286,19 +287,22 @@ onBeforeUnmount(() => {
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
       </button>
-      <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起页面导航' : '展开页面导航'" aria-controls="primary-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
+      <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起账户设置' : '打开账户设置'" aria-controls="account-menu" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
-      <nav id="primary-navigation" ref="primaryNavigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
+      <button v-if="isAdmin" type="button" class="admin-shortcut" :class="{ active: activePage === 'admin' }" aria-label="管理员" title="管理员" :aria-current="activePage === 'admin' ? 'page' : undefined" @click="navigate('admin')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5.2-3.2 8.4-8 10-4.8-1.6-8-4.8-8-10V6ZM9 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm4 0h4m-1 0v2" /></svg>
+      </button>
+      <nav id="primary-navigation" ref="primaryNavigation" aria-label="主要导航">
         <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
-        <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
+        <button v-for="item in (mobileViewport ? mobilePages : visiblePages)" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span>
           <Transition name="nav-notice"><b v-if="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0" key="mail-badge" class="nav-badge" :style="{ width: mailBadgeWidth }" aria-hidden="true"><Transition name="nav-count-roll" mode="out-in"><span :key="mailBadgeLabel" class="nav-count-value">{{ mailBadgeLabel }}</span></Transition></b></Transition>
           <Transition name="nav-notice"><span v-if="item.id === 'interview-summary' && summaryBadgeVisible" key="summary-badge" class="nav-status-dot" aria-hidden="true"></span></Transition>
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
-      <div class="sidebar-account" :inert="mobileViewport && !mobileMenuOpen"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
+      <div id="account-menu" class="sidebar-account" :inert="mobileViewport && !mobileMenuOpen"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary' }">
@@ -360,6 +364,7 @@ nav button.active::before { content: none; }
 .profile-entry-copy strong { overflow: hidden; color: var(--color-foreground); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .profile-entry-copy small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 .menu-toggle { display: none; }
+.admin-shortcut { display: none; }
 .product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; }
 .topbar {
   position: sticky;
@@ -458,27 +463,35 @@ nav button.active::before { content: none; }
 @media (max-width: 820px) {
   .product-shell { width: 100%; max-width: 100%; overflow-x: clip; }
   .skip-link { left: 12px; }
-  .sidebar { inset: 0 0 auto; z-index: 30; display: grid; width: 100%; grid-template-columns: minmax(0,1fr) auto auto; gap: 0 8px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
+  .sidebar { inset: 0 0 auto; z-index: 30; display: grid; width: 100%; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 0 8px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
   .brand { width: fit-content; min-width: 0; padding: 0; }
   .brand small { display: none; }
   .brand strong { font-size: 17px; }
   .theme-toggle { position: static; width: 44px; height: 44px; min-height: 44px; }
   .menu-toggle { display: grid; width: 44px; height: 44px; place-content: center; gap: 5px; border: 1px solid var(--color-border); background: var(--color-card); }
+  .admin-shortcut { display: grid; position: relative; width: 44px; height: 44px; place-items: center; padding: 0; border: 1px solid var(--color-border); color: #fff; background: var(--color-card); }
+  .admin-shortcut svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .admin-shortcut.active { color: var(--color-primary); }
+  .admin-shortcut.active::after { position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
   .menu-toggle span { display: block; width: 18px; height: 2px; background: currentColor; transition: transform .18s, opacity .18s; }
   .menu-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .menu-open .menu-toggle span:nth-child(2) { opacity: 0; }
   .menu-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  nav { grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 0; padding-top: 0; border-top: 0; overflow: hidden; opacity: 0; transition: opacity .16s; }
-  .menu-open nav { max-height: 240px; margin-top: 12px; opacity: 1; }
-  nav button { gap: 8px; padding: 10px 8px; }
-  .nav-copy strong { font-size: 13px; }
-  .nav-icon { width: 18px; }
-  .nav-badge { position: absolute; top: 0; right: 0; min-width: 17px; height: 17px; padding-inline: 3px; font-size: 10px; }
+  .sidebar nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; width: 100%; min-height: 64px; grid-template-columns: repeat(6,minmax(0,1fr)); align-content: center; gap: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); border-bottom: 0; background: color-mix(in srgb,var(--color-card) 94%,transparent); backdrop-filter: blur(18px); overflow: visible; opacity: 1; }
+  .nav-active-indicator { display: none; }
+  #app .sidebar nav button { display: grid; min-width: 0; min-height: 48px; height: 48px; grid-template-rows: 1fr; place-items: center; gap: 0; padding: 4px 0 7px; border: 0; color: #fff; background: transparent; }
+  #app .sidebar nav button:hover, #app .sidebar nav button.active { color: var(--color-primary); background: transparent; }
+  #app .sidebar nav button.active::after { position: absolute; bottom: 1px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
+  .nav-copy,.nav-arrow { display: none; }
+  .nav-icon { width: 22px; height: 22px; }
+  .nav-icon svg { width: 22px; height: 22px; }
+  .nav-badge { position: absolute; top: 1px; right: calc(50% - 20px); min-width: 17px; height: 17px; padding-inline: 3px; font-size: 10px; }
+  .nav-status-dot { position: absolute; top: 2px; right: calc(50% - 19px); width: 8px; height: 8px; margin: 0; }
   .sidebar-account { grid-column: 1/-1; display: none; margin-top: 12px; }
   .menu-open .sidebar-account { display: block; }
   .profile-entry { max-width: 100%; }
-  .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px 32px; }
-  .product-main.interview-summary-page{height:100dvh;padding-bottom:0;overflow:hidden}
+  .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
+  .product-main.interview-summary-page{height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom));overflow:hidden}
   .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
@@ -487,7 +500,7 @@ nav button.active::before { content: none; }
 }
 @media (max-width: 480px) {
   .sidebar { padding-inline: 12px; }
-  .product-main { padding-inline: 12px; }
+  .product-main { padding-right: 12px; padding-left: 12px; }
   .topbar > button { width: 100%; }
 }
 </style>
