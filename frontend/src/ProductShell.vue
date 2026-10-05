@@ -40,12 +40,32 @@ const adminAccessLoaded = ref(false)
 const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || isAdmin.value))
 const focusApplicationId = ref('')
 const mobileMenuOpen = ref(false)
+const primaryNavigation = ref<HTMLElement | null>(null)
+const navIndicatorStyle = ref<Record<string, string>>({ width: '0px', height: '0px', transform: 'translate3d(0,0,0)', opacity: '0' })
 const mainContent = ref<HTMLElement | null>(null)
 const store = useJobTrackerStore()
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
 const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
 function syncViewport() { mobileViewport.value = window.matchMedia('(max-width: 820px)').matches }
+function syncNavIndicator() {
+  const navigation = primaryNavigation.value
+  const activeButton = navigation?.querySelector<HTMLButtonElement>('button[aria-current="page"]')
+  if (!navigation || !activeButton) {
+    navIndicatorStyle.value = { ...navIndicatorStyle.value, opacity: '0' }
+    return
+  }
+  navIndicatorStyle.value = {
+    width: `${activeButton.offsetWidth}px`,
+    height: `${activeButton.offsetHeight}px`,
+    transform: `translate3d(${activeButton.offsetLeft}px,${activeButton.offsetTop}px,0)`,
+    opacity: '1'
+  }
+}
+function handleWindowResize() {
+  syncViewport()
+  void nextTick(syncNavIndicator)
+}
 let workspaceRefreshTimer: number | undefined
 let resumeFocusTimer: number | undefined
 let lastBusinessRefresh = 0
@@ -139,7 +159,7 @@ onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  window.addEventListener('resize', syncViewport)
+  window.addEventListener('resize', handleWindowResize)
   await store.initialize()
   if (store.user.value) {
     try { isAdmin.value = (await api<{ isAdmin: boolean }>('/api/poc/admin-sandbox/access')).isAdmin === true }
@@ -147,18 +167,21 @@ onMounted(async () => {
   }
   adminAccessLoaded.value = true
   syncHash()
+  await nextTick()
+  syncNavIndicator()
   if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
   lastBusinessRefresh = Date.now()
   syncHash()
   workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
 })
-watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }) })
+watch(activePage, async () => { await nextTick(); mainContent.value?.focus({ preventScroll: true }); syncNavIndicator() })
+watch([visiblePages, mobileMenuOpen], () => { void nextTick(syncNavIndicator) }, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncHash)
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  window.removeEventListener('resize', syncViewport)
+  window.removeEventListener('resize', handleWindowResize)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
   if (resumeFocusTimer !== undefined) window.clearTimeout(resumeFocusTimer)
 })
@@ -177,7 +200,8 @@ onBeforeUnmount(() => {
       <button class="menu-toggle" type="button" :aria-label="mobileMenuOpen ? '收起页面导航' : '展开页面导航'" aria-controls="primary-navigation" :aria-expanded="mobileMenuOpen" @click="mobileMenuOpen = !mobileMenuOpen">
         <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
       </button>
-      <nav id="primary-navigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
+      <nav id="primary-navigation" ref="primaryNavigation" aria-label="主要导航" :inert="mobileViewport && !mobileMenuOpen">
+        <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
         <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span><b v-if="item.id === 'mail' && store.pendingMailCount.value > 0" class="nav-badge" aria-hidden="true">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</b>
         </button>
@@ -212,17 +236,19 @@ onBeforeUnmount(() => {
 .brand div { display: grid; gap: 3px; }
 .brand strong { font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
 .brand small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
-nav { display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; padding-top: 12px; border-top: 1px solid var(--color-border); overflow-y: auto; scrollbar-width: thin; }
-nav button { position: relative; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
+.sidebar nav { position: relative; isolation: isolate; display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; padding-top: 12px; border-top: 1px solid var(--color-border); overflow-y: auto; scrollbar-width: thin; }
+.nav-active-indicator { position: absolute; z-index: 0; top: 0; left: 0; border: 1px solid color-mix(in srgb,var(--color-primary) 18%,transparent); border-radius: 11px; background: color-mix(in srgb,var(--color-primary) 10%,var(--color-card)); box-shadow: inset 0 1px 0 color-mix(in srgb,#fff 5%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 8%,transparent); pointer-events: none; transition: transform .66s cubic-bezier(.2,.82,.25,1.28),width .48s cubic-bezier(.2,.82,.25,1.18),height .48s cubic-bezier(.2,.82,.25,1.18),opacity .16s ease; will-change:transform,width,height; }
+nav button { position: relative; z-index: 1; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
 nav button:hover { background: var(--color-muted); }
-nav button.active { border-color: color-mix(in srgb,var(--color-primary) 14%,transparent); background: color-mix(in srgb,var(--color-primary) 9%,var(--color-card)); }
-nav button.active::before { content: ''; position: absolute; left: -1px; top: 13px; bottom: 13px; width: 3px; border-radius: 3px; background: var(--color-primary); }
+nav button.active { border-color: transparent; background: transparent; }
+nav button.active::before { content: none; }
 .nav-icon { display: grid; width: 20px; height: 20px; flex: none; place-items: center; }
 .nav-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .nav-copy { min-width: 0; flex: 1; }
 .nav-copy strong { font-size: 14px; font-weight: 550; }
 .nav-arrow { display: none; }
 .nav-badge { display: grid; min-width: 22px; height: 22px; padding: 0 5px; place-items: center; border-radius: 6px; color: var(--color-on-primary); background: var(--color-primary); font-size: 11px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .nav-active-indicator { transition-duration: .2s,.18s,.18s,.12s; transition-timing-function: ease-out; } }
 .sr-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .theme-toggle { position: absolute; right: 14px; bottom: 90px; display: grid; width: 36px; height: 36px; min-height: 36px; place-items: center; padding: 0; border: 1px solid var(--color-border); background: var(--color-card); }
 .theme-toggle:hover { background: var(--color-muted); }
