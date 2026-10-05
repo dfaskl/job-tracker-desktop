@@ -203,12 +203,16 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   gap: 12px;
 }
 
+.overview-column { gap: 10px; }
+.overview-column .control-card { flex: none; }
+
 .admin-toolbar {
   display: flex;
   min-height: 44px;
   flex: none;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .identity-heading {
@@ -370,14 +374,13 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 }
 
 .group-manager-card {
-  max-height: 210px;
   flex: none;
   margin: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
 }
 
 .group-manager-card .group-list { grid-template-columns: minmax(0, 1fr); }
+.group-manager-card .group-list { max-height: min(35vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
 
 @media (max-width: 480px) {
   .user-scroll{overflow-x:hidden}
