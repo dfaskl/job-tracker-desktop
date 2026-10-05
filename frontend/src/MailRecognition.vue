@@ -17,7 +17,8 @@ const mailBody = ref('')
 const result = reactive({ company: '', position: '', noticeType: '其他', scheduleTitle: '', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
 const hasResult = ref(false)
 const timeMode = ref<'point' | 'range'>('point')
-const loading = ref(false)
+const checkingStatus = ref(false)
+const recognizing = ref(false)
 const saving = ref(false)
 const error = ref('')
 const scheduleError = ref('')
@@ -91,11 +92,11 @@ function failure(cause: unknown, fallback: string) {
   return cause instanceof Error ? cause.message : fallback
 }
 async function checkStatus() {
-  loading.value = true; error.value = ''
+  checkingStatus.value = true; error.value = ''
   try {
     status.value = await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
   } catch (cause) { error.value = failure(cause, '检查 AI 服务失败') }
-  finally { loading.value = false }
+  finally { checkingStatus.value = false }
 }
 async function loadInbox(sync = false) {
   syncing.value = sync
@@ -202,7 +203,8 @@ function mailDate(value: string) {
   return formatShanghaiDateTime(value, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }, value)
 }
 async function recognize() {
-  loading.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
+  if (recognizing.value || !status.value?.callsEnabled || !mailBody.value.trim()) return
+  recognizing.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
     Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
@@ -211,7 +213,7 @@ async function recognize() {
     timeMode.value = value.endsAt ? 'range' : 'point'
     message.value = '识别完成，请核对后确认录入'
   } catch (cause) { error.value = failure(cause, '邮件识别失败') }
-  finally { loading.value = false }
+  finally { recognizing.value = false }
 }
 function applicationPayload(item?: JobApplication) {
   const payload = {
@@ -259,13 +261,13 @@ async function saveResult() {
   <section class="mail-page" :class="{'mail-entering':entranceActive}">
     <div class="mail-grid">
       <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击卡片填入通知正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击填入正文，双击查看原文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingAll">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
           <div v-else class="mail-cards" aria-label="待处理邮件">
             <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
-              <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-              <div class="mail-card-actions"><button class="mailbox-button icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click.stop="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
+              <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)" @dblclick.stop="openMailPreview(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
+              <div class="mail-card-actions"><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
             </article>
           </div>
           <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{processingAll?'已清空列表，后台正在完成处理':inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
@@ -277,7 +279,7 @@ async function saveResult() {
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
         <div v-if="status && !status.callsEnabled" class="service-unavailable">{{ status.message || '邮件识别服务当前不可用' }}</div>
-        <button class="primary-action" :disabled="loading || !status?.callsEnabled || !mailBody.trim()" @click="recognize">{{ loading ? '正在识别…' : '✦ 开始识别' }}</button>
+        <button class="primary-action" :disabled="recognizing || checkingStatus || !status?.callsEnabled || !mailBody.trim()" :aria-busy="recognizing" @click="recognize"><span v-if="recognizing" class="recognition-spinner" aria-hidden="true"></span><span v-else aria-hidden="true">✦</span>{{ recognizing ? '正在识别…' : checkingStatus ? '正在检查服务…' : '开始识别' }}</button>
       </section>
 
       <section class="card review-panel">
@@ -297,7 +299,8 @@ async function saveResult() {
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
           <div class="commit-box wide"><span>{{ actionSummary }}</span><button :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
         </form>
-        <div v-else class="empty-state"><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div>
+        <div v-else-if="recognizing" class="recognition-state" role="status" aria-live="polite" aria-busy="true"><span class="recognition-spinner large" aria-hidden="true"></span><strong>正在分析邮件内容</strong><span>识别结果会显示在这里，请稍候。</span><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
+        <div v-else class="empty-state"><div class="empty-state-copy"><span class="empty-state-icon" aria-hidden="true"><AppIcon name="mail" :size="22" /></span><div><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div></div><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
       </section>
     </div>
     <p v-if="message" class="feedback success">{{ message }}</p>
@@ -362,9 +365,13 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .process-notice{position:fixed;z-index:1200;top:22px;left:50%;display:flex;align-items:center;gap:9px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid #a9d7c0;border-radius:12px;color:#145c43;background:#f0fbf5;box-shadow:0 12px 32px rgba(14,75,55,.18);font-family:var(--font-button);font-weight:700;transform:translateX(-50%)}.process-notice span{display:grid;width:22px;height:22px;border-radius:50%;color:#fff;background:#26956b;place-items:center}.process-notice-enter-active,.process-notice-leave-active{transition:opacity .18s ease,transform .18s ease}.process-notice-enter-from,.process-notice-leave-to{opacity:0;transform:translate(-50%,-8px)}
 .mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:#fff;box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:#fff;background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:#f5f9fb;place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:#f7fafc}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid #dce6eb;border-radius:12px;background:#fbfcfc;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid #b9d9c9;border-radius:10px}
 @keyframes inbox-spin{to{transform:rotate(360deg)}}
+@keyframes skeleton-shimmer{to{background-position-x:-220%}}
 @keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(3px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(12px,-8px) scale(1.04)}}
 @keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.96}100%{opacity:0;transform:translate(10px,-12px) scale(1.28)}}
 @keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
+.compose-panel > textarea{border-color:#aeb9cb;box-shadow:inset 0 1px 2px rgba(24,39,75,.06);transition:border-color .18s ease,box-shadow .18s ease}.compose-panel > textarea:focus{border-color:var(--color-primary);box-shadow:inset 0 1px 3px rgba(24,39,75,.1),0 0 0 3px color-mix(in srgb,var(--color-primary) 15%,transparent);outline:none}
+.mail-card-actions{align-self:flex-end}.mail-card-actions :is(button,a){width:38px;flex:0 0 38px}
+.primary-action{display:inline-flex;width:auto;min-width:168px;min-height:46px;align-items:center;justify-content:center;align-self:flex-end;gap:9px;padding:11px 18px;border:1px solid color-mix(in srgb,var(--color-primary) 72%,#202d61);border-radius:10px;color:var(--color-on-primary);background:var(--color-primary);box-shadow:0 5px 14px color-mix(in srgb,var(--color-primary) 24%,transparent);font-weight:800;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}.primary-action:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 8px 18px color-mix(in srgb,var(--color-primary) 32%,transparent)}.primary-action:disabled{border-color:var(--color-border);color:var(--color-muted-foreground);background:var(--color-muted);box-shadow:none;opacity:.68;cursor:not-allowed}.recognition-spinner{width:17px;height:17px;border:2px solid color-mix(in srgb,currentColor 34%,transparent);border-top-color:currentColor;border-radius:50%;animation:inbox-spin .72s linear infinite}.recognition-spinner.large{width:32px;height:32px;border-width:3px}.recognition-state,.empty-state{display:grid;min-height:280px;gap:10px;padding:22px;border:1px dashed #aab7cb;border-radius:14px;color:var(--color-muted-foreground);background:color-mix(in srgb,var(--color-card) 88%,var(--color-muted));place-content:center;text-align:center}.recognition-state{align-content:center;justify-items:center;border-color:color-mix(in srgb,var(--color-primary) 55%,var(--color-border));background:color-mix(in srgb,var(--color-primary) 5%,var(--color-card))}.empty-state-copy{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;text-align:left}.empty-state-copy>div{display:grid;gap:4px}.empty-state strong,.recognition-state strong{color:var(--color-card-foreground);font-size:14px}.empty-state-copy span:last-child,.recognition-state>span:not(.recognition-spinner){font-size:12px;line-height:1.5}.empty-state-icon{display:grid;width:42px;height:42px;flex:none;place-items:center;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:var(--color-card)}.form-skeleton{display:grid;width:min(420px,100%);grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}.form-skeleton i,.form-skeleton b{height:38px;border:1px solid color-mix(in srgb,var(--color-border-strong) 65%,var(--color-border));border-radius:8px;background:linear-gradient(100deg,var(--color-muted) 25%,color-mix(in srgb,var(--color-card) 70%,var(--color-muted)) 42%,var(--color-muted) 60%);background-size:220% 100%;animation:skeleton-shimmer 1.8s ease-in-out infinite}.form-skeleton i:nth-child(3){grid-column:1/-1}.form-skeleton b{grid-column:1/-1;width:38%;height:34px;justify-self:end}.recognition-state .form-skeleton{margin-top:8px;opacity:.68}
 @media (min-width: 901px) and (max-width: 1200px) { .mail-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); grid-template-rows:minmax(150px,.34fr) minmax(0,1fr); } .inbox-panel { grid-column: 1 / -1; height:100%; overflow:hidden; } .compose-panel, .review-panel { min-height:0; height:100%; } }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } .inbox-panel { grid-column: auto; } .inbox-panel, .compose-panel, .review-panel { min-height: 0; height: auto; } .compose-panel > textarea { flex: none; height: clamp(160px, 24dvh, 240px); min-height: 160px; overflow-y: auto; resize: vertical; } }
 @media (max-width: 650px) {
@@ -378,6 +385,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .mail-entering :is(.inbox-panel,.compose-panel,.review-panel) { animation-name:mail-panel-pop-reduced; animation-duration:320ms; }
   .mail-entering .compose-panel { animation-delay:340ms; }
   .mail-entering .review-panel { animation-delay:680ms; }
+  .recognition-spinner,.form-skeleton i,.form-skeleton b,.inbox-spinner { animation-duration:2.6s; }
 }
 @keyframes mail-panel-pop-reduced { 0% { opacity:.3; transform:scale(.94); } 70% { opacity:1; transform:scale(1.012); } 100% { opacity:1; transform:scale(1); } }
 </style>
@@ -405,4 +413,10 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   background: #20242a;
   opacity: 1;
 }
+
+:global(:root[data-theme="dark"] .compose-panel > textarea) { border-color:#505967; color:var(--color-card-foreground); background:#191c22; box-shadow:inset 0 1px 3px rgba(0,0,0,.24); }
+:global(:root[data-theme="dark"] .compose-panel > textarea:focus) { border-color:var(--color-primary); box-shadow:inset 0 1px 3px rgba(0,0,0,.28),0 0 0 3px color-mix(in srgb,var(--color-primary) 18%,transparent); }
+:global(:root[data-theme="dark"] .empty-state),:global(:root[data-theme="dark"] .recognition-state) { border-color:#4a5362; background:#1b1e25; }
+:global(:root[data-theme="dark"] .form-skeleton i),:global(:root[data-theme="dark"] .form-skeleton b) { border-color:#414957; background:linear-gradient(100deg,#242832 25%,#303642 42%,#242832 60%); background-size:220% 100%; }
+:global(:root[data-theme="dark"] .primary-action:disabled) { border-color:#414650; color:#9299a6; background:#262a32; opacity:1; }
 </style>
