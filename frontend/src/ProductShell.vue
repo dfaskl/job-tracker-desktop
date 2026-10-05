@@ -68,6 +68,12 @@ const summaryBadgeVisible = ref(summaryUpdatedAt.value > summaryDismissedAt.valu
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
 const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
+const mailBadgeLabel = computed(() => store.pendingMailCount.value > 99 ? '99+' : String(store.pendingMailCount.value))
+const mailBadgeWidth = computed(() => {
+  const count = store.pendingMailCount.value
+  const digitCount = count > 99 ? 3 : count > 9 ? 2 : 1
+  return `${mobileViewport.value ? [17, 22, 27][digitCount - 1] : [22, 28, 34][digitCount - 1]}px`
+})
 function syncViewport() { mobileViewport.value = window.matchMedia('(max-width: 820px)').matches }
 function syncNavIndicator() {
   const navigation = primaryNavigation.value
@@ -287,7 +293,7 @@ onBeforeUnmount(() => {
         <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
         <button v-for="item in visiblePages" :key="item.id" type="button" :class="{ active: activePage === item.id, 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span>
-          <Transition name="nav-notice"><b v-if="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0" key="mail-badge" class="nav-badge" aria-hidden="true"><Transition name="nav-count-roll" mode="out-in"><span :key="store.pendingMailCount.value" class="nav-count-value">{{ store.pendingMailCount.value > 99 ? '99+' : store.pendingMailCount.value }}</span></Transition></b></Transition>
+          <Transition name="nav-notice"><b v-if="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0" key="mail-badge" class="nav-badge" :style="{ width: mailBadgeWidth }" aria-hidden="true"><Transition name="nav-count-roll" mode="out-in"><span :key="mailBadgeLabel" class="nav-count-value">{{ mailBadgeLabel }}</span></Transition></b></Transition>
           <Transition name="nav-notice"><span v-if="item.id === 'interview-summary' && summaryBadgeVisible" key="summary-badge" class="nav-status-dot" aria-hidden="true"></span></Transition>
         </button>
       </nav>
@@ -332,12 +338,12 @@ nav button.active::before { content: none; }
 .nav-copy { min-width: 0; flex: 1; }
 .nav-copy strong { font-size: 14px; font-weight: 550; }
 .nav-arrow { display: none; }
-.nav-badge { display: grid; min-width: 22px; height: 22px; padding: 0 5px; place-items: center; border-radius: 6px; color: var(--color-on-primary); background: var(--color-primary); font-size: 11px; font-weight: 600; }
+.nav-badge { display: grid; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box; flex: none; place-items: center; overflow: hidden; border-radius: 6px; color: var(--color-on-primary); background: var(--color-primary); font-size: 11px; font-weight: 600; transition: width .42s cubic-bezier(.22,1,.36,1); }
 .nav-count-value { display: block; line-height: 1; }
 .nav-status-dot { width: 9px; height: 9px; flex: none; margin-inline: 6px 4px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 42%,transparent); animation: nav-dot-breathe 1.8s ease-out infinite; }
-.nav-notice-leave-active { transition: transform .48s cubic-bezier(.2,.8,.25,1), opacity .42s ease; transform-origin: center; }
+.nav-notice-leave-active { transition: transform .62s cubic-bezier(.22,1,.36,1), opacity .54s ease; transform-origin: center; }
 .nav-notice-leave-to { transform: scale(.12); opacity: 0; }
-.nav-count-roll-enter-active,.nav-count-roll-leave-active { transition: transform .24s cubic-bezier(.2,.7,.3,1), opacity .2s ease; }
+.nav-count-roll-enter-active,.nav-count-roll-leave-active { transition: transform .4s cubic-bezier(.22,1,.36,1), opacity .32s ease; }
 .nav-count-roll-enter-from { transform: translateY(75%); opacity: 0; }
 .nav-count-roll-leave-to { transform: translateY(-75%); opacity: 0; }
 @keyframes nav-dot-breathe { 0% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 40%,transparent); transform: scale(.92); } 65% { box-shadow: 0 0 0 6px transparent; transform: scale(1); } 100% { box-shadow: 0 0 0 0 transparent; } }
@@ -467,7 +473,7 @@ nav button.active::before { content: none; }
   nav button { gap: 8px; padding: 10px 8px; }
   .nav-copy strong { font-size: 13px; }
   .nav-icon { width: 18px; }
-  .nav-badge { position: absolute; top: 0; right: 0; min-width: 17px; height: 17px; font-size: 10px; }
+  .nav-badge { position: absolute; top: 0; right: 0; min-width: 17px; height: 17px; padding-inline: 3px; font-size: 10px; }
   .sidebar-account { grid-column: 1/-1; display: none; margin-top: 12px; }
   .menu-open .sidebar-account { display: block; }
   .profile-entry { max-width: 100%; }
