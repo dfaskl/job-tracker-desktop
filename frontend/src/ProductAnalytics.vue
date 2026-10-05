@@ -2,7 +2,6 @@
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
-import { formatShanghaiScheduleDateTime } from './shanghaiTime'
 
 const store = useJobTrackerStore()
 const analyticsMain = ref<HTMLElement | null>(null)
@@ -24,7 +23,7 @@ const interviewRate = computed(() => total.value ? Math.round(interviews.value /
 const offerRate = computed(() => total.value ? Math.round(offers.value / total.value * 100) : 0)
 const byStage = computed(() => stages.map(name => ({ name, count: count(item => item.stage === name) })))
 const byChannel = computed(() => grouped('channel'))
-const stageColors = ['#5b6dd6', '#9470c5', '#d39331', '#34959c', '#35a36b', '#87909e']
+const stageColors = ['#163f9f', '#1d55c4', '#286de0', '#4389f0', '#65a3f5', '#8cbcf8']
 const channelColors = ['#39966f', '#6575d1', '#d49537', '#4795ad', '#9870ba', '#c66f73', '#7b9852', '#7b8599']
 const donutCircumference = 2 * Math.PI * 38
 type DistributionItem = { name: string; count: number }
@@ -72,16 +71,13 @@ const interviewRecords = computed(() => store.applications.value
       .filter(event => event.applicationId === item.id && !event.missed && isFormalInterview(event))
       .sort((a,b) => interviewTime(b).localeCompare(interviewTime(a)))
     const ended = item.stage === '已结束' || ['未通过','已放弃','已结束'].includes(String(item.status || ''))
-    return { item, related, ended, latest:related[0] ? interviewTime(related[0]) : '', flow:compactFlow(item) }
+    const offer = item.stage === 'Offer' || item.status === '已通过'
+    return { item, related, ended, offer, latest:related[0] ? interviewTime(related[0]) : '', flow:compactFlow(item) }
   })
   .sort((a,b) => Number(a.ended) - Number(b.ended) || b.latest.localeCompare(a.latest) || String(a.item.company || '').localeCompare(String(b.item.company || ''),'zh-CN')))
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function interviewTime(event: Record<string, unknown>) { return String(event.completedAt || event.startsAt || event.start || event.date || '') }
-function displayDate(value: string) {
-  if (!value) return '时间未记录'
-  return formatShanghaiScheduleDateTime(value, value)
-}
 function timeOf(value: unknown) {
   const time = new Date(String(value || '').replace(' ', 'T')).getTime()
   return Number.isFinite(time) ? time : 0
@@ -273,13 +269,13 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
     <aside class="interview-panel card" aria-labelledby="interview-records-title">
       <header><div><span>只读概览</span><h2 id="interview-records-title">面试投递记录</h2><p>展示所有进入过正式面试环节的投递</p></div><b>{{interviewRecords.length}} 条</b></header>
       <div v-if="interviewRecords.length" ref="interviewList" class="interview-list" :class="{'interview-revealing':recordsRevealActive}" tabindex="0" aria-label="面试投递记录，可上下滚动">
-        <article v-for="record in interviewRecords" :key="record.item.id" :class="record.ended?'is-ended':'is-active'">
-          <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.ended?'已结束':'正在推进'}}</span></div>
+        <article v-for="record in interviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
+          <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.offer?'Offer':record.ended?'已结束':'面试中'}}</span></div>
           <p>{{record.item.position||'未填写岗位'}}</p>
-          <div class="compact-flow" :style="{'--flow-count':record.flow.length}" role="list" :aria-label="`${record.item.company||'该投递'}的投递流程`">
+          <div class="compact-flow" :style="{'--flow-count':record.flow.length,'--flow-columns':Math.min(4,record.flow.length)}" role="list" :aria-label="`${record.item.company||'该投递'}的投递流程`">
             <span v-for="(node,index) in record.flow" :key="`${node.label}-${index}`" class="compact-node" :class="[node.kind,`flow-${node.style}`]" role="listitem" :title="`${node.label} ${node.at}`"><i aria-hidden="true">{{node.icon}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span>
           </div>
-          <footer><span>{{record.related.length?`${record.related.length} 场正式面试`:'阶段记录显示已进入面试'}}</span><time>{{record.latest?`最近：${displayDate(record.latest)}`:'面试时间未记录'}}</time></footer>
+          <footer><span>{{record.related.length?`${record.related.length} 场正式面试`:'阶段记录显示已进入面试'}}</span></footer>
         </article>
       </div>
       <p v-else class="interview-empty">暂无进入过正式面试环节的投递。</p>
@@ -345,6 +341,9 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 .interview-list.interview-revealing article.interview-fade-in { animation:analytics-record-appear var(--interview-reveal-duration,520ms) linear both; animation-delay:var(--interview-reveal-delay,0ms); }
 @keyframes analytics-record-appear { from { opacity:0; } to { opacity:1; } }
 .interview-panel{display:flex;height:var(--analytics-main-height,auto);min-width:0;min-height:0;margin:0;padding:18px;flex-direction:column;overflow:hidden}.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{--record-bg:#fff;display:grid;gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.compact-flow{display:grid;grid-template-columns:repeat(var(--flow-count),minmax(56px,1fr));min-width:max(100%,calc(var(--flow-count) * 62px));align-items:start;margin:2px 0;padding:4px 1px 3px;overflow-x:auto;scrollbar-width:none}.compact-flow::-webkit-scrollbar{display:none}.compact-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid;min-width:56px;justify-items:center;text-align:center}.compact-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 11px);top:11px;width:calc(100% - 22px);height:2px;background:color-mix(in srgb,var(--node-color) 24%,#dce3df)}.compact-node>i{position:relative;z-index:1;display:grid;width:23px;height:23px;place-items:center;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:8px;color:var(--node-color);background:var(--node-soft);font:800 12px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 3px var(--record-bg)}.compact-node>b{max-width:64px;margin-top:5px;overflow:hidden;color:var(--node-color);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.compact-node>small{margin-top:1px;color:#718079;font-size:9px;white-space:nowrap}.compact-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:12px;height:12px;place-items:center;border:2px solid var(--record-bg);border-radius:50%;color:#fff;background:var(--node-color);font-size:8px}.compact-node.current>i,.compact-node.upcoming>i{box-shadow:0 0 0 3px var(--record-bg),0 0 0 5px color-mix(in srgb,var(--node-color) 14%,transparent)}.compact-node.upcoming>i{border-style:dashed}.compact-node.failed>i,.compact-node.success>i{color:#fff;background:var(--node-color)}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
+.trend{height:158px;grid-template-columns:repeat(12,minmax(30px,1fr));gap:6px}.trend>div{grid-template-rows:120px auto}.trend>div>span{padding-top:12px}
+.interview-list article.is-active{--record-bg:#edf4ff;border-color:#b7cbed;border-left-color:#3974c6;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.interview-list article.is-offer{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.is-active .record-head span{color:#245ca6;background:#dceaff}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.is-offer .record-head span{color:#12623d;background:#d1eddc}
+.compact-flow{grid-template-columns:repeat(var(--flow-columns),minmax(0,1fr));min-width:0;row-gap:8px;overflow:visible}.compact-node{min-width:0}.compact-node:not(:first-child):not(:nth-child(4n + 1))::before{left:calc(-50% + 10px);top:10px;width:calc(100% - 20px)}.compact-node:not(:first-child)::before{display:block}.compact-node:nth-child(4n + 1)::before{display:none}.compact-node:first-child::before{display:none}.compact-node>i{width:21px;height:21px;border-radius:7px;font-size:11px}.compact-node>b{max-width:100%;font-size:9px}.compact-node>small{font-size:8px}
 @media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(300px,1fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
 @media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
 @media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
