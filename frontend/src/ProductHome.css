@@ -460,7 +460,7 @@
   color: #6b7784;
   background: #f1f4f5;
 }
-.schedule-actions { position: relative; justify-content: flex-end; flex-wrap: wrap; }
+.schedule-actions { position: relative; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .schedule-actions > i {
   position: absolute;
   right: -4px;
@@ -472,7 +472,11 @@
   font-size: 10px;
   font-style: normal;
 }
-.schedule-actions button { min-width: 60px; }
+.schedule-actions button { min-width: 48px; min-height: 48px; }
+.schedule-actions .schedule-edit { color: var(--color-muted-foreground); border-color: var(--color-border); background: transparent; }
+.schedule-actions .schedule-complete { color: var(--color-on-primary); border-color: var(--color-primary); background: var(--color-primary); box-shadow: 0 3px 10px color-mix(in srgb,var(--color-primary) 20%,transparent); }
+.schedule-actions .schedule-complete:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.schedule-actions .schedule-complete:disabled { opacity: .55; }
 .secondary { color: var(--color-card-foreground); background: #edf1f5; }
 
 .confirmation-panel {
@@ -505,6 +509,7 @@
 .confirmation-list article > button { border: 1px solid #edc7c3; color: #a93c35; background: transparent; }
 
 .empty { padding: 34px 12px; color: var(--home-muted); text-align: center; }
+.confirmation-empty{display:grid;justify-items:center;gap:7px;margin-top:12px;padding:25px 16px;border:1px dashed var(--home-line);border-radius:12px;color:var(--home-muted);background:color-mix(in srgb,var(--home-paper) 72%,transparent);text-align:center}.confirmation-empty-icon{display:grid;width:54px;height:54px;place-items:center;border-radius:50%;color:#929baa;background:color-mix(in srgb,var(--color-muted) 70%,transparent)}.confirmation-empty-icon svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8}.confirmation-empty-icon .empty-check{stroke:#7b8797;stroke-width:2.2}.confirmation-empty strong{color:var(--home-ink);font-size:13px}.confirmation-empty p{margin:0;font-size:12px}
 .feedback {
   position: fixed;
   top: 18px;
@@ -587,7 +592,7 @@
   .schedule-copy { grid-column: 2; }
   .schedule-copy p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .schedule-actions { grid-column: 3; align-self: start; gap: 6px; flex-wrap: nowrap; }
-  .schedule-actions button { width: 40px; min-width: 40px; height: 40px; padding: 0; }
+  .schedule-actions button { width: 48px; min-width: 48px; height: 48px; min-height: 48px; padding: 0; }
   .has-date-range .schedule-copy { grid-column: 1; }
   .has-date-range .schedule-actions { grid-column: 2; }
   .confirmation-list article { align-items: stretch; flex-direction: column; }

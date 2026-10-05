@@ -622,6 +622,9 @@ body { background: var(--color-background); }
 :root[data-theme="dark"] #app .selected-list .event-main strong {
   color: var(--color-foreground) !important;
 }
+:root[data-theme="dark"] #app .home-dashboard :is(.schedule-copy > strong,.schedule-copy a,.confirmation-list article > div:first-child strong) { color:#f1f4f8 !important; }
+:root[data-theme="dark"] #app .home-dashboard :is(.schedule-copy p,.date-block small,.confirmation-list article > div:first-child span) { color:#c2cad5 !important; }
+:root[data-theme="dark"] #app .home-dashboard .date-block strong { color:#e5eaf1 !important; }
 :root[data-theme="dark"] #app .selected-list .event-main .event-title-link strong,
 :root[data-theme="dark"] #app .selected-list .event-main .event-title-link span {
   color: var(--color-primary) !important;
