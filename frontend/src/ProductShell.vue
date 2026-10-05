@@ -484,7 +484,7 @@ nav button.active::before { content: none; }
   .admin-shortcut svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .admin-shortcut.active { color: var(--color-primary); }
   .admin-shortcut.active::after { position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; transform: translateX(-50%); border-radius: 50%; background: var(--color-primary); content: ''; }
-  .sidebar nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; width: 100%; min-height: 64px; grid-template-columns: repeat(7,minmax(0,1fr)); align-content: center; gap: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); border-bottom: 0; background: color-mix(in srgb,var(--color-card) 94%,transparent); backdrop-filter: blur(18px); overflow: visible; opacity: 1; }
+  .sidebar nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; width: 100%; min-height: calc(64px + env(safe-area-inset-bottom)); grid-template-columns: repeat(7,minmax(0,1fr)); align-content: center; gap: 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); border-top: 1px solid var(--color-border); border-bottom: 0; background: var(--color-card); overflow: visible; opacity: 1; }
   .sidebar nav.guide-nav-suppressed { display: none; }
   .nav-active-indicator { display: none; }
   #app .sidebar nav button { display: grid; min-width: 0; min-height: 48px; height: 48px; grid-template-rows: 1fr; place-items: center; gap: 0; padding: 4px 0 7px; border: 0; color: #fff; background: transparent; }
