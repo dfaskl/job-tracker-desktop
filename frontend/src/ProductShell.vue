@@ -44,6 +44,7 @@ const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || 
 const mobilePages = computed(() => visiblePages.value.filter(item => item.id !== 'admin'))
 const guidePage = { id: 'guide' as Page, label: '新手指南', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 13v.01M9.5 9a2.5 2.5 0 1 1 4.4 1.5c-1.1.7-1.9 1.2-1.9 2.5' }
 const lastPageBeforeGuide = ref<Page>('home')
+const guideOrigin = ref({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
 const navigationItems = computed(() => mobileViewport.value ? [...mobilePages.value, guidePage] : [...visiblePages.value, guidePage])
 const focusApplicationId = ref('')
 const primaryNavigation = ref<HTMLElement | null>(null)
@@ -135,7 +136,14 @@ async function createApplication() {
 }
 function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focus' = 'detail') {
   if (page === 'admin' && !isAdmin.value) return
-  if (page === 'guide' && activePage.value !== 'guide') lastPageBeforeGuide.value = activePage.value
+  if (page === 'guide' && activePage.value !== 'guide') {
+    lastPageBeforeGuide.value = activePage.value
+    const guideButton = primaryNavigation.value?.querySelector<HTMLButtonElement>('[data-guide]')
+    if (guideButton) {
+      const rect = guideButton.getBoundingClientRect()
+      guideOrigin.value = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    }
+  }
   const targetHash = page === 'applications' && applicationId ? `applications?${behavior === 'focus' ? 'focus' : 'application'}=${encodeURIComponent(applicationId)}` : page
   if (window.location.hash.replace(/^#\/?/, '') === targetHash) {
     if (applicationId && behavior === 'detail') store.requestApplicationDetail(applicationId)
@@ -317,7 +325,7 @@ onBeforeUnmount(() => {
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
-          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { guideOrigin } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
         </KeepAlive>
       </div>
     </main>

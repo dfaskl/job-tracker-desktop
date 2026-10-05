@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onActivated, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import AppIcon from './AppIcon.vue'
 
 const emit = defineEmits<{ navigate: [page: string]; close: [] }>()
+const props = defineProps<{ guideOrigin: { x: number; y: number } }>()
 const current = ref(0)
 const hoveredIndex = ref<number | null>(null)
+const guideRoot = ref<HTMLElement | null>(null)
+let closing = false
 const pages = [
   { eyebrow: 'WELCOME · 01', title: '先完成基础配置', description: '配置好这些功能，CareerFlow 才能更完整地协助你管理求职过程和准备面试。暂时不配置也可以继续手动使用。', next: '从一条投递开始' },
   { eyebrow: 'TRACK · 02', title: '从新建投递开始管理进度', description: '先为公司和岗位建立一条投递记录。收到笔试或面试安排后，再把日程添加到这条投递下，进展就能集中查看。', next: '也可以用邮件自动整理' },
@@ -34,21 +37,54 @@ const dockItems = [
 ]
 function previous() { if (current.value > 0) current.value -= 1 }
 function next() { if (current.value < pages.length - 1) current.value += 1 }
+function getOriginInGuide(element: HTMLElement) {
+  const rect = element.getBoundingClientRect()
+  return { x: props.guideOrigin.x - rect.left, y: props.guideOrigin.y - rect.top }
+}
+async function playOpenAnimation() {
+  await nextTick()
+  const element = guideRoot.value
+  if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches || typeof element.animate !== 'function') return
+  const origin = getOriginInGuide(element)
+  const keyframes: Keyframe[] = [
+    { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(.025)', opacity: 0.12 },
+    { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(1)', opacity: 1 }
+  ]
+  element.animate(keyframes, { duration: 920, easing: 'cubic-bezier(.2,.72,.25,1)', fill: 'both' })
+}
+async function closeToOrigin(action: () => void = () => emit('close')) {
+  if (closing) return
+  closing = true
+  const element = guideRoot.value
+  if (element && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && typeof element.animate === 'function') {
+    const origin = getOriginInGuide(element)
+    const animation = element.animate([
+      { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(1)', opacity: 1 },
+      { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(.025)', opacity: 0.12 }
+    ], { duration: 760, easing: 'cubic-bezier(.55,0,.8,.35)', fill: 'forwards' })
+    try { await animation.finished } catch { /* The route may be interrupted by browser navigation. */ }
+    animation.cancel()
+  }
+  closing = false
+  action()
+}
+function navigateFromGuide(page: string) { void closeToOrigin(() => emit('navigate', page)) }
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowLeft') { event.preventDefault(); previous() }
   if (event.key === 'ArrowRight') { event.preventDefault(); next() }
-  if (event.key === 'Escape') { event.preventDefault(); emit('close') }
+  if (event.key === 'Escape') { event.preventDefault(); void closeToOrigin() }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
+onActivated(() => { void playOpenAnimation() })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <section class="guide-page" aria-label="CareerFlow 新手指南">
+  <section ref="guideRoot" class="guide-page" aria-label="CareerFlow 新手指南">
     <header class="guide-header">
       <div class="guide-brand"><span class="guide-brand-icon"><AppIcon name="sparkles" :size="19" /></span><div><span>CAREERFLOW GUIDE</span><strong>新手指南</strong></div></div>
       <div class="guide-progress"><span>{{ progress }}</span><div><i :style="{ width: `${(current + 1) * 25}%` }"></i></div></div>
-      <button type="button" class="guide-close" aria-label="关闭新手指南" title="关闭指南" @click="emit('close')"><AppIcon name="close" :size="21" /><span>关闭</span></button>
+      <button type="button" class="guide-close" aria-label="关闭新手指南" title="关闭指南" @click="closeToOrigin()"><AppIcon name="close" :size="21" /><span>关闭</span></button>
     </header>
 
     <button type="button" class="guide-arrow guide-arrow-left" :disabled="current === 0" aria-label="上一页" title="上一页" @click="previous"><AppIcon name="chevron-left" :size="25" /></button>
@@ -123,9 +159,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <footer class="guide-footer">
-          <button type="button" class="guide-jump" @click="emit('navigate', current === 0 ? 'profile' : current === 1 ? 'applications' : current === 2 ? 'mail' : 'interview-summary')">{{ current === 0 ? '去配置' : current === 1 ? '去投递记录' : current === 2 ? '去邮件识别' : '去面试总结' }}</button>
+          <button type="button" class="guide-jump" @click="navigateFromGuide(current === 0 ? 'profile' : current === 1 ? 'applications' : current === 2 ? 'mail' : 'interview-summary')">{{ current === 0 ? '去配置' : current === 1 ? '去投递记录' : current === 2 ? '去邮件识别' : '去面试总结' }}</button>
           <button v-if="current < pages.length - 1" type="button" class="guide-next" @click="next">下一步 <span aria-hidden="true">→</span></button>
-          <button v-else type="button" class="guide-next" @click="emit('close')">完成指引 <span aria-hidden="true">✓</span></button>
+          <button v-else type="button" class="guide-next" @click="closeToOrigin()">完成指引 <span aria-hidden="true">✓</span></button>
         </footer>
       </main>
     </Transition>
@@ -152,6 +188,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .interview-mini{min-height:340px}.interview-mini-body{position:relative;display:grid;min-height:305px;grid-template-columns:112px minmax(0,1fr)}.interview-mini-body>aside{align-content:start}.interview-mini-body>section{position:relative;display:grid;align-content:start;gap:10px;padding:15px}.review-editor label{display:grid;gap:7px;color:#b6bdce;font-size:10px}.review-editor textarea{min-height:105px;resize:none;padding:10px;border:1px solid #44495c;border-radius:6px;color:#e5e7f0;background:#20232d;font-size:10px;line-height:1.6}.review-editor .mini-primary{justify-self:end}.interview-edit .mini-focus{position:absolute;top:126px;right:18px;left:127px;height:112px;border:2px solid #a4aaff;border-radius:7px;box-shadow:0 0 0 100vmax #090b1266}.mini-tabs{display:flex;gap:7px;margin:4px 0}.mini-tabs b{padding:7px 9px;border:1px solid #3b4050;border-radius:6px;color:#c4c9ff;font-size:9px;background:#222531}.mini-tabs b:first-child{border-color:#9299f2;background:#383b53}.mini-question{display:grid;gap:7px;padding:10px;border:1px solid #373b49;border-radius:7px;background:#1e212b}.mini-question>b{width:max-content;padding:4px 6px;border-radius:4px;color:#c3c7ff;background:#383b52;font-size:9px}.mini-question>strong{font-size:10px}.mini-question p{margin:0;color:#c8cddd;font-size:9px;line-height:1.5}.interview-review .mini-focus{position:absolute;inset:40px 13px 13px;border:2px solid #a4aaff;border-radius:8px;pointer-events:none;box-shadow:0 0 0 100vmax #090b1266}
 .guide-footer{display:flex;height:62px;align-items:center;justify-content:center;gap:12px;margin:0;padding:0}.guide-next{display:flex;min-height:48px;align-items:center;gap:10px;padding:0 22px;border:1px solid #747bea;border-radius:11px;color:#fff;background:#555cc7;font-size:14px;font-weight:750;box-shadow:0 7px 20px #454cb844;transition:filter .2s,transform .2s,box-shadow .2s}.guide-next:hover{filter:brightness(1.12);transform:translateY(-2px);box-shadow:0 10px 25px #454cb855}
 .guide-jump{min-height:48px;padding:0 18px;border:1px solid var(--color-border-strong);border-radius:11px;color:var(--color-foreground);background:var(--color-card);font-size:13px;font-weight:700;transition:border-color .2s,background .2s,transform .2s}.guide-jump:hover{transform:translateY(-1px);border-color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card))}
+.guide-footer{gap:28px}
 .guide-dock{position:fixed;z-index:30;bottom:calc(18px + env(safe-area-inset-bottom));left:calc(50% + var(--sidebar-width)/2);display:flex;align-items:flex-end;gap:10px;padding:12px 14px 14px;background:transparent;transform:translateX(-50%)}.dock-item{position:relative;display:grid;width:52px;height:52px;flex:none;place-items:center;padding:0;border:0;border-radius:0;color:var(--color-muted-foreground);background:transparent;outline-offset:5px}.dock-item svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transform:translateY(0) scale(1);transform-origin:center bottom;transition:transform .78s cubic-bezier(.22,.61,.36,1),color .52s ease,filter .52s ease;will-change:transform}.dock-item.dock-current{color:var(--color-primary)}.dock-item.dock-current svg{filter:drop-shadow(0 2px 5px color-mix(in srgb,var(--color-primary) 48%,transparent));transform:translateY(-1px) scale(1.08)}.dock-item.dock-hovered{z-index:2;color:var(--color-foreground)}.dock-item.dock-hovered svg{transform:translateY(-7px) scale(1.34)}.dock-item.dock-current.dock-hovered{color:var(--color-primary)}.dock-label{position:absolute;bottom:calc(100% + 11px);left:50%;padding:6px 10px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-foreground);background:var(--color-card);box-shadow:var(--shadow-md);font-size:11px;font-weight:700;white-space:nowrap;opacity:0;pointer-events:none;transform:translate(-50%,5px);transition:opacity .38s ease,transform .52s cubic-bezier(.22,.61,.36,1)}.dock-item:hover .dock-label,.dock-item:focus-visible .dock-label{opacity:1;transform:translate(-50%,0)}.dock-dot{position:absolute;bottom:2px;left:50%;width:5px;height:5px;border-radius:50%;background:var(--color-primary);box-shadow:0 0 8px color-mix(in srgb,var(--color-primary) 72%,transparent);transform:translateX(-50%)}
 .guide-arrow{position:fixed;z-index:5;top:50%;display:grid;width:46px;height:46px;place-items:center;padding:0;border:1px solid var(--color-border);border-radius:50%;color:var(--color-foreground);background:color-mix(in srgb,var(--color-card) 86%,transparent);box-shadow:var(--shadow-md);backdrop-filter:blur(10px);transform:translateY(-50%);transition:color .2s,border-color .2s,background .2s,transform .2s}.guide-arrow:hover:not(:disabled){transform:translateY(-50%) scale(1.07);border-color:var(--color-primary);color:var(--color-primary);background:var(--color-card)}.guide-arrow:disabled{opacity:.38}.guide-arrow-left{left:calc(var(--sidebar-width) + 18px)}.guide-arrow-right{right:18px}
 .guide-turn-enter-active,.guide-turn-leave-active{transition:opacity .2s ease,transform .2s ease}.guide-turn-enter-from{transform:translateY(9px);opacity:0}.guide-turn-leave-to{transform:translateY(-7px);opacity:0}
@@ -160,4 +197,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 @media(max-width:620px){.guide-page{min-height:calc(100dvh - 108px)}.guide-header{top:76px;min-height:60px;gap:10px;padding-inline:12px}.guide-brand-icon{width:34px;height:34px}.guide-brand>div>span{font-size:8px}.guide-brand strong{font-size:13px}.guide-progress{gap:7px}.guide-progress>div{width:42px}.guide-close{min-width:42px;width:42px;height:42px}.guide-close span{display:none}.guide-content{padding:20px 48px 122px}.guide-copy{margin-bottom:18px}.guide-copy h1{font-size:25px}.guide-copy>p{font-size:13px;line-height:1.65}.guide-visual-card{padding:12px}.mini-window{min-height:240px}.mini-layout{min-height:205px;grid-template-columns:78px minmax(0,1fr)}.mini-layout>aside{gap:6px;padding:10px 5px;font-size:9px}.mini-layout>aside span{padding:5px 3px}.mini-main{padding:10px}.visual-note{min-height:auto}.application-mini{min-height:285px}.application-mini-body{min-height:250px;padding:13px}.mail-mini{min-height:300px}.mail-mini-body{min-height:266px;gap:5px;padding:10px;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr)}.mail-mini-body section{min-height:210px;gap:8px;padding:8px}.interview-mini{min-height:300px}.interview-mini-body{min-height:265px;grid-template-columns:78px minmax(0,1fr)}.interview-mini-body>section{gap:7px;padding:9px}.interview-mini-body>aside{gap:6px;padding:10px 5px;font-size:9px}.interview-mini-body>aside span{padding:5px 3px}.review-editor textarea{min-height:80px}.mini-tabs{gap:3px}.mini-tabs b{padding:5px 4px;font-size:8px}.guide-footer{gap:8px;margin-top:18px}.guide-jump,.guide-next{min-height:44px;padding-inline:13px;font-size:12px}.guide-dock{gap:5px;padding:7px 8px 10px}.dock-item{width:42px;height:44px}.dock-item svg{width:21px;height:21px}.dock-item.dock-hovered svg{transform:translateY(-5px) scale(1.23)}.dock-item.dock-neighbor svg{transform:translateY(-2px) scale(1.08)}.dock-dot{bottom:3px;width:4px;height:4px}.guide-arrow{width:36px;height:36px}.guide-arrow-left{left:5px}.guide-arrow-right{right:5px}.form-line{grid-template-columns:45px 1fr}.guide-side-note{padding:13px}}
 @media(max-width:620px){.guide-page{min-height:calc(100dvh - 108px)}.guide-header{top:76px;min-height:60px;gap:10px;padding-inline:12px}.guide-brand-icon{width:34px;height:34px}.guide-brand>div>span{font-size:8px}.guide-brand strong{font-size:13px}.guide-progress{gap:7px}.guide-progress>div{width:42px}.guide-close{min-width:42px;width:42px;height:42px}.guide-close span{display:none}.guide-content{padding:20px 48px 122px}.guide-copy{margin-bottom:18px}.guide-copy h1{font-size:25px}.guide-copy>p{font-size:13px;line-height:1.65}.guide-visual-card{padding:12px}.mini-window{min-height:240px}.mini-layout{min-height:205px;grid-template-columns:78px minmax(0,1fr)}.mini-layout>aside{gap:6px;padding:10px 5px;font-size:9px}.mini-layout>aside span{padding:5px 3px}.mini-main{padding:10px}.visual-note{min-height:auto}.application-mini{min-height:285px}.application-mini-body{min-height:250px;padding:13px}.mail-mini{min-height:300px}.mail-mini-body{min-height:266px;gap:5px;padding:10px;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr)}.mail-mini-body section{min-height:210px;gap:8px;padding:8px}.interview-mini{min-height:300px}.interview-mini-body{min-height:265px;grid-template-columns:78px minmax(0,1fr)}.interview-mini-body>section{gap:7px;padding:9px}.interview-mini-body>aside{gap:6px;padding:10px 5px;font-size:9px}.interview-mini-body>aside span{padding:5px 3px}.review-editor textarea{min-height:80px}.mini-tabs{gap:3px}.mini-tabs b{padding:5px 4px;font-size:8px}.guide-footer{gap:8px;margin-top:18px}.guide-jump,.guide-next{min-height:44px;padding-inline:13px;font-size:12px}.guide-dock{gap:5px;padding:7px 8px 10px}.dock-item{width:42px;height:44px}.dock-item svg{width:21px;height:21px}.dock-item.dock-hovered svg{transform:translateY(-5px) scale(1.23)}.dock-dot{bottom:3px;width:4px;height:4px}.guide-arrow{width:36px;height:36px}.guide-arrow-left{left:5px}.guide-arrow-right{right:5px}.form-line{grid-template-columns:45px 1fr}.guide-side-note{padding:13px}}
 @media(prefers-reduced-motion:reduce){.guide-progress i,.guide-arrow,.guide-next,.guide-turn-enter-active,.guide-turn-leave-active,.dock-item svg,.dock-label{transition:none}}
+@media(max-width:620px){.guide-footer{gap:20px}}
 </style>
