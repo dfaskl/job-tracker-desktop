@@ -45,6 +45,7 @@ const mobilePages = computed(() => visiblePages.value.filter(item => item.id !==
 const guidePage = { id: 'guide' as Page, label: '新手指南', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 13v.01M9.5 9a2.5 2.5 0 1 1 4.4 1.5c-1.1.7-1.9 1.2-1.9 2.5' }
 const lastPageBeforeGuide = ref<Page>('home')
 const guideOrigin = ref({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+const guideCloseRequest = ref(0)
 const navigationItems = computed(() => mobileViewport.value ? [...mobilePages.value, guidePage] : [...visiblePages.value, guidePage])
 const focusApplicationId = ref('')
 const primaryNavigation = ref<HTMLElement | null>(null)
@@ -155,6 +156,13 @@ function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focu
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 function closeGuide() { navigate(lastPageBeforeGuide.value === 'guide' ? 'home' : lastPageBeforeGuide.value) }
+function handleNavigation(page: Page) {
+  if (page === 'guide' && activePage.value === 'guide') {
+    guideCloseRequest.value += 1
+    return
+  }
+  navigate(page)
+}
 
 async function focusResumeSettings() {
   if (activePage.value !== 'profile') navigate('profile')
@@ -306,7 +314,7 @@ onBeforeUnmount(() => {
       </button>
       <nav id="primary-navigation" ref="primaryNavigation" :class="{ 'guide-nav-suppressed': activePage === 'guide' }" aria-label="主要导航">
         <span class="nav-active-indicator" :style="navIndicatorStyle" aria-hidden="true"></span>
-        <button v-for="item in navigationItems" :key="item.id" type="button" :data-guide="item.id === 'guide' ? '' : undefined" :class="{ active: activePage === item.id, 'guide-nav-item': item.id === 'guide', 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="navigate(item.id)">
+        <button v-for="item in navigationItems" :key="item.id" type="button" :data-guide="item.id === 'guide' ? '' : undefined" :class="{ active: activePage === item.id, 'guide-nav-item': item.id === 'guide', 'has-badge': item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 }" :aria-label="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0 ? `${item.label}，${store.pendingMailCount.value} 封待处理邮件` : item.id === 'interview-summary' && summaryBadgeVisible ? `${item.label}，有更新` : item.label" :aria-current="activePage === item.id ? 'page' : undefined" @click="handleNavigation(item.id)">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path :d="item.icon" /></svg></span><span class="nav-copy"><strong>{{ item.label }}</strong></span><span class="nav-arrow" aria-hidden="true">›</span>
           <Transition name="nav-notice"><b v-if="item.id === 'mail' && mailBadgeVisible && store.pendingMailCount.value > 0" key="mail-badge" class="nav-badge" :style="{ width: mailBadgeWidth }" aria-hidden="true"><Transition name="nav-count-roll" mode="out-in"><span :key="mailBadgeLabel" class="nav-count-value">{{ mailBadgeLabel }}</span></Transition></b></Transition>
           <Transition name="nav-notice"><span v-if="item.id === 'interview-summary' && summaryBadgeVisible" key="summary-badge" class="nav-status-dot" aria-hidden="true"></span></Transition>
@@ -325,7 +333,7 @@ onBeforeUnmount(() => {
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
-          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { guideOrigin } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { guideOrigin, closeRequest: guideCloseRequest } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
         </KeepAlive>
       </div>
     </main>

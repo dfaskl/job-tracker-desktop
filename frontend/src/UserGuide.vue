@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
+import { computed, onActivated, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
 
 const emit = defineEmits<{ navigate: [page: string]; close: [] }>()
-const props = defineProps<{ guideOrigin: { x: number; y: number } }>()
+const props = defineProps<{ guideOrigin: { x: number; y: number }; closeRequest: number }>()
 const current = ref(0)
 const hoveredIndex = ref<number | null>(null)
 const guideRoot = ref<HTMLElement | null>(null)
@@ -76,6 +76,9 @@ function onKeydown(event: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onActivated(() => { void playOpenAnimation() })
+watch(() => props.closeRequest, (request, previous) => {
+  if (request !== previous) void closeToOrigin()
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
