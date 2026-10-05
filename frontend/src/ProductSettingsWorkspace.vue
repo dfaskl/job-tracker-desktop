@@ -7,6 +7,7 @@ import ProductDataManagement from './ProductDataManagement.vue'
 import MailAccountSettings from './MailAccountSettings.vue'
 import BackupManagement from './BackupManagement.vue'
 import AppIcon from './AppIcon.vue'
+import { profileSectionScrollTarget } from './profileNavigation'
 
 type SectionId = 'center' | 'resume' | 'ai' | 'data'
 const sections: { id: SectionId; label: string; icon: string }[] = [
@@ -42,7 +43,12 @@ function onPageScroll() {
 }
 function syncSectionFromHash(shouldScroll = true) {
   activeSection.value = sectionFromHash()
-  if (shouldScroll) void nextTick(() => sectionRefs.value[activeSection.value]?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  if (!shouldScroll) return
+  const target = profileSectionScrollTarget(window.location.hash)
+  void nextTick(() => {
+    if (target) sectionRefs.value[target as SectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else window.scrollTo({ top: 0, behavior: 'auto' })
+  })
 }
 function flashSection(section: SectionId) {
   const target = sectionRefs.value[section]
@@ -62,7 +68,9 @@ onMounted(() => {
   window.addEventListener('hashchange', onHashChange)
   window.addEventListener('scroll', onPageScroll, { passive: true })
   void nextTick(() => {
-    if (window.location.hash.includes('section=')) sectionRefs.value[activeSection.value]?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    const target = profileSectionScrollTarget(window.location.hash)
+    if (target) sectionRefs.value[target as SectionId]?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    else window.scrollTo({ top: 0, behavior: 'auto' })
     syncActiveSectionFromScroll()
   })
 })
