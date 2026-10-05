@@ -112,9 +112,9 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
           <section class="card control-card">
             <div class="section-title"><div><span>访问控制</span><h3>注册与系统状态</h3></div><b :class="overview.summary.registrationOpen?'ok':'muted'">{{overview.summary.registrationOpen?'允许注册':'停止注册'}}</b></div>
             <div class="registration"><div><strong>新用户注册</strong><small>{{overview.summary.registrationCodeEnabled?'已启用注册码验证':'无需注册码'}}</small></div><label class="switch-control"><input type="checkbox" role="switch" :checked="overview.summary.registrationOpen" :disabled="loading" :aria-label="overview.summary.registrationOpen?'关闭新用户注册':'开放新用户注册'" @change="toggleRegistration"><span aria-hidden="true"></span></label></div>
-            <div class="registration-code">
+            <div class="registration-code" :class="{'registration-code-disabled':!overview.summary.registrationOpen}" :aria-disabled="!overview.summary.registrationOpen">
               <label for="admin-registration-code">注册码</label>
-              <div class="registration-code-row"><input id="admin-registration-code" v-model="registrationCode" :class="{'saved-code':registrationCodeJustSaved}" type="text" minlength="4" maxlength="128" autocomplete="off" :placeholder="overview.summary.registrationCodeEnabled?'历史注册码无法回显，请设置新码':'输入 4–128 位注册码'" @input="registrationCodeJustSaved=false;registrationCodeDirty=true" /><button class="primary" :disabled="loading||registrationCode.trim().length<4" @click="saveRegistrationCode">设置</button><button v-if="overview.summary.registrationCodeEnabled" class="clear-code-button" :disabled="loading" @click="clearRegistrationCode">清除</button></div>
+              <div class="registration-code-row"><input id="admin-registration-code" v-model="registrationCode" :class="{'saved-code':registrationCodeJustSaved}" type="text" minlength="4" maxlength="128" autocomplete="off" :disabled="loading||!overview.summary.registrationOpen" :placeholder="overview.summary.registrationCodeEnabled?'历史注册码无法回显，请设置新码':'输入 4–128 位注册码'" @input="registrationCodeJustSaved=false;registrationCodeDirty=true" /><button class="primary" :disabled="loading||!overview.summary.registrationOpen||registrationCode.trim().length<4" @click="saveRegistrationCode">设置</button><button v-if="overview.summary.registrationCodeEnabled" class="clear-code-button" :disabled="loading||!overview.summary.registrationOpen" @click="clearRegistrationCode">清除</button></div>
             </div>
             <div class="health-grid">
               <div><i class="dot ok"></i><span>数据库</span><b>连接正常</b></div>
@@ -365,6 +365,15 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   white-space: nowrap;
 }
 
+.registration { padding-inline: 16px; }
+.registration > div { padding-left: 2px; }
+.registration-code-disabled { opacity: .52; filter: grayscale(.65); }
+.registration-code-disabled input,
+.registration-code-disabled button { cursor: not-allowed; }
+:global(:root[data-theme="dark"] .registration-code-disabled) {
+  background: color-mix(in srgb, var(--color-muted) 76%, #000);
+}
+
 .group-manager-card {
   max-height: 210px;
   flex: none;
@@ -373,9 +382,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
   overscroll-behavior: contain;
 }
 
-.group-manager-card .group-list {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
+.group-manager-card .group-list { grid-template-columns: minmax(0, 1fr); }
 
 @media (max-width: 480px) {
   .user-scroll{overflow-x:hidden}
