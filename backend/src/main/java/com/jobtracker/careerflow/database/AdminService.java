@@ -1,6 +1,9 @@
 package com.jobtracker.careerflow.database;
 
 import com.jobtracker.careerflow.compat.LegacyPasswordVerifier;
+import com.jobtracker.careerflow.compat.LegacySecretCrypto;
+import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
+import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter.EncryptedSecret;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -9,6 +12,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Base64;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,17 +30,23 @@ public class AdminService {
     private final ObjectMapper objectMapper;
     private final ApplicationService applicationSandboxService;
     private final LegacyPasswordVerifier passwords;
+    private final LegacySecretCrypto crypto;
+    private final LegacySecretCryptoWriter cryptoWriter;
 
     public AdminService(
         Environment environment,
         ObjectMapper objectMapper,
         ApplicationService applicationSandboxService,
-        LegacyPasswordVerifier passwords
+        LegacyPasswordVerifier passwords,
+        LegacySecretCrypto crypto,
+        LegacySecretCryptoWriter cryptoWriter
     ) {
         this.environment = environment;
         this.objectMapper = objectMapper;
         this.applicationSandboxService = applicationSandboxService;
         this.passwords = passwords;
+        this.crypto = crypto;
+        this.cryptoWriter = cryptoWriter;
     }
 
     public AdminStatus status() {
@@ -76,7 +86,7 @@ public class AdminService {
                 new Summary(
                     counts.totalUsers(), counts.enabledUsers(), counts.totalApplications(),
                     counts.activeSessions(), counts.configuredApiKeys(), registrationIsOpen(connection),
-                    registrationCodeIsEnabled(connection), configured("ADMIN_EMAIL")
+                    registrationCodeIsEnabled(connection), registrationCodeValue(connection), configured("ADMIN_EMAIL")
                 ),
                 groups(connection),
                 users,
@@ -239,6 +249,15 @@ public class AdminService {
         }
         LegacyPasswordVerifier.PasswordRecord record = clear ? null : passwords.create(clean);
         String stored = clear ? "" : record.salt() + ":" + record.hash();
+        String encryptedDisplayValue = "";
+        if (!clear) {
+            String key = com.jobtracker.careerflow.config.AppEnvironment.encryptionKey(environment);
+            if (key == null || key.length() < 32) {
+                throw new AdminValidationException("服务器尚未配置注册码加密密钥，无法安全保存注册码");
+            }
+            EncryptedSecret encrypted = cryptoWriter.encrypt(key, clean);
+            encryptedDisplayValue = encode(encrypted.encrypted()) + ":" + encode(encrypted.iv()) + ":" + encode(encrypted.authTag());
+        }
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -249,6 +268,15 @@ public class AdminService {
                         + "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()"
                 )) {
                     statement.setString(1, stored);
+                    statement.setLong(2, admin.id());
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO system_settings(key,value,updated_by) "
+                        + "VALUES('registration_code_display',to_jsonb(CAST(? AS text)),?) "
+                        + "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_by=EXCLUDED.updated_by,updated_at=NOW()"
+                )) {
+                    statement.setString(1, encryptedDisplayValue);
                     statement.setLong(2, admin.id());
                     statement.executeUpdate();
                 }
@@ -536,6 +564,29 @@ public class AdminService {
         return configured("REGISTRATION_CODE");
     }
 
+    private String registrationCodeValue(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT value #>> '{}' FROM system_settings WHERE key='registration_code_display'"
+        ); ResultSet result = statement.executeQuery()) {
+            if (result.next()) {
+                String stored = result.getString(1);
+                if (stored == null || stored.isBlank()) return "";
+                String[] parts = stored.split(":", -1);
+                if (parts.length != 3) return "";
+                String key = com.jobtracker.careerflow.config.AppEnvironment.encryptionKey(environment);
+                if (key == null || key.length() < 32) return "";
+                return crypto.decrypt(key, Base64.getUrlDecoder().decode(parts[0]),
+                    Base64.getUrlDecoder().decode(parts[1]), Base64.getUrlDecoder().decode(parts[2]));
+            }
+        }
+        // Environment-provided codes can be shown to an authenticated administrator too.
+        return environment.getProperty("REGISTRATION_CODE", "");
+    }
+
+    private String encode(byte[] value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
+    }
+
     private AdminIdentity requireAdmin(Connection connection, String email) throws Exception {
         String normalizedEmail = normalizeEmail(email);
         String configuredAdminEmail = normalizeEmail(environment.getProperty("ADMIN_EMAIL"));
@@ -676,7 +727,7 @@ public class AdminService {
     public record CurrentAdmin(String id, String email) {}
     public record Summary(int totalUsers, int enabledUsers, int totalApplications, int activeSessions,
                           int configuredApiKeys, boolean registrationOpen, boolean registrationCodeEnabled,
-                          boolean adminEmailConfigured) {}
+                          String registrationCode, boolean adminEmailConfigured) {}
     public record UserView(String id, String email, String displayName, String avatar, boolean isAdmin, boolean disabled, String disabledAt,
                            String createdAt, String lastActiveAt, int applicationCount, int eventCount,
                            boolean hasApiKey, String groupId, String groupName) {}

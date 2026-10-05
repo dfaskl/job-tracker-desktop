@@ -28,7 +28,8 @@ class SqliteCompatibilityTest {
             .withProperty("APP_DATABASE_URL", "jdbc:sqlite:" + database)
             .withProperty("ALLOW_REGISTRATION", "true")
             .withProperty("PERSISTENT_SESSION_ENABLED", "true")
-            .withProperty("ADMIN_EMAIL", "admin@example.com");
+            .withProperty("ADMIN_EMAIL", "admin@example.com")
+            .withProperty("ENCRYPTION_KEY", "test-encryption-key-that-is-at-least-32-characters-long");
 
         new DatabaseSchemaInitializer(environment).run(null);
         ObjectMapper mapper = new ObjectMapper();
@@ -67,7 +68,9 @@ class SqliteCompatibilityTest {
         assertThat(mapper.readTree(createdWithoutSchedule.documentJson()).path("events")).hasSize(1);
         assertThat(applications.findApplications("admin@example.com").total()).isEqualTo(2);
 
-        AdminService admin = new AdminService(environment, mapper, applications, passwords);
+        LegacySecretCrypto secretCrypto = new LegacySecretCrypto();
+        AdminService admin = new AdminService(environment, mapper, applications, passwords, secretCrypto,
+            new LegacySecretCryptoWriter(secretCrypto));
         var adminOverview = admin.overview("admin@example.com");
         assertThat(adminOverview.users()).hasSize(1);
         assertThat(adminOverview.users().getFirst().avatar()).isEqualTo(avatar);
@@ -77,13 +80,13 @@ class SqliteCompatibilityTest {
         assertThat(accounts.registrationOpen()).isTrue();
         admin.setRegistrationCode("admin@example.com", "invite-2026", false);
         assertThat(admin.overview("admin@example.com").summary().registrationCodeEnabled()).isTrue();
+        assertThat(admin.overview("admin@example.com").summary().registrationCode()).isEqualTo("invite-2026");
         var group = admin.createGroup("admin@example.com", "第一面试室");
         admin.assignGroup("admin@example.com", registered.id(), Long.parseLong(group.groupId()));
         assertThat(admin.overview("admin@example.com").groups()).hasSize(1);
         admin.assignGroup("admin@example.com", registered.id(), null);
         admin.deleteGroup("admin@example.com", Long.parseLong(group.groupId()));
 
-        LegacySecretCrypto secretCrypto = new LegacySecretCrypto();
         MailInboxService mail = new MailInboxService(
             environment, secretCrypto, new LegacySecretCryptoWriter(secretCrypto)
         );

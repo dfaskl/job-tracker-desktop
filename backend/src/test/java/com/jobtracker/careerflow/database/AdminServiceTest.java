@@ -2,6 +2,8 @@ package com.jobtracker.careerflow.database;
 
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator;
 import com.jobtracker.careerflow.compat.LegacyPasswordVerifier;
+import com.jobtracker.careerflow.compat.LegacySecretCrypto;
+import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
@@ -72,6 +74,8 @@ class AdminServiceTest {
         ApplicationService sandbox = new ApplicationService(
             environment, mapper, new ApplicationDocumentMutator(mapper)
         );
-        return new AdminService(environment, mapper, sandbox, new LegacyPasswordVerifier());
+        LegacySecretCrypto crypto = new LegacySecretCrypto();
+        return new AdminService(environment, mapper, sandbox, new LegacyPasswordVerifier(), crypto,
+            new LegacySecretCryptoWriter(crypto));
     }
 }
