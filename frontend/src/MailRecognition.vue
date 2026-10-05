@@ -381,13 +381,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:1fr 1fr}.sync-button,.process-all-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
-@media (prefers-reduced-motion: reduce) {
-  .mail-entering :is(.inbox-panel,.compose-panel,.review-panel) { animation-name:mail-panel-pop-reduced; animation-duration:320ms; }
-  .mail-entering .compose-panel { animation-delay:340ms; }
-  .mail-entering .review-panel { animation-delay:680ms; }
-  .recognition-spinner,.form-skeleton i,.form-skeleton b,.inbox-spinner { animation-duration:2.6s; }
-}
-@keyframes mail-panel-pop-reduced { 0% { opacity:.3; transform:scale(.94); } 70% { opacity:1; transform:scale(1.012); } 100% { opacity:1; transform:scale(1); } }
 </style>
 <style scoped>
 :global(:root[data-theme="dark"] .step) {

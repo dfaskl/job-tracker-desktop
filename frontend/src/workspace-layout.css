@@ -41,7 +41,6 @@
 #app .schedule-link span { margin-left: 6px; color: var(--color-primary); font-size: 13px; }
 #app .schedule-link:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
 #app .schedule-list :is(.schedule-link, .schedule-actions button) { position: relative; z-index: 2; pointer-events: auto; }
-@media (prefers-reduced-motion:reduce) { #app .schedule-list article { transition:none; } #app .schedule-list article:has(.schedule-row-target:hover) { transform:none; } }
 
 /* Application records can be individual cards within one scrollable list. */
 #app .workspace { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

@@ -90,7 +90,7 @@ async function focusApplicationInList() {
     ? Math.max(0, Math.min(grid.scrollHeight - grid.clientHeight, rowTop - grid.getBoundingClientRect().top + grid.scrollTop - grid.clientHeight * .28))
     : Math.max(0, rowTop + window.scrollY - window.innerHeight * .28)
   const distance = Math.abs(top - start)
-  const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 420 : Math.min(1400, Math.max(650, distance * .28))
+  const duration = Math.min(1400, Math.max(650, distance * .28))
   const started = performance.now()
   function step(now: number) {
     const progress = Math.min(1, (now - started) / duration)
@@ -131,7 +131,7 @@ async function startApplicationReveal() {
     revealActive.value = false
     return
   }
-  const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 180 : 520
+  const duration = 520
   const interval = duration * .3
   grid.style.setProperty('--application-reveal-duration', `${duration}ms`)
   nextRevealStart = performance.now()

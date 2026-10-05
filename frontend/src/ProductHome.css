@@ -550,21 +550,6 @@
   to { opacity: 1; transform: none; }
 }
 @keyframes timeline-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .quote-strip.home-quote-entering:not(.is-refreshing) .quote-trigger { animation-name:home-quote-light-reduced; animation-duration:220ms; }
-  .quote-strip.home-quote-entering .quote-copy { animation-name:home-subtle-in; animation-duration:220ms; animation-delay:50ms; }
-  .home-entering :is(.team-timeline,.details-column,.confirmation-panel).home-visible,
-  .home-entering .schedule-advice.home-visible { animation-name:home-subtle-in; animation-duration:200ms; }
-  .home-entering .team-timeline.home-visible .member-legend { animation-name:home-subtle-in; animation-duration:180ms; animation-delay:60ms; }
-  .home-entering .team-timeline.home-visible .team-timeline-list::before { animation-duration:240ms; animation-delay:100ms; }
-  .home-entering .team-timeline.home-visible .team-timeline-list article { animation-name:home-subtle-in; animation-duration:180ms; animation-delay:calc(190ms + var(--home-node-short-delay)); }
-  .home-card-revealing.schedule-list article.home-card-visible { animation-name:home-schedule-fly-reduced; animation-duration:200ms; }
-  .home-card-revealing.confirmation-list article.home-card-visible { animation-name:home-subtle-in; animation-duration:200ms; }
-  .home-entering :is(.details-column.home-visible > .column-heading,.confirmation-panel.home-visible .panel-head,.details-column.home-visible > .empty,.confirmation-panel.home-visible > .empty) { animation-name:home-subtle-in; }
-}
-@keyframes home-schedule-fly-reduced { from { opacity:.35; transform:translateX(8px); } to { opacity:1; transform:translateX(0); } }
-@keyframes home-quote-light-reduced { from { opacity:.5; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
-@keyframes home-subtle-in { from { opacity:.35; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width: 1180px) {
   .schedule-workspace { grid-template-columns: 1fr; }
 }

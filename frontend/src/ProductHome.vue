@@ -52,7 +52,6 @@ let cardObserver: IntersectionObserver | null = null
 let homeViewActive = false
 let homeRevealRun = 0
 let homeRevealStartedAt = 0
-let homeSequenceScale = 1
 let nextScheduleReveal = 0
 let nextConfirmationReveal = 0
 
@@ -103,7 +102,6 @@ async function startHomeReveal() {
   homeEntering.value = true
   cardsRevealing.value = typeof IntersectionObserver !== 'undefined'
   homeRevealStartedAt = performance.now()
-  homeSequenceScale = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? .45 : 1
   await nextTick()
   if (!homeViewActive || run !== homeRevealRun) return
   if (typeof IntersectionObserver === 'undefined') {
@@ -117,7 +115,7 @@ async function startHomeReveal() {
       const targetStart = section === timelineSection.value ? 0
         : section === adviceSection.value ? 500
         : section === detailsSection.value ? 650 : 1000
-      section.style.setProperty('--home-section-delay', `${Math.max(0, targetStart * homeSequenceScale - (performance.now() - homeRevealStartedAt))}ms`)
+      section.style.setProperty('--home-section-delay', `${Math.max(0, targetStart - (performance.now() - homeRevealStartedAt))}ms`)
       if (entry.target === timelineSection.value) timelineVisible.value = true
       if (entry.target === adviceSection.value) adviceVisible.value = true
       if (entry.target === detailsSection.value) detailsVisible.value = true
@@ -125,7 +123,7 @@ async function startHomeReveal() {
       sectionObserver?.unobserve(entry.target)
     })
   }, { threshold:0 })
-  const duration = homeSequenceScale < 1 ? 200 : 520
+  const duration = 520
   const interval = duration * .3
   nextScheduleReveal = nextConfirmationReveal = performance.now()
   cardObserver = new IntersectionObserver(entries => {
@@ -138,8 +136,8 @@ async function startHomeReveal() {
       if (!visible.length) return
       const now = performance.now()
       let next = schedule ? nextScheduleReveal : nextConfirmationReveal
-      const initialStart = (schedule ? 760 : 1110) * homeSequenceScale + homeRevealStartedAt
-      next = Math.max(now + 120 * homeSequenceScale, initialStart, Math.min(next, now + duration))
+      const initialStart = (schedule ? 760 : 1110) + homeRevealStartedAt
+      next = Math.max(now + 120, initialStart, Math.min(next, now + duration))
       visible.forEach(entry => {
         const card = entry.target as HTMLElement
         card.style.setProperty('--home-card-delay', `${Math.max(0, next - now)}ms`)
@@ -396,7 +394,7 @@ onUnmounted(()=>{stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(me
       <section ref="timelineSection" class="timeline-column team-timeline" :class="{'home-visible':timelineVisible}" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong><small>仅展示小组成员的时间点日程，时间段日程保留在个人详情中</small></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
-        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="(item,index) in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color,'--home-node-delay':`${Math.min(index,8)*75}ms`,'--home-node-short-delay':`${Math.min(index,8)*30}ms`}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
+        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="(item,index) in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color,'--home-node-delay':`${Math.min(index,8)*75}ms`}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time>{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
         <div v-if="teamConflicts.length" class="team-conflict-alert" role="alert"><strong>小组日程冲突</strong><span v-for="item in teamConflicts" :key="item.id">{{item.text}}</span></div>
         <div v-if="!teamTimeline.length&&sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载小组日程…</span></div>
         <p v-else-if="!teamTimeline.length&&sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>

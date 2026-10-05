@@ -197,7 +197,6 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 :global(:root[data-theme="dark"] .summary-grid i),:global(:root[data-theme="dark"] .summary-grid strong){color:color-mix(in srgb,var(--metric) 55%,#fff)}
 :global(:root[data-theme="dark"] .registration-code-row .saved-code){color:var(--color-muted-foreground);background:var(--color-muted)}
 :global(:root[data-theme="dark"] .group-pill.tone-0){border-color:#405888;color:#b4cbff;background:#202c43}:global(:root[data-theme="dark"] .group-pill.tone-1){border-color:#35634d;color:#a9e4c3;background:#1e3027}:global(:root[data-theme="dark"] .group-pill.tone-2){border-color:#715c37;color:#f0cf91;background:#332b1d}:global(:root[data-theme="dark"] .group-pill.tone-3){border-color:#594878;color:#d2b8ff;background:#2b2439}
-@media(prefers-reduced-motion:reduce){.switch-control>span,.switch-control>span::after{transition:none}}
 </style>
 <style scoped>
 .admin-shell {

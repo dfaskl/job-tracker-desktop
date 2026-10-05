@@ -171,9 +171,3 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
   #app .calendar-pane .calendar-head > div { justify-content: space-between; }
   #app .calendar-pane .calendar-head :is(strong, button, span) { white-space: nowrap; }
 }
-@media (prefers-reduced-motion: reduce) {
-  #app .page-content > :not(.access) { animation-name: workspace-fade; animation-duration: .16s; }
-  #app :is(.sidebar button, .application, .profile-entry) { transition: background-color .12s, color .12s, border-color .12s; }
-  #app .entry-inner { animation: workspace-fade .16s both; }
-}
-@keyframes workspace-fade { from { opacity: .6; } to { opacity: 1; } }

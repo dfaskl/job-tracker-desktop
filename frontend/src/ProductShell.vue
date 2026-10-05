@@ -374,7 +374,6 @@ nav button.active::before { content: none; }
 .nav-count-roll-enter-from { transform: translateY(75%); opacity: 0; }
 .nav-count-roll-leave-to { transform: translateY(-75%); opacity: 0; }
 @keyframes nav-dot-breathe { 0% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--color-primary) 40%,transparent); transform: scale(.92); } 65% { box-shadow: 0 0 0 6px transparent; transform: scale(1); } 100% { box-shadow: 0 0 0 0 transparent; } }
-@media (prefers-reduced-motion: reduce) { .nav-active-indicator { transition-duration: .2s,.18s,.18s,.12s; transition-timing-function: ease-out; } .nav-status-dot { animation: none; } .nav-notice-leave-active,.nav-count-roll-enter-active,.nav-count-roll-leave-active { transition-duration: .01ms; } }
 .sr-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .theme-toggle { position: absolute; right: 14px; bottom: 90px; display: grid; width: 36px; height: 36px; min-height: 36px; place-items: center; padding: 0; border: 1px solid var(--color-border); background: var(--color-card); }
 .theme-toggle:hover { background: var(--color-muted); }

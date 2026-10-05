@@ -246,7 +246,6 @@ watch(topicEntries, entries => {
 .topic-content-leave-active{transition:opacity .15s ease,transform .15s ease}
 .topic-content-enter-from{opacity:0;transform:translateY(8px)}
 .topic-content-leave-to{opacity:0;transform:translateY(-5px)}
-@media(prefers-reduced-motion:reduce){.topic-kind-indicator,.topic-kind-switch button{transition-duration:.18s}.topic-content-enter-active,.topic-content-leave-active{transition:none}}
 .detail-kind{color:var(--color-primary);font-size:12px;font-weight:700}
 .topic-detail h3{margin:8px 0 10px;overflow-wrap:anywhere;font-size:clamp(20px,2vw,26px);line-height:1.35}
 .detail-frequency{display:inline-block;padding:5px 9px;border-radius:6px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card));font-size:12px;font-weight:700}
@@ -354,20 +353,5 @@ watch(topicEntries, entries => {
   .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
   .topic-kind-switch button{min-width:0}
   .question-answer{padding:13px}
-}
-@media(prefers-reduced-motion:reduce){
-  .topic-tag,.batch-progress-track>span,.topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move,.topic-detail-enter-active,.topic-detail-leave-active,.stream-question-enter-active,.stream-question-leave-active,.stream-question-move{transition:none}
-  .topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition-duration:.24s}
-  .topic-detail-zoom-enter-from{transform:scale(.94);opacity:.5}
-  .topic-detail-zoom-leave-to{transform:scale(.98);opacity:0}
-  .workbench-flip-enter-active,.workbench-flip-leave-active{transition-duration:.32s,.28s}
-  .workbench-flip-enter-active{transition-delay:.04s}
-  .workbench-flip-enter-from{transform:rotateY(-18deg);opacity:0}
-  .workbench-flip-leave-to{transform:rotateY(18deg);opacity:0}
-  .stream-spinner{animation-duration:1.2s}
-  .summary-columns.is-entered .review-card{animation-duration:.26s;animation-delay:calc(var(--review-index,0)*130ms)}
-  .summary-columns.is-entered .workbench-column,.summary-pane.mobile-pane-active{animation-duration:.2s}
-  @keyframes interview-review-card-enter{0%{transform:translateY(10px) scale(.99);opacity:.15;filter:brightness(.65)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
-  @keyframes interview-pane-enter-right{from{transform:translateX(16px)}to{transform:translateX(0)}}
 }
 </style>
