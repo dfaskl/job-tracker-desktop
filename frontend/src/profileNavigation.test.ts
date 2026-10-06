@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { profileSectionScrollTarget } from './profileNavigation'
+import { profileSectionScrollTarget, profileToggleDestination } from './profileNavigation'
 
 describe('profileSectionScrollTarget', () => {
   it('keeps the page at the top when no subsection is requested', () => {
@@ -14,5 +14,19 @@ describe('profileSectionScrollTarget', () => {
     expect(profileSectionScrollTarget('#/profile?section=data')).toBe('data')
     expect(profileSectionScrollTarget('#/profile?section=unknown')).toBeNull()
     expect(profileSectionScrollTarget('#/home?section=resume')).toBeNull()
+  })
+})
+
+describe('profileToggleDestination', () => {
+  it('opens the profile from the current page', () => {
+    expect(profileToggleDestination('applications', 'home')).toBe('profile')
+  })
+
+  it('returns to the page that opened the profile', () => {
+    expect(profileToggleDestination('profile', 'calendar')).toBe('calendar')
+  })
+
+  it('falls back to home if the remembered page is profile itself', () => {
+    expect(profileToggleDestination('profile', 'profile')).toBe('home')
   })
 })

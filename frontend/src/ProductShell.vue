@@ -10,6 +10,7 @@ import AdminDashboard from './AdminDashboard.vue'
 import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
 import UserGuide from './UserGuide.vue'
 import { pageFromRoute, readHashRoute } from './routes'
+import { profileToggleDestination } from './profileNavigation'
 import { useJobTrackerStore } from './jobTrackerStore'
 import { api } from './api'
 
@@ -38,6 +39,7 @@ const pageComponents: Record<Page, Component> = {
 }
 
 const activePage = ref<Page>('home')
+const lastPageBeforeProfile = ref<Page>('home')
 const isAdmin = ref(false)
 const adminAccessLoaded = ref(false)
 const visiblePages = computed(() => pages.filter(item => item.id !== 'admin' || isAdmin.value))
@@ -137,6 +139,7 @@ async function createApplication() {
 }
 function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focus' = 'detail') {
   if (page === 'admin' && !isAdmin.value) return
+  if (page === 'profile' && activePage.value !== 'profile') lastPageBeforeProfile.value = activePage.value
   if (page === 'guide' && activePage.value !== 'guide') {
     lastPageBeforeGuide.value = activePage.value
     const guideButton = primaryNavigation.value?.querySelector<HTMLButtonElement>('[data-guide]')
@@ -154,6 +157,9 @@ function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focu
   activePage.value = page
   focusApplicationId.value = page === 'applications' && behavior === 'focus' ? applicationId || '' : ''
   window.scrollTo({ top: 0, behavior: 'auto' })
+}
+function toggleProfile() {
+  navigate(profileToggleDestination(activePage.value, lastPageBeforeProfile.value) as Page)
 }
 function closeGuide() { navigate(lastPageBeforeGuide.value === 'guide' ? 'home' : lastPageBeforeGuide.value) }
 function handleNavigation(page: Page) {
@@ -306,7 +312,7 @@ onBeforeUnmount(() => {
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
       </button>
-      <button v-if="store.user.value" type="button" class="profile-shortcut" :class="{ active: activePage === 'profile' }" aria-label="个人设置" title="个人设置" :aria-current="activePage === 'profile' ? 'page' : undefined" @click="navigate('profile')">
+      <button v-if="store.user.value" type="button" class="profile-shortcut" :class="{ active: activePage === 'profile' }" :aria-label="activePage === 'profile' ? '返回上一个页面' : '个人设置'" :title="activePage === 'profile' ? '返回上一个页面' : '个人设置'" :aria-current="activePage === 'profile' ? 'page' : undefined" @click="toggleProfile">
         <img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" />
       </button>
       <button v-if="isAdmin" type="button" class="admin-shortcut" :class="{ active: activePage === 'admin' }" aria-label="管理员" title="管理员" :aria-current="activePage === 'admin' ? 'page' : undefined" @click="navigate('admin')">
@@ -321,7 +327,7 @@ onBeforeUnmount(() => {
         </button>
       </nav>
       <span class="sr-status" role="status" aria-live="polite" aria-atomic="true">{{ store.pendingMailCount.value > 0 ? `有 ${store.pendingMailCount.value} 封待处理邮件` : '没有待处理邮件' }}</span>
-      <div class="sidebar-account" :inert="mobileViewport"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="`进入个人主页，当前用户 ${sidebarDisplayName}`" :title="sidebarDisplayName" @click="navigate('profile')"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>账户与设置</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
+      <div class="sidebar-account" :inert="mobileViewport"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="activePage === 'profile' ? `返回上一个页面，当前用户 ${sidebarDisplayName}` : `进入个人主页，当前用户 ${sidebarDisplayName}`" :title="activePage === 'profile' ? '返回上一个页面' : sidebarDisplayName" @click="toggleProfile"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>{{ activePage === 'profile' ? '返回上一个页面' : '账户与设置' }}</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary' }">

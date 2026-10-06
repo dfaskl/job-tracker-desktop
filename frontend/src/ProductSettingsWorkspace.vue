@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import AccountManagement from './AccountManagement.vue'
 import ResumeSettings from './ResumeSettings.vue'
 import ProductPreferences from './ProductPreferences.vue'
@@ -25,6 +25,8 @@ function sectionFromHash(): SectionId {
 const activeSection = ref<SectionId>(sectionFromHash())
 const sectionRefs = ref<Partial<Record<SectionId, HTMLElement>>>({})
 let scrollFrame = 0
+let sectionScrollFrame = 0
+let pendingSectionHash: string | null = null
 function setSectionRef(section: SectionId, element: Element | null) {
   if (element instanceof HTMLElement) sectionRefs.value[section] = element
   else delete sectionRefs.value[section]
@@ -42,12 +44,36 @@ function syncActiveSectionFromScroll() {
 function onPageScroll() {
   if (!scrollFrame) scrollFrame = window.requestAnimationFrame(syncActiveSectionFromScroll)
 }
+function stopSectionScroll() {
+  if (sectionScrollFrame) window.cancelAnimationFrame(sectionScrollFrame)
+  sectionScrollFrame = 0
+}
+function scrollToSection(section: SectionId) {
+  const target = sectionRefs.value[section]
+  if (!target) return
+  stopSectionScroll()
+  const startY = window.scrollY
+  const endY = Math.max(0, target.getBoundingClientRect().top + startY - 82)
+  const distance = endY - startY
+  if (Math.abs(distance) < 2) return
+  const duration = Math.min(1400, Math.max(760, Math.abs(distance) * 0.36))
+  let startedAt = 0
+  const step = (now: number) => {
+    if (!startedAt) startedAt = now
+    const progress = Math.min(1, (now - startedAt) / duration)
+    const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2
+    window.scrollTo(0, startY + distance * eased)
+    if (progress < 1) sectionScrollFrame = window.requestAnimationFrame(step)
+    else sectionScrollFrame = 0
+  }
+  sectionScrollFrame = window.requestAnimationFrame(step)
+}
 function syncSectionFromHash(shouldScroll = true) {
   activeSection.value = sectionFromHash()
   if (!shouldScroll) return
   const target = profileSectionScrollTarget(window.location.hash)
   void nextTick(() => {
-    if (target) sectionRefs.value[target as SectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (target) scrollToSection(target as SectionId)
     else window.scrollTo({ top: 0, behavior: 'auto' })
   })
 }
@@ -61,8 +87,13 @@ function flashSection(section: SectionId) {
 }
 function selectSection(section: SectionId) {
   activeSection.value = section
-  window.location.hash = `/profile?section=${section}`
-  sectionRefs.value[section]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const nextHash = `#/profile?section=${section}`
+  if (window.location.hash === nextHash) scrollToSection(section)
+  else {
+    pendingSectionHash = nextHash
+    window.location.hash = `/profile?section=${section}`
+    scrollToSection(section)
+  }
   window.setTimeout(() => flashSection(section), 220)
 }
 onMounted(() => {
@@ -77,13 +108,20 @@ onMounted(() => {
 })
 const onHashChange = () => {
   const page = window.location.hash.replace(/^#\/?/, '').split('?')[0]
-  if (page === 'profile' || page === 'settings') syncSectionFromHash()
+  if (page === 'profile' || page === 'settings') {
+    if (pendingSectionHash === window.location.hash) {
+      pendingSectionHash = null
+      syncSectionFromHash(false)
+    } else syncSectionFromHash()
+  } else pendingSectionHash = null
 }
 onActivated(() => syncSectionFromHash(false))
+onDeactivated(stopSectionScroll)
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', onHashChange)
   window.removeEventListener('scroll', onPageScroll)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+  stopSectionScroll()
 })
 </script>
 
