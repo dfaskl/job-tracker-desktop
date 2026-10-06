@@ -23,6 +23,7 @@ const reviewDialog = ref<HTMLDialogElement | null>(null)
 const selectedTopicKey = ref('')
 const activeTopicKind = ref<'project' | 'knowledge' | 'other'>('project')
 const activePane = ref<'reviews' | 'workbench'>('reviews')
+const reviewsCollapsed = ref(false)
 const workbenchScroll = ref<HTMLElement | null>(null)
 const pageEntered = ref(false)
 let autoAttemptedKey = ''
@@ -166,12 +167,13 @@ watch(topicEntries, entries => {
       <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="onSummarizeClick">{{ summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button></nav>
-    <div class="summary-columns" :class="{ 'is-entered': pageEntered }">
-      <section class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
+    <div class="summary-columns" :class="{ 'is-entered': pageEntered, 'reviews-collapsed': reviewsCollapsed }">
+      <section id="review-list-panel" class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
           <ol v-else class="review-list"><li v-for="(item, index) in reviews" :key="item.event.id"><button type="button" class="review-card" :style="{ '--review-index': index }" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
+      <div class="review-collapse-divider" aria-hidden="false"><button type="button" class="review-collapse-toggle" :aria-expanded="!reviewsCollapsed" aria-controls="review-list-panel" :aria-label="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" :title="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" @click="reviewsCollapsed = !reviewsCollapsed"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12 4-6 6 6 6" /></svg></button></div>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
           <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
@@ -270,8 +272,18 @@ watch(topicEntries, entries => {
   .summary-pane.mobile-pane-active{display:flex}
 }
 /* Keep reviews beside one unified topic workspace; only the workspace body scrolls. */
-.summary-columns{grid-template-columns:minmax(240px,.78fr) minmax(0,2fr)}
-.summary-pane+.summary-pane{padding-left:22px}
+.summary-columns{position:relative;grid-template-columns:minmax(240px,.78fr) 38px minmax(0,2fr);gap:0;transition:grid-template-columns .42s cubic-bezier(.2,.78,.2,1)}
+.summary-columns.reviews-collapsed{grid-template-columns:38px minmax(0,1fr)}
+.review-column{transition:opacity .2s ease,transform .35s cubic-bezier(.2,.78,.2,1)}
+.reviews-collapsed .review-column{display:none}
+.review-collapse-divider{position:relative;display:flex;align-items:center;justify-content:center;min-width:0}
+.review-collapse-divider::before{position:absolute;inset:0 auto 0 50%;width:1px;background:var(--color-border);content:"";transform:translateX(-50%)}
+.review-collapse-toggle{position:relative;z-index:1;display:grid;width:38px;height:48px;place-items:center;padding:0;border:1px solid var(--color-border);border-radius:999px;color:var(--color-primary);background:var(--color-card);box-shadow:0 3px 12px rgb(0 0 0 / 16%);cursor:pointer;transition:width .22s ease,height .22s ease,color .22s ease,background-color .22s ease,box-shadow .22s ease}
+.review-collapse-toggle:hover{width:42px;height:52px;background:var(--surface-hover);box-shadow:0 5px 16px rgb(0 0 0 / 22%)}
+.review-collapse-toggle:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px}
+.review-collapse-toggle svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .35s cubic-bezier(.2,.78,.2,1)}
+.reviews-collapsed .review-collapse-toggle svg{transform:rotate(180deg)}
+.workbench-column{padding-left:0!important;transition:padding .25s ease}
 .workbench-column{padding-right:0!important}
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
 .workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
@@ -341,6 +353,7 @@ watch(topicEntries, entries => {
 .stream-question-enter-from,.stream-question-leave-to{opacity:0;transform:translateY(7px)}
 @media(max-width:900px){
   .summary-columns{display:block;overflow:hidden}
+  .review-collapse-divider{display:none}
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
   .summary-pane.mobile-pane-active{display:flex}
   .workbench-column.mobile-pane-active{animation:interview-pane-enter-right .32s cubic-bezier(.2,.75,.25,1) both}
