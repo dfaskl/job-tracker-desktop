@@ -8,6 +8,8 @@ import jakarta.mail.*;
 import jakarta.mail.internet.MimeUtility;
 import org.eclipse.angus.mail.imap.IMAPStore;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.TextNode;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -99,9 +101,20 @@ public class MailInboxService {
         try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_error=? WHERE id=?")){s.setString(1,message);s.setLong(2,accountId);s.executeUpdate();}catch(Exception ignored){}
     }
     private String extract(Part part)throws Exception{
-        if(part.isMimeType("text/html")){var document=Jsoup.parse(String.valueOf(part.getContent()));StringBuilder out=new StringBuilder(document.text());document.select("a[href]").forEach(link->{String href=link.attr("href");if(!href.isBlank())out.append("\n").append(link.text().isBlank()?"链接":link.text()).append("：").append(href);});return out.toString();}
+        if(part.isMimeType("text/html"))return htmlToText(String.valueOf(part.getContent()));
         if(part.isMimeType("text/plain"))return String.valueOf(part.getContent());
         Object content=part.getContent();if(content instanceof Multipart multipart){String html="",plain="";for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);String value=extract(child);if(child.isMimeType("text/html"))html=value;else if(child.isMimeType("text/plain")&&!value.isBlank())plain=value;else if(plain.isBlank()&&!value.isBlank())plain=value;}return html.isBlank()?plain:html;}return "";
+    }
+    static String htmlToText(String html){
+        Document document=Jsoup.parse(html);
+        document.select("script,style,head,iframe,object,svg,noscript").remove();
+        document.select("br").forEach(lineBreak->lineBreak.replaceWith(new TextNode("\n")));
+        document.select("p,div,section,article,header,footer,blockquote,ul,ol,li,tr,h1,h2,h3,h4,h5,h6").forEach(block->{block.prependText("\n");block.appendText("\n");});
+        String text=document.body().wholeText().replace("\r\n","\n").replace('\r','\n').replace('\u00a0',' ');
+        text=text.replaceAll("[\\t ]+\\n","\n").replaceAll("\\n[\\t ]+","\n").replaceAll("\\n{3,}","\n\n").trim();
+        StringBuilder out=new StringBuilder(text);
+        document.select("a[href]").forEach(link->{String href=link.attr("href");if(!href.isBlank())out.append("\n").append(link.text().isBlank()?"链接":link.text()).append("：").append(href);});
+        return out.toString();
     }
     private long testConnection(String email,String provider,String password){try(Store store=connect(email,provider,password)){Folder folder=store.getFolder("INBOX");folder.open(Folder.READ_ONLY);try{return folder.getMessageCount()>0?((UIDFolder)folder).getUID(folder.getMessage(folder.getMessageCount())):0;}finally{folder.close(false);}}catch(Exception e){throw new ValidationException(connectionFailure(provider,e));}}
     private Store connect(String email,String provider,String password)throws MessagingException{
