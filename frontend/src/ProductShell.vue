@@ -414,6 +414,8 @@ nav button.active::before { content: none; }
   color: var(--color-on-primary);
   background: var(--color-primary);
 }
+.application-page .topbar { align-items: flex-start; }
+.application-page .topbar > button { align-self: flex-start; }
 .home-quote-slot { display: flex; min-width: 0; flex: 1; justify-content: center; }
 .application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
 .application-toolbar-slot.active { display: flex; }

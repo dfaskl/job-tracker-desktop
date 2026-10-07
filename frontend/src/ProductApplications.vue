@@ -432,7 +432,7 @@ async function removeEvent(item:JobEvent){
         <div v-if="stageFilter==='全部'" class="application-legend" aria-label="投递卡片颜色说明"><span v-for="category in applicationCategories" :key="category.tone"><i :class="category.tone"></i>{{category.label}}</span></div>
       </div>
       <aside class="application-heatmap" aria-label="月度投递数量热力图">
-        <div class="heatmap-grid"><i v-for="cell in applicationHeatCells" :key="cell.key" :class="[`level-${cell.level}`,{ outside:!cell.inMonth }]" :title="cell.inMonth ? `${cell.key}：${cell.count} 条投递` : ''"></i></div>
+        <div class="heatmap-calendar"><span class="heatmap-caption">每日投递概览</span><div class="heatmap-grid"><i v-for="cell in applicationHeatCells" :key="cell.key" :class="[`level-${cell.level}`,{ outside:!cell.inMonth }]" :title="cell.inMonth ? `${cell.key}：${cell.count} 条投递` : ''"></i></div></div>
         <div class="heatmap-controls"><strong>{{ applicationHeatTitle }}</strong><div><button type="button" :disabled="!canHeatPrevious" aria-label="上一个月份" title="上一个月" @click="moveApplicationHeatMonth(-1)"><AppIcon name="chevron-left" :size="14" /></button><button type="button" :disabled="!canHeatNext" aria-label="下一个月份" title="下一个月" @click="moveApplicationHeatMonth(1)"><AppIcon name="chevron-right" :size="14" /></button></div></div>
       </aside>
     </div>
@@ -624,6 +624,9 @@ async function removeEvent(item:JobEvent){
 .schedule-time-fields input { width:100%; min-width:0; }
 .application-filter-stack { width:min(100%, 920px); flex:1 1 620px; }
 .application-filter-fields { grid-template-columns:minmax(0,1fr); }
+.application-heatmap { align-items:flex-start; }
+.heatmap-calendar { display:grid; gap:5px; justify-items:center; }
+.heatmap-caption { color:var(--color-muted-foreground); font-size:10px; line-height:1; white-space:nowrap; }
 .application-stage-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:8px; }
 .application-stage-tabs button { min-height:32px; padding:6px 11px; border:1px solid var(--color-border); border-radius:999px; color:var(--color-muted-foreground); background:var(--color-card); font-size:12px; font-weight:650; line-height:1.25; white-space:nowrap; transition:color .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease; }
 .application-stage-tabs button:hover { border-color:var(--color-primary); color:var(--color-primary); }
