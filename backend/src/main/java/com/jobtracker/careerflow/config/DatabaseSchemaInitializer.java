@@ -40,8 +40,14 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                 for (String command : sql.split(";")) {
                     if (!command.isBlank()) statement.execute(command);
                 }
+                boolean hasBodyHtml = false;
+                try (var columns = statement.executeQuery("PRAGMA table_info(collected_mails)")) {
+                    while (columns.next()) if ("body_html".equalsIgnoreCase(columns.getString("name"))) hasBodyHtml = true;
+                }
+                if (!hasBodyHtml) statement.executeUpdate("ALTER TABLE collected_mails ADD COLUMN body_html TEXT");
             } else {
                 statement.execute(sql);
+                statement.executeUpdate("ALTER TABLE collected_mails ADD COLUMN IF NOT EXISTS body_html TEXT");
             }
             statement.executeUpdate("DELETE FROM sessions WHERE expires_at <= NOW()");
             String adminEmail = environment.getProperty("ADMIN_EMAIL", "").trim().toLowerCase();

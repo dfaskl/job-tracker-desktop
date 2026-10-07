@@ -9,7 +9,10 @@ import jakarta.mail.internet.MimeUtility;
 import org.eclipse.angus.mail.imap.IMAPStore;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
+import org.jsoup.safety.Safelist;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -56,6 +59,28 @@ public class MailInboxService {
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
     public int processAll(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));return s.executeUpdate();}}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
+    public String originalHtml(String email,long id)throws Exception{
+        OriginalMail mail;
+        try(Connection c=open();PreparedStatement s=c.prepareStatement("SELECT m.body_html,m.message_uid,a.id,a.user_id,a.email,a.provider,a.encrypted_password,a.encryption_iv,a.auth_tag,a.last_uid,a.initialized,a.collect_after FROM collected_mails m JOIN mail_accounts a ON a.id=m.account_id WHERE m.id=? AND m.user_id=?")){
+            s.setLong(1,id);s.setLong(2,userId(c,email));try(ResultSet r=s.executeQuery()){
+                if(!r.next())throw new ValidationException("邮件不存在或已被移除");
+                String cached=r.getString(1);if(cached!=null)return cached;
+                Timestamp collectedAt=r.getTimestamp(12);
+                mail=new OriginalMail(r.getLong(2),new AccountRow(r.getLong(3),r.getLong(4),r.getString(5),r.getString(6),r.getBytes(7),r.getBytes(8),r.getBytes(9),r.getLong(10),r.getBoolean(11),collectedAt==null?Instant.EPOCH:collectedAt.toInstant()));
+            }
+        }
+        String password=crypto.decrypt(encryptionKey(),mail.account().encrypted(),mail.account().iv(),mail.account().tag());
+        String html;
+        try(Store store=connect(mail.account().email(),mail.account().provider(),password)){
+            Folder folder=store.getFolder("INBOX");folder.open(Folder.READ_ONLY);
+            try{Message source=((UIDFolder)folder).getMessageByUID(mail.uid());if(source==null)throw new ValidationException("原邮件已不在收件箱，无法读取原始排版");html=htmlPart(source);}
+            finally{folder.close(false);}
+        }
+        if(html.isBlank())return "";
+        String safe=sanitizeEmailHtml(html);
+        try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET body_html=? WHERE id=? AND user_id=?")){s.setString(1,safe);s.setLong(2,id);s.setLong(3,userId(c,email));s.executeUpdate();}
+        return safe;
+    }
 
     @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:15000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:15000}")
     public void syncAll(){
@@ -80,8 +105,8 @@ public class MailInboxService {
             try{UIDFolder uidFolder=(UIDFolder)folder;long latestUid=folder.getMessageCount()>0?uidFolder.getUID(folder.getMessage(folder.getMessageCount())):0;
                 if(!account.initialized())return new SyncResult(latestUid,List.of());
                 long start=account.lastUid()+1;Message[] mails=uidFolder.getMessagesByUID(start,UIDFolder.LASTUID);
-                for(Message mail:mails){long uid=uidFolder.getUID(mail);if(uid<=0)continue;newest=Math.max(newest,uid);java.util.Date date=mail.getReceivedDate()!=null?mail.getReceivedDate():mail.getSentDate();if(date==null||!date.toInstant().isAfter(account.collectAfter()))continue;String body=extract(mail).trim();if(body.isBlank())continue;
-                    fetched.add(new FetchedMail(uid,addresses(mail.getFrom()),decode(mail.getSubject()),limit(body,100000),date.toInstant()));
+                for(Message mail:mails){long uid=uidFolder.getUID(mail);if(uid<=0)continue;newest=Math.max(newest,uid);java.util.Date date=mail.getReceivedDate()!=null?mail.getReceivedDate():mail.getSentDate();if(date==null||!date.toInstant().isAfter(account.collectAfter()))continue;MailContent content=extractContent(mail);String body=content.body().trim();if(body.isBlank())continue;
+                    fetched.add(new FetchedMail(uid,addresses(mail.getFrom()),decode(mail.getSubject()),limit(body,100000),limit(content.html(),200000),date.toInstant()));
                 }
             }finally{folder.close(false);}
         }
@@ -91,7 +116,7 @@ public class MailInboxService {
         try(Connection c=open()){
             c.setAutoCommit(false);
             try{
-                for(FetchedMail mail:result.mails())try(PreparedStatement s=c.prepareStatement("INSERT INTO collected_mails(user_id,account_id,message_uid,sender,subject,body,received_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,message_uid) DO NOTHING")){s.setLong(1,account.userId());s.setLong(2,account.id());s.setLong(3,mail.uid());s.setString(4,mail.sender());s.setString(5,mail.subject());s.setString(6,mail.body());s.setTimestamp(7,Timestamp.from(mail.receivedAt()));s.executeUpdate();}
+                for(FetchedMail mail:result.mails())try(PreparedStatement s=c.prepareStatement("INSERT INTO collected_mails(user_id,account_id,message_uid,sender,subject,body,body_html,received_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account_id,message_uid) DO NOTHING")){s.setLong(1,account.userId());s.setLong(2,account.id());s.setLong(3,mail.uid());s.setString(4,mail.sender());s.setString(5,mail.subject());s.setString(6,mail.body());s.setString(7,mail.bodyHtml());s.setTimestamp(8,Timestamp.from(mail.receivedAt()));s.executeUpdate();}
                 try(PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_uid=?,last_synced_at=NOW(),last_error='',initialized=TRUE WHERE id=?")){s.setLong(1,result.newestUid());s.setLong(2,account.id());s.executeUpdate();}
                 c.commit();
             }catch(Exception e){c.rollback();throw e;}
@@ -100,10 +125,15 @@ public class MailInboxService {
     private void persistError(long accountId,String message){
         try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_error=? WHERE id=?")){s.setString(1,message);s.setLong(2,accountId);s.executeUpdate();}catch(Exception ignored){}
     }
-    private String extract(Part part)throws Exception{
-        if(part.isMimeType("text/html"))return htmlToText(String.valueOf(part.getContent()));
-        if(part.isMimeType("text/plain"))return String.valueOf(part.getContent());
-        Object content=part.getContent();if(content instanceof Multipart multipart){String html="",plain="";for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);String value=extract(child);if(child.isMimeType("text/html"))html=value;else if(child.isMimeType("text/plain")&&!value.isBlank())plain=value;else if(plain.isBlank()&&!value.isBlank())plain=value;}return html.isBlank()?plain:html;}return "";
+    private MailContent extractContent(Part part)throws Exception{
+        if(part.isMimeType("text/html")){String html=String.valueOf(part.getContent());return new MailContent(htmlToText(html),sanitizeEmailHtml(html));}
+        if(part.isMimeType("text/plain"))return new MailContent(String.valueOf(part.getContent()),"");
+        Object content=part.getContent();if(content instanceof Multipart multipart){MailContent html=null,plain=null;for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);MailContent value=extractContent(child);if(child.isMimeType("text/html")||!value.html().isBlank())html=value;else if(child.isMimeType("text/plain")&&!value.body().isBlank())plain=value;else if(plain==null&&!value.body().isBlank())plain=value;}return html!=null?html:plain==null?new MailContent("",""):plain;}return new MailContent("","");
+    }
+    private String htmlPart(Part part)throws Exception{
+        if(part.isMimeType("text/html"))return String.valueOf(part.getContent());
+        if(part.isMimeType("text/plain"))return "";
+        Object content=part.getContent();if(content instanceof Multipart multipart){String fallback="";for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);String html=htmlPart(child);if(!html.isBlank())return html;}return fallback;}return "";
     }
     static String htmlToText(String html){
         Document document=Jsoup.parse(html);
@@ -116,6 +146,21 @@ public class MailInboxService {
         document.select("a[href]").forEach(link->{String href=link.attr("href");if(!href.isBlank())out.append("\n").append(link.text().isBlank()?"链接":link.text()).append("：").append(href);});
         return out.toString();
     }
+    static String sanitizeEmailHtml(String html){
+        Document source=Jsoup.parse(html);
+        String bodyStyle=sanitizeInlineCss(source.body().attr("style"));
+        List<String> styles=source.select("style").stream().map(Element::html).map(MailInboxService::sanitizeCss).filter(style->!style.isBlank()).toList();
+        Safelist safelist=Safelist.relaxed().addTags("font","center","hr").addAttributes(":all","style","class","align","valign","width","height","color","bgcolor","dir","face","size").addAttributes("a","target","rel");
+        Document document=Jsoup.parseBodyFragment(Jsoup.clean(source.body().html(),safelist));
+        document.select("img").forEach(image->{String alt=image.attr("alt");if(alt.isBlank())image.remove();else image.replaceWith(new TextNode("["+alt+"]"));});
+        document.select("[style]").forEach(element->{String style=element.attr("style");if(style.matches("(?is).*(url\\s*\\(|expression\\s*\\(|javascript\\s*:|@import|behavior\\s*:|-moz-binding).*"))element.removeAttr("style");});
+        document.select("a[href]").forEach(link->link.attr("target","_blank").attr("rel","noopener noreferrer"));
+        if(!bodyStyle.isBlank()){Element wrapper=new Element("div").attr("style",bodyStyle);for(Node node:new ArrayList<>(document.body().childNodes())){node.remove();wrapper.appendChild(node);}document.body().appendChild(wrapper);}
+        for(int i=styles.size()-1;i>=0;i--)document.body().prependElement("style").text(styles.get(i));
+        return document.body().html();
+    }
+    private static String sanitizeInlineCss(String css){return css.matches("(?is).*(url\\s*\\(|expression\\s*\\(|javascript\\s*:|@import|behavior\\s*:|-moz-binding).*")?"":css;}
+    private static String sanitizeCss(String css){return css.replaceAll("(?is)@import\\s+[^;]*;?","").replaceAll("(?is)[^{}]*\\{[^{}]*url\\([^}]*}","").replaceAll("(?is)expression\\s*\\([^)]*\\)|javascript\\s*:","").trim();}
     private long testConnection(String email,String provider,String password){try(Store store=connect(email,provider,password)){Folder folder=store.getFolder("INBOX");folder.open(Folder.READ_ONLY);try{return folder.getMessageCount()>0?((UIDFolder)folder).getUID(folder.getMessage(folder.getMessageCount())):0;}finally{folder.close(false);}}catch(Exception e){throw new ValidationException(connectionFailure(provider,e));}}
     private Store connect(String email,String provider,String password)throws MessagingException{
         Store store=Session.getInstance(mailProperties()).getStore("imaps");
@@ -156,7 +201,9 @@ public class MailInboxService {
     private String limit(String value,int max){return value.length()<=max?value:value.substring(0,max);}private String instant(Timestamp value){return value==null?"":value.toInstant().toString();}
     public record InboxView(List<AccountView> accounts,List<MailView> messages,long pendingCount){}public record AccountView(long id,String email,String provider,String lastSyncedAt,String lastError){}public record MailView(long id,String sender,String subject,String body,String receivedAt,String accountEmail){}
     private record AccountRow(long id,long userId,String email,String provider,byte[] encrypted,byte[] iv,byte[] tag,long lastUid,boolean initialized,Instant collectAfter){}
-    private record FetchedMail(long uid,String sender,String subject,String body,Instant receivedAt){}
+    private record FetchedMail(long uid,String sender,String subject,String body,String bodyHtml,Instant receivedAt){}
+    private record MailContent(String body,String html){}
+    private record OriginalMail(long uid,AccountRow account){}
     private record SyncResult(long newestUid,List<FetchedMail> mails){}
     public static class ValidationException extends RuntimeException{public ValidationException(String message){super(message);}}
 }

@@ -34,6 +34,9 @@ const smokingMailIds = ref(new Set<number>())
 const processingMailIds = new Set<number>()
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
+const previewHtml = ref('')
+const previewLoading = ref(false)
+const previewError = ref('')
 const entranceActive = ref(false)
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
@@ -191,12 +194,26 @@ async function processAllMail() {
 }
 async function openMailPreview(mail: CollectedMail) {
   previewMail.value = mail
+  previewHtml.value = ''
+  previewError.value = ''
+  previewLoading.value = !previewHtml.value
   await nextTick()
   previewDialog.value?.showModal()
+  if (!previewHtml.value) {
+    try {
+      const original = await api<{ bodyHtml: string }>(`/api/poc/mail-inbox/messages/${mail.id}/original`)
+      previewHtml.value = original.bodyHtml || ''
+    } catch (cause) {
+      previewError.value = failure(cause, '暂时无法读取邮箱中的原始排版，当前显示收取时保存的正文。')
+    } finally { previewLoading.value = false }
+  }
 }
 function closeMailPreview() {
   previewDialog.value?.close()
   previewMail.value = null
+  previewHtml.value = ''
+  previewLoading.value = false
+  previewError.value = ''
 }
 function mailDate(value: string) {
   if (!value) return '时间未知'
@@ -307,7 +324,7 @@ async function saveResult() {
     <p v-if="error" class="feedback danger" role="alert">{{ error }}</p>
     <Transition name="process-notice"><div v-if="processNotice" class="process-notice" role="status"><span aria-hidden="true">✓</span>{{processNotice}}</div></Transition>
 
-    <dialog ref="previewDialog" class="mail-preview" aria-labelledby="mail-preview-title" @close="previewMail = null">
+    <dialog ref="previewDialog" class="mail-preview" aria-labelledby="mail-preview-title" @close="previewMail = null; previewHtml = ''; previewLoading = false">
       <article v-if="previewMail" class="mail-preview-card">
         <header>
           <div class="mail-preview-heading"><span class="preview-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><span>邮件原文</span><h2 id="mail-preview-title">{{ previewMail.subject || '（无主题）' }}</h2></div></div>
@@ -318,8 +335,8 @@ async function saveResult() {
           <div><dt>收件邮箱</dt><dd>{{ previewMail.accountEmail }}</dd></div>
           <div><dt>收取时间</dt><dd>{{ mailDate(previewMail.receivedAt) }}</dd></div>
         </dl>
-        <div class="mail-preview-body" tabindex="0">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div>
-        <footer><small>这里展示系统通过邮箱服务收取并整理后的正文内容。</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" @click="processMail(previewMail)">标记为已处理</button></div></footer>
+        <div class="mail-preview-body" tabindex="0"><div v-if="previewLoading" class="mail-preview-loading" role="status"><span class="recognition-spinner" aria-hidden="true"></span>正在读取邮件原始排版…</div><iframe v-else-if="previewHtml" class="mail-preview-iframe" :srcdoc="previewHtml" title="邮件原文内容" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe><div v-else class="mail-preview-plain">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div></div>
+        <footer><small>{{ previewError || (previewHtml ? '邮件中的外部图片已隐藏，以保护隐私。' : '这里展示系统通过邮箱服务收取并整理后的正文内容。') }}</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" @click="processMail(previewMail)">标记为已处理</button></div></footer>
       </article>
     </dialog>
   </section>
@@ -364,6 +381,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .feedback { margin: 0; padding: 13px 16px; border-radius: 11px; background: #fff; }
 .process-notice{position:fixed;z-index:1200;top:22px;left:50%;display:flex;align-items:center;gap:9px;max-width:calc(100vw - 32px);padding:12px 18px;border:1px solid #a9d7c0;border-radius:12px;color:#145c43;background:#f0fbf5;box-shadow:0 12px 32px rgba(14,75,55,.18);font-family:var(--font-button);font-weight:700;transform:translateX(-50%)}.process-notice span{display:grid;width:22px;height:22px;border-radius:50%;color:#fff;background:#26956b;place-items:center}.process-notice-enter-active,.process-notice-leave-active{transition:opacity .18s ease,transform .18s ease}.process-notice-enter-from,.process-notice-leave-to{opacity:0;transform:translate(-50%,-8px)}
 .mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:var(--color-card);box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto;background:var(--color-card)}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:var(--color-on-primary);background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:var(--color-muted);place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:var(--color-muted)}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;color:var(--color-card-foreground);overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid var(--color-border);border-radius:12px;color:var(--color-card-foreground);background:var(--color-background);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid color-mix(in srgb,var(--color-success) 35%,var(--color-border));border-radius:10px;color:var(--color-success);background:color-mix(in srgb,var(--color-success) 10%,var(--color-card))}
+.mail-preview-body{padding:0;color:#202330;background:#fff;overflow:hidden}.mail-preview-iframe{display:block;width:100%;height:100%;min-height:320px;border:0;background:#fff}.mail-preview-plain{height:100%;padding:20px;color:#202330;white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere}.mail-preview-loading{display:flex;height:100%;min-height:180px;align-items:center;justify-content:center;gap:10px;color:#626879}.mail-preview-loading .recognition-spinner{flex:none;border-color:color-mix(in srgb,var(--color-primary) 30%,transparent);border-top-color:var(--color-primary)}
 @keyframes inbox-spin{to{transform:rotate(360deg)}}
 @keyframes skeleton-shimmer{to{background-position-x:-220%}}
 @keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(3px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(12px,-8px) scale(1.04)}}

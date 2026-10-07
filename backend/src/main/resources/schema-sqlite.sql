@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS collected_mails (
   sender TEXT NOT NULL DEFAULT '',
   subject TEXT NOT NULL DEFAULT '',
   body TEXT NOT NULL,
+  body_html TEXT,
   received_at INTEGER,
   processed_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000),

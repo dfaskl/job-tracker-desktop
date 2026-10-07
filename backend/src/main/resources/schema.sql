@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS collected_mails (
   sender TEXT NOT NULL DEFAULT '',
   subject TEXT NOT NULL DEFAULT '',
   body TEXT NOT NULL,
+  body_html TEXT,
   received_at TIMESTAMPTZ,
   processed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
