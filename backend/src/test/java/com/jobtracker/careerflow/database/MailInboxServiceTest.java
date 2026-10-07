@@ -28,7 +28,7 @@ class MailInboxServiceTest {
             <script>alert(1)</script><iframe src="https://example.com"></iframe></body></html>
             """);
 
-        assertThat(body).contains("<table", "岗位说明", "font-weight:bold", "font-size:18px", "font-family:Arial", "https://example.com", "target=\"_blank\"");
+        assertThat(body).contains("<table", "岗位说明", "font-weight:bold", "font-size:18px", "font-family:Arial", "https://example.com", "target=\"_blank\"", "email-original-content", "overflow-x:hidden", "email-remote-image-placeholder");
         assertThat(body).doesNotContain("<script", "<iframe", "onclick", "tracker.example", "src=");
     }
 }
