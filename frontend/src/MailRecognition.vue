@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -37,7 +37,12 @@ const previewDialog = ref<HTMLDialogElement | null>(null)
 const previewHtml = ref('')
 const previewLoading = ref(false)
 const previewError = ref('')
+const previewDarkTheme = ref(document.documentElement.dataset.theme === 'dark')
+let previewThemeObserver: MutationObserver | null = null
 const entranceActive = ref(false)
+const previewSrcdoc = computed(() => previewHtml.value
+  ? `${previewHtml.value}${previewDarkTheme.value ? '<style>html{background:#fff!important;filter:invert(1) hue-rotate(180deg)!important}</style>' : ''}`
+  : '')
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
@@ -60,9 +65,12 @@ watch(timeMode, mode => { if (mode === 'point') result.endsAt = ''; scheduleErro
 watch([()=>result.startsAt,()=>result.endsAt],()=>{scheduleError.value=''})
 
 onMounted(async () => {
+  previewThemeObserver = new MutationObserver(() => { previewDarkTheme.value = document.documentElement.dataset.theme === 'dark' })
+  previewThemeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
   await store.initialize()
   await Promise.all([checkStatus(), loadInbox(true)])
 })
+onBeforeUnmount(() => previewThemeObserver?.disconnect())
 onActivated(() => { entranceActive.value = true })
 onDeactivated(() => { entranceActive.value = false })
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
@@ -335,7 +343,7 @@ async function saveResult() {
           <div><dt>收件邮箱</dt><dd>{{ previewMail.accountEmail }}</dd></div>
           <div><dt>收取时间</dt><dd>{{ mailDate(previewMail.receivedAt) }}</dd></div>
         </dl>
-        <div class="mail-preview-body" tabindex="0"><div v-if="previewLoading" class="mail-preview-loading" role="status"><span class="recognition-spinner" aria-hidden="true"></span>正在读取邮件原始排版…</div><iframe v-else-if="previewHtml" class="mail-preview-iframe" :srcdoc="previewHtml" title="邮件原文内容" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe><div v-else class="mail-preview-plain">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div></div>
+        <div class="mail-preview-body" tabindex="0"><div v-if="previewLoading" class="mail-preview-loading" role="status"><span class="recognition-spinner" aria-hidden="true"></span>正在读取邮件原始排版…</div><iframe v-else-if="previewHtml" class="mail-preview-iframe" :srcdoc="previewSrcdoc" title="邮件原文内容" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe><div v-else class="mail-preview-plain">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div></div>
         <footer><small>{{ previewError || (previewHtml ? '邮件中的外部图片已隐藏，以保护隐私。' : '这里展示系统通过邮箱服务收取并整理后的正文内容。') }}</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" @click="processMail(previewMail)">标记为已处理</button></div></footer>
       </article>
     </dialog>
@@ -430,4 +438,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 :global(:root[data-theme="dark"] .empty-state),:global(:root[data-theme="dark"] .recognition-state) { border-color:#4a5362; background:#1b1e25; }
 :global(:root[data-theme="dark"] .form-skeleton i),:global(:root[data-theme="dark"] .form-skeleton b) { border-color:#414957; background:linear-gradient(100deg,#242832 25%,#303642 42%,#242832 60%); background-size:220% 100%; }
 :global(:root[data-theme="dark"] .primary-action:disabled) { border-color:#414650; color:#9299a6; background:#262a32; opacity:1; }
+:global(:root[data-theme="dark"] .mail-preview-body) { color:#e8eaf1; background:#171a21; }
+:global(:root[data-theme="dark"] .mail-preview-plain) { color:#e8eaf1; background:#171a21; }
 </style>
