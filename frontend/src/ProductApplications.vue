@@ -4,7 +4,6 @@ import { api, apiCached, invalidateApiCache } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
-import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 
 const store = useJobTrackerStore()
@@ -159,8 +158,8 @@ onBeforeUnmount(() => { window.removeEventListener('resize', stopApplicationReve
 
 const filtered = computed(() => {
   const keyword=query.value.trim().toLowerCase()
-  return store.applications.value.filter(item => (stageFilter.value==='全部'||applicationCategory(item)===stageFilter.value)
-    && (!keyword || Object.values(item).join(' ').toLowerCase().includes(keyword)))
+  const inCurrentStage = store.applications.value.filter(item => stageFilter.value==='全部'||applicationCategory(item)===stageFilter.value)
+  return inCurrentStage.filter(item => !keyword || Object.values(item).join(' ').toLowerCase().includes(keyword))
     .sort(compareApplications)
 })
 watch(filtered, () => {
@@ -426,8 +425,11 @@ async function removeEvent(item:JobEvent){
 
     <div v-if="store.user.value" class="toolbar">
       <div class="application-filter-stack">
-        <div class="application-filter-fields"><input v-model="query" type="search" aria-label="搜索投递记录" placeholder="搜索公司、岗位、地点、渠道或备注"><BaseSelect v-model="stageFilter" :options="['全部',...stageCategories]" align="center" /></div>
-        <div class="application-legend" aria-label="投递卡片颜色说明"><span v-for="category in applicationCategories" :key="category.tone"><i :class="category.tone"></i>{{category.label}}</span></div>
+        <div class="application-filter-fields"><input v-model="query" type="search" aria-label="在当前筛选范围内搜索投递记录" placeholder="搜索公司、岗位、地点、渠道或备注"></div>
+        <div class="application-stage-tabs" role="group" aria-label="投递阶段筛选">
+          <button v-for="category in ['全部',...stageCategories]" :key="category" type="button" :aria-pressed="stageFilter===category" :class="{active:stageFilter===category}" @click="stageFilter=category">{{category}}</button>
+        </div>
+        <div v-if="stageFilter==='全部'" class="application-legend" aria-label="投递卡片颜色说明"><span v-for="category in applicationCategories" :key="category.tone"><i :class="category.tone"></i>{{category.label}}</span></div>
       </div>
       <aside class="application-heatmap" aria-label="月度投递数量热力图">
         <div class="heatmap-grid"><i v-for="cell in applicationHeatCells" :key="cell.key" :class="[`level-${cell.level}`,{ outside:!cell.inMonth }]" :title="cell.inMonth ? `${cell.key}：${cell.count} 条投递` : ''"></i></div>
@@ -620,5 +622,12 @@ async function removeEvent(item:JobEvent){
 .schedule-time-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; min-width:0; }
 .schedule-time-fields.is-point { grid-template-columns:minmax(0,1fr); }
 .schedule-time-fields input { width:100%; min-width:0; }
+.application-filter-stack { width:min(100%, 920px); flex:1 1 620px; }
+.application-filter-fields { grid-template-columns:minmax(0,1fr); }
+.application-stage-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:8px; }
+.application-stage-tabs button { min-height:32px; padding:6px 11px; border:1px solid var(--color-border); border-radius:999px; color:var(--color-muted-foreground); background:var(--color-card); font-size:12px; font-weight:650; line-height:1.25; white-space:nowrap; transition:color .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease; }
+.application-stage-tabs button:hover { border-color:var(--color-primary); color:var(--color-primary); }
+.application-stage-tabs button.active { border-color:color-mix(in srgb,var(--color-primary) 58%,var(--color-border)); color:var(--color-primary); background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 12%,transparent); }
+.application-stage-tabs button:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
 @media(max-width:600px) { .schedule-time-fields { grid-template-columns:minmax(0,1fr); } }
 </style>
