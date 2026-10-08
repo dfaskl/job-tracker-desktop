@@ -177,6 +177,14 @@ watch(topicEntries, entries => {
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
           <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
+          <div class="mobile-workbench-menu" aria-label="考点分类菜单">
+            <div class="mobile-topic-kinds" role="group" aria-label="第一层：考点类型">
+              <button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button>
+              <button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button>
+              <button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button>
+            </div>
+            <label class="mobile-topic-select"><span>考点</span><select :value="selectedTopicKey" :disabled="!topicEntries.length" aria-label="第二层：选择具体考点" @change="selectTopic(($event.target as HTMLSelectElement).value)"><option v-if="!topicEntries.length" value="">{{ summary?.stale ? '汇总后可选择考点' : `暂无${activeTopicGroup.label}` }}</option><option v-for="entry in topicEntries" :key="entry.key" :value="entry.key">{{ entry.topic.name }}（{{ entry.topic.count }}）</option></select><span class="mobile-topic-chevron" aria-hidden="true">⌄</span></label>
+          </div>
           <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
@@ -256,6 +264,7 @@ watch(topicEntries, entries => {
 .detail-section p{margin:0;color:var(--color-muted-foreground);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 .detail-section ol{display:grid;gap:10px;margin:0;padding-left:22px;line-height:1.65;overflow-wrap:anywhere}
 .mobile-pane-tabs{display:none}
+.mobile-workbench-menu{display:none}
 @media(max-width:900px){
   .interview-summary{padding-top:8px;grid-template-rows:auto auto minmax(0,1fr)}
   .page-heading{align-items:flex-start;gap:10px;padding-bottom:10px}
@@ -362,9 +371,24 @@ watch(topicEntries, entries => {
   .topic-tags{padding-top:9px}
 }
 @media(max-width:620px){
-  .workbench-heading{align-items:flex-start;flex-direction:column;gap:6px}
+  .workbench-heading{align-items:flex-start;flex-direction:row;gap:6px;min-height:36px}
+  .workbench-heading h2{font-size:18px}
   .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
   .topic-kind-switch button{min-width:0}
   .question-answer{padding:13px}
+}
+@media(max-width:900px){
+  .workbench-heading{min-height:36px;align-items:center}
+  .workbench-heading h2{font-size:18px}
+  .workbench-heading>.topic-kind-switch,.topic-tags{display:none}
+  .mobile-workbench-menu{display:grid;gap:7px;padding-top:8px}
+  .mobile-topic-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .mobile-topic-kinds button{min-width:0;min-height:36px;padding:6px 8px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-muted-foreground);background:var(--color-card);font-size:13px;font-weight:650;transition:color .2s ease,border-color .2s ease,background-color .2s ease}
+  .mobile-topic-kinds button[aria-pressed="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
+  .mobile-topic-select{position:relative;display:flex;align-items:center;gap:10px;min-width:0;min-height:38px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-card)}
+  .mobile-topic-select>span:first-child{flex:none;color:var(--color-muted-foreground);font-size:12px}
+  .mobile-topic-select select{width:100%;min-width:0;height:36px;padding:0 22px 0 0;border:0;outline:none;appearance:none;color:var(--color-foreground);background:transparent;font:inherit;font-size:13px;font-weight:600}
+  .mobile-topic-select select:disabled{opacity:.68}
+  .mobile-topic-chevron{position:absolute;right:12px;pointer-events:none;color:var(--color-muted-foreground);font-size:17px}
 }
 </style>
