@@ -632,5 +632,6 @@ async function removeEvent(item:JobEvent){
 .application-stage-tabs button:hover { border-color:var(--color-primary); color:var(--color-primary); }
 .application-stage-tabs button.active { border-color:color-mix(in srgb,var(--color-primary) 58%,var(--color-border)); color:var(--color-primary); background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card)); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 12%,transparent); }
 .application-stage-tabs button:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
+@media(max-width:720px) { .application-filter-stack { flex:0 0 auto; } }
 @media(max-width:600px) { .schedule-time-fields { grid-template-columns:minmax(0,1fr); } }
 </style>
