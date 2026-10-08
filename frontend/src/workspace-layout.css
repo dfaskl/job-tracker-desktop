@@ -26,7 +26,9 @@
 :root[data-theme="dark"] #app .timeline-column { background: transparent; }
 #app .team-timeline { margin-top: 16px; border-top: 1px solid var(--color-border); }
 #app .dashboard-panel > .team-timeline { margin-top: 0; padding-top: 0; border-top: 0; }
-#app .member-legend { padding: 8px 0; border: 0; border-radius: 0; }
+#app .member-legend { padding: 8px 0 8px 6px; border: 0; border-radius: 0; overflow: visible; }
+#app .member-legend > span { overflow: visible; }
+#app .member-legend i { box-sizing: border-box; width: 12px; height: 12px; flex-basis: 12px; margin-left: 2px; }
 #app .schedule-advice { margin-top: 20px; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
 #app .confirmation-panel { padding: 0 0 24px; background: transparent; }
 #app .confirmation-panel .empty { margin-top: 12px; padding: 14px 0; border-radius: 0; background: transparent; }
