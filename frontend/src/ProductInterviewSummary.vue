@@ -23,6 +23,8 @@ const reviewDialog = ref<HTMLDialogElement | null>(null)
 const selectedTopicKey = ref('')
 const activeTopicKind = ref<'project' | 'knowledge' | 'other'>('project')
 const activePane = ref<'reviews' | 'workbench'>('reviews')
+const mobileTopicMenuOpen = ref(false)
+const mobileTopicMenuLevel = ref<1 | 2>(1)
 const reviewsCollapsed = ref(false)
 const workbenchScroll = ref<HTMLElement | null>(null)
 const pageEntered = ref(false)
@@ -42,7 +44,7 @@ const hasIncompleteAnswers = computed(() => (summary.value?.topics || []).some(t
 const projectTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'project').sort((a, b) => b.count - a.count))
 const knowledgeTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'knowledge').sort((a, b) => b.count - a.count))
 const otherTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'other').sort((a, b) => b.count - a.count))
-const topicGroups = computed(() => [
+const topicGroups = computed<{ kind: Topic['kind']; label: string; topics: Topic[] }[]>(() => [
   { kind: 'project', label: '项目考点', topics: projectTopics.value },
   { kind: 'knowledge', label: '八股考点', topics: knowledgeTopics.value },
   { kind: 'other', label: '其他问题', topics: otherTopics.value }
@@ -150,6 +152,21 @@ function switchTopicKind(kind: 'project' | 'knowledge' | 'other') {
   selectedTopicKey.value = ''
   workbenchScroll.value?.scrollTo({ top: 0 })
 }
+function toggleMobileTopicMenu() {
+  mobileTopicMenuOpen.value = !mobileTopicMenuOpen.value
+  if (mobileTopicMenuOpen.value) {
+    activePane.value = 'workbench'
+    mobileTopicMenuLevel.value = 1
+  }
+}
+function chooseMobileTopicKind(kind: 'project' | 'knowledge' | 'other') {
+  switchTopicKind(kind)
+  mobileTopicMenuLevel.value = 2
+}
+async function chooseMobileTopic(key: string) {
+  await selectTopic(key)
+  mobileTopicMenuOpen.value = false
+}
 onActivated(() => { startPageEntrance(); activate() })
 onDeactivated(() => { stopPageEntrance(); closeReview() })
 onBeforeUnmount(stopPageEntrance)
@@ -166,7 +183,29 @@ watch(topicEntries, entries => {
       <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="goToResume">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
       <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="onSummarizeClick">{{ summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
-    <nav class="mobile-pane-tabs" aria-label="面试总结栏目"><button type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'">面试回顾</button><button type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button></nav>
+    <nav class="mobile-pane-tabs" aria-label="面试总结栏目" @keydown.esc="mobileTopicMenuOpen = false">
+      <button class="mobile-pane-button" type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'; mobileTopicMenuOpen = false">面试回顾</button>
+      <span class="mobile-pane-divider" aria-hidden="true"></span>
+      <div class="mobile-workbench-tab">
+        <button class="mobile-pane-button" type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button>
+        <button class="mobile-topic-menu-toggle" type="button" :aria-expanded="mobileTopicMenuOpen" aria-controls="mobile-topic-menu" :aria-label="mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录'" :title="mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录'" @click.stop="toggleMobileTopicMenu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg></button>
+        <div v-if="mobileTopicMenuOpen" id="mobile-topic-menu" class="mobile-topic-menu" @click.stop>
+          <div class="mobile-topic-menu-level">
+            <small>1 · 选择类型</small>
+            <div class="mobile-topic-menu-kinds" role="group" aria-label="考点类型">
+              <button v-for="group in topicGroups" :key="group.kind" type="button" :aria-pressed="activeTopicKind === group.kind" @click="chooseMobileTopicKind(group.kind)">{{ group.kind === 'project' ? '项目' : group.kind === 'knowledge' ? '八股' : '其他' }}</button>
+            </div>
+          </div>
+          <div v-if="mobileTopicMenuLevel === 2" class="mobile-topic-menu-level">
+            <small>2 · 选择知识点</small>
+            <div v-if="topicEntries.length" class="mobile-topic-menu-topics">
+              <button v-for="entry in topicEntries" :key="entry.key" type="button" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="chooseMobileTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button>
+            </div>
+            <p v-else class="mobile-topic-menu-empty">{{ summary?.stale ? '汇总后可选择知识点' : `暂无${activeTopicGroup.label}` }}</p>
+          </div>
+        </div>
+      </div>
+    </nav>
     <div class="summary-columns" :class="{ 'is-entered': pageEntered, 'reviews-collapsed': reviewsCollapsed }">
       <section id="review-list-panel" class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
@@ -177,14 +216,6 @@ watch(topicEntries, entries => {
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
           <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
-          <div class="mobile-workbench-menu" aria-label="考点分类菜单">
-            <div class="mobile-topic-kinds" role="group" aria-label="第一层：考点类型">
-              <button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button>
-              <button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button>
-              <button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button>
-            </div>
-            <label class="mobile-topic-select"><span>考点</span><select :value="selectedTopicKey" :disabled="!topicEntries.length" aria-label="第二层：选择具体考点" @change="selectTopic(($event.target as HTMLSelectElement).value)"><option v-if="!topicEntries.length" value="">{{ summary?.stale ? '汇总后可选择考点' : `暂无${activeTopicGroup.label}` }}</option><option v-for="entry in topicEntries" :key="entry.key" :value="entry.key">{{ entry.topic.name }}（{{ entry.topic.count }}）</option></select><span class="mobile-topic-chevron" aria-hidden="true">⌄</span></label>
-          </div>
           <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
@@ -264,7 +295,6 @@ watch(topicEntries, entries => {
 .detail-section p{margin:0;color:var(--color-muted-foreground);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 .detail-section ol{display:grid;gap:10px;margin:0;padding-left:22px;line-height:1.65;overflow-wrap:anywhere}
 .mobile-pane-tabs{display:none}
-.mobile-workbench-menu{display:none}
 @media(max-width:900px){
   .interview-summary{padding-top:8px;grid-template-rows:auto auto minmax(0,1fr)}
   .page-heading{align-items:flex-start;gap:10px;padding-bottom:10px}
@@ -273,9 +303,26 @@ watch(topicEntries, entries => {
   .page-notices{padding-bottom:8px}
   .resume-hint{flex-basis:100%;margin:0}
   .summarize-action{width:100%}
-  .mobile-pane-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0 0 10px}
-  .mobile-pane-tabs button{min-height:44px;padding:7px 4px;border:1px solid var(--color-border);border-radius:7px;color:var(--color-muted-foreground);background:var(--color-card);font-size:12px}
-  .mobile-pane-tabs button[aria-pressed="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card))}
+  .mobile-pane-tabs{position:relative;z-index:5;display:flex;align-items:stretch;gap:9px;padding:0 0 8px}
+  .mobile-pane-divider{width:1px;height:26px;flex:none;align-self:center;background:var(--color-border-strong)}
+  .mobile-pane-button{display:grid;min-width:0;min-height:42px;flex:1;place-items:center;padding:7px 9px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-muted-foreground);background:var(--color-card);font-size:13px;font-weight:650;white-space:nowrap}
+  .mobile-pane-button[aria-pressed="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card))}
+  .mobile-workbench-tab{position:relative;display:flex;min-width:0;flex:1;gap:5px}
+  .mobile-topic-menu-toggle{display:grid;width:42px;min-height:42px;flex:none;place-items:center;padding:0;border:1px solid var(--color-border);border-radius:8px;color:var(--color-muted-foreground);background:var(--color-card);transition:color .2s ease,border-color .2s ease,background-color .2s ease,transform .25s ease}
+  .mobile-topic-menu-toggle[aria-expanded="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,var(--color-card))}
+  .mobile-topic-menu-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s ease}
+  .mobile-topic-menu-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+  .mobile-topic-menu{position:absolute;top:calc(100% + 7px);right:0;z-index:20;display:grid;width:min(360px,calc(100vw - 24px));max-height:min(52dvh,420px);gap:12px;overflow:auto;padding:12px;border:1px solid var(--color-border-strong);border-radius:12px;background:var(--color-card);box-shadow:0 12px 34px rgb(0 0 0 / 22%)}
+  .mobile-topic-menu-level{display:grid;gap:8px;min-width:0}
+  .mobile-topic-menu-level>small{color:var(--color-muted-foreground);font-size:11px;font-weight:700;letter-spacing:.03em}
+  .mobile-topic-menu-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .mobile-topic-menu button{min-width:0;min-height:44px;padding:7px 9px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-foreground);background:var(--color-background);font-size:13px;font-weight:650}
+  .mobile-topic-menu-kinds button[aria-pressed="true"],.mobile-topic-menu-topics button.selected{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 11%,var(--color-card))}
+  .mobile-topic-menu-topics{display:grid;max-height:30dvh;gap:5px;overflow:auto}
+  .mobile-topic-menu-topics button{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+  .mobile-topic-menu-topics button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-topic-menu-topics button strong{display:grid;min-width:24px;height:24px;flex:none;place-items:center;padding:0 5px;border-radius:99px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card));font-size:11px}
+  .mobile-topic-menu-empty{margin:0;padding:8px 2px;color:var(--color-muted-foreground);font-size:13px}
   .summary-columns{display:block;overflow:hidden}
   .summary-pane,.topic-column,.summary-pane+.summary-pane{display:none;height:100%;padding:14px 0 0;border-left:0;border-top:0}
   .summary-pane.mobile-pane-active{display:flex}
@@ -366,9 +413,7 @@ watch(topicEntries, entries => {
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
   .summary-pane.mobile-pane-active{display:flex}
   .workbench-column.mobile-pane-active{animation:interview-pane-enter-right .32s cubic-bezier(.2,.75,.25,1) both}
-  .mobile-pane-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .workbench-header{padding-bottom:10px}
-  .topic-tags{padding-top:9px}
 }
 @media(max-width:620px){
   .workbench-heading{align-items:flex-start;flex-direction:row;gap:6px;min-height:36px}
@@ -381,14 +426,5 @@ watch(topicEntries, entries => {
   .workbench-heading{min-height:36px;align-items:center}
   .workbench-heading h2{font-size:18px}
   .workbench-heading>.topic-kind-switch,.topic-tags{display:none}
-  .mobile-workbench-menu{display:grid;gap:7px;padding-top:8px}
-  .mobile-topic-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-  .mobile-topic-kinds button{min-width:0;min-height:36px;padding:6px 8px;border:1px solid var(--color-border);border-radius:8px;color:var(--color-muted-foreground);background:var(--color-card);font-size:13px;font-weight:650;transition:color .2s ease,border-color .2s ease,background-color .2s ease}
-  .mobile-topic-kinds button[aria-pressed="true"]{border-color:var(--color-primary);color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}
-  .mobile-topic-select{position:relative;display:flex;align-items:center;gap:10px;min-width:0;min-height:38px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:8px;background:var(--color-card)}
-  .mobile-topic-select>span:first-child{flex:none;color:var(--color-muted-foreground);font-size:12px}
-  .mobile-topic-select select{width:100%;min-width:0;height:36px;padding:0 22px 0 0;border:0;outline:none;appearance:none;color:var(--color-foreground);background:transparent;font:inherit;font-size:13px;font-weight:600}
-  .mobile-topic-select select:disabled{opacity:.68}
-  .mobile-topic-chevron{position:absolute;right:12px;pointer-events:none;color:var(--color-muted-foreground);font-size:17px}
 }
 </style>
