@@ -101,6 +101,9 @@ public class InterviewWorkbenchService {
         ArrayNode selected = summaryInput(reviews(snapshot.root()));
         if (selected.isEmpty()) throw new AiValidationException("请先在已完成的日程中记录面试回顾");
         JsonNode resume = workbench.path("resume");
+        if (!hasConfiguredResume(resume)) {
+            throw new AiValidationException("请先在个人主页配置至少一段实习或项目经历，再使用面试总结");
+        }
         String summaryKey = summaryFingerprint(selected, resume);
         boolean resumableJob = !force && workbench.path("summaryJob") instanceof ObjectNode savedJob
             && summaryKey.equals(savedJob.path("sourceKey").asText());
@@ -549,6 +552,22 @@ public class InterviewWorkbenchService {
         copyResumeItems(source.path("projects"), projects, new String[]{"name", "description", "coreWork"});
         if (clean.toString().length() > 20_000) throw new AiValidationException("简历内容不能超过 20000 个字符");
         return clean;
+    }
+
+    private boolean hasConfiguredResume(JsonNode resume) {
+        return hasConfiguredResumeItems(resume.path("internships"), "company", "role", "description", "coreWork")
+            || hasConfiguredResumeItems(resume.path("projects"), "name", "description", "coreWork");
+    }
+
+    private boolean hasConfiguredResumeItems(JsonNode items, String... fields) {
+        if (!items.isArray()) return false;
+        for (JsonNode item : items) {
+            if (!item.isObject()) continue;
+            for (String field : fields) {
+                if (!item.path(field).asText("").trim().isEmpty()) return true;
+            }
+        }
+        return false;
     }
 
     private void copyResumeItems(JsonNode source, ArrayNode target, String[] fields) {

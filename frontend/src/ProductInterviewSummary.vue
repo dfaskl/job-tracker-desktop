@@ -64,13 +64,20 @@ const streamingBatch = computed(() => {
   return total > 0 ? { current, total, percent: Math.min(100, Math.round(current / total * 100)) } : null
 })
 const hasResume = computed(() => {
-  const resume = (store.data.value.settings?.interviewWorkbench as { resume?: { internships?: unknown[]; projects?: unknown[] } } | undefined)?.resume
-  return !!(resume?.internships?.length || resume?.projects?.length)
+  const resume = (store.data.value.settings?.interviewWorkbench as { resume?: { internships?: Record<string, unknown>[]; projects?: Record<string, unknown>[] } } | undefined)?.resume
+  const hasConfiguredEntries = (entries?: Record<string, unknown>[]) => !!entries?.some(entry =>
+    Object.values(entry).some(value => typeof value === 'string' && value.trim().length > 0)
+  )
+  return hasConfiguredEntries(resume?.internships) || hasConfiguredEntries(resume?.projects)
 })
 
 function goToResume() {
   emit('navigate', 'profile')
   emit('focus-resume')
+}
+
+function scrollPageToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function loadState(autoSummarize = true) {
@@ -82,14 +89,14 @@ async function loadState(autoSummarize = true) {
   finally { loading.value = false }
   const unfinishedJob = !!state.value?.summaryJob && state.value.summaryJob.stage !== 'completed'
   const fullRebuildNeedsConfirmation = !!summary.value?.stale && !!state.value?.requiresFullRebuild
-  if (autoSummarize && (unfinishedJob || !fullRebuildNeedsConfirmation) && state.value && reviews.value.length && (unfinishedJob || !summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
+  if (autoSummarize && hasResume.value && (unfinishedJob || !fullRebuildNeedsConfirmation) && state.value && reviews.value.length && (unfinishedJob || !summary.value || summary.value.stale) && state.value.sourceKey !== autoAttemptedKey) {
     autoAttemptedKey = state.value.sourceKey
     await summarize(true)
   }
 }
 
 async function summarize(automatic = false, force = false) {
-  if (!reviews.value.length || summarizing.value) return
+  if (!hasResume.value || !reviews.value.length || summarizing.value) return
   summarizing.value = true; error.value = ''; message.value = ''
   streamingQuestions.value = []
   streamingStatus.value = '正在准备面试回顾…'
@@ -111,6 +118,7 @@ async function summarize(automatic = false, force = false) {
 }
 
 function onSummarizeClick() {
+  if (!hasResume.value) return
   const requiresFullRebuild = !!summary.value && (state.value?.requiresFullRebuild || !summary.value.stale && !hasIncompleteAnswers.value)
   if (!requiresFullRebuild) { void summarize(false); return }
   const confirmed = window.confirm('全量重建会重新分类所有面试回顾，并重新生成所有复习答案，耗时和 AI 用量都会增加。确定继续全量更新吗？')
@@ -154,6 +162,7 @@ function switchTopicKind(kind: 'project' | 'knowledge' | 'other') {
   workbenchScroll.value?.scrollTo({ top: 0 })
 }
 function toggleMobileTopicMenu() {
+  if (!hasResume.value) return
   mobileTopicMenuOpen.value = !mobileTopicMenuOpen.value
   if (mobileTopicMenuOpen.value) {
     activePane.value = 'workbench'
@@ -181,16 +190,16 @@ watch(topicEntries, entries => {
   <section class="interview-summary" aria-label="面试总结">
     <div class="page-notices">
       <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
-      <p class="resume-hint"><span>考点汇总可以参考你的实习和项目经历。</span><button type="button" @click="goToResume">{{ hasResume ? '查看简历配置' : '先去个人主页设置简历 →' }}</button></p>
-      <button type="button" class="primary-action summarize-action" :disabled="summarizing || !reviews.length" @click="onSummarizeClick">{{ summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
+      <p class="resume-hint"><span>{{ hasResume ? '考点汇总会结合你配置的实习和项目经历。' : '使用面试总结前，请先配置至少一段实习或项目经历。' }}</span><button type="button" @click="goToResume">{{ hasResume ? '查看简历配置' : '去个人主页设置简历 →' }}</button></p>
+      <button type="button" class="primary-action summarize-action" :disabled="!hasResume || summarizing || !reviews.length" @click="onSummarizeClick">{{ !hasResume ? '请先配置简历' : summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目" @keydown.esc="mobileTopicMenuOpen = false">
       <button class="mobile-pane-button" type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'; mobileTopicMenuOpen = false">面试回顾</button>
       <span class="mobile-pane-divider" aria-hidden="true"></span>
       <div class="mobile-workbench-tab">
         <button class="mobile-pane-button" type="button" :aria-pressed="activePane === 'workbench'" @click="activePane = 'workbench'">考点整理</button>
-        <button class="mobile-topic-menu-toggle" type="button" :aria-expanded="mobileTopicMenuOpen" aria-controls="mobile-topic-menu" :aria-label="mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录'" :title="mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录'" @click.stop="toggleMobileTopicMenu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg></button>
-        <div v-if="mobileTopicMenuOpen" id="mobile-topic-menu" class="mobile-topic-menu" @click.stop>
+        <button class="mobile-topic-menu-toggle" type="button" :disabled="!hasResume" :aria-expanded="mobileTopicMenuOpen" aria-controls="mobile-topic-menu" :aria-label="mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录'" :title="hasResume ? (mobileTopicMenuOpen ? '收起考点目录' : '展开考点目录') : '请先配置简历'" @click.stop="toggleMobileTopicMenu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5" /></svg></button>
+        <div v-if="mobileTopicMenuOpen && hasResume" id="mobile-topic-menu" class="mobile-topic-menu" @click.stop>
           <div class="mobile-topic-menu-level">
             <small>1 · 选择类型</small>
             <div class="mobile-topic-menu-kinds" role="group" aria-label="考点类型">
@@ -215,12 +224,18 @@ watch(topicEntries, entries => {
       </section>
       <div class="review-collapse-divider" aria-hidden="false"><button type="button" class="review-collapse-toggle" :aria-expanded="!reviewsCollapsed" aria-controls="review-list-panel" :aria-label="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" :title="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" @click="reviewsCollapsed = !reviewsCollapsed"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12 4-6 6 6 6" /></svg></button></div>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
-        <div class="workbench-header">
+        <section v-if="!hasResume" class="resume-required" aria-labelledby="resume-required-title">
+          <span class="resume-required-icon" aria-hidden="true">✦</span>
+          <h2 id="resume-required-title">配置简历后即可使用面试总结</h2>
+          <p>为了让 AI 结合你的真实经历整理问题并生成参考回答，请先在个人主页添加至少一段实习或项目经历。仅填写教育经历还不能启用此功能。</p>
+          <button type="button" class="primary-action" @click="goToResume">去配置简历</button>
+        </section>
+        <div v-if="hasResume" class="workbench-header">
           <div class="workbench-heading"><div class="workbench-heading-copy"><h2 id="topic-title" class="workbench-breadcrumb" aria-live="polite"><span>{{ activeTopicKindLabel }}</span><i aria-hidden="true">/</i><strong>{{ selectedTopic?.topic.name || (summary?.stale ? '汇总后显示知识点' : '暂无知识点') }}</strong></h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
           <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
-        <div ref="workbenchScroll" class="pane-scroll workbench-content">
+        <div v-if="hasResume" ref="workbenchScroll" class="pane-scroll workbench-content">
           <Transition name="workbench-flip" mode="out-in"><div :key="activeTopicKind" class="workbench-page">
           <section v-if="summarizing" class="stream-preview" aria-label="实时生成的复习内容">
             <div class="stream-status" role="status" aria-live="polite" aria-atomic="true"><span class="stream-spinner" aria-hidden="true"></span><span>{{ streamingStatus }}</span><span v-if="streamingQuestions.length" class="stream-count">已生成 {{ streamingQuestions.length }} 题</span></div>
@@ -236,6 +251,9 @@ watch(topicEntries, entries => {
         </div>
       </section>
     </div>
+    <button type="button" class="mobile-scroll-top" aria-label="滚动到页面顶部" title="回到顶部" @click="scrollPageToTop">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+    </button>
     <dialog v-if="selectedReview" ref="reviewDialog" class="review-dialog" aria-labelledby="review-dialog-title" @close="selectedReviewId = ''" @click="onReviewDialogClick"><div class="review-dialog-header"><div><span class="eyebrow">面试回顾 · 问题清单</span><h2 id="review-dialog-title">{{ selectedReview.company }} · {{ selectedReview.title }}</h2><p>{{ selectedReview.position }}</p></div><button type="button" class="secondary" @click="closeReview">关闭</button></div><div class="review-dialog-content">{{ selectedReview.questions }}</div></dialog>
   </section>
 </template>
@@ -343,6 +361,12 @@ watch(topicEntries, entries => {
 .workbench-column{padding-left:0!important;transition:padding .25s ease}
 .workbench-column{padding-right:0!important}
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
+.resume-required{display:grid;align-content:center;justify-items:start;gap:12px;min-height:240px;padding:clamp(18px,4vw,36px);border:1px solid var(--color-border);border-radius:14px;background:var(--color-card)}
+.resume-required-icon{display:grid;width:42px;height:42px;place-items:center;border-radius:12px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card));font-size:22px}
+.resume-required h2{margin:0;font-size:18px}
+.resume-required p{max-width:560px;margin:0;color:var(--color-muted-foreground);font-size:14px;line-height:1.75}
+.resume-required .primary-action{min-height:42px;padding:0 16px;border:0;border-radius:8px;color:var(--color-on-primary);background:var(--color-primary);font-weight:700;cursor:pointer}
+.summarize-action:disabled{border-color:var(--color-border);color:var(--color-muted-foreground);background:var(--color-background);box-shadow:none;cursor:not-allowed;opacity:.72}
 .workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
 .workbench-heading h2{margin-top:4px}
 .workbench-heading-copy{min-width:0;flex:1}
@@ -432,5 +456,17 @@ watch(topicEntries, entries => {
   .workbench-heading{min-height:36px;align-items:center}
   .workbench-heading h2{font-size:16px}
   .workbench-heading>.topic-kind-switch,.topic-tags{display:none}
+}
+.mobile-scroll-top{display:none}
+@media(max-width:900px){
+  .interview-summary{display:block;height:auto;min-height:0;overflow:visible;padding-bottom:20px}
+  .summary-columns{display:block;height:auto;min-height:0;overflow:visible}
+  .summary-pane,.summary-pane+.summary-pane,.workbench-column{height:auto;min-height:0;padding:14px 0 0!important;overflow:visible}
+  .summary-pane.mobile-pane-active{display:block}
+  .pane-scroll,.workbench-content{height:auto;min-height:0;max-height:none;flex:none;overflow:visible;padding:0 0 24px;scrollbar-gutter:auto}
+  .workbench-page{min-height:0}
+  .mobile-scroll-top{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:44;display:grid;width:48px;height:48px;place-items:center;padding:0;border:1px solid color-mix(in srgb,var(--color-primary) 30%,var(--color-border));border-radius:50%;color:var(--color-primary);background:var(--color-card);box-shadow:0 4px 16px rgb(17 24 39 / 18%);cursor:pointer}
+  .mobile-scroll-top svg{width:22px;height:22px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mobile-scroll-top:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px}
 }
 </style>

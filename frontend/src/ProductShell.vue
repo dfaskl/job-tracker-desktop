@@ -489,6 +489,8 @@ nav button.active::before { content: none; }
 @media (max-width: 900px) {
   .product-main.mail-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 44px; }
   .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
+  .product-main.interview-summary-page { height: auto; min-height: 100dvh; overflow: visible; padding-bottom: calc(98px + env(safe-area-inset-bottom)); }
+  .page-content.interview-summary-content { height: auto; min-height: 0; }
 }
 
 @media (max-width: 820px) {
@@ -523,7 +525,6 @@ nav button.active::before { content: none; }
   .sidebar-account { display: none; }
   .profile-entry { max-width: 100%; }
   .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
-  .product-main.interview-summary-page{height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom));overflow:hidden}
   .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }

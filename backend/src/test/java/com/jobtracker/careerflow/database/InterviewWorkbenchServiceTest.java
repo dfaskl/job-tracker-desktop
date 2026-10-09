@@ -19,13 +19,50 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class InterviewWorkbenchServiceTest {
+    @Test
+    void refusesToSummarizeReviewsWithoutConfiguredInternshipOrProjectAndDoesNotCallAi() throws Exception {
+        Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
+        Files.createDirectories(directory);
+        String jdbc = "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db");
+        MockEnvironment environment = new MockEnvironment().withProperty("APP_DATABASE_URL", jdbc)
+            .withProperty("ALLOW_REGISTRATION", "true");
+        new DatabaseSchemaInitializer(environment).run(null);
+        ObjectMapper mapper = new ObjectMapper();
+        ApplicationService applications = new ApplicationService(environment, mapper, new ApplicationDocumentMutator(mapper));
+        new AccountService(environment, applications, new LegacyPasswordVerifier())
+            .register("no-resume@example.com", "correct-horse-battery", "");
+        String document = """
+            {"applications":[{"id":"job","company":"甲公司","position":"Java 工程师"}],
+             "events":[{"id":"review","applicationId":"job","type":"面试","title":"一面",
+               "completed":true,"interviewQuestions":"解释线程池参数"}],
+             "settings":{"interviewWorkbench":{"resume":{"education":[{"school":"示例大学"}],
+               "internships":[{"company":"  ","role":"","description":"","coreWork":""}],"projects":[]}}}}
+            """;
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.prepareStatement("UPDATE user_data SET data=? WHERE user_id=(SELECT id FROM users WHERE email=?)")) {
+            statement.setString(1, document);
+            statement.setString(2, "no-resume@example.com");
+            statement.executeUpdate();
+        }
+        AiService ai = mock(AiService.class);
+        InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
+
+        assertThatThrownBy(() -> service.summarize("no-resume@example.com"))
+            .isInstanceOf(AiService.AiValidationException.class)
+            .hasMessageContaining("至少一段实习或项目经历");
+        verifyNoInteractions(ai);
+        assertThat(service.state("no-resume@example.com").has("summaryJob")).isFalse();
+    }
+
     @Test
     void classifiesReviewsInSavedBatchesThenStreamsAndPersistsAnswersBySmallBatches() throws Exception {
         Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
@@ -72,6 +109,8 @@ class InterviewWorkbenchServiceTest {
             return mapper.readTree(output);
         });
         InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
+        service.saveResume("batch@example.com", mapper.readTree(
+            "{\"internships\":[{\"company\":\"实习公司\",\"role\":\"Java 实习生\"}],\"projects\":[]}"));
         var streamed = new java.util.ArrayList<ObjectNode>();
         JsonNode result = service.summarizeStreaming("batch@example.com", streamed::add);
         verify(ai, org.mockito.Mockito.times(3)).classifyInterviewReviewBatch(eq("batch@example.com"), any(), any(), any());
