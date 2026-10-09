@@ -253,6 +253,7 @@ function applicationPayload(item?: JobApplication) {
   return {...payload,scheduleType:eventType,scheduleTitle:result.scheduleTitle.trim()||result.noticeType||'邮件通知',scheduleStartsAt:apiTime(result.startsAt),scheduleEndsAt:timeMode.value==='range'?apiTime(result.endsAt):'',scheduleLocation:result.location.trim(),scheduleNotes:result.notes.trim()}
 }
 async function saveResult() {
+  if (saving.value) return
   const matched = matchedApplication.value
   if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
   scheduleError.value=validateScheduleTime(timeMode.value,result.startsAt,result.endsAt)
@@ -279,6 +280,10 @@ async function saveResult() {
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
+}
+function preventImplicitSubmit(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return
+  if (event.target instanceof HTMLInputElement) event.preventDefault()
 }
 </script>
 
@@ -309,7 +314,7 @@ async function saveResult() {
 
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
-        <form v-if="hasResult" class="result-form" @submit.prevent="saveResult">
+        <form v-if="hasResult" class="result-form" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
           <label class="wide application-match"><span>关联已有投递</span><BaseSelect v-model="selectedApplicationId" :options="[{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{matchedApplication ? '将更新该投递的阶段和状态；识别出有效时间时会自动创建关联日程。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
@@ -322,7 +327,7 @@ async function saveResult() {
           <label v-if="timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
           <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
-          <div class="commit-box wide"><span>{{ actionSummary }}</span><button :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
+          <div class="commit-box wide"><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
         </form>
         <div v-else-if="recognizing" class="recognition-state" role="status" aria-live="polite" aria-busy="true"><span class="recognition-spinner large" aria-hidden="true"></span><strong>正在分析邮件内容</strong><span>识别结果会显示在这里，请稍候。</span><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
         <div v-else class="empty-state"><div class="empty-state-copy"><span class="empty-state-icon" aria-hidden="true"><AppIcon name="mail" :size="22" /></span><div><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div></div><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
