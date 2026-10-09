@@ -50,6 +50,7 @@ const topicGroups = computed<{ kind: Topic['kind']; label: string; topics: Topic
   { kind: 'other', label: '其他问题', topics: otherTopics.value }
 ])
 const activeTopicGroup = computed(() => topicGroups.value.find(group => group.kind === activeTopicKind.value)!)
+const activeTopicKindLabel = computed(() => activeTopicKind.value === 'project' ? '项目' : activeTopicKind.value === 'knowledge' ? '八股' : '其他')
 const activeTopics = computed(() => activeTopicGroup.value.topics)
 const topicEntries = computed(() => summary.value?.stale ? [] : activeTopics.value.map((topic, index) => ({
   key: `${activeTopicKind.value}:${index}:${topic.name}`, group: activeTopicGroup.value.label, topic
@@ -215,7 +216,7 @@ watch(topicEntries, entries => {
       <div class="review-collapse-divider" aria-hidden="false"><button type="button" class="review-collapse-toggle" :aria-expanded="!reviewsCollapsed" aria-controls="review-list-panel" :aria-label="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" :title="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" @click="reviewsCollapsed = !reviewsCollapsed"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12 4-6 6 6 6" /></svg></button></div>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <div class="workbench-header">
-          <div class="workbench-heading"><div><small>AI 归纳</small><h2 id="topic-title">考点整理</h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
+          <div class="workbench-heading"><div class="workbench-heading-copy"><h2 id="topic-title" class="workbench-breadcrumb" aria-live="polite"><span>{{ activeTopicKindLabel }}</span><i aria-hidden="true">/</i><strong>{{ selectedTopic?.topic.name || (summary?.stale ? '汇总后显示知识点' : '暂无知识点') }}</strong></h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
           <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
@@ -344,6 +345,11 @@ watch(topicEntries, entries => {
 .workbench-header{flex:none;padding:0 0 14px;border-bottom:1px solid var(--color-border)}
 .workbench-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px}
 .workbench-heading h2{margin-top:4px}
+.workbench-heading-copy{min-width:0;flex:1}
+.workbench-breadcrumb{display:flex;align-items:baseline;gap:8px;min-width:0;margin:0!important;font-size:17px;line-height:1.4}
+.workbench-breadcrumb>span{flex:none;color:var(--color-primary);font-size:13px;font-weight:700}
+.workbench-breadcrumb>i{flex:none;color:var(--color-muted-foreground);font-size:13px;font-style:normal}
+.workbench-breadcrumb>strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:inherit;font-weight:750;text-overflow:ellipsis;white-space:nowrap}
 .topic-tags{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:12px;max-width:100%;overflow:visible;padding:12px 1px 2px}
 .topic-tag{display:inline-flex;align-items:center;gap:10px;flex:none;max-width:280px;min-height:40px;padding:6px 9px 6px 13px;border:1px solid var(--color-border);border-radius:999px;color:var(--color-foreground);background:var(--color-card);font-size:13px;transition:color .16s,border-color .16s,background .16s}
 .topic-tag:hover{border-color:var(--color-border-strong);background:var(--surface-hover)}
@@ -417,14 +423,14 @@ watch(topicEntries, entries => {
 }
 @media(max-width:620px){
   .workbench-heading{align-items:flex-start;flex-direction:row;gap:6px;min-height:36px}
-  .workbench-heading h2{font-size:18px}
+  .workbench-heading h2{font-size:16px}
   .topic-kind-switch{align-self:stretch;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
   .topic-kind-switch button{min-width:0}
   .question-answer{padding:13px}
 }
 @media(max-width:900px){
   .workbench-heading{min-height:36px;align-items:center}
-  .workbench-heading h2{font-size:18px}
+  .workbench-heading h2{font-size:16px}
   .workbench-heading>.topic-kind-switch,.topic-tags{display:none}
 }
 </style>
