@@ -287,7 +287,8 @@ function flow(item:JobApplication){
   events.forEach(event=>{
     const abandoned=Boolean(event.abandoned||(!event.completed&&item.status==='已放弃'))
     const deadline=timeOf(eventDeadline(event)),kind=abandoned?'abandoned':event.missed?'failed':event.completed?'done':deadline>Date.now()?'upcoming':'current'
-    nodes.push({label:String(event.title||event.type||'日程'),at:eventFlowDate(event),kind,abandoned,...flowVisual(event.title||event.type,event.type),icon:abandoned?'×':flowVisual(event.title||event.type,event.type).icon})
+    const title=String(event.title||event.type||'日程')
+    nodes.push({label:abandoned?`${title}（已放弃）`:title,at:eventFlowDate(event),kind,abandoned,...flowVisual(event.title||event.type,event.type)})
   })
   const last=nodes[nodes.length-1],latest=events[events.length-1],latestPending=latest&&!latest.completed&&!latest.missed,terminal=['未通过','已放弃','已结束'].includes(String(item.status||'')),offer=item.stage==='Offer'||item.status==='已通过',enteredInterview=hasInterviewProgress(item)
   let statusLabel=offer?'Offer':terminal?String(item.status):String(item.status||'')
@@ -636,9 +637,6 @@ async function removeEvent(item:JobEvent){
 @media(max-width:600px) { .schedule-time-fields { grid-template-columns:minmax(0,1fr); } }
 .flow-node.abandoned { --node-color:#858d97; --node-soft:#eceff2; }
 .flow-node.abandoned::before { background:#d3d8dd; }
-.flow-node.abandoned > i { width:20px; height:20px; border-width:1.5px; border-radius:7px; background:var(--node-soft)!important; color:var(--node-color)!important; font-size:11px; opacity:.78; box-shadow:0 0 0 2px color-mix(in srgb,var(--node-color) 10%,transparent); }
-.flow-node.abandoned > b { max-width:68px; margin-top:5px; color:var(--node-color)!important; font-size:11px!important; }
-.flow-node.abandoned > small { max-width:72px; overflow:hidden; color:var(--color-muted-foreground); font-size:9px; text-overflow:ellipsis; }
 :root[data-theme="dark"] .flow-node.abandoned { --node-color:#a1a8b0; --node-soft:#2b3036; }
 :root[data-theme="dark"] .flow-node.abandoned::before { background:#4a5057; }
 </style>
