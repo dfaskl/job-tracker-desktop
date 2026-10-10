@@ -4,6 +4,7 @@ import { api, apiCached, invalidateApiCache } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
+import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 
 const store = useJobTrackerStore()
