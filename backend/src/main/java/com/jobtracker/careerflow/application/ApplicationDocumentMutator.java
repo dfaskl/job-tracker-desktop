@@ -133,8 +133,7 @@ public class ApplicationDocumentMutator {
         if (status.isEmpty()) status = "等待结果";
         if (!STATUSES.contains(status)) throw new ValidationException("投递状态不受支持");
         String notes = optional(input.notes(), 4_000);
-        String jobDescription = input.jobDescription() == null ? null : optional(input.jobDescription(), 20_000);
-        return new ApplicationInput(company, position, city, channel, appliedDate, stage, status, notes, jobDescription);
+        return new ApplicationInput(company, position, city, channel, appliedDate, stage, status, notes);
     }
 
     private void applyFields(ObjectNode application, ApplicationInput input) {
@@ -146,7 +145,7 @@ public class ApplicationDocumentMutator {
         application.put("stage", input.stage());
         application.put("status", input.status());
         application.put("notes", input.notes());
-        if (input.jobDescription() != null) application.put("jobDescription", input.jobDescription());
+        application.remove("jobDescription");
     }
 
     private ObjectNode timelineEntry(String title, String now) {
@@ -172,7 +171,6 @@ public class ApplicationDocumentMutator {
             text(application, "stage"),
             text(application, "status"),
             text(application, "notes"),
-            text(application, "jobDescription"),
             text(application, "createdAt"),
             text(application, "updatedAt")
         );
@@ -234,14 +232,8 @@ public class ApplicationDocumentMutator {
         String appliedDate,
         String stage,
         String status,
-        String notes,
-        String jobDescription
-    ) {
-        public ApplicationInput(String company, String position, String city, String channel,
-                                String appliedDate, String stage, String status, String notes) {
-            this(company, position, city, channel, appliedDate, stage, status, notes, null);
-        }
-    }
+        String notes
+    ) {}
 
     public record ApplicationView(
         String id,
@@ -253,16 +245,9 @@ public class ApplicationDocumentMutator {
         String stage,
         String status,
         String notes,
-        String jobDescription,
         String createdAt,
         String updatedAt
-    ) {
-        public ApplicationView(String id, String company, String position, String city, String channel,
-                               String appliedDate, String stage, String status, String notes,
-                               String createdAt, String updatedAt) {
-            this(id, company, position, city, channel, appliedDate, stage, status, notes, "", createdAt, updatedAt);
-        }
-    }
+    ) {}
 
     public record Mutation(String documentJson, ApplicationView application, int total) {}
 

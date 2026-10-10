@@ -5,7 +5,6 @@ export type User = { id: string; email: string; displayName?: string; avatar?: s
 export type JobApplication = Record<string, unknown> & {
   id: string; company?: string; position?: string; city?: string; channel?: string
   appliedDate?: string; stage?: string; status?: string; updatedAt?: string
-  jobDescription?: string
 }
 export type JobEvent = Record<string, unknown> & {
   id: string; applicationId?: string; title?: string; type?: string; date?: string

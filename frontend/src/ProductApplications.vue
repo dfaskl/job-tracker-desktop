@@ -297,10 +297,10 @@ function configuredOfficialUrl(item:JobApplication){const company=normalizeCompa
 function officialUrl(item:JobApplication){return configuredOfficialUrl(item)||'https://www.bing.com/search?q='+encodeURIComponent(String(item.company||'')+' 校园招聘 官网')}
 function localParts(date=new Date()){const pad=(v:number)=>String(v).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes())}
 function today(){return localParts().slice(0,10)}
-function emptyApplication(){return {company:'',position:'',city:'',channel:'官网',appliedDate:today(),stage:'已投递',status:'等待结果',notes:'',jobDescription:''}}
+function emptyApplication(){return {company:'',position:'',city:'',channel:'官网',appliedDate:today(),stage:'已投递',status:'等待结果',notes:''}}
 function text(value:unknown,fallback='未填写'){return String(value||fallback)}
 function openCreate(){selected.value=null;Object.assign(form,emptyApplication());officialChoice.value='__manual__';officialManual.value='';editing.value=true;message.value='';error.value='';aiChanges.value=[];aiWarnings.value=[]}
-function openEdit(item:JobApplication){selected.value=item;aiChanges.value=[];aiWarnings.value=[];Object.assign(form,{company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'其他',appliedDate:item.appliedDate||today(),stage:item.stage||'已投递',status:item.status||'等待结果',notes:item.notes||'',jobDescription:item.jobDescription||''});editing.value=true}
+function openEdit(item:JobApplication){selected.value=item;aiChanges.value=[];aiWarnings.value=[];Object.assign(form,{company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'其他',appliedDate:item.appliedDate||today(),stage:item.stage||'已投递',status:item.status||'等待结果',notes:item.notes||''});editing.value=true}
 function closeEditors(){editing.value=false;eventEditor.value=false;editingEvent.value=null}
 function openOfficialLinkEditor(){if(!selected.value)return;officialLinkDraft.value=configuredOfficialUrl(selected.value);officialLinkEditing.value=true;error.value='';message.value=''}
 function closeOfficialLinkEditor(){officialLinkEditing.value=false;officialLinkDraft.value=''}
@@ -360,7 +360,7 @@ async function saveApplication(){
 }
 async function quickUpdate(stage:string,status:string){
   if(!selected.value)return
-  Object.assign(form,{company:selected.value.company||'',position:selected.value.position||'',city:selected.value.city||'',channel:selected.value.channel||'其他',appliedDate:selected.value.appliedDate||today(),notes:selected.value.notes||'',jobDescription:selected.value.jobDescription||'',stage,status})
+  Object.assign(form,{company:selected.value.company||'',position:selected.value.position||'',city:selected.value.city||'',channel:selected.value.channel||'其他',appliedDate:selected.value.appliedDate||today(),notes:selected.value.notes||'',stage,status})
   await saveApplication()
 }
 async function removeApplication(){
@@ -471,8 +471,6 @@ async function removeEvent(item:JobEvent){
     <div class="detail-scroll">
     <h3 class="section-heading">基本信息</h3>
     <div class="basic-info"><div><strong>投递日期</strong><span>{{text(selected.appliedDate)}}</span><strong>投递渠道</strong><span>{{text(selected.channel)}}</span></div><p v-if="String(selected.notes||'').trim()"><b>备注</b>{{selected.notes}}</p></div>
-    <section v-if="String(selected.jobDescription||'').trim()" class="job-description"><h3 class="section-heading">岗位快照 · 岗位描述</h3><p>{{selected.jobDescription}}</p></section>
-    <button v-else-if="!store.readOnly.value" type="button" class="secondary add-description" @click="openEdit(selected)">添加岗位描述</button>
     <h3 class="section-heading">安排记录</h3>
     <div v-if="selectedEvents.length" class="event-records">
       <article v-for="item in selectedEvents" :key="item.id" class="event-record">
@@ -493,7 +491,7 @@ async function removeEvent(item:JobEvent){
 </Teleport>
 <Teleport to="body">
 <div v-if="editing" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="application-editor-title" @submit.prevent="saveApplication"><button type="button" class="close icon-button" aria-label="关闭投递编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="application-editor-title">{{selected?'编辑投递':'新建投递'}}</h2>
-<label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段</span><BaseSelect v-model="form.stage" :options="stages" /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>岗位快照 · 岗位描述</span><textarea v-model="form.jobDescription" maxlength="20000" rows="7" placeholder="粘贴招聘页面中的职责、要求和其他岗位信息"></textarea><small>这是投递时的岗位快照，与个人备注分开保存。</small></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+<label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段</span><BaseSelect v-model="form.stage" :options="stages" /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
 </Teleport>
 
 <Teleport to="body">
@@ -607,9 +605,6 @@ async function removeEvent(item:JobEvent){
     width: 100%;
   }
 }
-.job-description { margin: 18px 0 24px; }
-.job-description p { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
-.add-description { margin: 14px 0 24px; }
 .basic-info p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .basic-info p b { display: block; margin-bottom: 5px; color: var(--color-muted-foreground); font-size: 12px; }
 .event-review { margin-top: 12px; border-top: 1px solid var(--color-border); }

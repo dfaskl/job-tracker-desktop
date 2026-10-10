@@ -55,18 +55,19 @@ class ApplicationDocumentMutatorTest {
     }
 
     @Test
-    void savesJobDescriptionSeparatelyAndPreservesItForOlderClients() throws Exception {
-        var created = mutator.create("{\"applications\":[],\"events\":[]}",
-            new ApplicationDocumentMutator.ApplicationInput(
-                "Example", "Engineer", "上海", "官网", "2026-09-03", "已投递", "等待结果",
-                "个人备注", "岗位职责：开发服务端\n任职要求：Java"
-            ));
-        assertThat(created.application().jobDescription()).contains("岗位职责");
-        assertThat(created.application().notes()).isEqualTo("个人备注");
+    void removesLegacyJobDescriptionWhenApplicationIsUpdated() throws Exception {
+        String source = """
+            {"applications":[{"id":"app-1","company":"Example","position":"Engineer",
+            "stage":"已投递","status":"等待结果","updatedAt":"2026-09-01 10:00",
+            "jobDescription":"旧岗位描述"}],"events":[]}
+            """;
 
-        var updated = mutator.update(created.documentJson(), created.application().id(),
-            input("Example", "Engineer", "面试", "等待结果"), created.application().updatedAt());
-        assertThat(updated.application().jobDescription()).isEqualTo(created.application().jobDescription());
+        var updated = mutator.update(source, "app-1", input("Example", "Engineer", "面试", "等待结果"),
+            "2026-09-01 10:00");
+        JsonNode application = mapper.readTree(updated.documentJson()).path("applications").get(0);
+
+        assertThat(application.has("jobDescription")).isFalse();
+        assertThat(updated.application().notes()).isEqualTo("备注");
     }
 
     @Test
