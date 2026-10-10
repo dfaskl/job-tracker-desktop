@@ -29,6 +29,43 @@ import static org.mockito.Mockito.when;
 
 class InterviewWorkbenchServiceTest {
     @Test
+    void hidesOrphanedProjectTopicsWithoutRebuildingTheAiSummary() throws Exception {
+        Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
+        Files.createDirectories(directory);
+        String jdbc = "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db");
+        MockEnvironment environment = new MockEnvironment().withProperty("APP_DATABASE_URL", jdbc)
+            .withProperty("ALLOW_REGISTRATION", "true");
+        new DatabaseSchemaInitializer(environment).run(null);
+        ObjectMapper mapper = new ObjectMapper();
+        ApplicationService applications = new ApplicationService(environment, mapper, new ApplicationDocumentMutator(mapper));
+        new AccountService(environment, applications, new LegacyPasswordVerifier()).register("orphan@example.com", "correct-horse-battery", "");
+        String document = """
+            {"applications":[],"events":[],"settings":{"interviewWorkbench":{
+              "resume":{"education":[],"internships":[],"projects":[{"name":"化语智答 - RAG 校园问答助手","description":"","coreWork":""}]},
+              "overallSummary":{"sourceKey":"old","topics":[
+                {"name":"化语智答 - RAG 校园问答助手","kind":"project","resumeRef":"project-1","count":50,"summary":"","questionAnswers":[]},
+                {"name":"化语智答 - RAG 校园问答助手","kind":"project","count":0,"summary":"","questionAnswers":[]},
+                {"name":"旧项目名称","kind":"project","resumeRef":"project-2","count":0,"summary":"","questionAnswers":[]}
+              ]}
+            }}}
+            """;
+        try (var connection = DriverManager.getConnection(jdbc);
+             var statement = connection.prepareStatement("UPDATE user_data SET data=? WHERE user_id=(SELECT id FROM users WHERE email=?)")) {
+            statement.setString(1, document);
+            statement.setString(2, "orphan@example.com");
+            statement.executeUpdate();
+        }
+
+        AiService ai = mock(AiService.class);
+        InterviewWorkbenchService service = new InterviewWorkbenchService(environment, applications, mapper, ai);
+        JsonNode state = service.state("orphan@example.com");
+
+        assertThat(state.path("overallSummary").path("topics").size()).isEqualTo(1);
+        assertThat(state.path("overallSummary").path("topics").get(0).path("count").asInt()).isEqualTo(50);
+        verifyNoInteractions(ai);
+    }
+
+    @Test
     void refusesToSummarizeReviewsWithoutConfiguredInternshipOrProjectAndDoesNotCallAi() throws Exception {
         Path directory = Path.of("target", "interview-workbench-tests").toAbsolutePath();
         Files.createDirectories(directory);

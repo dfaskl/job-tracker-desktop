@@ -56,6 +56,7 @@ public class InterviewWorkbenchService {
                 summary.put("stale", !fingerprint.equals(summary.path("sourceKey").asText("")));
                 result.put("requiresFullRebuild", !summary.path("reviewFingerprints").isObject()
                     || !digest(result.path("resume").toString()).equals(summary.path("resumeFingerprint").asText("")));
+                removeOrphanedProjectTopics(summary, result.path("resume"));
             }
             return result;
         }
@@ -361,8 +362,11 @@ public class InterviewWorkbenchService {
             if (touchedTopics.contains(topicKey)) topic.put("summary", "");
         }
         ArrayNode retainedTopics = mapper.createArrayNode();
-        for (JsonNode topic : result.path("topics"))
-            if (topic.path("count").asInt() > 0 || "project".equals(topic.path("kind").asText())) retainedTopics.add(topic.deepCopy());
+        for (JsonNode topic : result.path("topics")) {
+            boolean project = "project".equals(topic.path("kind").asText());
+            if (project ? validResumeReference(resume, topic.path("resumeRef").asText("")) : topic.path("count").asInt() > 0)
+                retainedTopics.add(topic.deepCopy());
+        }
         result.set("topics", retainedTopics);
 
         ObjectNode delta;
@@ -501,6 +505,54 @@ public class InterviewWorkbenchService {
         return reference.startsWith("internship-") && indexExists(resume.path("internships"), reference, "internship-")
             || reference.startsWith("project-") && indexExists(resume.path("projects"), reference, "project-");
     }
+
+    private void removeOrphanedProjectTopics(ObjectNode summary, JsonNode resume) {
+        if (!(summary.path("topics") instanceof ArrayNode topics)) return;
+        ArrayNode currentTopics = mapper.createArrayNode();
+        Map<String, ObjectNode> projectsByReference = new LinkedHashMap<>();
+        for (JsonNode topic : topics) {
+            if (!"project".equals(topic.path("kind").asText())) {
+                currentTopics.add(topic.deepCopy());
+                continue;
+            }
+            ObjectNode projectTopic = (ObjectNode) topic.deepCopy();
+            String reference = projectTopic.path("resumeRef").asText("");
+            if (reference.isBlank()) reference = resumeReferenceByName(resume, projectTopic.path("name").asText(""));
+            if (!validResumeReference(resume, reference)) continue;
+            projectTopic.put("resumeRef", reference);
+            ObjectNode existing = projectsByReference.get(reference);
+            if (existing == null) {
+                projectsByReference.put(reference, projectTopic);
+                currentTopics.add(projectTopic);
+            } else if (existing.path("count").asInt() == 0 && projectTopic.path("count").asInt() > 0) {
+                int index = 0;
+                while (index < currentTopics.size() && currentTopics.get(index) != existing) index++;
+                projectsByReference.put(reference, projectTopic);
+                if (index < currentTopics.size()) currentTopics.set(index, projectTopic);
+            }
+        }
+        summary.set("topics", currentTopics);
+    }
+
+    private String resumeReferenceByName(JsonNode resume, String name) {
+        String match = "";
+        for (int index = 0; index < resume.path("internships").size(); index++) {
+            String reference = "internship-" + (index + 1);
+            if (resumeName(resume, reference).equals(name)) {
+                if (!match.isEmpty()) return "";
+                match = reference;
+            }
+        }
+        for (int index = 0; index < resume.path("projects").size(); index++) {
+            String reference = "project-" + (index + 1);
+            if (resumeName(resume, reference).equals(name)) {
+                if (!match.isEmpty()) return "";
+                match = reference;
+            }
+        }
+        return match;
+    }
+
     private boolean indexExists(JsonNode entries, String reference, String prefix) {
         try { int index = Integer.parseInt(reference.substring(prefix.length())) - 1; return entries.isArray() && index >= 0 && index < entries.size(); }
         catch (NumberFormatException exception) { return false; }
@@ -657,7 +709,7 @@ public class InterviewWorkbenchService {
                 if (name.isBlank()) name = "项目经历 " + (index + 1);
             }
             ObjectNode topic = mapper.createObjectNode().put("name", limit(name, 100))
-                .put("count", 0).put("kind", "project").put("summary", "");
+                .put("count", 0).put("kind", "project").put("resumeRef", reference).put("summary", "");
             topic.putArray("questionAnswers");
             topics.put(reference, topic);
         }
