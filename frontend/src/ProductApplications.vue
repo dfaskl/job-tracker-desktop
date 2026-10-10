@@ -175,7 +175,6 @@ watch([() => props.focusApplicationId, () => filtered.value.some(item => item.id
   if (!id) { lastFocusedId = ''; return }
   if (found) void focusApplicationInList()
 }, { immediate: true })
-const flowSlots = computed(() => Math.max(1, ...filtered.value.map(item => flow(item).length)))
 const applicationMonthBounds = computed(() => {
   const values=store.applications.value.map(item=>String(item.appliedDate||item.createdAt||'').slice(0,7)).filter(value=>/^\d{4}-\d{2}$/.test(value)).sort()
   const fallback=new Date(new Date().getFullYear(),new Date().getMonth(),1)
@@ -283,14 +282,22 @@ function eventFlowDate(item:Record<string,unknown>){const start=eventOccurrenceT
 function flow(item:JobApplication){
   const events=store.events.value.filter(e=>e.applicationId===item.id).slice().sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
   const applied=flowVisual('已投递')
-  const nodes=[{label:'已投递',at:String(item.appliedDate||''),kind:events.length||item.stage!=='已投递'?'done':'current',...applied}]
-  events.forEach(event=>{const deadline=timeOf(eventDeadline(event)),kind=event.missed?'failed':event.completed?'done':deadline>Date.now()?'upcoming':'current';nodes.push({label:String(event.title||event.type||'日程'),at:eventFlowDate(event),kind,...flowVisual(event.title||event.type,event.type)})})
+  const nodes=[{label:'已投递',at:String(item.appliedDate||''),kind:events.length||item.stage!=='已投递'?'done':'current',abandoned:false,...applied}]
+  events.forEach(event=>{
+    const abandoned=Boolean(event.abandoned||(!event.completed&&item.status==='已放弃'))
+    const deadline=timeOf(eventDeadline(event)),kind=abandoned?'abandoned':event.missed?'failed':event.completed?'done':deadline>Date.now()?'upcoming':'current'
+    nodes.push({label:String(event.title||event.type||'日程'),at:eventFlowDate(event),kind,abandoned,...flowVisual(event.title||event.type,event.type),icon:abandoned?'×':flowVisual(event.title||event.type,event.type).icon})
+  })
   const last=nodes[nodes.length-1],latest=events[events.length-1],latestPending=latest&&!latest.completed&&!latest.missed,terminal=['未通过','已放弃','已结束'].includes(String(item.status||'')),offer=item.stage==='Offer'||item.status==='已通过',enteredInterview=hasInterviewProgress(item)
   let statusLabel=offer?'Offer':terminal?String(item.status):String(item.status||'')
   if(statusLabel==='等待结果'&&!enteredInterview)statusLabel=''
-  if(statusLabel&&statusLabel!==last.label&&!(statusLabel==='等待结果'&&latestPending)){nodes.push({label:statusLabel,at:offer?'':'当前状态',kind:offer?'success':terminal?'failed':'current',...flowVisual(statusLabel)})}
-  else if(!events.length&&item.stage!=='已投递'){nodes.push({label:String(item.stage),at:'当前阶段',kind:'current',...flowVisual(item.stage,item.stage)})}
+  if(statusLabel&&statusLabel!==last.label&&!(statusLabel==='等待结果'&&latestPending)){nodes.push({label:statusLabel,at:offer?'':'当前状态',kind:offer?'success':terminal?'failed':'current',abandoned:false,...flowVisual(statusLabel)})}
+  else if(!events.length&&item.stage!=='已投递'){nodes.push({label:String(item.stage),at:'当前阶段',kind:'current',abandoned:false,...flowVisual(item.stage,item.stage)})}
   return nodes
+}
+function flowStyle(item:JobApplication){
+  const nodes=flow(item)
+  return {'grid-template-columns':nodes.map(node=>node.abandoned?'minmax(58px,.68fr)':'minmax(76px,1fr)').join(' ')}
 }
 function normalizeCompanyName(value:unknown){return String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('zh-CN')}
 function configuredOfficialUrl(item:JobApplication){const company=normalizeCompanyName(item.company);return companyLinks.value.find(link=>normalizeCompanyName(link.company)===company)?.url||''}
@@ -444,7 +451,7 @@ async function removeEvent(item:JobEvent){
   <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :class="{ 'application-revealing': revealActive }">
     <button v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]" @click="selected=item">
       <div class="application-overview"><div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><i>·</i><span>{{text(item.position,'未填写岗位')}}</span><i>·</i><small>{{text(item.city,'地点未填')}}</small><i>·</i><small>{{text(item.channel,'渠道未填')}}</small></div><span v-if="String(item.notes||'').trim()" class="application-note" :title="text(item.notes)"><b>备注：</b>{{text(item.notes)}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div>
-      <div class="flow" :style="{'--flow-slots':flowSlots}" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b>{{node.label}}</b><small>{{node.at}}</small></span></div>
+      <div class="flow" :style="flowStyle(item)" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
     </button>
   </div>
   <p v-else-if="store.user.value" class="empty">没有符合条件的投递记录。</p><p v-else>登录后查看和管理投递。</p>
@@ -630,4 +637,11 @@ async function removeEvent(item:JobEvent){
 .application-stage-tabs button:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
 @media(max-width:720px) { .application-filter-stack { flex:0 0 auto; } }
 @media(max-width:600px) { .schedule-time-fields { grid-template-columns:minmax(0,1fr); } }
+.flow-node.abandoned { --node-color:#858d97; --node-soft:#eceff2; min-width:58px; }
+.flow-node.abandoned::before { background:#d3d8dd; }
+.flow-node.abandoned > i { width:20px; height:20px; border-width:1.5px; border-radius:7px; background:var(--node-soft)!important; color:var(--node-color)!important; font-size:11px; opacity:.78; box-shadow:0 0 0 2px color-mix(in srgb,var(--node-color) 10%,transparent); }
+.flow-node.abandoned > b { max-width:68px; margin-top:5px; color:var(--node-color)!important; font-size:11px!important; }
+.flow-node.abandoned > small { max-width:72px; overflow:hidden; color:var(--color-muted-foreground); font-size:9px; text-overflow:ellipsis; }
+:root[data-theme="dark"] .flow-node.abandoned { --node-color:#a1a8b0; --node-soft:#2b3036; }
+:root[data-theme="dark"] .flow-node.abandoned::before { background:#4a5057; }
 </style>
