@@ -259,10 +259,10 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
         </div>
       </section>
     </div>
-      <section class="card"><div class="section-head"><div><h2>近 12 个月投递趋势</h2><p>按投递日期汇总</p></div></div><div class="trend"><div v-for="(item,index) in trend" :key="item.key" :style="{'--trend-delay':`${index*55}ms`}"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
+      <section class="card"><div class="section-head"><div><h2>近 12 个月投递趋势</h2></div></div><div class="trend"><div v-for="(item,index) in trend" :key="item.key" :style="{'--trend-delay':`${index*55}ms`}"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
     </main>
     <aside class="interview-panel card" aria-labelledby="interview-records-title">
-      <header><div><span>只读概览</span><h2 id="interview-records-title">面试投递记录</h2><p>展示所有进入过正式面试环节的投递</p></div><b>{{interviewRecords.length}} 条</b></header>
+      <header><div><h2 id="interview-records-title">面试记录</h2></div><b>{{interviewRecords.length}}</b></header>
       <div v-if="interviewRecords.length" ref="interviewList" class="interview-list" :class="{'interview-revealing':recordsRevealActive}" tabindex="0" aria-label="面试投递记录，可上下滚动">
         <article v-for="record in interviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
           <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.offer?'Offer':record.ended?'已结束':'面试中'}}</span></div>

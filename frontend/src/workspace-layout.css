@@ -242,3 +242,115 @@
 :root[data-theme="dark"] #app .interview-list .compact-node { background: transparent !important; }
 :root[data-theme="dark"] #app .schedule-copy > small { background: transparent !important; }
 :root[data-theme="dark"] #app .settings-column .metrics-row div { background: transparent !important; }
+
+/* CareerFlow's shared page rhythm: whitespace separates sections; rules do not. */
+#app hr { display: none; }
+#app :is(.sidebar, .sidebar nav, .sidebar-account, .topbar, .sidebar nav, .sidebar-account) {
+  border-color: transparent;
+}
+#app .sidebar { border-right: 0; }
+#app .sidebar nav { border-top: 0; }
+#app .sidebar-account { border-top: 0; }
+#app .topbar { border-bottom: 0; }
+
+/* Home */
+#app .dashboard-panel > .panel-head,
+#app .dashboard-panel > .details-column,
+#app .team-timeline,
+#app .schedule-advice { border-top: 0; border-bottom: 0; }
+#app .dashboard-panel > .details-column { margin-top: 12px; padding-top: 0; }
+#app .team-timeline { margin-top: 0; }
+#app .schedule-advice { margin-top: 8px; padding-top: 0; }
+
+/* Mail: keep the three work areas distinct by spacing, not column rules. */
+#app .mail-grid { gap: 14px; border: 0; }
+#app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) {
+  border: 0; border-radius: 12px; background: var(--color-card);
+}
+#app .mail-cards { gap: 6px; }
+#app .mail-cards article,
+#app .mail-grid .application-match { border: 0; border-radius: 8px; }
+#app .mail-cards article.selected { border: 0; background: var(--surface-selected); }
+
+/* Analytics */
+#app .analytics-main .metrics { gap: 10px; border: 0; }
+#app .analytics-main .metrics article,
+#app .summary-grid article { border: 0; border-radius: 10px; background: var(--color-muted); }
+#app .analytics-main > .card,
+#app .analytics-main .two-column > .card,
+#app .interview-panel { border: 0; border-radius: 12px; background: var(--color-card); }
+#app .analytics-main .two-column > .card + .card,
+#app .interview-panel { padding-left: 18px; }
+#app .interview-panel > header { border-bottom: 0; }
+#app .interview-list article { border-color: var(--color-border); }
+
+/* Interview summary */
+#app .summary-columns,
+#app .summary-columns > .summary-pane,
+#app .topic-column,
+#app .topic-column .topic-section,
+#app .topic-section,
+#app .detail-section,
+#app .workbench-header { border: 0; }
+#app .summary-columns { gap: 16px; }
+#app .summary-columns > .summary-pane + .summary-pane,
+#app .topic-column { padding-left: 0; }
+#app .topic-section + .topic-section,
+#app .topic-column .topic-section + .topic-section,
+#app .detail-section { margin-top: 18px; padding-top: 0; }
+
+/* Calendar and records: preserve the calendar grid and status accents. */
+#app .event-sandbox .calendar-layout,
+#app .event-sandbox .selected-list,
+#app .selected-list article,
+#app .selected-list > h3,
+#app .calendar-pane .calendar-head { border: 0; }
+#app .selected-list { gap: 8px; }
+#app .selected-list article { border-radius: 9px; }
+#app .workspace > .grid > .application:last-child { border-bottom: 1px solid var(--color-border); }
+
+/* Settings and admin */
+#app .settings-column > :is(section, div).card { margin-bottom: 8px; padding-block: 18px; border: 0; }
+#app .settings-column .metrics-row { gap: 8px; border: 0; }
+#app .settings-column .metrics-row div { border: 0; border-radius: 9px; background: var(--color-muted); }
+#app .admin-grid { gap: 18px; }
+#app .admin-grid > :is(.overview-column, .users-column, .audit-card) { padding: 0; border: 0; }
+#app .admin-grid .summary-grid { gap: 8px; border: 0; }
+#app .admin-grid .summary-grid article,
+#app .admin-grid :is(.control-card, .group-manager-card, .users-card, .audit-card) {
+  border: 0; border-radius: 12px; background: var(--color-card);
+}
+#app .admin-grid .health-grid > div { border: 0; border-radius: 8px; background: var(--color-muted); }
+#app .admin-grid .group-manager-card { margin-bottom: 8px; }
+#app .users-card { gap: 6px; }
+#app .audit-scroll > div,
+#app .users-card article,
+#app .detail-modal header,
+#app .detail-scroll > article { border: 0; }
+#app .audit-scroll { display: grid; gap: 4px; }
+#app .audit-scroll > div,
+#app .users-card article,
+#app .detail-scroll > article { border-radius: 8px; background: var(--color-muted); }
+
+/* Settings details and onboarding examples */
+#app .account-footer,
+#app .resume-preview-group + .resume-preview-group,
+#app .resume-entry,
+#app .project-heading,
+#app .collection-note,
+#app .guide-header { border: 0; }
+#app .resume-entry,
+#app .resume-preview-entry { padding-block: 12px; }
+
+@media (max-width: 1200px) {
+  #app .mail-grid > .inbox-panel,
+  #app .mail-grid > .compose-panel,
+  #app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) { border: 0; }
+}
+@media (max-width: 900px) {
+  #app .admin-grid > :is(.overview-column, .users-column, .audit-card),
+  #app .event-sandbox .selected-list,
+  #app .interview-panel { border: 0; }
+  #app .summary-columns > .summary-pane,
+  #app .topic-column { padding-top: 0; border: 0; }
+}
