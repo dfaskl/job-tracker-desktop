@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
-import { isFormalInterview } from './eventClassification'
+import { applicationProgressHealth } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
@@ -324,15 +324,7 @@ function localScheduleAdvice():ScheduleAdvice{
   }finally{adviceLoading.value=false}
 }
 function isEnded(item:JobApplication|undefined){return Boolean(item)&&(item?.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item?.status||'')))}
-function progressHealth(item:JobApplication){
-  if(isEnded(item)||item.stage==='Offer'||item.status==='已通过')return null
-  const related=store.events.value.filter(event=>event.applicationId===item.id&&isFormalInterview(event))
-  if(related.some(event=>!event.completed&&!event.missed&&parseTime(eventDeadline(event))>=Date.now()))return null
-  const times=related.filter(event=>event.completed&&!event.missed).map(event=>parseTime(String(event.completedAt||eventDeadline(event)))).filter(Number.isFinite)
-  if(!times.length)return null
-  const days=Math.max(0,Math.floor((Date.now()-Math.max(...times))/86400000))
-  return {days,label:days<=3?'进展正常':days<10?'等待较久':'等待确认'}
-}
+function progressHealth(item:JobApplication){return applicationProgressHealth(item,store.events.value)}
 function appFor(event:JobEvent){return store.applications.value.find(item=>item.id===event.applicationId)}
 function openApplicationDetail(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id))}
 function focusApplication(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id),'focus')}
