@@ -31,10 +31,11 @@ describe('applicationProgressHealth', () => {
     ], now)).toBeNull()
   })
 
-  it('does not count missed or abandoned schedules as progress', () => {
+  it('counts the newest associated schedule even when it is missed or abandoned', () => {
     expect(applicationProgressHealth(interviewApplication, [
-      event({ startsAt: '2026-10-10T10:00:00Z', missed: true }),
-      event({ id: 'abandoned', startsAt: '2026-10-10T10:00:00Z', abandoned: true })
-    ], now)).toBeNull()
+      event({ id: 'old-interview', startsAt: '2026-09-28T10:00:00Z', completed: true }),
+      event({ id: 'missed-authorization', type: '其他', startsAt: '2026-10-10T10:00:00Z', missed: true }),
+      event({ id: 'abandoned-followup', type: '其他', startsAt: '2026-10-10T12:00:00Z', abandoned: true })
+    ], Date.parse('2026-10-11T18:00:00Z'))).toEqual({ days: 1, label: '进展正常' })
   })
 })

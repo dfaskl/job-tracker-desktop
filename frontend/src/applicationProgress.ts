@@ -32,7 +32,6 @@ export function applicationProgressHealth(
   // Any associated schedule can mark progress, regardless of its event type.
   // Completed schedules use the actual completion time when available.
   const times = related
-    .filter(event => !event.missed && !event.abandoned)
     .map(event => eventTime(event.completed ? event.completedAt || eventEnd(event) : eventEnd(event)))
     .filter(Number.isFinite)
   if (!times.length) return null
