@@ -1,10 +1,36 @@
 package com.jobtracker.careerflow.database;
 
 import org.junit.jupiter.api.Test;
+import jakarta.mail.Part;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeBodyPart;
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MailInboxServiceTest {
+    @Test
+    void skipsImagePartsAndAttachmentsWithoutLoadingTheirBodies() throws Exception {
+        TrackingMimeBodyPart image = new TrackingMimeBodyPart();
+        image.setHeader("Content-Type", "image/png");
+        image.setDisposition(Part.INLINE);
+        image.setFileName("logo.png");
+
+        assertThat(MailInboxService.extractContent(image).body()).isEmpty();
+        assertThat(MailInboxService.htmlPart(image)).isEmpty();
+        assertThat(image.contentRead).isFalse();
+    }
+
+    private static final class TrackingMimeBodyPart extends MimeBodyPart {
+        private boolean contentRead;
+
+        @Override
+        public Object getContent() throws IOException, MessagingException {
+            contentRead = true;
+            return new byte[1024];
+        }
+    }
+
     @Test
     void htmlMailTextKeepsParagraphsAndLineBreaksWithoutIncludingScripts() {
         String body = MailInboxService.htmlToText("""

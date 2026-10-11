@@ -82,7 +82,7 @@ public class MailInboxService {
         return safe;
     }
 
-    @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:15000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:15000}")
+    @Scheduled(fixedDelayString="${MAIL_SYNC_INTERVAL_MS:300000}",initialDelayString="${MAIL_SYNC_INITIAL_DELAY_MS:300000}")
     public void syncAll(){
         if(encryptionKey().length()<32)return;
         try{for(AccountRow account:accounts()){try{syncAccount(account,false);}catch(Exception ignored){}}}catch(Exception ignored){}
@@ -125,15 +125,24 @@ public class MailInboxService {
     private void persistError(long accountId,String message){
         try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE mail_accounts SET last_error=? WHERE id=?")){s.setString(1,message);s.setLong(2,accountId);s.executeUpdate();}catch(Exception ignored){}
     }
-    private MailContent extractContent(Part part)throws Exception{
+    static MailContent extractContent(Part part)throws Exception{
+        if(isAttachment(part))return new MailContent("","");
         if(part.isMimeType("text/html")){String html=String.valueOf(part.getContent());return new MailContent(htmlToText(html),sanitizeEmailHtml(html));}
         if(part.isMimeType("text/plain"))return new MailContent(String.valueOf(part.getContent()),"");
+        if(!part.isMimeType("multipart/*"))return new MailContent("","");
         Object content=part.getContent();if(content instanceof Multipart multipart){MailContent html=null,plain=null;for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);MailContent value=extractContent(child);if(child.isMimeType("text/html")||!value.html().isBlank())html=value;else if(child.isMimeType("text/plain")&&!value.body().isBlank())plain=value;else if(plain==null&&!value.body().isBlank())plain=value;}return html!=null?html:plain==null?new MailContent("",""):plain;}return new MailContent("","");
     }
-    private String htmlPart(Part part)throws Exception{
+    static String htmlPart(Part part)throws Exception{
+        if(isAttachment(part))return "";
         if(part.isMimeType("text/html"))return String.valueOf(part.getContent());
         if(part.isMimeType("text/plain"))return "";
+        if(!part.isMimeType("multipart/*"))return "";
         Object content=part.getContent();if(content instanceof Multipart multipart){String fallback="";for(int i=0;i<multipart.getCount();i++){BodyPart child=multipart.getBodyPart(i);String html=htmlPart(child);if(!html.isBlank())return html;}return fallback;}return "";
+    }
+    static boolean isAttachment(Part part)throws MessagingException{
+        if(Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition()))return true;
+        String filename=part.getFileName();
+        return filename!=null&&!filename.isBlank();
     }
     static String htmlToText(String html){
         Document document=Jsoup.parse(html);
@@ -203,7 +212,7 @@ public class MailInboxService {
     public record InboxView(List<AccountView> accounts,List<MailView> messages,long pendingCount){}public record AccountView(long id,String email,String provider,String lastSyncedAt,String lastError){}public record MailView(long id,String sender,String subject,String body,String receivedAt,String accountEmail){}
     private record AccountRow(long id,long userId,String email,String provider,byte[] encrypted,byte[] iv,byte[] tag,long lastUid,boolean initialized,Instant collectAfter){}
     private record FetchedMail(long uid,String sender,String subject,String body,String bodyHtml,Instant receivedAt){}
-    private record MailContent(String body,String html){}
+    record MailContent(String body,String html){}
     private record OriginalMail(long uid,AccountRow account){}
     private record SyncResult(long newestUid,List<FetchedMail> mails){}
     public static class ValidationException extends RuntimeException{public ValidationException(String message){super(message);}}
