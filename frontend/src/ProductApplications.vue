@@ -7,6 +7,7 @@ import { applicationProgressHealth } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
+import { confirmDialog } from './modalDialogs'
 
 const store = useJobTrackerStore()
 const props = defineProps<{ focusApplicationId?: string }>()
@@ -356,7 +357,7 @@ async function quickUpdate(stage:string,status:string){
   await saveApplication()
 }
 async function removeApplication(){
-  const item=selected.value;if(!item||!confirm(`确认删除“${item.company} / ${item.position}”及其关联日程吗？`))return
+  const item=selected.value;if(!item||!await confirmDialog(`确认删除“${item.company} / ${item.position}”及其关联日程吗？`,{title:'删除投递记录',confirmText:'删除',tone:'danger'}))return
   busy.value=true;error.value='';message.value=''
   try{
     await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:item.updatedAt||''})})
@@ -405,7 +406,7 @@ async function resolveEvent(item:JobEvent,action:'complete'|'abandon'|'restore')
   catch(cause){error.value=cause instanceof Error?cause.message:'更新日程状态失败'}finally{busy.value=false}
 }
 async function removeEvent(item:JobEvent){
-  if(!confirm(`确认删除“${item.title||item.type||'日程'}”吗？`))return
+  if(!await confirmDialog(`确认删除“${item.title||item.type||'日程'}”吗？`,{title:'删除日程',confirmText:'删除',tone:'danger'}))return
   busy.value=true;error.value='';message.value=''
   try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(item.id)}`,{method:'DELETE',body:JSON.stringify({expectedUpdatedAt:eventVersion(item)})});await refreshSelected();message.value='日程已删除'}
   catch(cause){error.value=cause instanceof Error?cause.message:'删除日程失败'}finally{busy.value=false}

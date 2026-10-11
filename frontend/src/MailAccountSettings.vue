@@ -3,6 +3,7 @@ import { nextTick, onMounted, reactive, ref } from 'vue'
 import { api } from './api'
 import BaseSelect from './BaseSelect.vue'
 import { formatShanghaiDateTime } from './shanghaiTime'
+import { confirmDialog } from './modalDialogs'
 type Account={id:number;email:string;provider:string;lastSyncedAt:string;lastError:string}
 type Inbox={accounts:Account[];messages:unknown[]}
 const accounts=ref<Account[]>([]),loading=ref(false),message=ref(''),error=ref('')
@@ -11,7 +12,7 @@ const helpDialog=ref<HTMLDialogElement|null>(null),passwordInput=ref<HTMLInputEl
 onMounted(load)
 async function load(){try{accounts.value=(await api<Inbox>('/api/poc/mail-inbox')).accounts||[]}catch(cause){error.value=cause instanceof Error?cause.message:'读取邮箱配置失败'}}
 async function save(){loading.value=true;message.value='';error.value='';try{await api('/api/poc/mail-inbox/accounts',{method:'POST',body:JSON.stringify(form)});form.password='';message.value='邮箱已连接，之后收到的新邮件会进入收集箱';await load()}catch(cause){error.value=cause instanceof Error?cause.message:'邮箱连接失败'}finally{loading.value=false}}
-async function remove(account:Account){if(!confirm(`移除 ${account.email}？系统内由该邮箱收集的卡片也会删除，但不会删除邮箱中的原邮件。`))return;loading.value=true;message.value='';error.value='';try{await api(`/api/poc/mail-inbox/accounts/${account.id}`,{method:'DELETE'});await load();message.value='邮箱已移除'}catch(cause){error.value=cause instanceof Error?cause.message:'移除邮箱失败'}finally{loading.value=false}}
+async function remove(account:Account){if(!await confirmDialog(`移除 ${account.email}？系统内由该邮箱收集的卡片也会删除，但不会删除邮箱中的原邮件。`,{title:'移除邮箱',confirmText:'移除',tone:'danger'}))return;loading.value=true;message.value='';error.value='';try{await api(`/api/poc/mail-inbox/accounts/${account.id}`,{method:'DELETE'});await load();message.value='邮箱已移除'}catch(cause){error.value=cause instanceof Error?cause.message:'移除邮箱失败'}finally{loading.value=false}}
 function date(value:string){return value?formatShanghaiDateTime(value,{},value):'尚未同步'}
 function openHelp(){helpDialog.value?.showModal()}
 function closeHelp(){helpDialog.value?.close()}

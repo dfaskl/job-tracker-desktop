@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ProductShell from './ProductShell.vue'
 import LoginPage from './LoginPage.vue'
 import GlobalToastBridge from './GlobalToastBridge.vue'
+import GlobalDialogBridge from './GlobalDialogBridge.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 import { isSupportedRoute, pageFromRoute, readHashRoute, resolveRequestedRoute } from './routes'
 
@@ -60,6 +61,7 @@ onBeforeUnmount(() => {
     <ProductShell v-else-if="store.user.value" />
     <LoginPage v-else />
     <GlobalToastBridge />
+    <GlobalDialogBridge />
   </div>
 </template>
 

@@ -6,6 +6,7 @@ import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
 import { validateScheduleTime } from './scheduleValidation'
+import { confirmDialog } from './modalDialogs'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
@@ -176,7 +177,7 @@ function showProcessNotice(value: string) {
 }
 async function processAllMail() {
   const count=inbox.value.pendingCount
-  if(!count||!confirm(`确认将当前 ${count} 封待处理邮件全部标记为已处理吗？`))return
+  if(!count||!await confirmDialog(`确认将当前 ${count} 封待处理邮件全部标记为已处理吗？`,{title:'批量标记邮件',confirmText:'全部处理',tone:'warning'}))return
   const removed=[...inbox.value.messages],previousCount=inbox.value.pendingCount
   const removedIds=removed.map(item=>item.id)
   processingAll.value=true;error.value='';setSmoking(removedIds,true)

@@ -4,6 +4,7 @@ import { api, apiCached, ApiError, invalidateApiCache } from './api'
 import { useJobTrackerStore, type BusinessData } from './jobTrackerStore'
 import { formatShanghaiDateTime } from './shanghaiTime'
 import { exportRawBusinessData, exportReadableBusinessData } from './businessDataExport'
+import { confirmDialog } from './modalDialogs'
 
 type CompanyLink = { company: string; url: string }
 type CompanyLinkResponse = { items: CompanyLink[]; updatedAt: string }
@@ -88,7 +89,7 @@ async function addLink() {
     return
   }
   const similar = findSimilarCompanies(company)
-  if (similar.length && !confirm(`检测到可能相似的公司：${similar.map(item => `“${item.company}”`).join('、')}。仍要新增“${company}”吗？`)) return
+  if (similar.length && !await confirmDialog(`检测到可能相似的公司：${similar.map(item => `“${item.company}”`).join('、')}。仍要新增“${company}”吗？`,{title:'确认新增公司',confirmText:'仍要新增',tone:'warning'})) return
   if (await saveLinks([...links.value, { company, url }].sort((a,b)=>a.company.localeCompare(b.company,'zh-CN')))) {
     newCompany.value = ''; newUrl.value = ''
   }
@@ -148,7 +149,7 @@ async function saveEdit() {
   if (await saveLinks(next)) cancelEdit()
 }
 async function removeLink(item: CompanyLink) {
-  if (confirm(`确认删除“${item.company}”的官网链接吗？`)) await saveLinks(links.value.filter(value => value !== item))
+  if (await confirmDialog(`确认删除“${item.company}”的官网链接吗？`,{title:'删除官网链接',confirmText:'删除',tone:'danger'})) await saveLinks(links.value.filter(value => value !== item))
 }
 function exportRawData() {
   message.value = ''

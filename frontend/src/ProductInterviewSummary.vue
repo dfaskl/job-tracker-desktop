@@ -3,6 +3,7 @@ import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, w
 import { api } from './api'
 import { notifyInterviewSummaryUpdated, summarizeInterviewReviewsStream } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
+import { confirmDialog } from './modalDialogs'
 
 type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string; answerStatus?: string; frequency?: number; sourceQuestions?: { question: string; eventId?: string }[] }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
@@ -117,11 +118,11 @@ async function summarize(automatic = false, force = false) {
   finally { summarizing.value = false; streamingStatus.value = '' }
 }
 
-function onSummarizeClick() {
+async function onSummarizeClick() {
   if (!hasResume.value) return
   const requiresFullRebuild = !!summary.value && (state.value?.requiresFullRebuild || !summary.value.stale && !hasIncompleteAnswers.value)
   if (!requiresFullRebuild) { void summarize(false); return }
-  const confirmed = window.confirm('全量重建会重新分类所有面试回顾，并重新生成所有复习答案，耗时和 AI 用量都会增加。确定继续全量更新吗？')
+  const confirmed = await confirmDialog('全量重建会重新分类所有面试回顾，并重新生成所有复习答案，耗时和 AI 用量都会增加。确定继续全量更新吗？',{title:'全量更新面试总结',confirmText:'继续更新',tone:'warning'})
   if (confirmed) void summarize(false, true)
 }
 

@@ -155,6 +155,75 @@ body .modal.form .actions > button:not([type="button"]) { color: var(--color-on-
 body .modal.form .actions > :is(.ai-button, .secondary) { color: var(--color-foreground); background: var(--color-muted); border: 1px solid var(--color-border); }
 body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-family: var(--font-ui); }
 
+/* Shared dialog system: consistent surface and actions across native and custom dialogs. */
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) {
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-ui);
+}
+body dialog[class]::backdrop,
+body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) {
+  background: rgb(13 17 27 / 58%);
+  backdrop-filter: blur(4px);
+}
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { color: var(--color-foreground); font-family: var(--font-ui); }
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(p, small) { color: var(--color-muted-foreground); }
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close) {
+  display: inline-grid;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-muted-foreground);
+  background: var(--color-muted);
+}
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close):hover { color: var(--color-primary); border-color: var(--color-border-strong); }
+body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  color: var(--color-foreground);
+  border-color: var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-background);
+  font: inherit;
+}
+body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal) { overflow-wrap: anywhere; }
+
+.system-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(82dvh, 680px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+}
+.system-dialog-content { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 14px; padding: 24px; }
+.system-dialog-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 11%, var(--color-card)); }
+.system-dialog.tone-warning .system-dialog-icon { color: #a56a12; background: color-mix(in srgb, #e7a93b 14%, var(--color-card)); }
+.system-dialog.tone-danger .system-dialog-icon { color: var(--color-destructive); background: color-mix(in srgb, var(--color-destructive) 11%, var(--color-card)); }
+.system-dialog-copy { min-width: 0; padding: 2px 28px 0 0; }
+.system-dialog-copy h2 { margin: 0 0 8px; font-size: 18px; }
+.system-dialog-copy p { margin: 0; color: var(--color-muted-foreground); font-size: 14px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; }
+.system-dialog-input { display: grid; grid-column: 1 / -1; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 650; }
+.system-dialog-input input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-border-strong); border-radius: 8px; color: var(--color-foreground); background: var(--color-background); font: inherit; }
+.system-dialog-actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 9px; padding-top: 4px; }
+.system-dialog-actions button { min-height: 40px; padding: 9px 15px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; font-weight: 650; }
+.system-dialog-actions .secondary { color: var(--color-foreground); background: var(--color-muted); }
+.system-dialog-primary { color: var(--color-on-primary); border-color: transparent !important; background: var(--color-primary); }
+.system-dialog.tone-danger .system-dialog-primary { color: #fff; background: var(--color-destructive); }
+.system-dialog-primary:hover { filter: brightness(.96); }
+@media (max-width: 520px) {
+  .system-dialog-content { gap: 12px; padding: 20px; }
+  .system-dialog-actions button { flex: 1; }
+  body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { padding: 12px !important; }
+  body :is(.modal, .detail-modal, .link-modal, .edit-modal) { max-width: 100%; max-height: calc(100dvh - 24px); }
+}
+
 @media (min-width: 821px) and (min-height: 700px) {
   #app .product-main:has(.home-content) { display: flex; height: 100dvh; min-height: 0; flex-direction: column; padding-bottom: 0; overflow: hidden; }
   #app .product-main:has(.home-content) > .topbar { flex: none; }

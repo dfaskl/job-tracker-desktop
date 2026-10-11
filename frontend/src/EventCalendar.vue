@@ -6,6 +6,7 @@ import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { jsonFetch } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { useCalendarEventCapacity } from './useCalendarEventCapacity'
+import { confirmDialog } from './modalDialogs'
 
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ApplicationOption = { id: string; company: string; position: string; appliedDate: string }
@@ -338,7 +339,7 @@ async function resolve(item: EventItem, action: 'complete' | 'miss' | 'abandon' 
 }
 
 async function remove(item: EventItem) {
-  if (!window.confirm(`确认从测试库删除“${item.company} / ${item.title || item.type}”日程吗？`)) return
+  if (!await confirmDialog(`确认从测试库删除“${item.company} / ${item.title || item.type}”日程吗？`, { title: '删除日程', confirmText: '删除', tone: 'danger' })) return
   loading.value = true
   error.value = ''
   message.value = ''

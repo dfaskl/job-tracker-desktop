@@ -3,6 +3,7 @@ import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted,
 import { api, apiCached, ApiError } from './api'
 import { applicationProgressHealth } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
+import { confirmDialog } from './modalDialogs'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
 type AiStatus = { callsEnabled: boolean; message: string }
@@ -365,7 +366,7 @@ async function generateQuote(force:boolean){
   }
 }
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';message.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();await loadSharedTimelines();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
-async function markRejected(item:JobApplication){if(!confirm(`确认将“${item.company} · ${item.position}”标记为未通过吗？`))return;busyId.value=item.id;error.value='';message.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
+async function markRejected(item:JobApplication){if(!await confirmDialog(`确认将“${item.company} · ${item.position}”标记为未通过吗？`,{title:'结束投递',confirmText:'标记未通过',tone:'warning'}))return;busyId.value=item.id;error.value='';message.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
 watch(message,value=>{if(messageTimer)clearTimeout(messageTimer);if(value)messageTimer=setTimeout(()=>{if(message.value===value)message.value=''},2600)})
 function syncScheduleAdvice(signature:string){
