@@ -370,11 +370,11 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 .result-form .wide { grid-column: 1 / -1; }
 .application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:var(--color-muted-foreground);font-weight:400}
 .mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(260px, .82fr) minmax(300px, 1fr) minmax(380px, 1.28fr); gap: 16px; padding-bottom: 18px; }
-.mail-entering :is(.inbox-panel,.compose-panel,.review-panel) { transform-origin:center; animation:mail-panel-pop 760ms cubic-bezier(.19,.75,.26,1) both; }
-.mail-entering .compose-panel { animation-delay:780ms; }
-.mail-entering .review-panel { animation-delay:1560ms; }
-.mail-entering :is(.inbox-panel,.compose-panel,.review-panel):focus-within { animation:none; opacity:1; transform:none; }
-@keyframes mail-panel-pop { 0% { opacity:0; transform:scale(.3); } 58% { opacity:1; transform:scale(1.055); } 78% { transform:scale(.977); } 90% { transform:scale(1.012); } 100% { opacity:1; transform:scale(1); } }
+.mail-entering :is(.inbox-panel,.compose-panel,.review-panel) { animation:mail-panel-brighten 360ms ease-out both; }
+.mail-entering .compose-panel { animation-delay:100ms; }
+.mail-entering .review-panel { animation-delay:200ms; }
+.mail-entering :is(.inbox-panel,.compose-panel,.review-panel):focus-within { animation:none; filter:none; }
+@keyframes mail-panel-brighten { from { filter:brightness(.76); } to { filter:brightness(1); } }
 .inbox-panel, .compose-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
 .inbox-panel, .compose-panel { display: flex; flex-direction: column; }
 .review-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
