@@ -23,6 +23,7 @@ import java.util.Properties;
 @Component
 public class PersistentSessionStore {
     private static final int DEFAULT_SESSION_DAYS = 7;
+    private static final int ACTIVITY_UPDATE_INTERVAL_SECONDS = 300;
     private static final Base64.Encoder TOKEN_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
     private final Environment environment;
@@ -126,15 +127,19 @@ public class PersistentSessionStore {
                     }
                 }
                 try (PreparedStatement updateSession = connection.prepareStatement(
-                    "UPDATE sessions SET last_active_at=NOW() WHERE token_hash=?"
+                    "UPDATE sessions SET last_active_at=NOW() WHERE token_hash=? "
+                        + "AND last_active_at<=NOW()-(? || ' seconds')::interval"
                 )) {
                     updateSession.setString(1, tokenHash(token));
+                    updateSession.setInt(2, ACTIVITY_UPDATE_INTERVAL_SECONDS);
                     updateSession.executeUpdate();
                 }
                 try (PreparedStatement updateUser = connection.prepareStatement(
-                    "UPDATE users SET last_active_at=NOW() WHERE id=?"
+                    "UPDATE users SET last_active_at=NOW() WHERE id=? "
+                        + "AND last_active_at<=NOW()-(? || ' seconds')::interval"
                 )) {
                     updateUser.setLong(1, userId);
+                    updateUser.setInt(2, ACTIVITY_UPDATE_INTERVAL_SECONDS);
                     updateUser.executeUpdate();
                 }
                 connection.commit();

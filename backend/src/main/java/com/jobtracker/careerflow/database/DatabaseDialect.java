@@ -10,6 +10,7 @@ public final class DatabaseDialect {
         if (!database.isSqlite() || sql == null || sql.isBlank()) return sql;
         String value = sql;
         value = value.replace("NOW()+(? || ' seconds')::interval", SQLITE_NOW + "+(CAST(? AS INTEGER)*1000)");
+        value = value.replace("NOW()-(? || ' seconds')::interval", SQLITE_NOW + "-(CAST(? AS INTEGER)*1000)");
         value = value.replace("to_jsonb(CAST(? AS boolean))", "CASE WHEN ? THEN 'true' ELSE 'false' END");
         value = value.replace("to_jsonb(CAST(? AS text))", "json_quote(?)");
         value = value.replace("value #>> '{}'", "json_extract(value,'$')");

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import BaseSelect from './BaseSelect.vue'
 import { jsonFetch } from './api'
 import type { BusinessData } from './jobTrackerStore'
@@ -18,6 +18,8 @@ type Overview={currentUser:{id:string;email:string};summary:Summary;groups:Inter
 const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
 const query=ref(''),stateFilter=ref('all'),sortMode=ref('created-old'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
 const registrationCode=ref('')
+const currentTime=ref(Date.now())
+let relativeClockTimer:number|undefined
 const registrationCodeJustSaved=ref(false)
 const registrationCodeDirty=ref(false)
 const adminView=ref<'overview'|'audit'>('overview')
@@ -41,13 +43,14 @@ const filteredUsers=computed(()=>{
   })
 })
 const totalEvents=computed(()=>users.value.reduce((sum,user)=>sum+user.eventCount,0))
-const recentUsers=computed(()=>{const edge=Date.now()-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
+const recentUsers=computed(()=>{const edge=currentTime.value-30*86400000;return users.value.filter(user=>Date.parse(user.lastActiveAt)>edge).length})
 const emptyDataUsers=computed(()=>users.value.filter(user=>!user.applicationCount&&!user.eventCount).length)
 function missingUserSetup(user:User){return [!user.hasApiKey?'API': '',!user.hasMailAccount?'邮箱': '',!user.hasResume?'简历': ''].filter(Boolean)}
 const auditPages=computed(()=>Math.max(1,Math.ceil((overview.value?.audit.length||0)/auditPageSize)))
 const pagedAudit=computed(()=>{const items=overview.value?.audit||[];const start=(Math.min(auditPage.value,auditPages.value)-1)*auditPageSize;return items.slice(start,start+auditPageSize)})
 
-onMounted(checkStatus)
+onMounted(()=>{relativeClockTimer=window.setInterval(()=>{currentTime.value=Date.now()},60_000);void checkStatus()})
+onBeforeUnmount(()=>{if(relativeClockTimer!==undefined)window.clearInterval(relativeClockTimer)})
 async function requestJson(url:string,init?:RequestInit){const{response,body}=await jsonFetch<Record<string,any>>(url,{cache:'no-store',...init});if(!response.ok)throw new Error(body.message||'操作失败');return body}
 async function checkStatus(){loading.value=true;error.value='';try{status.value=await requestJson('/api/poc/admin-sandbox/status') as AdminStatus;if(status.value.enabled)await loadOverview()}catch(cause){error.value=failure(cause,'管理员服务检查失败')}finally{loading.value=false}}
 async function loadOverview(){overview.value=await requestJson('/api/poc/admin-sandbox/overview') as Overview;if(!registrationCodeDirty.value){registrationCode.value=overview.value.summary.registrationCode||'';registrationCodeJustSaved.value=!!registrationCode.value}auditPage.value=Math.min(auditPage.value,Math.max(1,Math.ceil(overview.value.audit.length/auditPageSize)))}
@@ -86,7 +89,7 @@ function assignGroupFromEvent(user:User,event:Event){void assignGroup(user,(even
 async function deleteUser(user:User){const confirmEmail=prompt(`删除后无法恢复。请输入 ${user.email} 确认：`,'');if(confirmEmail===null)return;busyUser.value=user.id;error.value='';message.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmEmail})});if(selected.value?.id===user.id){selected.value=null;detail.value=null}await loadOverview();message.value='用户及其业务数据已删除'}catch(cause){error.value=failure(cause,'删除用户失败')}finally{busyUser.value=''}}
 function failure(cause:unknown,fallback:string){return cause instanceof Error?cause.message:fallback}
 function formatDate(value:string){return value?formatShanghaiDateTime(value,{},value):'从未'}
-function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const elapsed=Math.max(0,Date.now()-time);if(elapsed<86400000){const hours=Math.floor(elapsed/3600000);return hours===0?'刚刚在线':`${hours}小时前在线`}const days=Math.floor(elapsed/86400000);return `${days}天前在线`}
+function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const elapsed=Math.max(0,currentTime.value-time);if(elapsed<86400000){const hours=Math.floor(elapsed/3600000);return hours===0?'刚刚在线':`${hours}小时前在线`}const days=Math.floor(elapsed/86400000);return `${days}天前在线`}
 </script>
 
 <template>

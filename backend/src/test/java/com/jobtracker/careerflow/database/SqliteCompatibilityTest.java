@@ -14,6 +14,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,7 +120,32 @@ class SqliteCompatibilityTest {
 
         PersistentSessionStore sessions = new PersistentSessionStore(environment, applications);
         String token = sessions.issue("admin@example.com");
+        long oldActivity = System.currentTimeMillis() - 10 * 60_000L;
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE sessions SET last_active_at=" + oldActivity);
+            statement.executeUpdate("UPDATE users SET last_active_at=" + oldActivity);
+        }
         assertThat(sessions.verifyEmail(token)).contains("admin@example.com");
+        long updatedActivity;
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                 "SELECT u.last_active_at FROM users u WHERE lower(u.email)='admin@example.com'"
+             )) {
+            result.next();
+            updatedActivity = result.getLong(1);
+        }
+        assertThat(updatedActivity).isGreaterThan(oldActivity);
+        assertThat(sessions.verifyEmail(token)).contains("admin@example.com");
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                 "SELECT u.last_active_at FROM users u WHERE lower(u.email)='admin@example.com'"
+             )) {
+            result.next();
+            assertThat(result.getLong(1)).isEqualTo(updatedActivity);
+        }
         sessions.revoke(token);
         assertThat(sessions.verifyEmail(token)).isEmpty();
     }

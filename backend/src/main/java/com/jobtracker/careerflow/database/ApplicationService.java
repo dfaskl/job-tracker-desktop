@@ -21,15 +21,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class ApplicationService {
     private static final int MAX_APPLICATIONS = 500;
+    private static final long STATUS_CACHE_TTL_NANOS = TimeUnit.SECONDS.toNanos(15);
 
     private final Environment environment;
     private final ObjectMapper objectMapper;
     private final ApplicationDocumentMutator mutator;
     private final EventDocumentMutator eventMutator;
+    private volatile SandboxStatus cachedStatus;
+    private volatile long cachedStatusAtNanos;
 
     @Autowired
     public ApplicationService(
@@ -51,11 +55,31 @@ public class ApplicationService {
     public SandboxStatus status() {
         String databaseUrl = AppEnvironment.databaseUrl(environment);
         if (databaseUrl == null) return new SandboxStatus(false, false, false, "尚未配置业务数据库");
-        try {
-            LegacyDatabaseUrl.parse(databaseUrl);
-            return new SandboxStatus(true, true, false, "业务数据库已连接");
-        } catch (IllegalArgumentException exception) {
-            return new SandboxStatus(false, true, false, "业务数据库地址格式无效");
+        long now = System.nanoTime();
+        SandboxStatus cached = cachedStatus;
+        if (cached != null && now - cachedStatusAtNanos < STATUS_CACHE_TTL_NANOS) return cached;
+        synchronized (this) {
+            now = System.nanoTime();
+            cached = cachedStatus;
+            if (cached != null && now - cachedStatusAtNanos < STATUS_CACHE_TTL_NANOS) return cached;
+            SandboxStatus result;
+            try {
+                LegacyDatabaseUrl.parse(databaseUrl);
+                try (Connection connection = openConfiguredConnection(databaseUrl);
+                     PreparedStatement statement = connection.prepareStatement("SELECT 1");
+                     ResultSet rows = statement.executeQuery()) {
+                    result = rows.next()
+                        ? new SandboxStatus(true, true, false, "业务数据库已连接")
+                        : new SandboxStatus(false, true, false, "业务数据库连接失败");
+                }
+            } catch (IllegalArgumentException exception) {
+                result = new SandboxStatus(false, true, false, "业务数据库地址格式无效");
+            } catch (Exception exception) {
+                result = new SandboxStatus(false, true, false, "业务数据库连接失败");
+            }
+            cachedStatus = result;
+            cachedStatusAtNanos = System.nanoTime();
+            return result;
         }
     }
     public ApplicationPage findApplications(String email) throws Exception {
@@ -174,7 +198,11 @@ public class ApplicationService {
     private Connection openConnection() throws Exception {
         SandboxStatus status = status();
         if (!status.enabled()) throw new SandboxDisabledException(status.message());
-        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(AppEnvironment.databaseUrl(environment));
+        return openConfiguredConnection(AppEnvironment.databaseUrl(environment));
+    }
+
+    private Connection openConfiguredConnection(String databaseUrl) throws Exception {
+        LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(databaseUrl);
         Properties properties = new Properties();
         if (config.username() != null) properties.setProperty("user", config.username());
         if (config.password() != null) properties.setProperty("password", config.password());

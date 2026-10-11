@@ -106,6 +106,8 @@ function handleWindowResize() {
 let workspaceRefreshTimer: number | undefined
 let resumeFocusTimer: number | undefined
 let lastBusinessRefresh = 0
+let lastMailInboxRefresh = 0
+const mailInboxRefreshInterval = 5 * 60_000
 
 function routeFromHash() {
   const route = readHashRoute(window.location.hash)
@@ -203,7 +205,10 @@ function refreshWorkspaceData(forceBusiness = false) {
     lastBusinessRefresh = now
     void store.refresh(false, false, false)
   }
-  void store.refreshMailInbox()
+  if (now - lastMailInboxRefresh >= mailInboxRefreshInterval) {
+    lastMailInboxRefresh = now
+    void store.refreshMailInbox()
+  }
 }
 function handleWindowFocus() { refreshWorkspaceData(true) }
 function handleVisibilityChange() { if (document.visibilityState === 'visible') refreshWorkspaceData(true) }
@@ -267,12 +272,15 @@ onMounted(async () => {
   syncHash()
   await nextTick()
   syncNavIndicator()
-  if (store.user.value) await Promise.all([store.refresh(), store.refreshMailInbox()])
+  if (store.user.value) {
+    await Promise.all([store.refresh(), store.refreshMailInbox()])
+    lastMailInboxRefresh = Date.now()
+  }
   initializeMailBadge()
   lastBusinessRefresh = Date.now()
   syncHash()
   if (activePage.value === 'interview-summary') dismissSummaryBadge()
-  workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 15_000)
+  workspaceRefreshTimer = window.setInterval(refreshWorkspaceData, 60_000)
 })
 watch(store.pendingMailCount, count => {
   if (!mailNoticeReady) return
