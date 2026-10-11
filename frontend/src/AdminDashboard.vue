@@ -86,7 +86,7 @@ function assignGroupFromEvent(user:User,event:Event){void assignGroup(user,(even
 async function deleteUser(user:User){const confirmEmail=prompt(`删除后无法恢复。请输入 ${user.email} 确认：`,'');if(confirmEmail===null)return;busyUser.value=user.id;error.value='';message.value='';try{await requestJson(`/api/poc/admin-sandbox/users/${user.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmEmail})});if(selected.value?.id===user.id){selected.value=null;detail.value=null}await loadOverview();message.value='用户及其业务数据已删除'}catch(cause){error.value=failure(cause,'删除用户失败')}finally{busyUser.value=''}}
 function failure(cause:unknown,fallback:string){return cause instanceof Error?cause.message:fallback}
 function formatDate(value:string){return value?formatShanghaiDateTime(value,{},value):'从未'}
-function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const days=Math.floor((Date.now()-time)/86400000);return days<=0?'今天活跃':days===1?'昨天活跃':`${days} 天前活跃`}
+function relativeDate(value:string){if(!value)return '从未活跃';const time=Date.parse(value);if(!Number.isFinite(time))return value;const elapsed=Math.max(0,Date.now()-time);if(elapsed<86400000){const hours=Math.floor(elapsed/3600000);return hours===0?'刚刚在线':`${hours}小时前在线`}const days=Math.floor(elapsed/86400000);return `${days}天前在线`}
 </script>
 
 <template>
