@@ -156,7 +156,7 @@ body .modal.form .actions > :is(.ai-button, .secondary) { color: var(--color-for
 body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-family: var(--font-ui); }
 
 /* Shared dialog system: consistent surface and actions across native and custom dialogs. */
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) {
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) {
   color: var(--color-foreground);
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -164,14 +164,14 @@ body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) {
   box-shadow: var(--shadow-lg);
   font-family: var(--font-ui);
 }
-body dialog[class]::backdrop,
-body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) {
+#app dialog[class][open]::backdrop,
+#app :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop)[class] {
   background: rgb(13 17 27 / 58%);
   backdrop-filter: blur(4px);
 }
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { color: var(--color-foreground); font-family: var(--font-ui); }
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(p, small) { color: var(--color-muted-foreground); }
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close) {
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { color: var(--color-foreground); font-family: var(--font-ui); }
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(p, small) { color: var(--color-muted-foreground); }
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close) {
   display: inline-grid;
   width: 40px;
   min-width: 40px;
@@ -184,15 +184,15 @@ body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.cl
   color: var(--color-muted-foreground);
   background: var(--color-muted);
 }
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close):hover { color: var(--color-primary); border-color: var(--color-border-strong); }
-body :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(.close, .modal-close):hover { color: var(--color-primary); border-color: var(--color-border-strong); }
+#app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
   color: var(--color-foreground);
   border-color: var(--color-border-strong);
   border-radius: 8px;
   background: var(--color-background);
   font: inherit;
 }
-body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal) { overflow-wrap: anywhere; }
+#app :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal) { overflow-wrap: anywhere; }
 
 .system-dialog {
   width: min(440px, calc(100vw - 32px));
@@ -220,8 +220,8 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal,
 @media (max-width: 520px) {
   .system-dialog-content { gap: 12px; padding: 20px; }
   .system-dialog-actions button { flex: 1; }
-  body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { padding: 12px !important; }
-  body :is(.modal, .detail-modal, .link-modal, .edit-modal) { max-width: 100%; max-height: calc(100dvh - 24px); }
+  #app :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { padding: 12px !important; }
+  #app :is(.modal, .detail-modal, .link-modal, .edit-modal) { max-width: 100%; max-height: calc(100dvh - 24px); }
 }
 
 @media (min-width: 821px) and (min-height: 700px) {
