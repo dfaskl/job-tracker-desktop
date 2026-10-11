@@ -3,6 +3,7 @@ import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, reacti
 import { api, apiCached, invalidateApiCache } from './api'
 import { summarizeInterviewReviews } from './interviewSummary'
 import { isFormalInterview } from './eventClassification'
+import { applicationProgressHealth } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
@@ -217,24 +218,10 @@ function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未�
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function eventOccurrenceTime(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||item.at||'')}
 function eventRecordTime(item:Record<string,unknown>){return eventOccurrenceTime(item)}
-function interviewParticipationTime(event:JobEvent){
-  const end=String(event.endsAt||event.end||'').trim()
-  if(!end)return timeOf(event.startsAt||event.start||event.date)
-  return event.completed?timeOf(event.completedAt):0
-}
 function health(item:JobApplication){
-  if(String(item.stage)!=='面试'||String(item.status)!=='等待结果')return null
-  const interviews=store.events.value.filter(event=>event.applicationId===item.id&&isFormalInterview(event)&&!event.missed)
-  if(interviews.some(event=>!event.completed))return null
-  const times=interviews
-    .map(interviewParticipationTime)
-    .filter(Boolean)
-  if(!times.length)return null
-  const latest=Math.max(...times)
-  const today=new Date(),scheduled=new Date(latest)
-  const todayDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime()
-  const scheduledDate=new Date(scheduled.getFullYear(),scheduled.getMonth(),scheduled.getDate()).getTime()
-  const days=Math.max(0,Math.floor((todayDate-scheduledDate)/86400000))
+  const progress=applicationProgressHealth(item,store.events.value)
+  if(!progress)return null
+  const days=progress.days
   return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}
 }
 function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isFormalInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
