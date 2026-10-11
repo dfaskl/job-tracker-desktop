@@ -148,7 +148,7 @@ h1, .topbar h1 { font-family: var(--font-button); letter-spacing: -.035em; }
   font-family: var(--font-button);
   font-weight: 600;
   letter-spacing: 0;
-  transition: color .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease;
+  transition: color .18s ease, border-color .18s ease, background-color .18s ease, opacity .18s ease, translate .14s ease;
 }
 #app button.icon-button {
   display: inline-grid;
@@ -170,6 +170,13 @@ h1, .topbar h1 { font-family: var(--font-button); letter-spacing: -.035em; }
 }
 #app button.icon-button svg { pointer-events: none; }
 #app button:not(:disabled):hover { filter: saturate(1.05); }
+@media (hover: hover) and (pointer: fine) {
+  #app button:not(:disabled):hover { translate: 0 1px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app button { transition: none; }
+  #app button:not(:disabled):hover { translate: none; }
+}
 #app .card {
   border-color: var(--color-border);
   border-radius: var(--radius-lg);
