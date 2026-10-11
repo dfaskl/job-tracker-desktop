@@ -624,4 +624,6 @@ async function removeEvent(item:JobEvent){
 @media(max-width:600px) { .schedule-time-fields { grid-template-columns:minmax(0,1fr); } }
 .flow-node.abandoned { --node-color:#858d97; --node-soft:#eceff2; }
 :root[data-theme="dark"] .flow-node.abandoned { --node-color:#a1a8b0; --node-soft:#2b3036; }
+:root #app .flow-node.flow-other { --node-color:#347f9d; --node-soft:#e0f1f7; }
+:root[data-theme="dark"] #app .flow-node.flow-other { --node-color:#63b8d2; --node-soft:#1e3b45; }
 </style>
