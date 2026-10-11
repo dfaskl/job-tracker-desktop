@@ -38,4 +38,17 @@ describe('applicationProgressHealth', () => {
       event({ id: 'abandoned-followup', type: '其他', startsAt: '2026-10-10T12:00:00Z', abandoned: true })
     ], Date.parse('2026-10-11T18:00:00Z'))).toEqual({ days: 1, label: '进展正常' })
   })
+
+  it('uses the scheduled time instead of the later completion time', () => {
+    expect(applicationProgressHealth(interviewApplication, [
+      event({
+        id: 'authorization',
+        type: '其他',
+        title: '授权书签署',
+        startsAt: '2026-10-10 17:20',
+        completed: true,
+        completedAt: '2026-10-11 00:51'
+      })
+    ], new Date('2026-10-11T18:00:00').getTime())).toEqual({ days: 1, label: '进展正常' })
+  })
 })
