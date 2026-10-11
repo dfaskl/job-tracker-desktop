@@ -214,9 +214,9 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
 .system-dialog-actions { display: flex; grid-column: 1 / -1; justify-content: flex-end; gap: 9px; padding-top: 4px; }
 .system-dialog-actions button { min-height: 40px; padding: 9px 15px; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; font-weight: 650; }
 .system-dialog-actions .secondary { color: var(--color-foreground); background: var(--color-muted); }
-.system-dialog-primary { color: var(--color-on-primary); border-color: transparent !important; background: var(--color-primary); }
-.system-dialog.tone-danger .system-dialog-primary { color: #fff; background: var(--color-destructive); }
-.system-dialog-primary:hover { filter: brightness(.96); }
+#app .system-dialog-primary { color: var(--color-on-primary); border-color: transparent !important; background: var(--color-primary); }
+#app .system-dialog.tone-danger .system-dialog-primary { color: #fff; background: var(--color-destructive); }
+#app .system-dialog-primary:hover { filter: brightness(.96); }
 @media (max-width: 520px) {
   .system-dialog-content { gap: 12px; padding: 20px; }
   .system-dialog-actions button { flex: 1; }
