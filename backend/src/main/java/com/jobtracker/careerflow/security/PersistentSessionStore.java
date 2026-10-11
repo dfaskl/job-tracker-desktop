@@ -98,7 +98,7 @@ public class PersistentSessionStore {
                 connection.commit();
                 return token;
             } catch (Exception exception) {
-                connection.rollback();
+                rollbackPreservingOriginal(connection, exception);
                 throw exception;
             }
         }
@@ -118,7 +118,7 @@ public class PersistentSessionStore {
                     select.setString(1, tokenHash(token));
                     try (ResultSet result = select.executeQuery()) {
                         if (!result.next()) {
-                            connection.rollback();
+                            connection.setAutoCommit(true);
                             return Optional.empty();
                         }
                         userId = result.getLong(1);
@@ -140,7 +140,7 @@ public class PersistentSessionStore {
                 connection.commit();
                 return Optional.of(email);
             } catch (Exception exception) {
-                connection.rollback();
+                rollbackPreservingOriginal(connection, exception);
                 throw exception;
             }
         }
@@ -204,6 +204,14 @@ public class PersistentSessionStore {
     private void requireEnabled() {
         SessionModeStatus status = status();
         if (!status.persistent()) throw new SessionStoreException(status.message());
+    }
+
+    private void rollbackPreservingOriginal(Connection connection, Exception original) {
+        try {
+            connection.rollback();
+        } catch (Exception rollbackFailure) {
+            original.addSuppressed(rollbackFailure);
+        }
     }
 
     private boolean validToken(String token) {
