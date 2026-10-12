@@ -437,7 +437,7 @@ nav button.active::before { content: none; }
 .menu-toggle { display: none; }
 .profile-shortcut { display: none; }
 .admin-shortcut { display: none; }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: linear-gradient(color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent),color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent)),var(--page-background-image); background-position: right top; background-repeat: no-repeat; background-size: min(1280px, 100vw) auto; background-attachment: fixed; }
+.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: linear-gradient(color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent),color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent)),var(--page-background-image); background-position: center top; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; }
 .topbar {
   position: sticky;
   top: 0;
@@ -568,7 +568,7 @@ nav button.active::before { content: none; }
   .sidebar-account { display: none; }
   .profile-entry { max-width: 100%; }
   .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
-  .product-main { background-position: right top 64px; background-size: min(760px, 120vw) auto; }
+  .product-main { background-position: center top 64px; background-size: cover; }
   .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
