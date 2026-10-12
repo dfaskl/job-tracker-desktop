@@ -133,6 +133,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
           <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>
           <div class="user-table-scroll">
             <table class="user-table">
+              <colgroup><col class="account-column"><col class="status-column"><col class="group-column"><col class="data-column"><col class="active-column"><col class="config-column"><col class="actions-column"></colgroup>
               <thead><tr><th scope="col">账号</th><th scope="col">状态</th><th scope="col">协作小组</th><th scope="col">业务数据</th><th scope="col">最近在线</th><th scope="col">配置</th><th scope="col" class="table-actions-heading">操作</th></tr></thead>
               <tbody>
                 <tr v-for="user in filteredUsers" :key="user.id" class="user-table-row" :class="{disabled:user.disabled}">
@@ -185,7 +186,8 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 
 <style scoped>
 .user-table-scroll{min-height:0;flex:1;overflow:auto;margin-top:12px;border:1px solid var(--color-border);border-radius:10px;overscroll-behavior:contain}
-.user-table{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0;text-align:left;font-size:12px}
+.user-table{width:100%;min-width:1210px;table-layout:fixed;border-collapse:separate;border-spacing:0;text-align:left;font-size:12px}
+.user-table .account-column{width:190px}.user-table .status-column{width:145px}.user-table .group-column{width:205px}.user-table .data-column{width:165px}.user-table .active-column{width:125px}.user-table .config-column{width:145px}.user-table .actions-column{width:245px}
 .user-table th{position:sticky;top:0;z-index:2;padding:10px 9px;border-bottom:1px solid var(--color-border);color:var(--color-muted-foreground);background:var(--color-muted);font-size:10px;font-weight:800;white-space:nowrap}
 .user-table td{padding:9px;border-bottom:1px solid var(--color-border);vertical-align:middle;background:var(--color-card)}
 .user-table tbody tr:last-child td{border-bottom:0}
@@ -202,7 +204,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .user-status.disabled{border-color:#e9c3c0;color:#a33c37;background:#fff0ee}
 .user-status.admin{border-color:#c8d2f4;color:#455cae;background:#edf0ff}
 .table-secondary{display:block;margin-top:4px;color:var(--color-muted-foreground);font-size:10px;white-space:nowrap}
-.table-group-select{width:138px;max-width:150px;height:32px;padding:0 24px 0 8px;border:1px solid var(--color-border);border-radius:7px;color:var(--color-card-foreground);background:var(--color-card);font:inherit;font-size:11px}
+.table-group-select{width:100%;max-width:190px;height:34px;padding:0 26px 0 9px;border:1px solid var(--color-border);border-radius:7px;color:var(--color-card-foreground);background:var(--color-card);font:inherit;font-size:11px}
 .table-data-count{display:inline-block;margin-right:8px;color:var(--color-muted-foreground);white-space:nowrap}
 .table-data-count b{color:var(--color-foreground);font-variant-numeric:tabular-nums}
 .table-last-active{color:var(--color-foreground);font-size:11px;white-space:nowrap}
@@ -217,7 +219,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 :global(:root[data-theme="dark"] .user-status.enabled){border-color:#35634d;color:#a9e4c3;background:#1e3027}
 :global(:root[data-theme="dark"] .user-status.disabled){border-color:#70413e;color:#f1b2ad;background:#362321}
 :global(:root[data-theme="dark"] .user-status.admin){border-color:#46537f;color:#c0caff;background:#252b40}
-@media(max-width:1100px){.user-table-scroll{max-height:640px}.user-table{min-width:1120px}}
+@media(max-width:1100px){.user-table-scroll{max-height:640px}.user-table{min-width:1210px}}
 </style>
 
 <style scoped>
