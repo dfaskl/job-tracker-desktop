@@ -355,7 +355,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.product-shell { min-height: 100dvh; background: var(--color-background); }
+.product-shell { min-height: 100dvh; background: transparent; }
 .skip-link { position: fixed; z-index: 100; top: 8px; left: 232px; padding: 12px 18px; transform: translateY(-150%); border-radius: 8px; color: var(--color-on-primary); background: var(--color-primary); }
 .skip-link:focus { transform: none; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; width: var(--sidebar-width); flex-direction: column; padding: 24px 12px 16px; border-right: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-card); }
@@ -402,7 +402,7 @@ nav button.active::before { content: none; }
 .menu-toggle { display: none; }
 .profile-shortcut { display: none; }
 .admin-shortcut { display: none; }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; }
+.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: var(--page-background-image); background-position: right top; background-repeat: no-repeat; background-size: min(1080px, 90vw) auto; background-attachment: fixed; }
 .topbar {
   position: sticky;
   top: 0;
@@ -533,6 +533,7 @@ nav button.active::before { content: none; }
   .sidebar-account { display: none; }
   .profile-entry { max-width: 100%; }
   .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
+  .product-main { background-position: right top 64px; background-size: min(640px, 100vw) auto; }
   .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }

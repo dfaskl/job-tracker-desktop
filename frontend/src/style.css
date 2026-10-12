@@ -24,6 +24,7 @@
   --color-avatar-background: #535fc7;
   --color-avatar-foreground: #ffffff;
   --color-avatar-border: #535fc7;
+  --page-background-image: url('/page-background-light.svg');
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -67,6 +68,7 @@
   --color-avatar-background: #30343b;
   --color-avatar-foreground: #eceef5;
   --color-avatar-border: #626e86;
+  --page-background-image: url('/page-background-dark.svg');
   --application-pending-surface: #172433;
   --application-pending-border: #466e9e;
   --application-pending-accent: #6da7e6;
