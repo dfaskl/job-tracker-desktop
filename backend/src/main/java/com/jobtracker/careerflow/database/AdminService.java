@@ -13,7 +13,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Base64;
-import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,8 +25,6 @@ import java.util.Properties;
 public class AdminService {
     private static final int MAX_USERS = 500;
     private static final int MAX_APPLICATIONS = 500;
-    private static final int MAX_BACKGROUND_IMAGE_CHARS = 1_300_000;
-    private static final Pattern BACKGROUND_IMAGE = Pattern.compile("^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$");
 
     private final Environment environment;
     private final ObjectMapper objectMapper;
@@ -566,95 +563,6 @@ public class AdminService {
         return configured("REGISTRATION_CODE");
     }
 
-    public PageBackgroundSettings pageBackgroundSettings() throws Exception {
-        try (Connection connection = openConnection(); PreparedStatement statement = connection.prepareStatement(
-            "SELECT CAST(value AS TEXT) FROM system_settings WHERE key='page_background'"
-        ); ResultSet result = statement.executeQuery()) {
-            if (!result.next()) return PageBackgroundSettings.defaults();
-            JsonNode value = objectMapper.readTree(result.getString(1));
-            return new PageBackgroundSettings(
-                choice(value, "lightChoice"), opacity(value, "lightOpacity"), image(value, "lightCustomImage"),
-                choice(value, "darkChoice"), opacity(value, "darkOpacity"), image(value, "darkCustomImage")
-            );
-        }
-    }
-
-    public PageBackgroundTheme pageBackgroundTheme(String theme) throws Exception {
-        if (!"light".equals(theme) && !"dark".equals(theme)) throw new AdminValidationException("主题类型不正确");
-        PageBackgroundSettings settings = pageBackgroundSettings();
-        return "dark".equals(theme)
-            ? new PageBackgroundTheme(settings.darkChoice(), settings.darkOpacity(), settings.darkCustomImage())
-            : new PageBackgroundTheme(settings.lightChoice(), settings.lightOpacity(), settings.lightCustomImage());
-    }
-
-    public PageBackgroundSettings setPageBackground(String adminEmail, PageBackgroundSettings requested) throws Exception {
-        if (requested == null) throw new AdminValidationException("背景设置内容不正确");
-        PageBackgroundSettings settings = new PageBackgroundSettings(
-            validateChoice(requested.lightChoice()), validateOpacity(requested.lightOpacity()), validateImage(requested.lightCustomImage()),
-            validateChoice(requested.darkChoice()), validateOpacity(requested.darkOpacity()), validateImage(requested.darkCustomImage())
-        );
-        if (settings.lightChoice().equals("custom") && settings.lightCustomImage().isBlank()
-            || settings.darkChoice().equals("custom") && settings.darkCustomImage().isBlank()) {
-            throw new AdminValidationException("请选择自定义图片后再保存");
-        }
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                AdminIdentity admin = requireAdmin(connection, adminEmail);
-                String json = objectMapper.writeValueAsString(settings);
-                LegacyDatabaseUrl config = LegacyDatabaseUrl.parse(com.jobtracker.careerflow.config.AppEnvironment.databaseUrl(environment));
-                String sql = config.isSqlite()
-                    ? "INSERT INTO system_settings(key,value,updated_by) VALUES('page_background',json(?),?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_by=excluded.updated_by,updated_at=(CAST(strftime('%s','now') AS INTEGER)*1000)"
-                    : "INSERT INTO system_settings(key,value,updated_by) VALUES('page_background',CAST(? AS jsonb),?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_by=excluded.updated_by,updated_at=NOW()";
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, json);
-                    statement.setLong(2, admin.id());
-                    statement.executeUpdate();
-                }
-                insertAudit(connection, admin.id(), null, "全站页面背景", "update-page-background");
-                connection.commit();
-                return settings;
-            } catch (Exception exception) {
-                connection.rollback();
-                throw exception;
-            }
-        }
-    }
-
-    private String choice(JsonNode value, String field) {
-        String choice = value.path(field).asText("career");
-        return List.of("career", "mountain", "custom", "none").contains(choice) ? choice : "career";
-    }
-
-    private int opacity(JsonNode value, String field) {
-        return Math.max(0, Math.min(100, value.path(field).asInt(100)));
-    }
-
-    private String image(JsonNode value, String field) {
-        try { return validateImage(value.path(field).asText("")); }
-        catch (AdminValidationException ignored) { return ""; }
-    }
-
-    private String validateChoice(String value) {
-        if (value == null || !List.of("career", "mountain", "custom", "none").contains(value)) {
-            throw new AdminValidationException("背景类型不正确");
-        }
-        return value;
-    }
-
-    private int validateOpacity(int value) {
-        if (value < 0 || value > 100) throw new AdminValidationException("背景透明度需要在 0–100 之间");
-        return value;
-    }
-
-    private String validateImage(String value) {
-        if (value == null || value.isBlank()) return "";
-        if (value.length() > MAX_BACKGROUND_IMAGE_CHARS || !BACKGROUND_IMAGE.matcher(value).matches()) {
-            throw new AdminValidationException("图片格式不支持或文件过大，请使用 PNG、JPG 或 WebP，并控制压缩后大小");
-        }
-        return value;
-    }
-
     private String registrationCodeValue(Connection connection) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
             "SELECT value #>> '{}' FROM system_settings WHERE key='registration_code_display'"
@@ -856,13 +764,6 @@ public class AdminService {
                               int totalApplications, boolean truncated) {}
     public record UserBusinessData(DetailUser user, JsonNode data) {}
     public record RegistrationResult(boolean ok, boolean registrationOpen) {}
-    public record PageBackgroundSettings(String lightChoice, int lightOpacity, String lightCustomImage,
-                                         String darkChoice, int darkOpacity, String darkCustomImage) {
-        public static PageBackgroundSettings defaults() {
-            return new PageBackgroundSettings("career", 100, "", "career", 100, "");
-        }
-    }
-    public record PageBackgroundTheme(String choice, int opacity, String customImage) {}
     public record RegistrationCodeResult(boolean ok, boolean registrationCodeEnabled) {}
     public record DisabledResult(boolean ok, boolean disabled) {}
     public record DisplayNameResult(boolean ok, String displayName) {}

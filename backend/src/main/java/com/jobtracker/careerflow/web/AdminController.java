@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -68,36 +67,6 @@ public class AdminController {
             return ok(adminService.overview(user.get().email()));
         } catch (Exception exception) {
             return mapException("overview", exception);
-        }
-    }
-
-    @GetMapping("/settings/page-background")
-    public ResponseEntity<?> pageBackground(
-        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
-        @RequestParam(required = false) String theme
-    ) {
-        try {
-            Optional<LegacyUser> user = authController.authenticatedUser(token);
-            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            return ok(theme == null ? adminService.pageBackgroundSettings() : adminService.pageBackgroundTheme(theme));
-        } catch (Exception exception) {
-            return mapException("page-background", exception);
-        }
-    }
-
-    @PatchMapping("/settings/page-background")
-    public ResponseEntity<?> updatePageBackground(
-        @CookieValue(value = AuthController.COOKIE_NAME, required = false) String token,
-        @RequestBody(required = false) AdminService.PageBackgroundSettings body,
-        HttpServletRequest request
-    ) {
-        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
-        try {
-            Optional<LegacyUser> user = authController.authenticatedUser(token);
-            if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
-            return ok(adminService.setPageBackground(user.get().email(), body));
-        } catch (Exception exception) {
-            return mapException("update-page-background", exception);
         }
     }
 

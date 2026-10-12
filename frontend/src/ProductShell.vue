@@ -76,37 +76,6 @@ const summaryUpdatedAt = ref(readStoredNumber(SUMMARY_UPDATED_KEY) || 0)
 const summaryDismissedAt = ref(readStoredNumber(SUMMARY_DISMISSED_KEY) || 0)
 const summaryBadgeVisible = ref(summaryUpdatedAt.value > summaryDismissedAt.value)
 const theme = ref<'light' | 'dark'>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
-type BackgroundThemeSetting = { choice: 'career' | 'mountain' | 'custom' | 'none'; opacity: number; customImage: string }
-const appliedBackground = ref<BackgroundThemeSetting | null>(null)
-function applyPageBackground(setting: BackgroundThemeSetting | null) {
-  const root = document.documentElement
-  const mode = theme.value
-  let image = mode === 'dark' ? "url('/page-background-dark.svg')" : "url('/page-background-light.svg')"
-  let opacity = 100
-  if (setting) {
-    opacity = Math.max(0, Math.min(100, setting.opacity))
-    if (setting.choice === 'mountain') image = "url('/page-background-mountain.webp')"
-    else if (setting.choice === 'custom' && setting.customImage) image = `url("${setting.customImage}")`
-    else if (setting.choice === 'none') image = 'none'
-  }
-  root.style.setProperty('--page-background-image', image)
-  root.style.setProperty('--page-background-opacity', `${opacity}%`)
-}
-async function loadPageBackground() {
-  if (!store.user.value) return
-  const requestedTheme = theme.value
-  try {
-    const setting = await api<BackgroundThemeSetting>(`/api/poc/admin-sandbox/settings/page-background?theme=${requestedTheme}`)
-    if (theme.value !== requestedTheme) return
-    appliedBackground.value = setting
-    applyPageBackground(setting)
-  } catch {
-    if (theme.value !== requestedTheme) return
-    appliedBackground.value = null
-    applyPageBackground(null)
-  }
-}
-function handlePageBackgroundUpdated() { void loadPageBackground() }
 const sidebarDisplayName = computed(() => store.user.value?.displayName || store.user.value?.email.split('@')[0] || '个人主页')
 const mobileViewport = ref(window.matchMedia('(max-width: 820px)').matches)
 const mailBadgeLabel = computed(() => store.pendingMailCount.value > 99 ? '99+' : String(store.pendingMailCount.value))
@@ -226,7 +195,6 @@ function toggleTheme() {
   theme.value = nextTheme
   if (nextTheme === 'dark') document.documentElement.dataset.theme = 'dark'
   else delete document.documentElement.dataset.theme
-  void loadPageBackground()
   try { localStorage.setItem('job-tracker-theme', nextTheme) } catch { /* Keep the selected theme for this session. */ }
 }
 
@@ -294,13 +262,11 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('resize', handleWindowResize)
   window.addEventListener('careerflow:interview-summary-updated', handleSummaryUpdated)
-  window.addEventListener('careerflow:page-background-updated', handlePageBackgroundUpdated)
   window.addEventListener('storage', handleStoredNotice)
   await store.initialize()
   if (store.user.value) {
     try { isAdmin.value = (await api<{ isAdmin: boolean }>('/api/poc/admin-sandbox/access')).isAdmin === true }
     catch { isAdmin.value = false }
-    void loadPageBackground()
   }
   adminAccessLoaded.value = true
   syncHash()
@@ -338,7 +304,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('resize', handleWindowResize)
   window.removeEventListener('careerflow:interview-summary-updated', handleSummaryUpdated)
-  window.removeEventListener('careerflow:page-background-updated', handlePageBackgroundUpdated)
   window.removeEventListener('storage', handleStoredNotice)
   if (workspaceRefreshTimer !== undefined) window.clearInterval(workspaceRefreshTimer)
   if (resumeFocusTimer !== undefined) window.clearTimeout(resumeFocusTimer)
@@ -437,7 +402,7 @@ nav button.active::before { content: none; }
 .menu-toggle { display: none; }
 .profile-shortcut { display: none; }
 .admin-shortcut { display: none; }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: linear-gradient(color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent),color-mix(in srgb,var(--color-background) calc(100% - var(--page-background-opacity,100%)),transparent)),var(--page-background-image); background-position: center top; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; }
+.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: var(--page-background-image); background-position: center top; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; }
 .topbar {
   position: sticky;
   top: 0;
