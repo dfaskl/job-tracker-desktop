@@ -121,7 +121,7 @@ function observeApplicationCards() {
   const grid = applicationGrid.value
   if (!grid || !revealObserver || !revealActive.value) return
   revealObserver.disconnect()
-  grid.querySelectorAll<HTMLElement>('.application-table-row:not(.application-fade-in)').forEach(card => revealObserver?.observe(card))
+  grid.querySelectorAll<HTMLElement>('.application:not(.application-fade-in)').forEach(card => revealObserver?.observe(card))
 }
 async function startApplicationReveal() {
   stopApplicationReveal()
@@ -139,7 +139,7 @@ async function startApplicationReveal() {
   nextRevealStart = performance.now()
   const scrollRoot = grid.scrollHeight > grid.clientHeight + 2 ? grid : null
   revealObserver = new IntersectionObserver(entries => {
-    const cards = Array.from(grid.querySelectorAll('.application-table-row'))
+    const cards = Array.from(grid.querySelectorAll('.application'))
     const visible = entries.filter(entry => entry.isIntersecting)
       .sort((left, right) => cards.indexOf(left.target) - cards.indexOf(right.target))
     const now = performance.now()
@@ -199,6 +199,7 @@ const applicationHeatCells=computed(()=>{
 watch(applicationMonthBounds,bounds=>{applicationHeatMonth.value=clampApplicationMonth(applicationHeatMonth.value,bounds)},{immediate:true})
 const selectedEvents = computed(() => selected.value ? store.events.value.filter(event=>event.applicationId===selected.value?.id).slice().sort((a,b)=>eventRecordTime(a).localeCompare(eventRecordTime(b))) : [])
 const selectedTimeline = computed(() => Array.isArray(selected.value?.timeline) ? selected.value.timeline as Record<string,unknown>[] : [])
+const flowSlots = computed(() => Math.max(1, ...filtered.value.map(item => flow(item).length)))
 const officialMatches = computed(() => {
   const key=normalizeCompanyName(form.company)
   if(!key)return []
@@ -224,14 +225,10 @@ function health(item:JobApplication){
   const days=progress.days
   return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}
 }
-function nextSchedule(item:JobApplication){
-  const now=Date.now()
-  return store.events.value.filter(event=>event.applicationId===item.id&&!event.completed&&!event.missed&&!event.abandoned&&timeOf(eventDeadline(event))>=now)
-    .sort((a,b)=>timeOf(eventOccurrenceTime(a))-timeOf(eventOccurrenceTime(b)))[0]
-}
 function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isFormalInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
 function applicationCategory(item:JobApplication){const tone=cardTone(item);return applicationCategories.find(category=>category.tone===tone)?.label||'仅投递'}
 function timeOf(value:unknown){const time=new Date(String(value||'').replace(' ','T')).getTime();return Number.isFinite(time)?time:0}
+function hasInterviewProgress(item:JobApplication){return ['面试','Offer'].includes(String(item.stage))||item.status==='已通过'||store.events.value.some(event=>event.applicationId===item.id&&!event.missed&&(isFormalInterview(event)||event.type==='Offer'))}
 function currentStageRank(item:JobApplication){
   const stage=stageCategory(item)
   if(stage==='Offer')return 0
@@ -268,6 +265,25 @@ function compareApplications(a:JobApplication,b:JobApplication){
   const appliedDifference=timeOf(b.appliedDate||b.createdAt)-timeOf(a.appliedDate||a.createdAt)
   if(appliedDifference)return appliedDifference
   return String(a.id).localeCompare(String(b.id),'zh-CN')
+}
+function flowVisual(label:unknown,type:unknown=''){const value=`${type||''} ${label||''}`;if(/未通过|错过|放弃/.test(value))return{style:'failed',icon:'×'};if(/Offer|录用|通过/.test(value))return{style:'offer',icon:'★'};if(value.includes('测评'))return{style:'assessment',icon:'◇'};if(value.includes('笔试'))return{style:'test',icon:'✎'};if(/面试|[一二三四五六七八九]面|HR/.test(value))return{style:'interview',icon:'◎'};if(value.includes('电话'))return{style:'phone',icon:'☎'};if(value.includes('等待'))return{style:'waiting',icon:'◷'};if(value.includes('投递'))return{style:'applied',icon:'↗'};return{style:'other',icon:'＋'}}
+function eventFlowDate(item:Record<string,unknown>){const start=eventOccurrenceTime(item),end=String(item.endsAt||item.end||'');return end?`${start.slice(0,10)} 至 ${end.slice(0,10)}`:start.slice(0,10)}
+function flow(item:JobApplication){
+  const events=store.events.value.filter(e=>e.applicationId===item.id).slice().sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
+  const applied=flowVisual('已投递')
+  const nodes=[{label:'已投递',at:String(item.appliedDate||''),kind:events.length||item.stage!=='已投递'?'done':'current',abandoned:false,...applied}]
+  events.forEach(event=>{
+    const abandoned=Boolean(event.abandoned||(!event.completed&&item.status==='已放弃'))
+    const deadline=timeOf(eventDeadline(event)),kind=abandoned?'abandoned':event.missed?'failed':event.completed?'done':deadline>Date.now()?'upcoming':'current'
+    const title=String(event.title||event.type||'日程')
+    nodes.push({label:abandoned?`${title}（已放弃）`:title,at:eventFlowDate(event),kind,abandoned,...flowVisual(event.title||event.type,event.type)})
+  })
+  const last=nodes[nodes.length-1],latest=events[events.length-1],latestPending=latest&&!latest.completed&&!latest.missed,terminal=['未通过','已放弃','已结束'].includes(String(item.status||'')),offer=item.stage==='Offer'||item.status==='已通过',enteredInterview=hasInterviewProgress(item)
+  let statusLabel=offer?'Offer':terminal?String(item.status):String(item.status||'')
+  if(statusLabel==='等待结果'&&!enteredInterview)statusLabel=''
+  if(statusLabel&&statusLabel!==last.label&&!(statusLabel==='等待结果'&&latestPending)){nodes.push({label:statusLabel,at:offer?'':'当前状态',kind:offer?'success':terminal?'failed':'current',abandoned:false,...flowVisual(statusLabel)})}
+  else if(!events.length&&item.stage!=='已投递'){nodes.push({label:String(item.stage),at:'当前阶段',kind:'current',abandoned:false,...flowVisual(item.stage,item.stage)})}
+  return nodes
 }
 function normalizeCompanyName(value:unknown){return String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('zh-CN')}
 function configuredOfficialUrl(item:JobApplication){const company=normalizeCompanyName(item.company);return companyLinks.value.find(link=>normalizeCompanyName(link.company)===company)?.url||''}
@@ -418,21 +434,11 @@ async function removeEvent(item:JobEvent){
   </div>
 </Teleport>
 <section class="card workspace">
-  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="application-table-scroll" :class="{ 'application-revealing': revealActive }">
-    <table class="applications-table">
-      <thead><tr><th scope="col">公司与岗位</th><th scope="col">地点与渠道</th><th scope="col">投递日期</th><th scope="col">阶段 / 状态</th><th scope="col">下一项日程</th><th scope="col">进展</th><th scope="col" class="application-actions-heading">操作</th></tr></thead>
-      <tbody>
-        <tr v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application-table-row" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]">
-          <td class="application-company-cell"><strong>{{text(item.company,'未填写公司')}}</strong><span>{{text(item.position,'未填写岗位')}}</span><small v-if="String(item.notes||'').trim()" :title="text(item.notes)">{{text(item.notes)}}</small></td>
-          <td><span>{{text(item.city,'地点未填')}}</span><small>{{text(item.channel,'渠道未填')}}</small></td>
-          <td>{{text(item.appliedDate,'未填写')}}</td>
-          <td><span class="application-stage-badge">{{text(item.stage,'未设置')}}</span><small class="application-status-text">{{text(item.status,'未设置状态')}}</small></td>
-          <td><template v-if="nextSchedule(item)"><span class="application-next-event">{{text(nextSchedule(item)?.title||nextSchedule(item)?.type,'日程')}}</span><small>{{eventDateLabel(nextSchedule(item)!)}} · {{eventTimeLabel(nextSchedule(item)!)}}</small></template><span v-else class="application-no-event">暂无待办日程</span></td>
-          <td><em v-if="health(item)" class="application-health" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em><span v-else class="application-no-event">—</span></td>
-          <td><div class="application-row-actions"><button v-if="!store.readOnly.value" type="button" class="secondary icon-button" :aria-label="`编辑 ${text(item.company)} · ${text(item.position)}`" title="编辑投递" @click="openEdit(item)"><AppIcon name="edit" /></button><button type="button" class="secondary icon-button" :aria-label="`查看 ${text(item.company)} · ${text(item.position)} 的详情`" title="查看详情" @click="selected=item"><AppIcon name="info" /></button></div></td>
-        </tr>
-      </tbody>
-    </table>
+  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :class="{ 'application-revealing': revealActive }">
+    <button v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]" @click="selected=item">
+      <div class="application-overview"><div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><i>·</i><span>{{text(item.position,'未填写岗位')}}</span><i>·</i><small>{{text(item.city,'地点未填')}}</small><i>·</i><small>{{text(item.channel,'渠道未填')}}</small></div><span v-if="String(item.notes||'').trim()" class="application-note" :title="text(item.notes)"><b>备注：</b>{{text(item.notes)}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div>
+      <div class="flow" :style="{'--flow-slots':flowSlots}" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
+    </button>
   </div>
   <p v-else-if="store.user.value" class="empty">没有符合条件的投递记录。</p><p v-else>登录后查看和管理投递。</p>
 </section>
@@ -621,21 +627,4 @@ async function removeEvent(item:JobEvent){
 :root[data-theme="dark"] .flow-node.abandoned { --node-color:#a1a8b0; --node-soft:#2b3036; }
 :root #app .flow-node.flow-other { --node-color:#347f9d; --node-soft:#e0f1f7; }
 :root[data-theme="dark"] #app .flow-node.flow-other { --node-color:#63b8d2; --node-soft:#1e3b45; }
-.workspace>.application-table-scroll{min-height:0;flex:1 1 auto;overflow:auto;padding:10px 4px 16px 2px;border-top:1px solid var(--color-border);scrollbar-width:thin;scrollbar-color:var(--color-border-strong) transparent;overscroll-behavior:contain}
-.applications-table{width:100%;min-width:1060px;border-collapse:separate;border-spacing:0;table-layout:fixed;color:var(--color-foreground);font-size:12px;text-align:left}
-.applications-table th{position:sticky;top:0;z-index:2;padding:11px 10px;border-bottom:1px solid var(--color-border);color:var(--color-muted-foreground);background:var(--color-card);font-size:11px;font-weight:750;white-space:nowrap}
-.applications-table th:first-child{width:22%}.applications-table th:nth-child(2){width:14%}.applications-table th:nth-child(3){width:10%}.applications-table th:nth-child(4){width:13%}.applications-table th:nth-child(5){width:17%}.applications-table th:nth-child(6){width:12%}.applications-table th:last-child{width:12%}
-.applications-table td{padding:12px 10px;border-bottom:1px solid var(--color-border);vertical-align:middle;background:var(--color-card)}
-.application-table-row{--row-accent:var(--color-border-strong);scroll-margin:25vh}
-.application-table-row>td:first-child{border-left:3px solid var(--row-accent)}
-.application-table-row.tone-pending{--row-accent:#4388d0}.application-table-row.tone-interview{--row-accent:#8968c4}.application-table-row.tone-assessment{--row-accent:#dc9629}.application-table-row.tone-applied{--row-accent:#7f8e87}.application-table-row.tone-stopped{--row-accent:#d45f57}.application-table-row.tone-offer{--row-accent:#2eaf69}
-.application-table-row:hover td{background:color-mix(in srgb,var(--row-accent) 5%,var(--color-card))}
-.application-table-row.application-arrival td{animation:application-table-arrival 1.4s ease-in-out both}
-@keyframes application-table-arrival{0%,38%,75%,100%{background:var(--color-card)}16%,56%{background:color-mix(in srgb,var(--color-primary) 18%,var(--color-card))}}
-.application-company-cell{display:grid;min-width:0;gap:3px}.application-company-cell strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.application-company-cell>span,.applications-table td>span,.application-next-event{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.application-company-cell>span{color:var(--color-muted-foreground)}.application-company-cell small,.applications-table td>small{display:block;max-width:100%;margin-top:3px;overflow:hidden;color:var(--color-muted-foreground);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.applications-table td:nth-child(2)>span,.applications-table td:nth-child(2)>small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.application-stage-badge{display:inline-flex;max-width:100%;padding:4px 7px;border:1px solid var(--color-border);border-radius:7px;color:var(--color-primary);background:var(--color-muted);font-weight:750}.application-status-text{color:var(--color-muted-foreground)}.application-next-event{display:block;max-width:100%;font-weight:700}.application-no-event{color:var(--color-muted-foreground);font-size:11px;white-space:nowrap}.application-health{display:inline-flex;padding:4px 7px;border-radius:999px;font-size:10px;font-style:normal;white-space:nowrap}.application-health.health-good{color:#167647;background:#e9f8ef}.application-health.health-watch{color:#8a5608;background:#fff3d6}.application-health.health-risk{color:#a52d2d;background:#fceaea}.application-actions-heading{text-align:right}.application-row-actions{display:flex;justify-content:flex-end;gap:6px}.application-row-actions .icon-button{width:34px;min-width:34px;min-height:34px;padding:0}.application-row-actions svg{width:16px;height:16px}
-:global(:root[data-theme="dark"] .applications-table th){background:var(--color-card)}
-:global(:root[data-theme="dark"] .applications-table td){background:var(--color-card)}
-:global(:root[data-theme="dark"] .application-table-row:hover td){background:color-mix(in srgb,var(--row-accent) 10%,var(--color-card))}
-@media(max-width:720px){.workspace>.application-table-scroll{margin-inline:-2px;padding-inline:0}.applications-table{min-width:1060px}.applications-table th,.applications-table td{padding-inline:9px}}
 </style>
