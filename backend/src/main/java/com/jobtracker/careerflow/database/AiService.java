@@ -596,6 +596,7 @@ public class AiService {
             字段必须为 company、position、noticeType、scheduleTitle、suggestedStage、suggestedStatus、startsAt、endsAt、location、summary。无法识别的字段返回空字符串。
             noticeType 只能为测评、笔试、面试、Offer、未通过、其他之一；scheduleTitle 必须与 noticeType 完全一致，不得使用邮件里的考试名称、活动全称或面试轮次；suggestedStage 只能为已投递、测评、笔试、面试、Offer、已结束之一；suggestedStatus 只能为等待结果、已通过、未通过、已放弃、已结束之一。
             如果通知属于 AI 面试、智能面试或由 AI 自动完成的面试评估，noticeType、scheduleTitle 和 suggestedStage 都必须返回测评，不得归类为面试。只有真人面试官参与的面试才归类为面试。
+            如果邮件明确表示本次招聘流程已经结束、岗位与候选人不匹配、简历/申请未通过、岗位取消或停止招聘等终止结果：noticeType 和 scheduleTitle 返回未通过，suggestedStage 返回已结束，suggestedStatus 按邮件事实返回未通过、已放弃或已结束；startsAt、endsAt、location 必须返回空字符串。此类邮件不是未来日程，不得从正文推断或创建安排时间。仅在仍有后续环节或明确要求参加活动时才识别日程。
             startsAt 和 endsAt 格式为 YYYY-MM-DD HH:mm。只有两个边界都明确且结束晚于开始时才填写 endsAt，不得猜测缺失时间。
             当前时间（Asia/Shanghai）为 %s。若邮件写明“收到本邮件后 N 小时/天内完成”“请于收到通知后 N 小时/天内完成”等相对期限，且内容属于可在期限内任意完成的测评、笔试或任务：将 startsAt 设为当前时间，将 endsAt 设为当前时间加上 N 小时/天后再提前 24 小时，并输出为时间段；例如“72 小时内完成”应形成从当前时间到 48 小时后的时间段。若原期限不超过 24 小时，提前 24 小时会导致区间无效，此时不要提前，endsAt 使用原期限。不得把具有明确举行时间的面试或会议误判为这种自由时间段。
             location 优先返回活动视频链接；没有链接时可返回明确线下地址或会议平台名称。不得把邮箱阅读页、职位详情页或公司首页当作活动链接。

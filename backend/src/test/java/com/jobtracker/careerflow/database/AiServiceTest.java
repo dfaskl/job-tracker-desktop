@@ -138,7 +138,7 @@ class AiServiceTest {
         assertThat(request.path("response_format").path("type").asText()).isEqualTo("json_object");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(1_000);
         assertThat(request.path("messages").get(0).path("content").asText())
-            .contains("输出示例", "AI 面试", "都必须返回测评");
+            .contains("输出示例", "AI 面试", "都必须返回测评", "岗位与候选人不匹配", "不得从正文推断或创建安排时间");
         assertThat(request.path("messages")).hasSize(4);
         assertThat(request.path("messages").get(2).path("role").asText()).isEqualTo("assistant");
         assertThat(request.path("messages").get(3).path("content").asText())

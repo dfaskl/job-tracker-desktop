@@ -46,6 +46,8 @@ const previewSrcdoc = computed(() => previewHtml.value
   : '')
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
+const terminalNotice = computed(() => result.noticeType === '未通过' || result.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(result.suggestedStatus))
+const terminalStatus = computed(() => ['未通过','已放弃','已结束'].includes(result.suggestedStatus) ? result.suggestedStatus : result.noticeType === '未通过' ? '未通过' : '已结束')
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
   applicationMatchScore(b, result.company, result.position) - applicationMatchScore(a, result.company, result.position)
 ))
@@ -53,7 +55,9 @@ const recommendedApplications = computed(() => rankedApplications.value.filter(i
 const otherApplications = computed(() => rankedApplications.value.filter(item => !isRecommendedApplication(item)))
 const canCreateSchedule = computed(() => Boolean(result.startsAt))
 const actionSummary = computed(() => hasResult.value
-  ? `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}，并自动创建关联日程`
+  ? terminalNotice.value
+    ? (matchedApplication.value ? `只更新“${matchedApplication.value.company} · ${matchedApplication.value.position}”的结束状态，不创建日程` : '结束类通知不能新建投递或日程')
+    : `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}，并自动创建关联日程`
   : '')
 
 watch(selectedApplicationId, () => {
@@ -234,6 +238,9 @@ async function recognize() {
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
     Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
+    if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
+      result.startsAt = ''; result.endsAt = ''; result.location = ''
+    }
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
     hasResult.value = true
     timeMode.value = value.endsAt ? 'range' : 'point'
@@ -257,10 +264,21 @@ async function saveResult() {
   if (saving.value) return
   const matched = matchedApplication.value
   if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
-  scheduleError.value=validateScheduleTime(timeMode.value,result.startsAt,result.endsAt)
-  if(scheduleError.value){error.value='';return}
+  if (terminalNotice.value && !matched) { error.value = '这是结束类通知，不会新建投递或日程。请先关联一条已有投递。'; return }
+  if (!terminalNotice.value) {
+    scheduleError.value=validateScheduleTime(timeMode.value,result.startsAt,result.endsAt)
+    if(scheduleError.value){error.value='';return}
+  }
   saving.value = true; error.value = ''; message.value = ''
   try {
+    if (terminalNotice.value && matched) {
+      const payload = { ...applicationPayload(matched), stage: '已结束', status: terminalStatus.value }
+      await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(payload) })
+      await store.refresh()
+      message.value = `已将 ${matched.company} · ${matched.position} 标记为${terminalStatus.value}，未创建日程`
+      mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
+      return
+    }
     const response = matched
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
@@ -281,6 +299,12 @@ async function saveResult() {
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
+}
+function skipTerminalUpdate() {
+  hasResult.value = false
+  selectedApplicationId.value = ''
+  message.value = '未修改投递，也未创建日程；邮件仍保留在待处理列表中'
+  error.value = ''
 }
 function preventImplicitSubmit(event: KeyboardEvent) {
   if (event.isComposing || event.keyCode === 229) return
@@ -316,19 +340,20 @@ function preventImplicitSubmit(event: KeyboardEvent) {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
-          <label class="wide application-match"><span>关联已有投递</span><BaseSelect v-model="selectedApplicationId" :options="[{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{matchedApplication ? '将更新该投递的阶段和状态；识别出有效时间时会自动创建关联日程。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
+          <label class="wide application-match"><span>{{terminalNotice?'关联要结束的已有投递':'关联已有投递'}}</span><BaseSelect v-model="selectedApplicationId" :options="terminalNotice ? [{value:'',label:'请选择已有投递（不会新建）'},...rankedApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))] : [{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{terminalNotice ? (matchedApplication ? '确认后只会把这条投递标记为已结束，不会创建日程。' : '结束类通知不能新建投递或日程，请选择一条已有投递。') : matchedApplication ? '将更新该投递的阶段和状态；识别出有效时间时会自动创建关联日程。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
+          <div v-if="terminalNotice" class="terminal-notice wide" role="status"><AppIcon name="info" :size="18" /><div><strong>邮件可能表示招聘流程已结束或岗位不匹配</strong><span>已关闭日程录入。请确认是否要结束关联投递。</span></div></div>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><BaseSelect v-model="result.noticeType" :options="noticeTypes" /></label>
-          <label><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
-          <ScheduleTimeModeNotice class="wide" :mode="timeMode" :detected="canCreateSchedule" />
-          <label><span>时间类型 *</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
-          <label><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
-          <label><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
-          <label v-if="timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
-          <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
+          <label v-if="!terminalNotice"><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
+          <ScheduleTimeModeNotice v-if="!terminalNotice" class="wide" :mode="timeMode" :detected="canCreateSchedule" />
+          <label v-if="!terminalNotice"><span>时间类型 *</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
+          <label v-if="!terminalNotice"><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
+          <label v-if="!terminalNotice"><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
+          <label v-if="!terminalNotice&&timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
+          <label v-if="!terminalNotice" class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
-          <div class="commit-box wide"><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></div>
+          <div class="commit-box wide"><template v-if="terminalNotice"><span>{{actionSummary}}</span><div class="terminal-actions"><button type="button" class="secondary" :disabled="saving" @click="skipTerminalUpdate">暂不修改</button><button type="submit" :disabled="saving||!matchedApplication">{{saving?'正在更新…':'标记投递已结束'}}</button></div></template><template v-else><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></template></div>
         </form>
         <div v-else-if="recognizing" class="recognition-state" role="status" aria-live="polite" aria-busy="true"><span class="recognition-spinner large" aria-hidden="true"></span><strong>正在分析邮件内容</strong><span>识别结果会显示在这里，请稍候。</span><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
         <div v-else class="empty-state"><div class="empty-state-copy"><span class="empty-state-icon" aria-hidden="true"><AppIcon name="mail" :size="22" /></span><div><strong>等待识别结果</strong><span>识别出的公司、岗位、通知类型和时间会显示在这里。</span></div></div><div class="form-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div></div>
@@ -413,6 +438,18 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:1fr 1fr}.sync-button,.process-all-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
+</style>
+
+<style scoped>
+.terminal-notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid color-mix(in srgb,#cf8b22 35%,var(--color-border));border-radius:10px;color:#76500d;background:color-mix(in srgb,#f3bf54 12%,var(--color-card))}
+.terminal-notice>svg{flex:none;margin-top:1px;color:#ae7415}
+.terminal-notice>div{display:grid;gap:4px}
+.terminal-notice strong{font-size:12px}
+.terminal-notice span{color:var(--color-muted-foreground);font-size:11px;line-height:1.5}
+.terminal-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+:global(:root[data-theme="dark"] .terminal-notice){border-color:#6e5428;color:#f0d093;background:#342a19}
+:global(:root[data-theme="dark"] .terminal-notice>svg){color:#e5ae4b}
+@media(max-width:650px){.terminal-actions{width:100%}.terminal-actions button{flex:1}}
 </style>
 <style scoped>
 :global(:root[data-theme="dark"] .step) {
