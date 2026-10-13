@@ -138,7 +138,7 @@ class AiServiceTest {
         assertThat(request.path("response_format").path("type").asText()).isEqualTo("json_object");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(1_000);
         assertThat(request.path("messages").get(0).path("content").asText())
-            .contains("输出示例", "AI 面试", "都必须返回测评", "岗位与候选人不匹配", "不得从正文推断或创建安排时间");
+            .contains("输出示例", "AI 面试", "统一归类为测评", "岗位不匹配", "账号、用户名、密码", "不要把这些内容放进 location", "不得推断安排时间");
         assertThat(request.path("messages")).hasSize(4);
         assertThat(request.path("messages").get(2).path("role").asText()).isEqualTo("assistant");
         assertThat(request.path("messages").get(3).path("content").asText())
@@ -154,7 +154,7 @@ class AiServiceTest {
         List<String> reasons = new ArrayList<>();
         List<String> previousOutputs = new ArrayList<>();
         String valid = """
-            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","summary":""}
+            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","notes":"账号：candidate01；密码：abc123","summary":""}
             """;
 
         var result = service.recognizeWithRetries("真人面试通知", (reason, previousOutput) -> {
@@ -168,6 +168,7 @@ class AiServiceTest {
         assertThat(reasons.subList(1, 4)).allMatch(reason -> reason.contains("JSON 缺少字符串字段"));
         assertThat(previousOutputs.get(1)).contains("示例科技");
         assertThat(result.noticeType()).isEqualTo("面试");
+        assertThat(result.notes()).isEqualTo("账号：candidate01；密码：abc123");
     }
 
     @Test

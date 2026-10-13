@@ -9,7 +9,7 @@ import { validateScheduleTime } from './scheduleValidation'
 import { confirmDialog } from './modalDialogs'
 
 type AiStatus = { callsEnabled: boolean; message: string }
-type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; summary: string }
+type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; notes: string; summary: string }
 type CollectedMail = { id: number; sender: string; subject: string; body: string; receivedAt: string; accountEmail: string }
 const noticeTypes = ['测评', '笔试', '面试', 'Offer', '未通过', '其他']
 const store = useJobTrackerStore()
@@ -237,7 +237,7 @@ async function recognize() {
   recognizing.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
-    Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: '' })
+    Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
     if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
       result.startsAt = ''; result.endsAt = ''; result.location = ''
     }
@@ -351,7 +351,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           <label v-if="!terminalNotice"><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
           <label v-if="!terminalNotice"><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label v-if="!terminalNotice&&timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
-          <label v-if="!terminalNotice" class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="可补充轮次、准备事项等" /></label>
+          <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="账号密码、考试码或其他需要记住的信息" /></label>
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
           <div class="commit-box wide"><template v-if="terminalNotice"><span>{{actionSummary}}</span><div class="terminal-actions"><button type="button" class="secondary" :disabled="saving" @click="skipTerminalUpdate">暂不修改</button><button type="submit" :disabled="saving||!matchedApplication">{{saving?'正在更新…':'标记投递已结束'}}</button></div></template><template v-else><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></template></div>
         </form>
