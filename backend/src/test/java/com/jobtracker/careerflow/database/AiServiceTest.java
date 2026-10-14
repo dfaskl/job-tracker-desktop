@@ -154,7 +154,7 @@ class AiServiceTest {
         List<String> reasons = new ArrayList<>();
         List<String> previousOutputs = new ArrayList<>();
         String valid = """
-            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","notes":"账号：candidate01；密码：abc123","summary":""}
+            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","summary":""}
             """;
 
         var result = service.recognizeWithRetries("真人面试通知", (reason, previousOutput) -> {
@@ -168,7 +168,22 @@ class AiServiceTest {
         assertThat(reasons.subList(1, 4)).allMatch(reason -> reason.contains("JSON 缺少字符串字段"));
         assertThat(previousOutputs.get(1)).contains("示例科技");
         assertThat(result.noticeType()).isEqualTo("面试");
-        assertThat(result.notes()).isEqualTo("账号：candidate01；密码：abc123");
+        assertThat(result.notes()).isEmpty();
+    }
+
+    @Test
+    void doesNotRetryPermanentAiHttpErrors() {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+        AtomicInteger calls = new AtomicInteger();
+
+        assertThatThrownBy(() -> service.recognizeWithRetries("招聘通知", (reason, previousOutput) -> {
+            calls.incrementAndGet();
+            throw new AiService.AiResponseException("AI 请求失败（401）");
+        })).hasMessage("AI 请求失败（401）");
+
+        assertThat(calls.get()).isEqualTo(1);
     }
 
     @Test

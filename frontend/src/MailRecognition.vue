@@ -253,7 +253,7 @@ function applicationPayload(item?: JobApplication) {
     company: String(item?.company || result.company).trim(), position: String(item?.position || result.position).trim(),
     city: String(item?.city || ''), channel: String(item?.channel || '邮件识别'),
     appliedDate: String(item?.appliedDate || today()), stage: result.suggestedStage,
-    status: result.suggestedStatus, notes: result.notes.trim() || String(item?.notes || ''),
+    status: result.suggestedStatus, notes: String(item?.notes || ''),
     expectedUpdatedAt: String(item?.updatedAt || '')
   }
   if(item)return payload
@@ -283,11 +283,21 @@ async function saveResult() {
       ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
     let duplicateSchedule=false
+    let updatedScheduleNote=false
     if (matched) {
       const eventType=result.noticeType==='其他'||result.noticeType==='未通过'?'其他':result.noticeType
       const startsAt=apiTime(result.startsAt),endsAt=timeMode.value==='range'?apiTime(result.endsAt):''
-      duplicateSchedule=store.events.value.some(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
-      if(!duplicateSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
+      const existingSchedule=store.events.value.find(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
+      duplicateSchedule=Boolean(existingSchedule)
+      if(existingSchedule&&result.notes.trim()){
+        await api(`/api/poc/event-sandbox/events/${encodeURIComponent(existingSchedule.id)}`,{method:'PUT',body:JSON.stringify({
+          applicationId:response.application.id,type:String(existingSchedule.type||eventType),title:String(existingSchedule.title||result.scheduleTitle.trim()||eventType),
+          startsAt:apiTime(String(existingSchedule.startsAt||existingSchedule.start||existingSchedule.date||'')),
+          endsAt:apiTime(String(existingSchedule.endsAt||existingSchedule.end||'')),location:String(existingSchedule.location||''),
+          notes:result.notes.trim(),expectedUpdatedAt:String(existingSchedule.updatedAt||existingSchedule.createdAt||'')
+        })})
+        updatedScheduleNote=true
+      }else if(!existingSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
         applicationId: response.application.id, type: eventType,
         title: result.scheduleTitle.trim()||(eventType==='其他'?'邮件通知':eventType),
         startsAt, endsAt,
@@ -295,7 +305,7 @@ async function saveResult() {
       }) })
     }
     await store.refresh()
-    message.value = duplicateSchedule ? '已更新投递；相同日程已存在，未重复创建' : `已${matched ? '更新投递' : '新建投递'}并自动创建关联日程，写入前备份已自动生成`
+    message.value = duplicateSchedule ? (updatedScheduleNote?'已更新投递和匹配日程备注，未重复创建日程':'已更新投递；相同日程已存在，未重复创建') : `已${matched ? '更新投递' : '新建投递'}并自动创建关联日程，写入前备份已自动生成`
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
