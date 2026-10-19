@@ -138,7 +138,8 @@ class AiServiceTest {
         assertThat(request.path("response_format").path("type").asText()).isEqualTo("json_object");
         assertThat(request.path("max_tokens").asInt()).isEqualTo(1_000);
         assertThat(request.path("messages").get(0).path("content").asText())
-            .contains("输出示例", "AI 面试", "统一归类为测评", "岗位不匹配", "账号、用户名、密码", "不要把这些内容放进 location", "不得推断安排时间");
+            .contains("输出示例", "AI 面试", "统一归类为测评", "岗位不匹配", "账号、用户名、密码", "不要把这些内容放进 location", "不得推断安排时间",
+                "严格区分绝对截止时间和相对期限", "绝不能减一天或提前", "收到通知后 N 小时/天/工作日内完成");
         assertThat(request.path("messages")).hasSize(4);
         assertThat(request.path("messages").get(2).path("role").asText()).isEqualTo("assistant");
         assertThat(request.path("messages").get(3).path("content").asText())
