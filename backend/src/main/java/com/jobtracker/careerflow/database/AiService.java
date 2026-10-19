@@ -649,6 +649,7 @@ public class AiService {
     private String callAi(URI endpoint, String apiKey, String model, String mailBody, String failureReason, String previousOutput) throws Exception {
         String currentTime = ZonedDateTime.now(ZoneId.of("Asia/Shanghai")).toLocalDateTime().withSecond(0).withNano(0).format(TIME_FORMAT);
         ObjectNode requestBody = recognitionRequestBody(model, mailBody, currentTime, failureReason, previousOutput);
+        prepareRecognitionRequest(requestBody, endpoint);
         HttpRequest request = HttpRequest.newBuilder(endpoint)
             .timeout(Duration.ofSeconds(60))
             .header("Content-Type", "application/json")
@@ -664,10 +665,44 @@ public class AiService {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new AiResponseException("AI 请求失败（" + response.statusCode() + "）");
         }
-        JsonNode responseJson = objectMapper.readTree(responseBytes);
-        String content = responseJson.path("choices").path(0).path("message").path("content").asText("");
-        if (content.isBlank()) throw new AiResponseException("AI 没有返回识别内容");
+        return parseRecognitionResponse(objectMapper.readTree(responseBytes));
+    }
+
+    void prepareRecognitionRequest(ObjectNode requestBody, URI endpoint) {
+        if ("api.deepseek.com".equalsIgnoreCase(endpoint.getHost()))
+            requestBody.putObject("thinking").put("type", "disabled");
+    }
+
+    String parseRecognitionResponse(JsonNode response) {
+        JsonNode choice = response.path("choices").path(0);
+        if (!choice.isObject()) throw new AiResponseException("AI 响应缺少 choices[0]");
+        String finishReason = choice.path("finish_reason").asText("");
+        if ("length".equals(finishReason))
+            throw new AiResponseException("AI 识别结果被输出长度限制截断，请重试");
+        if ("content_filter".equals(finishReason))
+            throw new AiResponseException("AI 服务因内容过滤未返回识别结果");
+        JsonNode message = choice.path("message");
+        String refusal = message.path("refusal").asText("").trim();
+        if (!refusal.isEmpty()) throw new AiResponseException("AI 拒绝处理这封邮件");
+        JsonNode contentNode = message.path("content");
+        String content = contentNode.isTextual() ? contentNode.asText() : textFromContentParts(contentNode);
+        if (content.isBlank()) {
+            if (!message.path("reasoning_content").asText("").isBlank())
+                throw new AiResponseException("AI 只返回了推理内容，没有返回识别结果；请关闭模型思考模式后重试");
+            throw new AiResponseException("AI 响应正文为空（finish_reason="
+                + (finishReason.isBlank() ? "未知" : finishReason) + "）");
+        }
         return content;
+    }
+
+    private String textFromContentParts(JsonNode content) {
+        if (!content.isArray()) return "";
+        StringBuilder text = new StringBuilder();
+        for (JsonNode part : content) {
+            String value = part.path("text").asText("");
+            if (!value.isEmpty()) text.append(value);
+        }
+        return text.toString();
     }
 
     private String callNormalize(URI endpoint, String apiKey, String model, JsonNode application) throws Exception {

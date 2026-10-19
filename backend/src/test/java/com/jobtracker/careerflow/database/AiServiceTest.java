@@ -187,6 +187,26 @@ class AiServiceTest {
     }
 
     @Test
+    void disablesDeepSeekThinkingForMailRecognitionAndExplainsEmptyResponses() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
+        AiService service = service(new MockEnvironment(), sandbox);
+        var request = service.recognitionRequestBody("deepseek-chat", "招聘通知", "2026-10-19 10:00", "", "");
+        service.prepareRecognitionRequest(request, URI.create("https://api.deepseek.com/chat/completions"));
+        assertThat(request.path("thinking").path("type").asText()).isEqualTo("disabled");
+
+        assertThatThrownBy(() -> service.parseRecognitionResponse(new ObjectMapper().readTree(
+            "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"\",\"reasoning_content\":\"分析中\"}}]}")))
+            .isInstanceOf(AiService.AiResponseException.class).hasMessageContaining("只返回了推理内容");
+        assertThatThrownBy(() -> service.parseRecognitionResponse(new ObjectMapper().readTree(
+            "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"content\":\"\"}}]}")))
+            .isInstanceOf(AiService.AiResponseException.class).hasMessageContaining("截断");
+        assertThat(service.parseRecognitionResponse(new ObjectMapper().readTree(
+            "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"company\\\":\\\"甲\\\"}\"}]}}]}")))
+            .isEqualTo("{\"company\":\"甲\"}");
+    }
+
+    @Test
     void forcesAiInterviewIntoAssessmentStage() throws Exception {
         ApplicationService sandbox = mock(ApplicationService.class);
         when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
