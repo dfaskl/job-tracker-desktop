@@ -10,6 +10,17 @@ function event(overrides: Partial<JobEvent>): JobEvent {
 }
 
 describe('applicationProgressHealth', () => {
+  it.each([
+    [7, '进展正常'],
+    [8, '等待较久'],
+    [21, '等待较久'],
+    [22, '建议确认']
+  ])('uses the correct threshold at %i days', (days, label) => {
+    const startsAt = new Date(now - Number(days) * 86_400_000).toISOString()
+    const result = applicationProgressHealth(interviewApplication, [event({ startsAt })], now)
+    expect(result).toEqual({ days, label })
+  })
+
   it('counts from the latest associated schedule regardless of event type', () => {
     const result = applicationProgressHealth(interviewApplication, [
       event({ id: 'interview', type: '面试', completed: true, completedAt: '2026-09-28T10:00:00Z' }),

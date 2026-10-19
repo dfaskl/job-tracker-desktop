@@ -37,5 +37,5 @@ export function applicationProgressHealth(
   if (!times.length) return null
 
   const days = Math.max(0, Math.floor((now - Math.max(...times)) / 86_400_000))
-  return { days, label: days <= 3 ? '进展正常' : days < 10 ? '等待较久' : '等待确认' }
+  return { days, label: days <= 7 ? '进展正常' : days <= 21 ? '等待较久' : '建议确认' }
 }

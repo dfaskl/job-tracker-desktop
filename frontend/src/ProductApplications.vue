@@ -223,7 +223,7 @@ function health(item:JobApplication){
   const progress=applicationProgressHealth(item,store.events.value)
   if(!progress)return null
   const days=progress.days
-  return {days,label:days<=3?'进展正常':days<10?'等待较久':'建议确认',tone:days<=3?'good':days<10?'watch':'risk'}
+  return {days,label:days<=7?'进展正常':days<=21?'等待较久':'建议确认',tone:days<=7?'good':days<=21?'watch':'risk'}
 }
 function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isFormalInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
 function applicationCategory(item:JobApplication){const tone=cardTone(item);return applicationCategories.find(category=>category.tone===tone)?.label||'仅投递'}
