@@ -55,6 +55,7 @@ let homeRevealRun = 0
 let homeRevealStartedAt = 0
 let nextScheduleReveal = 0
 let nextConfirmationReveal = 0
+let sharedTimelineRequest = 0
 
 function stopHomeReveal() {
   homeRevealRun += 1
@@ -155,9 +156,15 @@ async function startHomeReveal() {
   observeHomeSections()
   observeHomeCards()
 }
-onActivated(() => { homeViewActive = true; void startHomeReveal() })
+onActivated(() => {
+  homeViewActive = true
+  void store.refresh(false, false, false)
+  void loadSharedTimelines()
+  void startHomeReveal()
+})
 onDeactivated(() => { homeViewActive = false; stopHomeReveal() })
 watch(() => store.user.value?.id, () => { if (homeViewActive) void startHomeReveal() })
+watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 watch([timelineSection, adviceSection, detailsSection, confirmationSection], () => {
   if (homeEntering.value) void nextTick(observeHomeSections)
 })
@@ -260,7 +267,6 @@ watch([scheduleList, confirmationList, recentSchedules, staleApplications], () =
 
 onMounted(async () => {
   await store.initialize()
-  void loadSharedTimelines()
   const cached = loadCachedQuote()
   if (store.user.value && !cached) await generateQuote(false)
 })
@@ -273,11 +279,12 @@ function parseTime(value:string){const time=new Date(value.replace(' ','T')).get
 function teamConflictTime(item:TeamTimelineEntry){const match=item.date.match(/^\d{4}-(\d{2})-(\d{2})$/);return match?`${Number(match[1])}月${Number(match[2])}日 ${item.start}`:`${item.date} ${item.start}`}
 function displayName(name:string|undefined,email:string){return String(name||'').trim()||String(email||'').split('@')[0]||'未命名用户'}
 async function loadSharedTimelines(){
-  if(!store.user.value||sharedTimelinesLoading.value)return
+  if(!store.user.value)return
+  const request=++sharedTimelineRequest
   sharedTimelinesLoading.value=true;sharedTimelinesNotice.value=''
-  try{const result=await api<{groupId:string;groupName:string;users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines');sharedTimelines.value=Array.isArray(result.users)?result.users:[];sharedGroupName.value=String(result.groupName||'')}
-  catch{sharedTimelines.value=[];sharedGroupName.value='';sharedTimelinesNotice.value='小组时间轴暂时无法加载'}
-  finally{sharedTimelinesLoading.value=false}
+  try{const result=await api<{groupId:string;groupName:string;users:SharedTimelineUser[]}>('/api/poc/event-sandbox/timelines');if(request!==sharedTimelineRequest)return;sharedTimelines.value=Array.isArray(result.users)?result.users:[];sharedGroupName.value=String(result.groupName||'')}
+  catch{if(request===sharedTimelineRequest){sharedTimelines.value=[];sharedGroupName.value='';sharedTimelinesNotice.value='小组时间轴暂时无法加载'}}
+  finally{if(request===sharedTimelineRequest)sharedTimelinesLoading.value=false}
 }
 function adviceCacheKey(){return 'job_tracker_schedule_advice_v12_'+String(store.user.value?.email||'guest').toLowerCase()}
 function scheduleAdviceExpiry(){const now=Date.now();const times=adviceCandidates.value.map(event=>parseTime(eventDeadline(event))).filter(time=>Number.isFinite(time)&&time>now);return times.length?Math.min(...times):now}
