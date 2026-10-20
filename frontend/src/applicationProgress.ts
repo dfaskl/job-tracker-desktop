@@ -12,6 +12,12 @@ function eventEnd(event: JobEvent) {
   return event.endsAt || event.end || event.startsAt || event.start || event.date || ''
 }
 
+export function schedulePriorityTimestamp(event: JobEvent) {
+  const deadline = event.endsAt || event.end || event.startsAt || event.start || event.date || ''
+  const time = eventTime(deadline)
+  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY
+}
+
 export function applicationProgressHealth(
   application: JobApplication,
   events: JobEvent[],

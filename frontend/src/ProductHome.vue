@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
-import { applicationProgressHealth } from './applicationProgress'
+import { applicationProgressHealth, schedulePriorityTimestamp } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import { confirmDialog } from './modalDialogs'
 
@@ -173,7 +173,7 @@ watch(adviceSection, (current, previous) => {
 })
 
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
-  .sort((a,b) => eventDeadline(a).localeCompare(eventDeadline(b))))
+  .sort((a,b) => schedulePriorityTimestamp(a)-schedulePriorityTimestamp(b)))
 const recentSchedules = computed(() => upcomingItems.value)
 const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({

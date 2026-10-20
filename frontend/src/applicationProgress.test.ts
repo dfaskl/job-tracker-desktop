@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applicationProgressHealth } from './applicationProgress'
+import { applicationProgressHealth, schedulePriorityTimestamp } from './applicationProgress'
 import type { JobApplication, JobEvent } from './jobTrackerStore'
 
 const now = Date.parse('2026-10-11T00:00:00Z')
@@ -61,5 +61,20 @@ describe('applicationProgressHealth', () => {
         completedAt: '2026-10-11 00:51'
       })
     ], new Date('2026-10-11T18:00:00').getTime())).toEqual({ days: 1, label: '进展正常' })
+  })
+})
+
+describe('schedulePriorityTimestamp', () => {
+  it('uses the start for a point schedule and the end for a time range', () => {
+    const point = event({ startsAt: '2026-10-21T14:00:00+08:00' })
+    const range = event({ startsAt: '2026-10-20T14:33:00+08:00', endsAt: '2026-10-22T14:33:00+08:00' })
+
+    expect(schedulePriorityTimestamp(point)).toBe(Date.parse('2026-10-21T06:00:00Z'))
+    expect(schedulePriorityTimestamp(range)).toBe(Date.parse('2026-10-22T06:33:00Z'))
+    expect(schedulePriorityTimestamp(range)).toBeGreaterThan(schedulePriorityTimestamp(point))
+  })
+
+  it('places schedules without a valid time after dated schedules', () => {
+    expect(schedulePriorityTimestamp(event({ startsAt: '' }))).toBe(Number.POSITIVE_INFINITY)
   })
 })
