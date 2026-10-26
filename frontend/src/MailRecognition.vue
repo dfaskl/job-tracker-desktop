@@ -356,8 +356,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>
           <label><span>通知类型</span><BaseSelect v-model="result.noticeType" :options="noticeTypes" /></label>
           <label v-if="!terminalNotice"><span>安排名称</span><input v-model="result.scheduleTitle" maxlength="160" placeholder="如：一面、二面、HR面试" /></label>
-          <ScheduleTimeModeNotice v-if="!terminalNotice" class="wide" :mode="timeMode" :detected="canCreateSchedule" />
-          <label v-if="!terminalNotice"><span>时间类型 *</span><BaseSelect v-model="timeMode" :options="[{value:'point',label:'时间点'},{value:'range',label:'时间段'}]" /></label>
+          <ScheduleTimeModeNotice v-if="!terminalNotice" class="wide" :mode="timeMode" :detected="canCreateSchedule" selectable @select="timeMode=$event" />
           <label v-if="!terminalNotice"><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
           <label v-if="!terminalNotice"><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label v-if="!terminalNotice&&timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
