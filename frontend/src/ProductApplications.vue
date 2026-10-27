@@ -519,6 +519,10 @@ async function removeEvent(item:JobEvent){
   min-width: 0;
 }
 
+.application-title > strong {
+  margin-right: 6px;
+}
+
 .application-note {
   min-width: 0;
   margin: 0;
