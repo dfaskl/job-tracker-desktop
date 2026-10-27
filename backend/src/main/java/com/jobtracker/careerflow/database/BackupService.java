@@ -203,7 +203,13 @@ public class BackupService {
                     "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
                 )) {
                     save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
-                    try (ResultSet saved = save.executeQuery()) { saved.next(); String updatedAt = instant(saved, "updated_at"); connection.commit(); return new CompanyLinks(items, updatedAt); }
+                    String updatedAt;
+                    try (ResultSet saved = save.executeQuery()) {
+                        if (!saved.next()) throw new IllegalStateException("公司行业标签保存失败");
+                        updatedAt = instant(saved, "updated_at");
+                    }
+                    connection.commit();
+                    return new CompanyLinks(items, updatedAt);
                 }
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
