@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 @Component
 public class BackupService {
@@ -90,17 +91,25 @@ public class BackupService {
                     }
                     JsonNode previous = storedByCompany.get(companyKey(company));
                     var normalized = clean.addObject().put("company", company).put("url", url);
+                    String industryVersion = item.path("industryVersion").asText("").trim();
+                    if (industryVersion.isEmpty() && previous != null) industryVersion = previous.path("industryVersion").asText("").trim();
                     String industry = item.path("industry").asText("").trim();
                     if (industry.isEmpty() && previous != null) industry = previous.path("industry").asText("").trim();
-                    if (!industry.isEmpty()) {
-                        if (!CompanyIndustryCatalog.ALLOWED.contains(industry)) throw new IllegalArgumentException("公司行业标签无效");
+                    String industryError = item.path("industryError").asText("").trim();
+                    if (industryError.isEmpty() && previous != null) industryError = previous.path("industryError").asText("").trim();
+                    if (!industry.isEmpty() && CompanyIndustryCatalog.ALLOWED.contains(industry)
+                        && CompanyIndustryCatalog.VERSION.equals(industryVersion)) {
                         normalized.put("industry", industry);
                     }
                     String industryStatus = item.path("industryStatus").asText("").trim();
                     if (industryStatus.isEmpty() && previous != null) industryStatus = previous.path("industryStatus").asText("").trim();
+                    if (!CompanyIndustryCatalog.VERSION.equals(industryVersion) || !CompanyIndustryCatalog.ALLOWED.contains(industry)) {
+                        industryStatus = "pending";
+                        industryVersion = CompanyIndustryCatalog.VERSION;
+                        industryError = "";
+                    }
                     if (!industryStatus.isEmpty()) normalized.put("industryStatus", industryStatus);
-                    String industryError = item.path("industryError").asText("").trim();
-                    if (industryError.isEmpty() && previous != null) industryError = previous.path("industryError").asText("").trim();
+                    if (!industryVersion.isEmpty()) normalized.put("industryVersion", industryVersion);
                     if (!industryError.isEmpty()) normalized.put("industryError", industryError.substring(0, Math.min(300, industryError.length())));
                 }
                 String updatedAt;
@@ -145,11 +154,17 @@ public class BackupService {
                     String key = companyKey(company);
                     var entry = byCompany.get(key);
                     if (entry == null) {
-                        entry = items.addObject().put("company", company).put("url", "").put("industryStatus", "pending");
+                        entry = items.addObject().put("company", company).put("url", "").put("industryStatus", "pending")
+                            .put("industryVersion", CompanyIndustryCatalog.VERSION);
                         byCompany.put(key, entry);
                         changed = true;
+                    } else if (!CompanyIndustryCatalog.VERSION.equals(entry.path("industryVersion").asText(""))) {
+                        entry.remove("industry");
+                        entry.remove("industryError");
+                        entry.put("industryStatus", "pending").put("industryVersion", CompanyIndustryCatalog.VERSION);
+                        changed = true;
                     } else if (entry.path("industry").asText("").isBlank()
-                        && !"pending".equals(entry.path("industryStatus").asText(""))) {
+                        && !Set.of("pending", "failed").contains(entry.path("industryStatus").asText(""))) {
                         entry.put("industryStatus", "pending").remove("industryError");
                         changed = true;
                     }
@@ -194,9 +209,11 @@ public class BackupService {
                     String key = companyKey(entry.path("company").asText(""));
                     String industry = normalizedResults.get(key);
                     if (industry != null && CompanyIndustryCatalog.ALLOWED.contains(industry)) {
-                        entry.put("industry", industry).put("industryStatus", "classified").remove("industryError");
+                        entry.put("industry", industry).put("industryStatus", "classified")
+                            .put("industryVersion", CompanyIndustryCatalog.VERSION).remove("industryError");
                     } else if (error != null && !error.isBlank() && "pending".equals(entry.path("industryStatus").asText(""))) {
-                        entry.put("industryStatus", "failed").put("industryError", error.substring(0, Math.min(300, error.length())));
+                        entry.put("industryStatus", "failed").put("industryVersion", CompanyIndustryCatalog.VERSION)
+                            .put("industryError", error.substring(0, Math.min(300, error.length())));
                     }
                 }
                 try (PreparedStatement save = connection.prepareStatement(
