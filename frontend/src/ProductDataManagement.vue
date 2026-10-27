@@ -6,7 +6,7 @@ import { formatShanghaiDateTime } from './shanghaiTime'
 import { exportRawBusinessData, exportReadableBusinessData } from './businessDataExport'
 import { confirmDialog } from './modalDialogs'
 
-type CompanyLink = { company: string; url: string }
+type CompanyLink = { company: string; url: string; industry?: string; industryStatus?: 'pending' | 'classified' | 'failed' | ''; industryError?: string }
 type CompanyLinkResponse = { items: CompanyLink[]; updatedAt: string }
 type SandboxStatus = { enabled: boolean; configured: boolean; isolated: boolean; message: string }
 type ImportResult = { applicationCount: number; eventCount: number; currentUpdatedAt: string }
@@ -37,7 +37,7 @@ const error = ref('')
 const filteredLinks = computed(() => {
   const q = linkQuery.value.trim().toLowerCase()
   if (!q) return links.value
-  return links.value.filter((item) => item.company.toLowerCase().includes(q) || item.url.toLowerCase().includes(q))
+  return links.value.filter((item) => item.company.toLowerCase().includes(q) || item.url.toLowerCase().includes(q) || String(item.industry||'').toLowerCase().includes(q))
 })
 
 const exactNewLink = computed(() => {
@@ -140,12 +140,12 @@ async function saveEdit() {
   const current = editingLink.value
   const company = editingCompany.value.trim(), url = editingUrl.value.trim()
   if (!current) return
-  if (!company || !/^https?:\/\//i.test(url)) { error.value = '请填写公司名称和以 http:// 或 https:// 开头的网址'; return }
+  if (!company || (url && !/^https?:\/\//i.test(url))) { error.value = '官网网址需留空或以 http://、https:// 开头'; return }
   if (links.value.some(item => item !== current && normalizeCompany(item.company) === normalizeCompany(company))) {
     error.value = `“${company}”已存在，不能保存为重复公司`
     return
   }
-  const next = links.value.map(item => item === current ? { company, url } : item).sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))
+  const next = links.value.map(item => item === current ? { ...item, company, url } : item).sort((a,b)=>a.company.localeCompare(b.company,'zh-CN'))
   if (await saveLinks(next)) cancelEdit()
 }
 async function removeLink(item: CompanyLink) {
@@ -271,7 +271,7 @@ function formatDate(value: string) {
 <template>
   <section class="card data-card">
     <div class="section-head">
-      <div><span class="section-kicker">数据管理</span><h2>公司官网库与业务数据</h2></div>
+      <div><span class="section-kicker">数据管理</span><h2>公司库与业务数据</h2></div>
       <button class="secondary" type="button" @click="openCompanyLinks">{{ links.length ? '官网库详情' : '＋ 添加第一条公司链接' }}</button>
     </div>
 
@@ -312,7 +312,7 @@ function formatDate(value: string) {
   <div v-if="linkDetailsOpen" class="link-backdrop" @click.self="linkDetailsOpen=false">
     <section class="link-modal" role="dialog" aria-modal="true" aria-labelledby="company-links-title">
       <button type="button" class="modal-close icon-button" aria-label="关闭公司官网库" title="关闭" @click="linkDetailsOpen=false"><AppIcon name="close" /></button>
-      <div class="modal-heading"><div><span class="section-kicker">官网库详情</span><h2 id="company-links-title">公司官网库</h2></div><small>共 {{ links.length }} 条 · {{ formatDate(linksUpdatedAt) }}</small></div>
+      <div class="modal-heading"><div><span class="section-kicker">公司信息</span><h2 id="company-links-title">公司库</h2></div><small>共 {{ links.length }} 家 · {{ formatDate(linksUpdatedAt) }}</small></div>
       <div class="link-panel">
         <div class="toolbar"><label><span>搜索公司或链接</span><input v-model="linkQuery" autofocus placeholder="公司名称 / careers URL" /></label><button class="secondary icon-button" type="button" :disabled="loading" aria-label="刷新公司官网库" title="刷新列表" @click="loadLinks"><AppIcon name="refresh" /></button></div>
         <form v-if="sandbox?.enabled" class="link-editor" @submit.prevent="addLink">
@@ -326,10 +326,10 @@ function formatDate(value: string) {
           <article v-for="item in filteredLinks" :key="`${item.company}:${item.url}`" :class="{editing:editingLink===item}">
             <form v-if="editingLink===item" class="inline-link-editor" @submit.prevent="saveEdit">
               <label><span>公司名称</span><input v-model="editingCompany" required maxlength="120" /></label>
-              <label><span>官网网址</span><input v-model="editingUrl" type="url" required /></label>
+              <label><span>官网网址</span><input v-model="editingUrl" type="url" placeholder="可留空" /></label>
               <div><button type="button" class="secondary" :disabled="loading" @click="cancelEdit">取消</button><button :disabled="loading">保存修改</button></div>
             </form>
-            <template v-else><a :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><div v-if="sandbox?.enabled" class="link-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`编辑 ${item.company} 的官网信息`" title="编辑公司" @click="startEdit(item)"><AppIcon name="edit" /></button><button class="link-delete icon-button compact-icon" type="button" :aria-label="`删除 ${item.company} 的官网链接`" title="删除链接" @click="removeLink(item)"><AppIcon name="trash" /></button></div></template>
+            <template v-else><a v-if="item.url" :href="item.url" target="_blank" rel="noreferrer"><strong>{{ item.company }}</strong><span>{{ item.url }}</span></a><div v-else class="company-link-no-url"><strong>{{ item.company }}</strong><span>未填写官网</span></div><div class="company-link-tags"><span v-if="item.industry" class="industry-tag">{{ item.industry }}</span><span v-else-if="item.industryStatus==='pending'" class="industry-tag pending">AI 识别中</span><span v-else-if="item.industryStatus==='failed'" class="industry-tag failed" :title="item.industryError||'分类失败'">分类失败</span></div><div v-if="sandbox?.enabled" class="link-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`编辑 ${item.company} 的公司信息`" title="编辑公司" @click="startEdit(item)"><AppIcon name="edit" /></button><button class="link-delete icon-button compact-icon" type="button" :aria-label="`删除 ${item.company} 的公司信息`" title="删除公司信息" @click="removeLink(item)"><AppIcon name="trash" /></button></div></template>
           </article>
         </div>
         <div v-else class="notice">{{ linkQuery ? '没有匹配的公司官网。' : '当前账号没有可展示的公司链接。' }}</div>
@@ -379,6 +379,11 @@ function formatDate(value: string) {
 .link-list article { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 13px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
 .link-list article.editing{grid-column:1/-1;border-color:color-mix(in srgb,var(--color-primary) 45%,var(--color-border));background:#f5fbfb}.link-actions{display:flex;flex:none;gap:8px}.inline-link-editor{display:grid;width:100%;grid-template-columns:1fr 2fr auto;align-items:end;gap:9px}.inline-link-editor>div{display:flex;gap:8px}.inline-link-editor>div button{white-space:nowrap}
 .link-list a { display: grid; flex: 1; gap: 5px; min-width: 0; color: inherit; text-decoration: none; }
+.company-link-no-url { display: grid; flex: 1; gap: 5px; min-width: 0; }
+.company-link-tags { display: flex; flex: none; align-items: center; gap: 6px; }
+.company-link-tags .industry-tag { display: inline-flex; align-items: center; max-width: 190px; padding: 4px 8px; overflow: hidden; border: 1px solid color-mix(in srgb,var(--color-primary) 24%,var(--color-border)); border-radius: 999px; color: var(--color-primary); background: color-mix(in srgb,var(--color-primary) 8%,var(--color-card)); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.company-link-tags .industry-tag.pending { color: #89610f; border-color: #ead39a; background: #fff7df; }
+.company-link-tags .industry-tag.failed { color: #a33d38; border-color: #edc1bd; background: #fff0ee; }
 .link-list article:hover { border-color: var(--color-primary); background: #f4f6ff; }
 .link-delete { padding: 7px 9px; color: #a52d2d; background: #fceaea; }
 .link-list span { overflow: hidden; color: var(--color-muted-foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }

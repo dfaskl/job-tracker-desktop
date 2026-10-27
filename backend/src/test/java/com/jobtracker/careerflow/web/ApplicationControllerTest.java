@@ -3,6 +3,7 @@ package com.jobtracker.careerflow.web;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.ApplicationView;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.Mutation;
 import com.jobtracker.careerflow.database.ApplicationService;
+import com.jobtracker.careerflow.database.CompanyIndustryService;
 import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -28,7 +29,7 @@ class ApplicationControllerTest {
         );
         when(auth.authenticatedUser("token")).thenReturn(Optional.of(user));
         when(sandbox.create(any(), any(), any())).thenReturn(new Mutation("{}", application, 1));
-        var controller = new ApplicationController(auth, sandbox);
+        var controller = new ApplicationController(auth, sandbox, mock(CompanyIndustryService.class));
 
         var response = controller.create("token", requestBody(), sameOriginRequest());
 
@@ -42,7 +43,7 @@ class ApplicationControllerTest {
     void rejectsCrossOriginWritesBeforeAuthenticationOrDatabaseAccess() {
         AuthController auth = mock(AuthController.class);
         ApplicationService sandbox = mock(ApplicationService.class);
-        var controller = new ApplicationController(auth, sandbox);
+        var controller = new ApplicationController(auth, sandbox, mock(CompanyIndustryService.class));
         MockHttpServletRequest request = sameOriginRequest();
         request.removeHeader("Origin");
         request.addHeader("Origin", "https://invalid.example");

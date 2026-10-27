@@ -11,8 +11,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 
 @Component
@@ -66,15 +68,6 @@ public class BackupService {
 
     public CompanyLinks saveCompanyLinks(String email, JsonNode source) throws Exception {
         if (source == null || !source.isArray() || source.size() > 500) throw new IllegalArgumentException("官网链接数据格式无效");
-        var clean = objectMapper.createArrayNode();
-        for (JsonNode item : source) {
-            String company = item.path("company").asText("").trim();
-            String url = item.path("url").asText("").trim();
-            if (company.isEmpty() || company.length() > 120 || url.length() > 2048 || !(url.startsWith("https://") || url.startsWith("http://"))) {
-                throw new IllegalArgumentException("公司名称或官网地址无效");
-            }
-            clean.addObject().put("company", company).put("url", url);
-        }
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -85,6 +78,30 @@ public class BackupService {
                         if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
                         userId = result.getLong(1);
                     }
+                }
+                Map<String, JsonNode> storedByCompany = existingCompanyLinks(connection, userId);
+                var clean = objectMapper.createArrayNode();
+                for (JsonNode item : source) {
+                    String company = item.path("company").asText("").trim();
+                    String url = item.path("url").asText("").trim();
+                    if (company.isEmpty() || company.length() > 120 || url.length() > 2048
+                        || (!url.isEmpty() && !(url.startsWith("https://") || url.startsWith("http://")))) {
+                        throw new IllegalArgumentException("公司名称或官网地址无效");
+                    }
+                    JsonNode previous = storedByCompany.get(companyKey(company));
+                    var normalized = clean.addObject().put("company", company).put("url", url);
+                    String industry = item.path("industry").asText("").trim();
+                    if (industry.isEmpty() && previous != null) industry = previous.path("industry").asText("").trim();
+                    if (!industry.isEmpty()) {
+                        if (!CompanyIndustryCatalog.ALLOWED.contains(industry)) throw new IllegalArgumentException("公司行业标签无效");
+                        normalized.put("industry", industry);
+                    }
+                    String industryStatus = item.path("industryStatus").asText("").trim();
+                    if (industryStatus.isEmpty() && previous != null) industryStatus = previous.path("industryStatus").asText("").trim();
+                    if (!industryStatus.isEmpty()) normalized.put("industryStatus", industryStatus);
+                    String industryError = item.path("industryError").asText("").trim();
+                    if (industryError.isEmpty() && previous != null) industryError = previous.path("industryError").asText("").trim();
+                    if (!industryError.isEmpty()) normalized.put("industryError", industryError.substring(0, Math.min(300, industryError.length())));
                 }
                 String updatedAt;
                 try (PreparedStatement save = connection.prepareStatement(
@@ -100,6 +117,119 @@ public class BackupService {
                 return new CompanyLinks(clean, updatedAt);
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
+    }
+
+    public CompanyLinks ensureCompanyEntries(String email, List<String> companyNames) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long userId;
+                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                    user.setString(1, normalizeEmail(email));
+                    try (ResultSet result = user.executeQuery()) {
+                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                        userId = result.getLong(1);
+                    }
+                }
+                JsonNode stored = currentCompanyLinks(connection, userId);
+                var items = stored.isArray() ? (tools.jackson.databind.node.ArrayNode) stored.deepCopy() : objectMapper.createArrayNode();
+                Map<String, tools.jackson.databind.node.ObjectNode> byCompany = new LinkedHashMap<>();
+                for (JsonNode item : items) {
+                    String company = item.path("company").asText("").trim();
+                    if (!company.isEmpty()) byCompany.putIfAbsent(companyKey(company), (tools.jackson.databind.node.ObjectNode) item);
+                }
+                boolean changed = false;
+                for (String rawName : companyNames == null ? List.<String>of() : companyNames) {
+                    String company = rawName == null ? "" : rawName.trim();
+                    if (company.isEmpty() || company.length() > 120) continue;
+                    String key = companyKey(company);
+                    var entry = byCompany.get(key);
+                    if (entry == null) {
+                        entry = items.addObject().put("company", company).put("url", "").put("industryStatus", "pending");
+                        byCompany.put(key, entry);
+                        changed = true;
+                    } else if (entry.path("industry").asText("").isBlank()
+                        && !"pending".equals(entry.path("industryStatus").asText(""))) {
+                        entry.put("industryStatus", "pending").remove("industryError");
+                        changed = true;
+                    }
+                }
+                String updatedAt;
+                if (changed) {
+                    try (PreparedStatement save = connection.prepareStatement(
+                        "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
+                    )) {
+                        save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
+                        try (ResultSet saved = save.executeQuery()) { saved.next(); updatedAt = instant(saved, "updated_at"); }
+                    }
+                } else {
+                    try (PreparedStatement read = connection.prepareStatement("SELECT updated_at FROM company_links WHERE user_id=?")) {
+                        read.setLong(1, userId);
+                        try (ResultSet result = read.executeQuery()) { updatedAt = result.next() ? instant(result, "updated_at") : ""; }
+                    }
+                }
+                connection.commit();
+                return new CompanyLinks(items, updatedAt);
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+    }
+
+    public CompanyLinks saveIndustryResults(String email, Map<String, String> industries, String error) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long userId;
+                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                    user.setString(1, normalizeEmail(email));
+                    try (ResultSet result = user.executeQuery()) {
+                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                        userId = result.getLong(1);
+                    }
+                }
+                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
+                Map<String, String> normalizedResults = new LinkedHashMap<>();
+                if (industries != null) industries.forEach((name, industry) -> normalizedResults.put(companyKey(name), industry));
+                for (JsonNode node : items) {
+                    var entry = (tools.jackson.databind.node.ObjectNode) node;
+                    String key = companyKey(entry.path("company").asText(""));
+                    String industry = normalizedResults.get(key);
+                    if (industry != null && CompanyIndustryCatalog.ALLOWED.contains(industry)) {
+                        entry.put("industry", industry).put("industryStatus", "classified").remove("industryError");
+                    } else if (error != null && !error.isBlank() && "pending".equals(entry.path("industryStatus").asText(""))) {
+                        entry.put("industryStatus", "failed").put("industryError", error.substring(0, Math.min(300, error.length())));
+                    }
+                }
+                try (PreparedStatement save = connection.prepareStatement(
+                    "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
+                )) {
+                    save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
+                    try (ResultSet saved = save.executeQuery()) { saved.next(); String updatedAt = instant(saved, "updated_at"); connection.commit(); return new CompanyLinks(items, updatedAt); }
+                }
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+    }
+
+    private Map<String, JsonNode> existingCompanyLinks(Connection connection, long userId) throws Exception {
+        JsonNode items = currentCompanyLinks(connection, userId);
+        Map<String, JsonNode> result = new LinkedHashMap<>();
+        if (items.isArray()) for (JsonNode item : items) {
+            String company = item.path("company").asText("").trim();
+            if (!company.isEmpty()) result.putIfAbsent(companyKey(company), item);
+        }
+        return result;
+    }
+
+    private JsonNode currentCompanyLinks(Connection connection, long userId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT items::text FROM company_links WHERE user_id=? FOR UPDATE")) {
+            statement.setLong(1, userId);
+            try (ResultSet result = statement.executeQuery()) { return result.next() ? objectMapper.readTree(result.getString(1)) : objectMapper.createArrayNode(); }
+        }
+    }
+
+    private static String companyKey(String value) {
+        if (value == null) return "";
+        return value.toLowerCase(Locale.ROOT).replaceAll("[\\s·•・()（）\\[\\]【】._-]+", "")
+            .replaceAll("(股份)?有限公司$|有限责任公司$|集团$|公司$", "");
     }
     public BackupPage backups(String email) throws Exception {
         try (Connection connection = openConnection()) {
