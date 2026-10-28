@@ -7,14 +7,19 @@ import com.jobtracker.careerflow.compat.LegacySecretCryptoWriter;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminServiceTest {
     @Test
-    void enablesAdminByDefaultWhenTheBusinessDatabaseIsConfigured() {
+    void enablesAdminByDefaultWhenTheBusinessDatabaseIsAvailable() throws Exception {
+        Path directory = Path.of("target", "admin-tests").toAbsolutePath();
+        Files.createDirectories(directory);
         MockEnvironment environment = new MockEnvironment()
-            .withProperty("APP_DATABASE_URL", "postgres://db.example.com/main");
+            .withProperty("APP_DATABASE_URL", "jdbc:sqlite:" + directory.resolve(UUID.randomUUID() + ".db"));
         var status = service(environment).status();
         assertThat(status.enabled()).isTrue();
         assertThat(status.requested()).isTrue();

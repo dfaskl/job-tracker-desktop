@@ -7,14 +7,16 @@ import ProductDataManagement from './ProductDataManagement.vue'
 import MailAccountSettings from './MailAccountSettings.vue'
 import BackupManagement from './BackupManagement.vue'
 import AppIcon from './AppIcon.vue'
+import McpAccessSettings from './McpAccessSettings.vue'
 import { profileSectionScrollTarget } from './profileNavigation'
 
-type SectionId = 'center' | 'resume' | 'ai' | 'mail' | 'data'
+type SectionId = 'center' | 'resume' | 'ai' | 'mail' | 'mcp' | 'data'
 const sections: { id: SectionId; label: string; icon: string }[] = [
   { id: 'center', label: '个人中心', icon: 'user' },
   { id: 'resume', label: '我的简历', icon: 'file-spreadsheet' },
   { id: 'ai', label: '大模型 API', icon: 'info' },
   { id: 'mail', label: '邮件配置', icon: 'mail' },
+  { id: 'mcp', label: 'MCP 访问', icon: 'key' },
   { id: 'data', label: '数据管理', icon: 'database' }
 ]
 function sectionFromHash(): SectionId {
@@ -153,7 +155,11 @@ onBeforeUnmount(() => {
           <div class="section-title"><h2>邮件配置</h2><p>连接邮箱，让系统识别邮件并辅助创建求职日程。</p></div>
           <MailAccountSettings />
         </section>
-        <section :id="`profile-section-${sections[4].id}`" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
+        <section id="profile-section-mcp" :ref="element => setSectionRef('mcp', element as Element | null)" class="profile-section">
+          <div class="section-title"><h2>MCP 访问</h2><p>授权 Codex 查询和管理当前账户的投递与日程。</p></div>
+          <McpAccessSettings />
+        </section>
+        <section id="profile-section-data" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
           <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理历史备份。</p></div>
           <ProductDataManagement />
           <BackupManagement />
@@ -173,7 +179,7 @@ onBeforeUnmount(() => {
 @media(max-width:560px){.profile-workspace{padding:14px 0 22px}.settings-heading{margin-bottom:16px}.settings-nav{top:74px;gap:4px}.settings-nav a{gap:6px;padding:8px 5px;font-size:12px}.settings-nav a :deep(svg){width:16px;height:16px}.section-title h2{font-size:18px}.settings-content{gap:22px}.data-sections :deep(.data-card),.data-sections :deep(.mail-account-card),.data-sections :deep(.backup-card){padding:16px}}
 </style>
 <style scoped>
-.settings-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+.settings-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
 .mail-settings-section :deep(.mail-account-card){grid-area:auto;padding:20px}
 @media(max-width:560px){.settings-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.mail-settings-section :deep(.mail-account-card){padding:16px}}
 </style>

@@ -18,6 +18,29 @@ CREATE TABLE IF NOT EXISTS interview_groups (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id BIGINT REFERENCES interview_groups(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS users_group_id_idx ON users(group_id);
+CREATE TABLE IF NOT EXISTS mcp_tokens (
+  id TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  token_prefix TEXT NOT NULL,
+  scopes TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  last_used_at BIGINT,
+  revoked_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS mcp_tokens_user_idx ON mcp_tokens(user_id);
+CREATE TABLE IF NOT EXISTS mcp_audit_logs (
+  id TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_id TEXT REFERENCES mcp_tokens(id) ON DELETE SET NULL,
+  tool_name TEXT NOT NULL,
+  target_id TEXT NOT NULL DEFAULT '',
+  outcome TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS mcp_audit_user_idx ON mcp_audit_logs(user_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

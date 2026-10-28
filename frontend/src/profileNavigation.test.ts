@@ -11,6 +11,7 @@ describe('profileSectionScrollTarget', () => {
     expect(profileSectionScrollTarget('#/profile?section=resume')).toBe('resume')
     expect(profileSectionScrollTarget('#/settings?section=ai')).toBe('ai')
     expect(profileSectionScrollTarget('#/profile?section=mail')).toBe('mail')
+    expect(profileSectionScrollTarget('#/profile?section=mcp')).toBe('mcp')
     expect(profileSectionScrollTarget('#/profile?section=data')).toBe('data')
     expect(profileSectionScrollTarget('#/profile?section=unknown')).toBeNull()
     expect(profileSectionScrollTarget('#/home?section=resume')).toBeNull()

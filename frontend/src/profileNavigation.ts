@@ -1,4 +1,4 @@
-const profileSections = new Set(['center', 'resume', 'ai', 'mail', 'data'])
+const profileSections = new Set(['center', 'resume', 'ai', 'mail', 'mcp', 'data'])
 
 /** Profile is a toggle destination: return to the page it was opened from. */
 export function profileToggleDestination(activePage: string, previousPage: string): string {
