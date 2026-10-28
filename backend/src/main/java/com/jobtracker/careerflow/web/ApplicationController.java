@@ -80,7 +80,7 @@ public class ApplicationController {
             Optional<LegacyUser> user = authController.authenticatedUser(token);
             if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
             var mutation = sandboxService.create(user.get().email(), input(body), schedule(body));
-            companyIndustries.enqueueAfterApplicationWrite(user.get().email(), mutation.application().company());
+            companyIndustries.enqueueAfterApplicationWrite(user.get().email(), mutation.application().company(), mutation.application().position());
             return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
                 .body(new MutationResponse(mutation.application(), mutation.total(), true));
         } catch (Exception exception) {
@@ -100,7 +100,7 @@ public class ApplicationController {
             Optional<LegacyUser> user = authController.authenticatedUser(token);
             if (user.isEmpty()) return error(HttpStatus.UNAUTHORIZED, "请先登录");
             var mutation = sandboxService.update(user.get().email(), id, input(body), body.expectedUpdatedAt());
-            companyIndustries.enqueueAfterApplicationWrite(user.get().email(), mutation.application().company());
+            companyIndustries.enqueueAfterApplicationWrite(user.get().email(), mutation.application().company(), mutation.application().position());
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(new MutationResponse(mutation.application(), mutation.total(), true));
         } catch (Exception exception) {

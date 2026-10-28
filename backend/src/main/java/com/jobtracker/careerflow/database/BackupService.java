@@ -111,6 +111,9 @@ public class BackupService {
                     if (!industryStatus.isEmpty()) normalized.put("industryStatus", industryStatus);
                     if (!industryVersion.isEmpty()) normalized.put("industryVersion", industryVersion);
                     if (!industryError.isEmpty()) normalized.put("industryError", industryError.substring(0, Math.min(300, industryError.length())));
+                    JsonNode salaryEstimates = item.path("salaryEstimates");
+                    if (previous != null && previous.path("salaryEstimates").isArray() && !previous.path("salaryEstimates").isEmpty()) salaryEstimates = previous.path("salaryEstimates");
+                    if (salaryEstimates.isArray() && !salaryEstimates.isEmpty()) normalized.set("salaryEstimates", salaryEstimates.deepCopy());
                 }
                 String updatedAt;
                 try (PreparedStatement save = connection.prepareStatement(
@@ -231,6 +234,96 @@ public class BackupService {
             } catch (Exception exception) { connection.rollback(); throw exception; }
         }
     }
+
+    public CompanyLinks ensureSalaryEntries(String email, List<com.jobtracker.careerflow.database.AiService.CompanyPosition> positions) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long userId;
+                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                    user.setString(1, normalizeEmail(email));
+                    try (ResultSet result = user.executeQuery()) {
+                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                        userId = result.getLong(1);
+                    }
+                }
+                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
+                Map<String, tools.jackson.databind.node.ObjectNode> byCompany = new LinkedHashMap<>();
+                for (JsonNode node : items) if (node instanceof tools.jackson.databind.node.ObjectNode entry)
+                    byCompany.putIfAbsent(companyKey(entry.path("company").asText("")), entry);
+                boolean changed = false;
+                for (var position : positions == null ? List.<com.jobtracker.careerflow.database.AiService.CompanyPosition>of() : positions) {
+                    String company = position.company() == null ? "" : position.company().trim();
+                    String title = position.position() == null ? "" : position.position().trim();
+                    if (company.isEmpty() || title.isEmpty()) continue;
+                    var entry = byCompany.get(companyKey(company));
+                    if (entry == null || !"classified".equals(entry.path("industryStatus").asText(""))) continue;
+                    var estimates = entry.path("salaryEstimates").isArray()
+                        ? (tools.jackson.databind.node.ArrayNode) entry.path("salaryEstimates") : entry.putArray("salaryEstimates");
+                    boolean exists = false;
+                    for (JsonNode estimate : estimates) if (positionKey(estimate.path("position").asText("")).equals(positionKey(title))) { exists = true; break; }
+                    if (!exists) {
+                        estimates.addObject().put("position", title).put("status", "pending").put("version", "salary-v1");
+                        changed = true;
+                    }
+                }
+                String updatedAt = writeCompanyLinks(connection, userId, items, changed);
+                connection.commit();
+                return new CompanyLinks(items, updatedAt);
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+    }
+
+    public CompanyLinks saveSalaryResults(String email, Map<String, String> salaryRanges, String error) throws Exception {
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                long userId;
+                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
+                    user.setString(1, normalizeEmail(email));
+                    try (ResultSet result = user.executeQuery()) {
+                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
+                        userId = result.getLong(1);
+                    }
+                }
+                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
+                Map<String, String> results = new LinkedHashMap<>();
+                if (salaryRanges != null) salaryRanges.forEach((key, value) -> results.put(key, value));
+                for (JsonNode node : items) if (node instanceof tools.jackson.databind.node.ObjectNode company && company.path("salaryEstimates").isArray()) {
+                    for (JsonNode estimateNode : company.path("salaryEstimates")) if (estimateNode instanceof tools.jackson.databind.node.ObjectNode estimate
+                        && "pending".equals(estimate.path("status").asText(""))) {
+                        String key = salaryKey(company.path("company").asText(""), estimate.path("position").asText(""));
+                        String range = results.get(key);
+                        if (range != null) estimate.put("range", range).put("status", "classified").put("version", "salary-v1").remove("error");
+                        else if (error != null && !error.isBlank()) estimate.put("status", "failed").put("version", "salary-v1").put("error", error.substring(0, Math.min(300, error.length())));
+                        else estimate.put("status", "unavailable").put("version", "salary-v1");
+                    }
+                }
+                String updatedAt = writeCompanyLinks(connection, userId, items, true);
+                connection.commit();
+                return new CompanyLinks(items, updatedAt);
+            } catch (Exception exception) { connection.rollback(); throw exception; }
+        }
+    }
+
+    private String writeCompanyLinks(Connection connection, long userId, JsonNode items, boolean changed) throws Exception {
+        if (changed) {
+            try (PreparedStatement save = connection.prepareStatement("INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at")) {
+                save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
+                try (ResultSet saved = save.executeQuery()) { saved.next(); return instant(saved, "updated_at"); }
+            }
+        }
+        try (PreparedStatement read = connection.prepareStatement("SELECT updated_at FROM company_links WHERE user_id=?")) {
+            read.setLong(1, userId);
+            try (ResultSet result = read.executeQuery()) { return result.next() ? instant(result, "updated_at") : ""; }
+        }
+    }
+
+    private String positionKey(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+    }
+
+    private String salaryKey(String company, String position) { return companyKey(company) + "\n" + positionKey(position); }
 
     private Map<String, JsonNode> existingCompanyLinks(Connection connection, long userId) throws Exception {
         JsonNode items = currentCompanyLinks(connection, userId);
