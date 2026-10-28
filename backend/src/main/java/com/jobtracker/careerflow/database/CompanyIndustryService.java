@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 public class CompanyIndustryService {
     private static final Logger LOGGER = LoggerFactory.getLogger(CompanyIndustryService.class);
     private static final int CLASSIFICATION_BATCH_SIZE = 60;
+    private static final int SALARY_ESTIMATE_BATCH_SIZE = 10;
     private final ApplicationService applications;
     private final BackupService backup;
     private final AiService ai;
@@ -112,18 +113,25 @@ public class CompanyIndustryService {
         JsonNode current = backup.ensureSalaryEntries(email, applicationsNow).items();
         List<CompanyPosition> pending = pendingSalaries(current);
         if (!pending.isEmpty()) Thread.sleep(3_100);
-        for (int start = 0; start < pending.size(); start += CLASSIFICATION_BATCH_SIZE) {
+        for (int start = 0; start < pending.size(); start += SALARY_ESTIMATE_BATCH_SIZE) {
             if (start > 0) Thread.sleep(3_100);
-            List<CompanyPosition> batch = pending.subList(start, Math.min(start + CLASSIFICATION_BATCH_SIZE, pending.size()));
+            List<CompanyPosition> batch = pending.subList(start, Math.min(start + SALARY_ESTIMATE_BATCH_SIZE, pending.size()));
             try {
                 Map<String, String> ranges = ai.estimateSalaryRanges(email, batch);
                 current = backup.saveSalaryResults(email, ranges, "").items();
             } catch (Exception exception) {
-                backup.saveSalaryResults(email, Map.of(), exception.getMessage());
-                LOGGER.warn("salary estimate failed for user {}", safeEmail(email), exception);
-                return;
+                String reason = salaryFailureMessage(exception);
+                backup.saveSalaryResults(email, Map.of(), reason);
+                LOGGER.warn("salary estimate failed for user {}: {}", safeEmail(email), reason, exception);
             }
         }
+    }
+
+    private String salaryFailureMessage(Exception exception) {
+        String message = exception.getMessage();
+        if (message != null && !message.isBlank()) return message.substring(0, Math.min(300, message.length()));
+        if (exception instanceof java.net.http.HttpTimeoutException) return "AI 接口请求超时（60 秒）";
+        return "AI 估算请求异常（" + exception.getClass().getSimpleName() + "）";
     }
 
     private List<CompanyPosition> pendingSalaries(JsonNode items) {

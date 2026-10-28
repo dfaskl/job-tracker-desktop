@@ -38,6 +38,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -51,6 +53,7 @@ public class AiService {
     private static final long MIN_CALL_INTERVAL_MILLIS = 3_000;
     private static final int MAX_AI_RESPONSE_BYTES = 1_048_576;
     private static final int MAX_RECOGNITION_RETRIES = 3;
+    private static final Pattern SALARY_RANGE_PATTERN = Pattern.compile("(?i)(\\d+(?:\\.\\d+)?)\\s*k?\\s*(?:-|~|至|到)\\s*(\\d+(?:\\.\\d+)?)\\s*k?");
 
     private final Environment environment;
     private final ApplicationService sandboxService;
@@ -288,7 +291,11 @@ public class AiService {
         if (bytes.length > MAX_AI_RESPONSE_BYTES) throw new AiResponseException("薪资估算响应过大");
         if (response.statusCode() < 200 || response.statusCode() >= 300)
             throw new AiResponseException("薪资估算请求失败（" + response.statusCode() + "）");
-        JsonNode items = parseModelJson(responseContent(objectMapper.readTree(bytes))).path("items");
+        JsonNode envelope = objectMapper.readTree(bytes);
+        JsonNode choice = envelope.path("choices").path(0);
+        if ("length".equals(choice.path("finish_reason").asText("")))
+            throw new AiResponseException("薪资估算结果被截断；请减少单次估算岗位数量后重试");
+        JsonNode items = parseModelJson(responseContent(envelope)).path("items");
         if (!items.isArray()) throw new AiResponseException("薪资估算结果缺少 items 数组");
         Map<String, CompanyPosition> inputByKey = new LinkedHashMap<>();
         for (CompanyPosition position : positions) inputByKey.put(positionKey(position.company(), position.position()), position);
@@ -299,7 +306,17 @@ public class AiService {
             String position = item.path("position").asText("").trim();
             CompanyPosition exact = inputByKey.get(positionKey(company, position));
             if (exact == null && items.size() == positions.size()) exact = positions.get(index);
-            double min = item.path("minK").asDouble(Double.NaN), max = item.path("maxK").asDouble(Double.NaN);
+            double min = salaryNumber(item, "minK", "minSalaryK", "lowerK", "min");
+            double max = salaryNumber(item, "maxK", "maxSalaryK", "upperK", "max");
+            if (!Double.isFinite(min) || !Double.isFinite(max)) {
+                String range = firstText(item, "range", "salaryRange", "monthlyRange", "salary");
+                Matcher matcher = SALARY_RANGE_PATTERN.matcher(range);
+                if (matcher.find()) {
+                    min = Double.parseDouble(matcher.group(1));
+                    max = Double.parseDouble(matcher.group(2));
+                }
+            }
+            if (min > 1000 && max > 1000) { min /= 1000; max /= 1000; }
             if (exact != null && Double.isFinite(min) && Double.isFinite(max) && min > 0 && max > min && max <= 1000) {
                 if (max - min > 5) {
                     min = Math.max(0.5, Math.min(995, Math.floor(((min + max) / 2) / 5) * 5));
@@ -317,14 +334,43 @@ public class AiService {
         return value == Math.rint(value) ? Long.toString((long) value) : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
+    private double salaryNumber(JsonNode item, String... fields) {
+        for (String field : fields) {
+            JsonNode value = item.path(field);
+            if (value.isNumber()) return value.asDouble(Double.NaN);
+            if (value.isTextual()) {
+                try { return Double.parseDouble(value.asText().trim().replaceAll("(?i)k(?:/月)?$", "").trim()); }
+                catch (NumberFormatException ignored) { }
+            }
+        }
+        return Double.NaN;
+    }
+
+    private String firstText(JsonNode item, String... fields) {
+        for (String field : fields) {
+            JsonNode value = item.path(field);
+            if (value.isTextual() && !value.asText().isBlank()) return value.asText().trim();
+        }
+        return "";
+    }
+
     private String positionKey(String company, String position) {
         return companyKey(company) + "\\n" + (position == null ? "" : position.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim());
     }
 
     private String responseContent(JsonNode response) {
         JsonNode choice = response.path("choices").path(0);
-        String content = choice.path("message").path("content").asText("").trim();
-        if (content.isEmpty()) throw new AiResponseException("公司行业分类模型没有返回内容");
+        JsonNode contentNode = choice.path("message").path("content");
+        String content = contentNode.asText("").trim();
+        if (content.isEmpty() && contentNode.isArray()) {
+            StringBuilder joined = new StringBuilder();
+            for (JsonNode part : contentNode) {
+                String text = part.isTextual() ? part.asText() : part.path("text").asText("");
+                if (!text.isBlank()) joined.append(text).append('\n');
+            }
+            content = joined.toString().trim();
+        }
+        if (content.isEmpty()) throw new AiResponseException("AI 服务没有返回文本内容");
         return content;
     }
 

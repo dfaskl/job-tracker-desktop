@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class BackupService {
-    private static final String SALARY_ESTIMATE_VERSION = "salary-v3";
+    private static final String SALARY_ESTIMATE_VERSION = "salary-v4";
     private static final Duration SALARY_RETRY_DELAY = Duration.ofHours(6);
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
@@ -322,7 +322,7 @@ public class BackupService {
                         String range = results.get(key);
                         if (range != null) estimate.put("range", range).put("status", "classified").put("version", SALARY_ESTIMATE_VERSION).remove("error");
                         else estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
-                            .put("error", error == null || error.isBlank() ? "模型未返回有效薪资区间" : error.substring(0, Math.min(300, error.length())))
+                            .put("error", error == null || error.isBlank() ? "估算请求异常，未获取到错误详情" : error.substring(0, Math.min(300, error.length())))
                             .put("retryAfter", Instant.now().plus(SALARY_RETRY_DELAY).toString());
                     }
                 }
