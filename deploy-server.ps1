@@ -1,14 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$Server = 'jobtracker-server',
+    [string]$Server = 'zhoujiajun@10.12.152.159',
     [string]$RemoteDirectory = '/home/zhoujiajun/jobTracker',
     [string]$JarPath = (Join-Path $PSScriptRoot 'dist\job-tracker.jar'),
+    [string]$IdentityFile = (Join-Path $env:USERPROFILE '.ssh\jobtracker_server'),
     [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
 
-if ($Server -notmatch '^[A-Za-z0-9._-]+$') {
+if ($Server -notmatch '^[A-Za-z0-9._-]+(@[A-Za-z0-9.-]+)?$') {
     throw '服务器名称包含不受支持的字符。'
 }
 if ($RemoteDirectory -notmatch '^/[A-Za-z0-9._/-]+$') {
@@ -23,18 +24,23 @@ if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command scp -ErrorAction SilentlyContinue)) {
     throw '未找到 scp 命令。'
 }
+if (-not (Test-Path -LiteralPath $IdentityFile -PathType Leaf)) {
+    throw "没有找到 SSH 部署密钥：$IdentityFile"
+}
+
+$sshOptions = @('-i', $IdentityFile, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes')
 
 $jar = Get-Item -LiteralPath $JarPath
 $localHash = (Get-FileHash -LiteralPath $jar.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 $remoteUpload = "$RemoteDirectory/job-tracker.jar.uploading"
 
 Write-Host "正在检查服务器：$Server" -ForegroundColor Cyan
-& ssh -o BatchMode=yes -o ConnectTimeout=8 $Server "test -d '$RemoteDirectory' && test -x '$RemoteDirectory/start.sh' && test -x '$RemoteDirectory/stop.sh' && test -x '$RemoteDirectory/status.sh'"
+& ssh @sshOptions -o ConnectTimeout=8 $Server "test -d '$RemoteDirectory' && test -x '$RemoteDirectory/start.sh' && test -x '$RemoteDirectory/stop.sh' && test -x '$RemoteDirectory/status.sh'"
 if ($LASTEXITCODE -ne 0) {
     throw '服务器目录或启停脚本检查失败。'
 }
 
-$remoteHash = (& ssh -o BatchMode=yes $Server "sha256sum '$RemoteDirectory/job-tracker.jar' | cut -d' ' -f1").Trim().ToLowerInvariant()
+$remoteHash = (& ssh @sshOptions $Server "sha256sum '$RemoteDirectory/job-tracker.jar' | cut -d' ' -f1").Trim().ToLowerInvariant()
 if ($LASTEXITCODE -ne 0) {
     throw '读取服务器 JAR 校验值失败。'
 }
@@ -44,7 +50,7 @@ if (-not $Force -and $remoteHash -eq $localHash) {
 }
 
 Write-Host "正在上传：$($jar.Name)" -ForegroundColor Cyan
-& scp -q $jar.FullName "${Server}:$remoteUpload"
+& scp -q -i $IdentityFile -o IdentitiesOnly=yes $jar.FullName "${Server}:$remoteUpload"
 if ($LASTEXITCODE -ne 0) {
     throw "JAR 上传失败，退出码：$LASTEXITCODE"
 }
@@ -102,7 +108,7 @@ echo "BACKUP_JAR=$backup_jar"
 $remoteScript = $remoteScript.Replace('__REMOTE_DIRECTORY__', $RemoteDirectory).Replace('__EXPECTED_HASH__', $localHash)
 
 Write-Host '正在重启并检查健康状态……' -ForegroundColor Cyan
-$remoteScript | & ssh -o BatchMode=yes $Server 'bash -s'
+$remoteScript | & ssh @sshOptions $Server 'bash -s'
 if ($LASTEXITCODE -ne 0) {
     throw "服务器部署失败，退出码：$LASTEXITCODE"
 }
