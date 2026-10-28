@@ -38,13 +38,19 @@ public class CompanyIndustryService {
 
     public CompanyLinks prepareAndQueue(String email) throws Exception {
         List<String> companies;
+        List<CompanyPosition> positions;
         try {
-            companies = applications.findApplications(email).applications().stream()
-                .map(ApplicationView::company).filter(value -> value != null && !value.isBlank()).distinct().toList();
+            List<ApplicationView> current = applications.findApplications(email).applications();
+            companies = current.stream().map(ApplicationView::company).filter(value -> value != null && !value.isBlank()).distinct().toList();
+            positions = current.stream().map(item -> new CompanyPosition(item.company(), item.position()))
+                .filter(item -> item.company() != null && !item.company().isBlank() && item.position() != null && !item.position().isBlank())
+                .distinct().toList();
         } catch (ApplicationService.SandboxDataNotFoundException missingCopy) {
             companies = List.of();
+            positions = List.of();
         }
         CompanyLinks links = backup.ensureCompanyEntries(email, companies);
+        links = backup.ensureSalaryEntries(email, positions);
         queue(email, links.items());
         return links;
     }

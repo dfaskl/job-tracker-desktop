@@ -372,7 +372,7 @@ async function saveApplication(){
     const response=current
       ? await api<{application:JobApplication}>(`/api/poc/application-sandbox/applications/${encodeURIComponent(current.id)}`,{method:'PUT',body:JSON.stringify({...form,expectedUpdatedAt:current.updatedAt||''})})
       : await api<{application:JobApplication}>('/api/poc/application-sandbox/applications',{method:'POST',body:JSON.stringify({...form,expectedUpdatedAt:''})})
-    await store.refresh();selected.value=store.applications.value.find(item=>item.id===response.application.id)||response.application;editing.value=false;message.value=current?'投递已更新':'投递已创建';undo.value=null
+    await store.refresh();await loadCompanyLinks();selected.value=store.applications.value.find(item=>item.id===response.application.id)||response.application;editing.value=false;message.value=current?'投递已更新':'投递已创建';undo.value=null
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存失败'}finally{busy.value=false}
 }
 async function quickUpdate(stage:string,status:string){
