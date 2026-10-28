@@ -118,10 +118,10 @@ public class CompanyIndustryService {
             List<CompanyPosition> batch = pending.subList(start, Math.min(start + SALARY_ESTIMATE_BATCH_SIZE, pending.size()));
             try {
                 Map<String, String> ranges = ai.estimateSalaryRanges(email, batch);
-                current = backup.saveSalaryResults(email, ranges, "").items();
+                current = backup.saveSalaryResults(email, batch, ranges, "").items();
             } catch (Exception exception) {
                 String reason = salaryFailureMessage(exception);
-                backup.saveSalaryResults(email, Map.of(), reason);
+                backup.saveSalaryResults(email, batch, Map.of(), reason);
                 LOGGER.warn("salary estimate failed for user {}: {}", safeEmail(email), reason, exception);
             }
         }

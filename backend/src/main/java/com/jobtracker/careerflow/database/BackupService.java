@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class BackupService {
-    private static final String SALARY_ESTIMATE_VERSION = "salary-v4";
+    private static final String SALARY_ESTIMATE_VERSION = "salary-v5";
     private static final Duration SALARY_RETRY_DELAY = Duration.ofHours(6);
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
@@ -300,7 +300,7 @@ public class BackupService {
         }
     }
 
-    public CompanyLinks saveSalaryResults(String email, Map<String, String> salaryRanges, String error) throws Exception {
+    public CompanyLinks saveSalaryResults(String email, List<AiService.CompanyPosition> batch, Map<String, String> salaryRanges, String error) throws Exception {
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -315,15 +315,21 @@ public class BackupService {
                 var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
                 Map<String, String> results = new LinkedHashMap<>();
                 if (salaryRanges != null) salaryRanges.forEach((key, value) -> results.put(key, value));
+                Set<String> targetKeys = new java.util.HashSet<>();
+                if (batch != null) for (AiService.CompanyPosition position : batch)
+                    targetKeys.add(salaryKey(position.company(), position.position()));
                 for (JsonNode node : items) if (node instanceof tools.jackson.databind.node.ObjectNode company && company.path("salaryEstimates").isArray()) {
                     for (JsonNode estimateNode : company.path("salaryEstimates")) if (estimateNode instanceof tools.jackson.databind.node.ObjectNode estimate
                         && "pending".equals(estimate.path("status").asText(""))) {
                         String key = salaryKey(company.path("company").asText(""), estimate.path("position").asText(""));
+                        if (!targetKeys.contains(key)) continue;
                         String range = results.get(key);
                         if (range != null) estimate.put("range", range).put("status", "classified").put("version", SALARY_ESTIMATE_VERSION).remove("error");
-                        else estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
-                            .put("error", error == null || error.isBlank() ? "估算请求异常，未获取到错误详情" : error.substring(0, Math.min(300, error.length())))
-                            .put("retryAfter", Instant.now().plus(SALARY_RETRY_DELAY).toString());
+                        else {
+                            String failure = error == null || error.isBlank() ? "模型未能为该岗位返回有效薪资范围" : error.substring(0, Math.min(300, error.length()));
+                            estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
+                                .put("error", failure).put("retryAfter", Instant.now().plus(SALARY_RETRY_DELAY).toString());
+                        }
                     }
                 }
                 String updatedAt = writeCompanyLinks(connection, userId, items, true);
