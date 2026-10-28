@@ -20,6 +20,7 @@ import java.util.Set;
 
 @Component
 public class BackupService {
+    private static final String SALARY_ESTIMATE_VERSION = "salary-v2";
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
     private final BackupDocumentValidator validator;
@@ -260,10 +261,18 @@ public class BackupService {
                     if (entry == null || !"classified".equals(entry.path("industryStatus").asText(""))) continue;
                     var estimates = entry.path("salaryEstimates").isArray()
                         ? (tools.jackson.databind.node.ArrayNode) entry.path("salaryEstimates") : entry.putArray("salaryEstimates");
-                    boolean exists = false;
-                    for (JsonNode estimate : estimates) if (positionKey(estimate.path("position").asText("")).equals(positionKey(title))) { exists = true; break; }
-                    if (!exists) {
-                        estimates.addObject().put("position", title).put("status", "pending").put("version", "salary-v1");
+                    tools.jackson.databind.node.ObjectNode existing = null;
+                    for (JsonNode estimate : estimates) if (positionKey(estimate.path("position").asText("")).equals(positionKey(title))) {
+                        if (estimate instanceof tools.jackson.databind.node.ObjectNode object) existing = object;
+                        break;
+                    }
+                    if (existing == null) {
+                        estimates.addObject().put("position", title).put("status", "pending").put("version", SALARY_ESTIMATE_VERSION);
+                        changed = true;
+                    } else if (!SALARY_ESTIMATE_VERSION.equals(existing.path("version").asText(""))) {
+                        existing.put("position", title).put("status", "pending").put("version", SALARY_ESTIMATE_VERSION);
+                        existing.remove("range");
+                        existing.remove("error");
                         changed = true;
                     }
                 }
@@ -294,9 +303,9 @@ public class BackupService {
                         && "pending".equals(estimate.path("status").asText(""))) {
                         String key = salaryKey(company.path("company").asText(""), estimate.path("position").asText(""));
                         String range = results.get(key);
-                        if (range != null) estimate.put("range", range).put("status", "classified").put("version", "salary-v1").remove("error");
-                        else if (error != null && !error.isBlank()) estimate.put("status", "failed").put("version", "salary-v1").put("error", error.substring(0, Math.min(300, error.length())));
-                        else estimate.put("status", "unavailable").put("version", "salary-v1");
+                        if (range != null) estimate.put("range", range).put("status", "classified").put("version", SALARY_ESTIMATE_VERSION).remove("error");
+                        else estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
+                            .put("error", error == null || error.isBlank() ? "模型未返回有效薪资区间" : error.substring(0, Math.min(300, error.length())));
                     }
                 }
                 String updatedAt = writeCompanyLinks(connection, userId, items, true);

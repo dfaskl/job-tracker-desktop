@@ -132,7 +132,7 @@ public class CompanyIndustryService {
         for (JsonNode company : items) {
             if (!"classified".equals(company.path("industryStatus").asText("")) || !company.path("salaryEstimates").isArray()) continue;
             for (JsonNode estimate : company.path("salaryEstimates")) if ("pending".equals(estimate.path("status").asText("")))
-                result.add(new CompanyPosition(company.path("company").asText(""), estimate.path("position").asText("")));
+                result.add(new CompanyPosition(company.path("company").asText(""), estimate.path("position").asText(""), company.path("industry").asText("")));
         }
         return result;
     }
