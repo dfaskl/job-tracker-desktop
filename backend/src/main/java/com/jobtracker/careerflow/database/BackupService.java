@@ -22,7 +22,7 @@ import java.util.Set;
 
 @Component
 public class BackupService {
-    private static final String SALARY_ESTIMATE_VERSION = "salary-v5";
+    private static final String SALARY_ESTIMATE_VERSION = "salary-v6";
     private static final Duration SALARY_RETRY_DELAY = Duration.ofHours(6);
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
@@ -356,7 +356,7 @@ public class BackupService {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
     }
 
-    private String salaryKey(String company, String position) { return companyKey(company) + "\n" + positionKey(position); }
+    private String salaryKey(String company, String position) { return SalaryEstimateKey.of(company, position); }
 
     private Map<String, JsonNode> existingCompanyLinks(Connection connection, long userId) throws Exception {
         JsonNode items = currentCompanyLinks(connection, userId);

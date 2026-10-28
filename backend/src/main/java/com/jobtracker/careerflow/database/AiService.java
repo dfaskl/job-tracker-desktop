@@ -291,7 +291,10 @@ public class AiService {
         if (bytes.length > MAX_AI_RESPONSE_BYTES) throw new AiResponseException("薪资估算响应过大");
         if (response.statusCode() < 200 || response.statusCode() >= 300)
             throw new AiResponseException("薪资估算请求失败（" + response.statusCode() + "）");
-        JsonNode envelope = objectMapper.readTree(bytes);
+        return parseSalaryEstimates(objectMapper.readTree(bytes), positions);
+    }
+
+    Map<String, String> parseSalaryEstimates(JsonNode envelope, List<CompanyPosition> positions) throws Exception {
         JsonNode choice = envelope.path("choices").path(0);
         if ("length".equals(choice.path("finish_reason").asText("")))
             throw new AiResponseException("薪资估算结果被截断；请减少单次估算岗位数量后重试");
@@ -355,7 +358,7 @@ public class AiService {
     }
 
     private String positionKey(String company, String position) {
-        return companyKey(company) + "\\n" + (position == null ? "" : position.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim());
+        return SalaryEstimateKey.of(company, position);
     }
 
     private String responseContent(JsonNode response) {
