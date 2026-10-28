@@ -307,9 +307,9 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
         <p v-else-if="companyLinksError" class="distribution-empty">公司分类暂时无法读取</p>
         <p v-else class="distribution-empty">暂无公司分类</p>
       </section>
-      <section class="card"><div class="section-head"><div><h2>近 12 个月投递趋势</h2></div></div><div class="trend"><div v-for="(item,index) in trend" :key="item.key" :style="{'--trend-delay':`${index*55}ms`}"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
     </main>
     <aside class="interview-panel card" aria-labelledby="interview-records-title">
+      <section class="trend-panel" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="(item,index) in trend" :key="item.key" :style="{'--trend-delay':`${index*55}ms`}"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
       <header><div><h2 id="interview-records-title">面试记录</h2></div><b>{{interviewRecords.length}}</b></header>
       <div v-if="interviewRecords.length" ref="interviewList" class="interview-list" :class="{'interview-revealing':recordsRevealActive}" tabindex="0" aria-label="面试投递记录，可上下滚动">
         <article v-for="record in interviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
@@ -401,7 +401,9 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
 @media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(300px,1fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
 @media(max-width:560px){.company-type-list{grid-template-columns:1fr;gap:12px}}
 @media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
-@media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
+@media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}}
 @media(max-width:380px){.distribution-content{grid-template-columns:120px minmax(0,1fr);gap:10px}.distribution-legend{gap:7px}}
 @media(max-width:640px){.analytics-layout{padding-top:14px}.interview-list{grid-template-columns:1fr}.interview-list footer{align-items:flex-start;flex-direction:column}.interview-list time{text-align:left}}
+.trend-panel{flex:none;min-width:0;margin-bottom:16px;overflow-x:auto}.trend-panel .section-head h2{margin:0;font-size:17px}.trend-panel .trend{height:158px;grid-template-columns:repeat(12,minmax(26px,1fr));gap:5px;margin-top:12px}.trend-panel .trend>div{grid-template-rows:120px auto;gap:6px}.trend-panel .trend>div>span{padding-top:12px}
+@media(max-width:640px){.trend-panel .trend{min-width:360px;grid-template-columns:repeat(12,minmax(26px,1fr));gap:4px}}
 </style>
