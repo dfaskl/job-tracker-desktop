@@ -10,6 +10,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,7 +22,8 @@ import java.util.Set;
 
 @Component
 public class BackupService {
-    private static final String SALARY_ESTIMATE_VERSION = "salary-v2";
+    private static final String SALARY_ESTIMATE_VERSION = "salary-v3";
+    private static final Duration SALARY_RETRY_DELAY = Duration.ofHours(6);
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
     private final BackupDocumentValidator validator;
@@ -270,10 +273,24 @@ public class BackupService {
                         estimates.addObject().put("position", title).put("status", "pending").put("version", SALARY_ESTIMATE_VERSION);
                         changed = true;
                     } else if (!SALARY_ESTIMATE_VERSION.equals(existing.path("version").asText(""))) {
-                        existing.put("position", title).put("status", "pending").put("version", SALARY_ESTIMATE_VERSION);
-                        existing.remove("range");
-                        existing.remove("error");
+                        existing.put("position", title).put("version", SALARY_ESTIMATE_VERSION);
+                        if (!"classified".equals(existing.path("status").asText("")) || existing.path("range").asText("").isBlank()) {
+                            existing.put("status", "pending");
+                            existing.remove("range");
+                            existing.remove("error");
+                            existing.remove("retryAfter");
+                        }
                         changed = true;
+                    } else if ("failed".equals(existing.path("status").asText(""))) {
+                        Instant retryAfter = null;
+                        try { retryAfter = Instant.parse(existing.path("retryAfter").asText("")); }
+                        catch (RuntimeException ignored) { }
+                        if (retryAfter == null || !retryAfter.isAfter(Instant.now())) {
+                            existing.put("position", title).put("status", "pending");
+                            existing.remove("error");
+                            existing.remove("retryAfter");
+                            changed = true;
+                        }
                     }
                 }
                 String updatedAt = writeCompanyLinks(connection, userId, items, changed);
@@ -305,7 +322,8 @@ public class BackupService {
                         String range = results.get(key);
                         if (range != null) estimate.put("range", range).put("status", "classified").put("version", SALARY_ESTIMATE_VERSION).remove("error");
                         else estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
-                            .put("error", error == null || error.isBlank() ? "模型未返回有效薪资区间" : error.substring(0, Math.min(300, error.length())));
+                            .put("error", error == null || error.isBlank() ? "模型未返回有效薪资区间" : error.substring(0, Math.min(300, error.length())))
+                            .put("retryAfter", Instant.now().plus(SALARY_RETRY_DELAY).toString());
                     }
                 }
                 String updatedAt = writeCompanyLinks(connection, userId, items, true);
