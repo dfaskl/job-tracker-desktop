@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
+import { api } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
 
@@ -9,8 +10,14 @@ const analyticsMainHeight = ref(0)
 const interviewList = ref<HTMLElement | null>(null)
 const revealActive = ref(false)
 const recordsRevealActive = ref(false)
+type CompanyLink = { company: string; industry?: string; industryStatus?: string }
+const companyLinks = ref<CompanyLink[]>([])
+const companyLinksLoading = ref(false)
+const companyLinksError = ref(false)
 let mainResizeObserver: ResizeObserver | undefined
 let interviewRevealObserver: IntersectionObserver | null = null
+let companyLinksPollTimer = 0
+let companyLinksPollAttempts = 0
 let nextInterviewRevealStart = 0
 let viewActive = false
 let revealRun = 0
@@ -49,6 +56,21 @@ function distribution(items: DistributionItem[], colors: string[]) {
 }
 const stageDistribution = computed(() => distribution(byStage.value, stageColors))
 const channelDistribution = computed(() => distribution(byChannel.value, channelColors))
+const companyTypeCounts = computed(() => {
+  const byCompany = new Map<string, string>()
+  for (const item of companyLinks.value) {
+    const company = item.company.trim().toLocaleLowerCase()
+    if (!company || byCompany.has(company)) continue
+    const category = item.industry?.trim() || (item.industryStatus === 'pending' ? 'AI识别中' : item.industryStatus === 'failed' ? '识别失败' : '未分类')
+    byCompany.set(company, category)
+  }
+  const counts = new Map<string, number>()
+  for (const category of byCompany.values()) counts.set(category, (counts.get(category) || 0) + 1)
+  return [...counts.entries()].map(([name, count], index) => ({ name, count, color: name === 'AI识别中' ? '#8290a5' : name === '识别失败' ? '#cf6962' : channelColors[index % channelColors.length] }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'))
+})
+const companyTypeTotal = computed(() => companyTypeCounts.value.reduce((sum, item) => sum + item.count, 0))
+const companyTypeMax = computed(() => Math.max(1, ...companyTypeCounts.value.map(item => item.count)))
 const trend = computed(() => {
   const months: { key: string; label: string; count: number }[] = []
   for (let offset = 11; offset >= 0; offset--) {
@@ -190,10 +212,24 @@ async function startAnalyticsReveal() {
   observeInterviewRecords()
 }
 
-onActivated(() => { viewActive = true; void startAnalyticsReveal() })
-onDeactivated(() => { viewActive = false; stopAnalyticsReveal() })
+async function loadCompanyLinks() {
+  if (!viewActive || !store.user.value || companyLinksLoading.value) return
+  companyLinksLoading.value = true
+  try {
+    const result = await api<{ items: CompanyLink[] }>('/api/poc/company-links')
+    companyLinks.value = result.items || []
+    companyLinksError.value = false
+    window.clearTimeout(companyLinksPollTimer)
+    if (viewActive && companyLinks.value.some(item => item.industryStatus === 'pending') && companyLinksPollAttempts < 40) {
+      companyLinksPollTimer = window.setTimeout(() => { companyLinksPollAttempts++; void loadCompanyLinks() }, 3000)
+    }
+  } catch { companyLinksError.value = true }
+  finally { companyLinksLoading.value = false }
+}
+onActivated(() => { viewActive = true; companyLinksPollAttempts = 0; void startAnalyticsReveal(); void loadCompanyLinks() })
+onDeactivated(() => { viewActive = false; window.clearTimeout(companyLinksPollTimer); stopAnalyticsReveal() })
 watch([() => store.loading.value, () => store.user.value], () => {
-  if (viewActive && !store.loading.value && store.user.value) void startAnalyticsReveal()
+  if (viewActive && !store.loading.value && store.user.value) { void startAnalyticsReveal(); void loadCompanyLinks() }
 })
 watch(interviewRecords, (records, previous) => {
   if (!viewActive) return
@@ -211,7 +247,7 @@ watch(analyticsMain, element => {
   })
   mainResizeObserver.observe(element)
 }, { flush: 'post' })
-onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObserver?.disconnect() })
+onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPollTimer); stopAnalyticsReveal(); mainResizeObserver?.disconnect() })
 </script>
 
 <template>
@@ -259,6 +295,18 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
         </div>
       </section>
     </div>
+      <section class="card company-type-card" aria-labelledby="company-type-title">
+        <header class="company-type-header"><div><h2 id="company-type-title">公司类型分布</h2><p>按公司数统计</p></div><span>{{companyTypeTotal}} 家</span></header>
+        <div v-if="companyTypeCounts.length" class="company-type-list" aria-label="各公司类型数量">
+          <div v-for="item in companyTypeCounts" :key="item.name" class="company-type-row">
+            <div class="company-type-label"><span :title="item.name">{{item.name}}</span><strong>{{item.count}}</strong></div>
+            <div class="company-type-track" aria-hidden="true"><i :style="{width:(item.count/companyTypeMax*100)+'%',background:item.color}" /></div>
+          </div>
+        </div>
+        <p v-else-if="companyLinksLoading" class="distribution-empty">正在读取公司分类…</p>
+        <p v-else-if="companyLinksError" class="distribution-empty">公司分类暂时无法读取</p>
+        <p v-else class="distribution-empty">暂无公司分类</p>
+      </section>
       <section class="card"><div class="section-head"><div><h2>近 12 个月投递趋势</h2></div></div><div class="trend"><div v-for="(item,index) in trend" :key="item.key" :style="{'--trend-delay':`${index*55}ms`}"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
     </main>
     <aside class="interview-panel card" aria-labelledby="interview-records-title">
@@ -310,6 +358,18 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 .distribution-legend span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .distribution-legend strong { color:var(--color-foreground); font-size:12px; font-variant-numeric:tabular-nums; }
 .distribution-empty { margin:0; color:var(--color-muted-foreground); font-size:12px; }
+.company-type-card { min-width:0; }
+.company-type-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.company-type-header h2 { margin:0; font-size:17px; }
+.company-type-header p { margin:4px 0 0; color:var(--color-muted-foreground); font-size:11px; }
+.company-type-header>span { flex:none; padding:4px 8px; border-radius:999px; color:var(--color-muted-foreground); background:var(--color-muted); font-size:11px; font-weight:700; }
+.company-type-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 24px; }
+.company-type-row { display:grid; min-width:0; gap:6px; }
+.company-type-label { display:flex; min-width:0; align-items:center; justify-content:space-between; gap:10px; color:var(--color-muted-foreground); font-size:12px; }
+.company-type-label>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.company-type-label>strong { color:var(--color-foreground); font-variant-numeric:tabular-nums; }
+.company-type-track { height:6px; overflow:hidden; border-radius:999px; background:var(--color-muted); }
+.company-type-track>i { display:block; height:100%; min-width:4px; border-radius:inherit; transition:width .35s ease; }
 .analytics-revealing .metrics article strong { animation:analytics-number-appear 600ms ease-out both; }
 .analytics-revealing .metrics article:nth-child(2) strong { animation-delay:120ms; }
 .analytics-revealing .metrics article:nth-child(3) strong { animation-delay:240ms; }
@@ -339,6 +399,7 @@ onBeforeUnmount(() => { viewActive = false; stopAnalyticsReveal(); mainResizeObs
 .trend{height:158px;grid-template-columns:repeat(12,minmax(30px,1fr));gap:6px}.trend>div{grid-template-rows:120px auto}.trend>div>span{padding-top:12px}
 .interview-list article.is-active{--record-bg:#edf4ff;border-color:#b7cbed;border-left-color:#3974c6;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.interview-list article.is-offer{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.is-active .record-head span{color:#245ca6;background:#dceaff}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.is-offer .record-head span{color:#12623d;background:#d1eddc}
 @media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(300px,1fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
+@media(max-width:560px){.company-type-list{grid-template-columns:1fr;gap:12px}}
 @media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
 @media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}.analytics-main>.card:last-child{overflow-x:auto}.trend{min-width:620px}}
 @media(max-width:380px){.distribution-content{grid-template-columns:120px minmax(0,1fr);gap:10px}.distribution-legend{gap:7px}}
