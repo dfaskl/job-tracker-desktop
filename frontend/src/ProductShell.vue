@@ -345,7 +345,7 @@ onBeforeUnmount(() => {
         <button v-if="activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
       </header>
 
-      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'interview-summary-content': activePage === 'interview-summary' }">
+      <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'guide-content-shell': activePage === 'guide', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
           <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { guideOrigin, closeRequest: guideCloseRequest } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
         </KeepAlive>
@@ -429,6 +429,7 @@ nav button.active::before { content: none; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
 .page-content.stats-content { display: flow-root; }
+.page-content.guide-content-shell { width: 100%; max-width: none; }
 .product-main.interview-summary-page{height:100dvh;min-height:0;padding-bottom:0;overflow:hidden}
 .page-content.interview-summary-content{width:100%;max-width:none;height:100%;min-height:0}
 .page-content.home-content,
