@@ -112,7 +112,7 @@ class AiServiceTest {
         assertThat(advice.path("conflicts").get(0).asText()).isEqualTo("两项安排重叠");
     }
     @Test
-    void keepsRecognizedScheduleTitleEqualToNoticeType() throws Exception {
+    void preservesSpecificRecognizedScheduleTitle() throws Exception {
         ApplicationService sandbox = mock(ApplicationService.class);
         when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
         AiService service = service(new MockEnvironment(), sandbox);
@@ -122,7 +122,11 @@ class AiServiceTest {
         ));
 
         assertThat(result.noticeType()).isEqualTo("笔试");
-        assertThat(result.scheduleTitle()).isEqualTo("笔试");
+        assertThat(result.scheduleTitle()).isEqualTo("新石器2027届AICoding后端工程类考试（二）");
+        var unnamed = service.recognition(new ObjectMapper().readTree(
+            "{\"noticeType\":\"笔试\",\"scheduleTitle\":\"  \"}"
+        ));
+        assertThat(unnamed.scheduleTitle()).isEqualTo("笔试");
     }
     @Test
     void buildsJsonModeRequestWithExampleAndRetryFeedback() {
@@ -156,7 +160,7 @@ class AiServiceTest {
         List<String> reasons = new ArrayList<>();
         List<String> previousOutputs = new ArrayList<>();
         String valid = """
-            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","summary":""}
+            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"技术复试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"","summary":""}
             """;
 
         var result = service.recognizeWithRetries("真人面试通知", (reason, previousOutput) -> {
@@ -170,6 +174,7 @@ class AiServiceTest {
         assertThat(reasons.subList(1, 4)).allMatch(reason -> reason.contains("JSON 缺少字符串字段"));
         assertThat(previousOutputs.get(1)).contains("示例科技");
         assertThat(result.noticeType()).isEqualTo("面试");
+        assertThat(result.scheduleTitle()).isEqualTo("技术复试");
         assertThat(result.notes()).isEmpty();
     }
 
@@ -214,13 +219,13 @@ class AiServiceTest {
         when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
         AiService service = service(new MockEnvironment(), sandbox);
         var modelResult = new ObjectMapper().readTree(
-            "{\"noticeType\":\"面试\",\"suggestedStage\":\"面试\",\"suggestedStatus\":\"等待结果\"}"
+            "{\"noticeType\":\"面试\",\"scheduleTitle\":\"AI 面试\",\"suggestedStage\":\"面试\",\"suggestedStatus\":\"等待结果\"}"
         );
 
         var result = service.recognition(modelResult, "请在 48 小时内完成 AI 面试");
 
         assertThat(result.noticeType()).isEqualTo("测评");
-        assertThat(result.scheduleTitle()).isEqualTo("测评");
+        assertThat(result.scheduleTitle()).isEqualTo("AI 面试");
         assertThat(result.suggestedStage()).isEqualTo("测评");
     }
     private AiService service(MockEnvironment environment, ApplicationService sandbox) {

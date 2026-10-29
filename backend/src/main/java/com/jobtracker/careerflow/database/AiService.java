@@ -789,7 +789,7 @@ public class AiService {
         String stage = result.path("suggestedStage").asText("").trim();
         String status = result.path("suggestedStatus").asText("").trim();
         if (!NOTICE_TYPES.contains(noticeType)) throw new AiResponseException("noticeType 不在允许范围内");
-        if (!scheduleTitle.equals(noticeType)) throw new AiResponseException("scheduleTitle 必须与 noticeType 完全一致");
+        if (scheduleTitle.length() > 160) throw new AiResponseException("scheduleTitle 不能超过 160 个字符");
         if (!STAGES.contains(stage)) throw new AiResponseException("suggestedStage 不在允许范围内");
         if (!STATUSES.contains(status)) throw new AiResponseException("suggestedStatus 不在允许范围内");
         String startsAt = result.path("startsAt").asText("").trim();
@@ -819,12 +819,16 @@ public class AiService {
 
             输出字段
             必须包含以下全部字符串字段；无法确认时返回空字符串：company、position、noticeType、scheduleTitle、suggestedStage、suggestedStatus、startsAt、endsAt、location、notes、summary。
-            noticeType 只能是测评、笔试、面试、Offer、未通过、其他之一；scheduleTitle 必须与 noticeType 完全一致，不得填写考试名称、活动全称或面试轮次。
+            noticeType 只能是测评、笔试、面试、Offer、未通过、其他之一，用于分类，不限制安排名称。
             suggestedStage 只能是已投递、测评、笔试、面试、Offer、已结束之一；suggestedStatus 只能是等待结果、已通过、未通过、已放弃、已结束之一。
+
+            提取安排名称
+            scheduleTitle 用于让用户辨认具体要参加或完成的安排，应结合正文和邮件主题提取，不必与 noticeType 相同。优先保留明确的环节、轮次、考试或任务名称，例如“一面”“技术复试”“HR面试”“AI 面试”“英语测评”“后端开发笔试”“授权书签署”“材料提交”。
+            优先依据正文中明确的安排；主题只作补充。名称保持简洁，通常不超过 20 个字，最多 160 个字符。较长考试名称可压缩，但保留有辨识度的考试方向或轮次；去掉重复公司名、称呼、通知套话、宣传语、时间、链接和账号密码。不要自行补造轮次、面试形式或任务。没有可提取的具体名称时，才使用 noticeType 作为名称。
 
             判断通知类型与招聘状态
             先判断邮件是否明确表示招聘流程结束、岗位不匹配、申请/简历未通过、岗位取消或停止招聘。若是终止结果：noticeType 和 scheduleTitle 填未通过，suggestedStage 填已结束，suggestedStatus 按邮件事实选择未通过、已放弃或已结束；startsAt、endsAt、location 留空。不要把结束通知识别为未来日程，也不要推断安排时间。只有邮件明确表示仍有后续环节或要求参加活动时，才提取日程。
-            AI 面试、智能面试或由 AI 自动完成的面试评估统一归类为测评，noticeType、scheduleTitle、suggestedStage 均填测评。只有真人面试官参与时才归类为面试。
+            AI 面试、智能面试或由 AI 自动完成的面试评估统一归类为测评，noticeType、suggestedStage 均填测评，scheduleTitle 仍保留邮件明确的“AI 面试”“智能面试”等具体名称。只有真人面试官参与时才归类为面试。
             对仍在进行的招聘流程，按邮件实际内容填写通知类型和当前阶段；没有明确结果时，suggestedStatus 填等待结果。
 
             时间与地点
@@ -837,7 +841,7 @@ public class AiService {
             summary 始终返回空字符串。不要把整封邮件、无关宣传、发件人联系方式或普通背景介绍复制到 notes 或 summary。
 
             输出示例（字段必须齐全）：
-            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"面试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"https://example.com/meeting","notes":"账号：candidate01；密码：abc123；请提前完成设备测试","summary":""}
+            {"company":"示例科技","position":"Java开发工程师","noticeType":"面试","scheduleTitle":"技术复试","suggestedStage":"面试","suggestedStatus":"等待结果","startsAt":"2026-10-08 14:30","endsAt":"","location":"https://example.com/meeting","notes":"账号：candidate01；密码：abc123；请提前完成设备测试","summary":""}
             """.formatted(currentTime);
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("model", model);
@@ -1044,7 +1048,8 @@ public class AiService {
             noticeType = "测评";
             stage = "测评";
         }
-        String scheduleTitle = noticeType;
+        String scheduleTitle = optional(result, "scheduleTitle", 160);
+        if (scheduleTitle.isEmpty()) scheduleTitle = noticeType;
         String status = enumValue(optional(result, "suggestedStatus", 20), STATUSES, "等待结果");
         return new RecognitionResult(
             optional(result, "company", 120), optional(result, "position", 160), noticeType, scheduleTitle,

@@ -237,7 +237,7 @@ async function recognize() {
   recognizing.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
-    Object.assign(result, value, { scheduleTitle: value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
+    Object.assign(result, value, { scheduleTitle: value.scheduleTitle?.trim() || value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
     if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
       result.startsAt = ''; result.endsAt = ''; result.location = ''
     }
