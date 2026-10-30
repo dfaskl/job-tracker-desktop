@@ -35,7 +35,7 @@ CareerFlow 是一个面向个人与小组协作的求职管理系统，用于统
 - 前端：Vue 3、TypeScript、Vite
 - 后端：Java 21、Spring Boot、Maven
 - 数据库：SQLite 或 PostgreSQL
-- 发布：本地脚本生成可直接上传服务器的 JAR；GitHub Actions 仅保留手动生成完整 Linux x64 部署包的入口
+- 发布：Docker 镜像打包与 Compose 部署脚本；原 JAR 发布脚本保留兼容与回滚
 
 ## 仓库结构
 
@@ -78,9 +78,15 @@ java -jar .\dist\job-tracker.jar
 
 ## 部署
 
+### Docker 单机部署（SQLite）
+
+使用 `.\build-docker.ps1 -Deploy` 在本机容器内测试、构建并导出 Linux amd64 镜像，再上传服务器运行。服务器继续使用原 `data/`、`backups/` 和密钥；首次迁移失败时自动尝试恢复 JAR。
+
+**当前尚未切换线上运行方式**：本机容器已可运行，但 Docker Hub 连接超时，服务器账户也尚无 Docker 引擎访问权限。解决后才能完成镜像实测和生产迁移。详细准备、验证、更新与回滚见 [Docker 部署文档](docs/DOCKER-DEPLOYMENT.md)。
+
 ### Linux 单机部署
 
-日常更新推荐运行 `.\build-jar.ps1`，然后把 `dist/job-tracker.jar` 上传到服务器替换旧 JAR。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
+Docker 迁移完成前，仍可运行 `.\build-jar.ps1` 生成 `dist/job-tracker.jar`，通过 `.\deploy-server.ps1` 更新服务器。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
 
 完整的安装、更新、回滚和 SQLite 备份方法见 [自托管部署文档](docs/SELF-HOSTED-DEPLOYMENT.md)。更新版本时必须保留服务器上的 `.env`、`data/`、`backups/` 和 `logs/`。
 
