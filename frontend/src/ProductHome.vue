@@ -421,9 +421,9 @@ onUnmounted(()=>{stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(me
     </section>
 
     <section ref="confirmationSection" class="dashboard-panel confirmation-panel" :class="{'home-visible':confirmationVisible}">
-      <div class="panel-head"><div><h2>人工确认 <span title="最近日程后长时间没有新进展的岗位">ⓘ</span></h2><p>最近一项日程达到 22 天仍无进展的面试岗位，请确认是否标记为未通过。</p></div><b v-if="staleApplications.length">{{staleApplications.length}} 个待确认</b></div>
+      <div class="panel-head"><div><h2>人工确认 <span title="最近日程后长时间没有新进展的岗位">ⓘ</span></h2><p>最近一项日程达到 3 周仍无进展的面试岗位，请确认是否标记为未通过。</p></div><b v-if="staleApplications.length">{{staleApplications.length}} 个待确认</b></div>
       <div v-if="staleApplications.length" ref="confirmationList" class="confirmation-list" :class="{'home-card-revealing':cardsRevealing}"><article v-for="row in staleApplications" :key="row.item.id"><div><strong>{{row.item.company||'未填写公司'}}</strong><span>{{row.item.position||'未填写岗位'}}</span></div><div class="progress-line"><i>已投递</i><span>→</span><i>测评 / 笔试</i><span>→</span><i>面试</i><span>→</span><i class="current">等待结果</i></div><em>{{row.health?.days}}天无进展</em><button :disabled="busyId===row.item.id||store.readOnly.value" @click="markRejected(row.item)">标记未通过</button></article></div>
-      <div v-else class="confirmation-empty"><span class="confirmation-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M16 8h16a4 4 0 0 1 4 4v27H12V12a4 4 0 0 1 4-4Z"/><path d="M19 8V6h10v2M18 19h12M18 25h12M18 31h7"/><path class="empty-check" d="m29 33 3 3 6-7"/></svg></span><strong>目前没有需要人工确认的岗位</strong><p>暂时没有最近日程达到 22 天的面试记录。</p></div>
+      <div v-else class="confirmation-empty"><span class="confirmation-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M16 8h16a4 4 0 0 1 4 4v27H12V12a4 4 0 0 1 4-4Z"/><path d="M19 8V6h10v2M18 19h12M18 25h12M18 31h7"/><path class="empty-check" d="m29 33 3 3 6-7"/></svg></span><strong>目前没有需要人工确认的岗位</strong><p>暂时没有最近日程达到 3 周的面试记录。</p></div>
     </section>
   </div>
 
