@@ -35,7 +35,7 @@ CareerFlow 是一个面向个人与小组协作的求职管理系统，用于统
 - 前端：Vue 3、TypeScript、Vite
 - 后端：Java 21、Spring Boot、Maven
 - 数据库：SQLite 或 PostgreSQL
-- 发布：Docker 镜像打包与 Compose 部署脚本；原 JAR 发布脚本保留兼容与回滚
+- 发布：本地构建 JAR，通过 SSH 部署到 Linux 服务器，支持健康检查与失败回滚
 
 ## 仓库结构
 
@@ -45,12 +45,10 @@ CareerFlow 是一个面向个人与小组协作的求职管理系统，用于统
 ├── frontend/                Vue 3 前端、样式与前端测试
 ├── deploy/self-hosted/      Linux 自托管环境模板及启停脚本
 ├── docs/                    部署和运维文档
-├── scripts/                 Docker 自托管初始化脚本
 ├── data/                    本地 SQLite 数据目录（数据库文件不提交）
 ├── .github/workflows/       持续集成和部署包构建
-├── Dockerfile               应用镜像构建
-├── docker-compose.yml       PostgreSQL + 应用的容器部署
-└── render.yaml              Render 部署配置
+├── build-jar.ps1            测试、构建与 JAR 打包
+└── deploy-server.ps1        上传、重启、健康检查与失败回滚
 ```
 
 ## 本地构建
@@ -78,27 +76,11 @@ java -jar .\dist\job-tracker.jar
 
 ## 部署
 
-### Docker 单机部署（SQLite）
-
-使用 `.\build-docker.ps1 -Deploy` 在本机容器内测试、构建并导出 Linux amd64 镜像，再上传服务器运行。服务器继续使用原 `data/`、`backups/` 和密钥；首次迁移失败时自动尝试恢复 JAR。
-
-**当前尚未切换线上运行方式**：本机容器已可运行，但 Docker Hub 连接超时，服务器账户也尚无 Docker 引擎访问权限。解决后才能完成镜像实测和生产迁移。详细准备、验证、更新与回滚见 [Docker 部署文档](docs/DOCKER-DEPLOYMENT.md)。
-
 ### Linux 单机部署
 
-Docker 迁移完成前，仍可运行 `.\build-jar.ps1` 生成 `dist/job-tracker.jar`，通过 `.\deploy-server.ps1` 更新服务器。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
+运行 `.\build-jar.ps1 -Deploy` 完成测试、打包和部署；也可以运行 `.\build-jar.ps1` 生成 `dist/job-tracker.jar`，再通过 `.\deploy-server.ps1` 单独更新服务器。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
 
 完整的安装、更新、回滚和 SQLite 备份方法见 [自托管部署文档](docs/SELF-HOSTED-DEPLOYMENT.md)。更新版本时必须保留服务器上的 `.env`、`data/`、`backups/` 和 `logs/`。
-
-### Docker Compose
-
-复制 `.env.example` 为 `.env`，填写密钥后运行：
-
-```sh
-docker compose up -d --build
-```
-
-此模式会同时运行 PostgreSQL 和 CareerFlow，数据库保存在 `jobtracker_data` 数据卷中。
 
 ## 数据安全
 

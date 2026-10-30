@@ -1,6 +1,6 @@
 # 自带 Java 21 的服务器部署包
 
-部署包面向 Linux x64 服务器，不要求服务器安装 Docker、Java、Maven或 Node。解压后的 Java 运行时、应用、配置、日志和 PID 文件都位于同一个目录。
+部署包面向 Linux x64 服务器，自带 Java 运行时，不要求服务器安装 Java、Maven 或 Node。解压后的 Java 运行时、应用、配置、日志和 PID 文件都位于同一个目录。
 
 ## 1. 生成部署包
 
