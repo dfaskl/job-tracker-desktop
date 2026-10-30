@@ -1,3 +1,4 @@
+import { isFormalInterview } from './eventClassification'
 import type ExcelJS from 'exceljs'
 import type { BusinessData, JobApplication, JobEvent, User } from './jobTrackerStore'
 import { shanghaiDateKey } from './shanghaiTime'
@@ -246,7 +247,7 @@ function buildTimeline(application: JobApplication, allEvents: JobEvent[]): Time
   const status = text(application.status, '')
   const terminal = ['未通过', '已放弃', '已结束'].includes(status)
   const offer = application.stage === 'Offer' || status === '已通过'
-  const enteredInterview = application.stage === '面试' || offer || applicationEvents.some(event => /面试|[一二三四五六七八九]面|HR/i.test(`${event.type || ''} ${event.title || ''}`))
+  const enteredInterview = application.stage === '面试' || offer || applicationEvents.some(event => !event.abandoned && isFormalInterview(event))
   let statusLabel = offer ? 'Offer' : terminal ? status : status
   if (statusLabel === '等待结果' && !enteredInterview) statusLabel = ''
   const latestEvent = applicationEvents[applicationEvents.length - 1]

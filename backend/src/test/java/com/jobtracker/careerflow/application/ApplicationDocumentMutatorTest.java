@@ -51,7 +51,8 @@ class ApplicationDocumentMutatorTest {
         assertThat(updated.path("company").asText()).isEqualTo("New");
         assertThat(updated.path("officialUrl").asText()).isEqualTo("https://example.com");
         assertThat(updated.path("timeline")).hasSize(2);
-        assertThat(updated.path("timeline").get(0).path("title").asText()).contains("面试", "已通过");
+        assertThat(updated.path("timeline").get(0).path("title").asText()).contains("Offer", "已通过");
+        assertThat(result.application().stage()).isEqualTo("Offer");
     }
 
     @Test

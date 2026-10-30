@@ -108,11 +108,13 @@ public class LegacyReadService {
         ObjectNode safe = root.deepCopy();
         JsonNode settings = safe.path("settings");
         if (settings instanceof ObjectNode settingsObject) settingsObject.remove("apiKey");
+        com.jobtracker.careerflow.application.ApplicationStagePolicy.normalize(safe);
         return safe;
     }
 
     ApplicationPage mapApplications(String json) throws Exception {
         JsonNode root = objectMapper.readTree(json == null ? "{}" : json);
+        com.jobtracker.careerflow.application.ApplicationStagePolicy.normalize(root);
         JsonNode source = root.path("applications");
         if (!source.isArray()) throw new IllegalStateException("Legacy applications data is not an array");
 

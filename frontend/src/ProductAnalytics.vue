@@ -85,7 +85,7 @@ const interviewRecords = computed(() => store.applications.value
   .filter(item => hasInterviewProgress(item))
   .map(item => {
     const related = store.events.value
-      .filter(event => event.applicationId === item.id && !event.missed && isFormalInterview(event))
+      .filter(event => event.applicationId === item.id && !event.abandoned && isFormalInterview(event))
       .sort((a,b) => interviewTime(b).localeCompare(interviewTime(a)))
     const ended = item.stage === '已结束' || ['未通过','已放弃','已结束'].includes(String(item.status || ''))
     const offer = item.stage === 'Offer' || item.status === '已通过'
@@ -153,7 +153,7 @@ function compactFlow(item: Record<string, unknown>) {
 }
 function hasInterviewProgress(item: Record<string, unknown>) {
   if (['面试', 'Offer'].includes(String(item.stage || '')) || item.status === '已通过') return true
-  return store.events.value.some(event => event.applicationId === item.id && !event.missed && isFormalInterview(event))
+  return store.events.value.some(event => event.applicationId === item.id && !event.abandoned && isFormalInterview(event))
 }
 function grouped(field: string) {
   const counts = new Map<string, number>()

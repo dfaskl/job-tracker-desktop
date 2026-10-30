@@ -106,7 +106,8 @@ public class ApplicationService {
             );
             try {
                 var event = eventMutator.create(application.documentJson(), linkedSchedule);
-                return new Mutation(event.documentJson(), application.application(), application.total());
+                return new Mutation(event.documentJson(),
+                    mutator.findInDocument(event.documentJson(), application.application().id()), application.total());
             } catch (EventDocumentMutator.ValidationException exception) {
                 throw new ApplicationDocumentMutator.ValidationException(exception.getMessage());
             }
@@ -211,7 +212,9 @@ public class ApplicationService {
     }
 
     private ApplicationPage mapApplications(String json) throws Exception {
-        JsonNode source = objectMapper.readTree(json == null ? "{}" : json).path("applications");
+        JsonNode document = objectMapper.readTree(json == null ? "{}" : json);
+        com.jobtracker.careerflow.application.ApplicationStagePolicy.normalize(document);
+        JsonNode source = document.path("applications");
         if (!source.isArray()) throw new IllegalStateException("Legacy applications data is not an array");
         List<ApplicationView> applications = new ArrayList<>();
         for (JsonNode item : source) {

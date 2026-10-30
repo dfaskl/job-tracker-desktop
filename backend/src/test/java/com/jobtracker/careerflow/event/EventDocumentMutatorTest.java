@@ -192,6 +192,8 @@ class EventDocumentMutatorTest {
         assertThat(abandoned.event().completed()).isTrue();
         assertThat(abandoned.event().missed()).isFalse();
         assertThat(abandoned.event().abandoned()).isTrue();
+        assertThat(mapper.readTree(abandoned.documentJson()).path("applications").get(0).path("stage").asText())
+            .isEqualTo("已投递");
 
         var restored = mutator.resolve(
             abandoned.documentJson(), abandoned.event().id(), EventDocumentMutator.Resolution.RESTORE,
@@ -199,6 +201,29 @@ class EventDocumentMutatorTest {
         );
         assertThat(restored.event().completed()).isFalse();
         assertThat(restored.event().abandoned()).isFalse();
+        assertThat(mapper.readTree(restored.documentJson()).path("applications").get(0).path("stage").asText())
+            .isEqualTo("笔试");
+    }
+
+    @Test
+    void editingEventTypeAndAddingLowerStagesRecalculatesTheHighestActiveStage() throws Exception {
+        var interview = mutator.create(document(), input("面试", "一面", "2026-09-05 19:00", ""));
+        var assessment = mutator.create(interview.documentJson(), input("测评", "测评", "2026-09-06 19:00", ""));
+        assertThat(mapper.readTree(assessment.documentJson()).path("applications").get(0).path("stage").asText())
+            .isEqualTo("面试");
+        var other = mutator.update(assessment.documentJson(), interview.event().id(),
+            input("其他", "材料提交", "2026-09-05 19:00", ""), interview.event().updatedAt());
+        assertThat(mapper.readTree(other.documentJson()).path("applications").get(0).path("stage").asText())
+            .isEqualTo("测评");
+    }
+
+    @Test
+    void deletingTheLastOfferEventFallsBackInsteadOfKeepingAnAutomaticOffer() throws Exception {
+        var exam = mutator.create(document(), input("笔试", "笔试", "2026-09-05 19:00", ""));
+        var offer = mutator.create(exam.documentJson(), input("Offer", "录用通知", "2026-09-06 19:00", ""));
+        var deleted = mutator.delete(offer.documentJson(), offer.event().id(), offer.event().updatedAt());
+        assertThat(mapper.readTree(deleted.documentJson()).path("applications").get(0).path("stage").asText())
+            .isEqualTo("笔试");
     }
     private String document() {
         return """

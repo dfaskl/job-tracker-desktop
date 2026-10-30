@@ -416,6 +416,7 @@ public class AdminService {
     UserDetails mapDetails(long userId, String email, String json) throws Exception {
         JsonNode root = objectMapper.readTree(json == null || json.isBlank()
             ? "{\"applications\":[],\"events\":[]}" : json);
+        com.jobtracker.careerflow.application.ApplicationStagePolicy.normalize(root);
         JsonNode applicationNodes = root.path("applications");
         JsonNode eventNodes = root.path("events");
         if (!applicationNodes.isArray() || !eventNodes.isArray()) {

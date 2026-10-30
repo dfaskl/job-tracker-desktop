@@ -1,5 +1,7 @@
 package com.jobtracker.careerflow.event;
 
+import com.jobtracker.careerflow.application.ApplicationStagePolicy;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -23,7 +25,6 @@ public class EventDocumentMutator {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final Set<String> TYPES = Set.of("测评", "笔试", "面试", "Offer", "其他");
     private static final Set<String> PROGRESS_TYPES = Set.of("测评", "笔试", "面试", "Offer");
-    private static final Set<String> TERMINAL_STATUSES = Set.of("已通过", "未通过", "已放弃", "已结束");
 
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -159,7 +160,6 @@ public class EventDocumentMutator {
                 document.applications().get(applicationIndex), "投递记录不是 JSON 对象"
             );
             removeEventHistory(application, removed);
-            rollbackProgress(application, removed, document.events());
             application.put("updatedAt", now());
         }
         return mutation(document.root(), removed, document.events().size());
@@ -190,6 +190,7 @@ public class EventDocumentMutator {
             throw new ValidationException("applications 不是数组");
         }
         if (!(root.path("events") instanceof ArrayNode events)) throw new ValidationException("events 不是数组");
+        ApplicationStagePolicy.normalize(root);
         return new BusinessDocument(root, applications, events);
     }
 
@@ -231,8 +232,6 @@ public class EventDocumentMutator {
     private void applyCreatedProgress(ObjectNode application, ObjectNode event, String now) {
         String type = text(event, "type");
         if (!PROGRESS_TYPES.contains(type)) return;
-        application.put("stage", type);
-        application.put("status", "Offer".equals(type) ? "已通过" : "等待结果");
         ArrayNode timeline = application.path("timeline") instanceof ArrayNode array
             ? array
             : objectMapper.createArrayNode();
@@ -264,23 +263,6 @@ public class EventDocumentMutator {
         }
     }
 
-    private void rollbackProgress(ObjectNode application, ObjectNode removed, ArrayNode remainingEvents) {
-        String stage = text(application, "stage");
-        String status = text(application, "status");
-        boolean terminal = "已结束".equals(stage) || TERMINAL_STATUSES.contains(status);
-        if (terminal || !stage.equals(text(removed, "type"))) return;
-        ObjectNode latest = null;
-        for (JsonNode candidateNode : remainingEvents) {
-            if (!(candidateNode instanceof ObjectNode candidate)) continue;
-            if (!text(application, "id").equals(text(candidate, "applicationId"))) continue;
-            if (!PROGRESS_TYPES.contains(text(candidate, "type"))) continue;
-            if (latest == null || recordAt(candidate).compareTo(recordAt(latest)) > 0) latest = candidate;
-        }
-        String nextStage = latest == null ? "已投递" : text(latest, "type");
-        application.put("stage", nextStage);
-        application.put("status", "Offer".equals(nextStage) ? "已通过" : "等待结果");
-    }
-
     private ObjectNode application(ArrayNode applications, String id) {
         int index = find(applications, id);
         if (index < 0) throw new ValidationException("关联岗位不存在");
@@ -288,6 +270,15 @@ public class EventDocumentMutator {
     }
 
     private Mutation mutation(ObjectNode root, ObjectNode event, int total) throws Exception {
+        ObjectNode related = null;
+        for (JsonNode value : root.path("applications")) {
+            if (value instanceof ObjectNode item && text(item, "id").equals(text(event, "applicationId"))) related = item;
+        }
+        String beforeStage = related == null ? "" : text(related, "stage");
+        String beforeStatus = related == null ? "" : text(related, "status");
+        ApplicationStagePolicy.normalize(root);
+        if (related != null && (!beforeStage.equals(text(related, "stage"))
+            || !beforeStatus.equals(text(related, "status")))) related.put("updatedAt", now());
         return new Mutation(objectMapper.writeValueAsString(root), view(event), total);
     }
 

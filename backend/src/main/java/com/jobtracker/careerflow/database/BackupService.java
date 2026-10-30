@@ -1,6 +1,7 @@
 package com.jobtracker.careerflow.database;
 
 import com.jobtracker.careerflow.backup.BackupDocumentValidator;
+import com.jobtracker.careerflow.application.ApplicationStagePolicy;
 import com.jobtracker.careerflow.backup.BackupDocumentValidator.BackupSummary;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -49,6 +50,7 @@ public class BackupService {
         try (Connection connection = openConnection()) {
             UserDocument current = currentUserDocument(connection, email, false);
             JsonNode data = objectMapper.readTree(current.json());
+            ApplicationStagePolicy.normalize(data);
             if (!data.isObject() || !data.path("applications").isArray() || !data.path("events").isArray()) {
                 throw new SandboxDataNotFoundException("测试业务数据结构不兼容");
             }

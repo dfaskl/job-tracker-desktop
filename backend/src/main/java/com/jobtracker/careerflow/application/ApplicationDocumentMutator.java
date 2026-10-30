@@ -40,6 +40,9 @@ public class ApplicationDocumentMutator {
         String id = id("app");
         ObjectNode application = objectMapper.createObjectNode();
         applyFields(application, validate(input));
+        if ("Offer".equals(text(application, "stage")) || "已通过".equals(text(application, "status"))) {
+            application.put("stageSource", "manual-result");
+        }
         application.put("id", id);
         application.put("createdAt", now);
         application.put("updatedAt", now);
@@ -48,6 +51,13 @@ public class ApplicationDocumentMutator {
         application.set("timeline", timeline);
         document.applications().insert(0, application);
         return mutation(document.root(), application, document.applications().size());
+    }
+
+    public ApplicationView findInDocument(String json, String id) throws Exception {
+        BusinessDocument document = document(json);
+        int index = find(document.applications(), id);
+        if (index < 0) throw new NotFoundException("投递记录不存在");
+        return view(requireObject(document.applications().get(index)));
     }
 
     public Mutation update(String json, String id, ApplicationInput input, String expectedUpdatedAt) throws Exception {
@@ -62,15 +72,14 @@ public class ApplicationDocumentMutator {
         ObjectNode updated = previous.deepCopy();
         ApplicationInput clean = validate(input);
         applyFields(updated, clean);
+        if (!oldStage.equals(clean.stage()) || !oldStatus.equals(clean.status())) {
+            updated.remove("stageSource");
+            if ("Offer".equals(clean.stage()) || "已通过".equals(clean.status())) {
+                updated.put("stageSource", "manual-result");
+            }
+        }
         String now = now();
         updated.put("updatedAt", now);
-        if (!oldStage.equals(clean.stage()) || !oldStatus.equals(clean.status())) {
-            ArrayNode timeline = updated.path("timeline").isArray()
-                ? (ArrayNode) updated.path("timeline")
-                : objectMapper.createArrayNode();
-            timeline.insert(0, timelineEntry("更新为 " + clean.stage() + " · " + clean.status(), now));
-            updated.set("timeline", timeline);
-        }
         if ("已放弃".equals(clean.status())) {
             for (JsonNode value : document.events()) {
                 if (!(value instanceof ObjectNode event) || !id.equals(text(event, "applicationId"))) continue;
@@ -81,7 +90,14 @@ public class ApplicationDocumentMutator {
                 if (!text(event, "endsAt").isEmpty() || !text(event, "end").isEmpty()) event.put("completedAt", now);
                 event.put("updatedAt", now);
             }
-        }        document.applications().set(index, updated);
+        }
+        document.applications().set(index, updated);
+        ApplicationStagePolicy.normalize(document.root());
+        if (!oldStage.equals(text(updated, "stage")) || !oldStatus.equals(text(updated, "status"))) {
+            ArrayNode timeline = updated.path("timeline") instanceof ArrayNode array ? array : objectMapper.createArrayNode();
+            timeline.insert(0, timelineEntry("更新为 " + text(updated, "stage") + " · " + text(updated, "status"), now));
+            updated.set("timeline", timeline);
+        }
         return mutation(document.root(), updated, document.applications().size());
     }
 
@@ -109,6 +125,7 @@ public class ApplicationDocumentMutator {
         if (!(root.path("events") instanceof ArrayNode events)) {
             throw new ValidationException("events 不是数组");
         }
+        ApplicationStagePolicy.normalize(root);
         return new BusinessDocument(root, applications, events);
     }
 
@@ -157,6 +174,7 @@ public class ApplicationDocumentMutator {
     }
 
     private Mutation mutation(ObjectNode root, ObjectNode application, int total) throws Exception {
+        ApplicationStagePolicy.normalize(root);
         return new Mutation(objectMapper.writeValueAsString(root), view(application), total);
     }
 

@@ -32,7 +32,6 @@ const error = ref('')
 const aiChanges = ref<string[]>([])
 const aiWarnings = ref<string[]>([])
 const undo = ref<{ backupId: number; expected: string } | null>(null)
-const stages = ['已投递','测评','笔试','面试','Offer','已结束']
 const applicationCategories = [
   { label:'待参加日程', tone:'pending' },
   { label:'有面试进展', tone:'interview' },
@@ -248,10 +247,10 @@ function health(item:JobApplication){
   const days=progress.days
   return {days,label:days<=7?'进展正常':days<=21?'等待较久':'建议确认',tone:days<=7?'good':days<=21?'watch':'risk'}
 }
-function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(store.events.value.some(e=>e.applicationId===item.id&&isFormalInterview(e)))return 'interview';if(['测评','笔试'].includes(String(item.stage))||store.events.value.some(e=>e.applicationId===item.id&&['测评','笔试'].includes(String(e.type))))return 'assessment';return 'applied'}
+function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed&&!e.abandoned);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(item.stage==='面试')return 'interview';if(['测评','笔试'].includes(String(item.stage)))return 'assessment';return 'applied'}
 function applicationCategory(item:JobApplication){const tone=cardTone(item);return applicationCategories.find(category=>category.tone===tone)?.label||'仅投递'}
 function timeOf(value:unknown){const time=new Date(String(value||'').replace(' ','T')).getTime();return Number.isFinite(time)?time:0}
-function hasInterviewProgress(item:JobApplication){return ['面试','Offer'].includes(String(item.stage))||item.status==='已通过'||store.events.value.some(event=>event.applicationId===item.id&&!event.missed&&(isFormalInterview(event)||event.type==='Offer'))}
+function hasInterviewProgress(item:JobApplication){return ['面试','Offer'].includes(String(item.stage))||item.status==='已通过'||store.events.value.some(event=>event.applicationId===item.id&&!event.abandoned&&(isFormalInterview(event)||event.type==='Offer'))}
 function currentStageRank(item:JobApplication){
   const stage=stageCategory(item)
   if(stage==='Offer')return 0
@@ -370,9 +369,10 @@ async function saveApplication(){
   try{
     const current=selected.value
     if(!current)await saveCompanyOfficialLink()
+    const payload={...form,stage:form.status==='已通过'?'Offer':['未通过','已放弃','已结束'].includes(form.status)?'已结束':'已投递'}
     const response=current
-      ? await api<{application:JobApplication}>(`/api/poc/application-sandbox/applications/${encodeURIComponent(current.id)}`,{method:'PUT',body:JSON.stringify({...form,expectedUpdatedAt:current.updatedAt||''})})
-      : await api<{application:JobApplication}>('/api/poc/application-sandbox/applications',{method:'POST',body:JSON.stringify({...form,expectedUpdatedAt:''})})
+      ? await api<{application:JobApplication}>(`/api/poc/application-sandbox/applications/${encodeURIComponent(current.id)}`,{method:'PUT',body:JSON.stringify({...payload,expectedUpdatedAt:current.updatedAt||''})})
+      : await api<{application:JobApplication}>('/api/poc/application-sandbox/applications',{method:'POST',body:JSON.stringify({...payload,expectedUpdatedAt:''})})
     await store.refresh();await loadCompanyLinks();selected.value=store.applications.value.find(item=>item.id===response.application.id)||response.application;editing.value=false;message.value=current?'投递已更新':'投递已创建';undo.value=null
   }catch(cause){error.value=cause instanceof Error?cause.message:'保存失败'}finally{busy.value=false}
 }
@@ -509,7 +509,7 @@ async function removeEvent(item:JobEvent){
 </Teleport>
 <Teleport to="body">
 <div v-if="editing" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="application-editor-title" @submit.prevent="saveApplication"><button type="button" class="close icon-button" aria-label="关闭投递编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="application-editor-title">{{selected?'编辑投递':'新建投递'}}</h2>
-<label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段</span><BaseSelect v-model="form.stage" :options="stages" /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+<label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段（随日程自动更新）</span><input :value="form.status==='已通过'?'Offer':['未通过','已放弃','已结束'].includes(form.status)?'已结束':selected?.stage||'已投递'" readonly /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
 </Teleport>
 
 <Teleport to="body">
