@@ -46,6 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 if (-not $Force -and $remoteHash -eq $localHash) {
     Write-Host '服务器已经是相同版本，无需上传或重启。' -ForegroundColor Green
+    & (Join-Path $PSScriptRoot 'backup-server.ps1') -Server $Server -RemoteDirectory $RemoteDirectory -IdentityFile $IdentityFile
     return
 }
 
@@ -60,6 +61,9 @@ set -u
 remote_dir='__REMOTE_DIRECTORY__'
 expected_hash='__EXPECTED_HASH__'
 cd "$remote_dir" || exit 20
+mkdir -p run || exit 20
+exec 9>run/deployment-backup.lock
+flock -x 9 || exit 20
 
 actual_hash="$(sha256sum job-tracker.jar.uploading | cut -d' ' -f1)"
 if [ "$actual_hash" != "$expected_hash" ]; then
@@ -74,20 +78,20 @@ backup_jar="$backup_dir/job-tracker-$timestamp.jar"
 mkdir -p "$backup_dir"
 cp -p job-tracker.jar "$backup_jar" || exit 22
 
-./stop.sh || exit 23
+./stop.sh 9>&- || exit 23
 mv -f job-tracker.jar.uploading job-tracker.jar || exit 24
 chmod 0644 job-tracker.jar
 
 rollback() {
   echo "新版本启动失败，正在恢复旧 JAR……" >&2
-  ./stop.sh >/dev/null 2>&1 || true
+  ./stop.sh 9>&- >/dev/null 2>&1 || true
   cp -p "$backup_jar" job-tracker.jar
-  ./start.sh || true
+  ./start.sh 9>&- || true
   tail -n 80 logs/app.log 2>/dev/null || true
   exit 25
 }
 
-./start.sh || rollback
+./start.sh 9>&- || rollback
 healthy=0
 for attempt in $(seq 1 30); do
   if curl -fsS --connect-timeout 2 http://127.0.0.1:18080/healthz >/dev/null; then
@@ -114,3 +118,4 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host '服务器部署完成，健康检查已通过。' -ForegroundColor Green
+& (Join-Path $PSScriptRoot 'backup-server.ps1') -Server $Server -RemoteDirectory $RemoteDirectory -IdentityFile $IdentityFile

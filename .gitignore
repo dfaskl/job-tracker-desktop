@@ -13,3 +13,5 @@ frontend/dist/
 dist/
 .design-reference/
 .design-qa/
+server-backup/
+scripts/__pycache__/

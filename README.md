@@ -86,6 +86,7 @@ java -jar .\dist\job-tracker.jar
 
 ## 数据安全
 
+- 服务器最新 JAR、SQLite 和恢复配置会同步到本机 `server-backup/current/`；部署后全量覆盖，数据库由 Windows 计划任务每小时同步。只保留一个本地版本，详见 [本机备份说明](docs/LOCAL-BACKUP.md)。
 - SQLite 数据库默认位于 `data/jobtracker.db`。
 - SQLite 可每天生成一致性备份，并按配置自动轮换。
 - `.env`、数据库、日志、备份和密钥文件均被 Git 忽略。
