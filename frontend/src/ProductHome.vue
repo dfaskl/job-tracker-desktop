@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
-import { applicationProgressHealth, schedulePriorityTimestamp } from './applicationProgress'
+import { applicationProgressHealth, isScheduleOverdue, schedulePriorityTimestamp } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import { confirmDialog } from './modalDialogs'
 
@@ -26,6 +26,19 @@ const quoteBurst = ref(0)
 const message = ref('')
 const error = ref('')
 const busyId = ref('')
+const scheduleNow = ref(Date.now())
+let scheduleClock: ReturnType<typeof setInterval> | null = null
+function updateScheduleClock() { scheduleNow.value = Date.now() }
+function startScheduleClock() {
+  updateScheduleClock()
+  if (scheduleClock) clearInterval(scheduleClock)
+  scheduleClock = setInterval(updateScheduleClock, 30_000)
+}
+function stopScheduleClock() {
+  if (scheduleClock) clearInterval(scheduleClock)
+  scheduleClock = null
+}
+function scheduleOverdue(event: JobEvent) { return isScheduleOverdue(event, scheduleNow.value) }
 const scheduleAdvice = ref<ScheduleAdvice | null>(null)
 const adviceLoading = ref(false)
 const adviceNotice = ref('')
@@ -158,11 +171,12 @@ async function startHomeReveal() {
 }
 onActivated(() => {
   homeViewActive = true
+  startScheduleClock()
   void store.refresh(false, false, false)
   void loadSharedTimelines()
   void startHomeReveal()
 })
-onDeactivated(() => { homeViewActive = false; stopHomeReveal() })
+onDeactivated(() => { homeViewActive = false; stopScheduleClock(); stopHomeReveal() })
 watch(() => store.user.value?.id, () => { if (homeViewActive) void startHomeReveal() })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 watch([timelineSection, adviceSection, detailsSection, confirmationSection], () => {
@@ -172,9 +186,11 @@ watch(adviceSection, (current, previous) => {
   if (!current && previous) adviceVisible.value = false
 })
 
-const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !isEnded(appFor(item)))
+const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !item.abandoned && !isEnded(appFor(item)))
   .sort((a,b) => schedulePriorityTimestamp(a)-schedulePriorityTimestamp(b)))
 const recentSchedules = computed(() => upcomingItems.value)
+const overdueScheduleCount = computed(() => recentSchedules.value.filter(scheduleOverdue).length)
+const nextScheduleId = computed(() => recentSchedules.value.find(event => !scheduleOverdue(event) && Number.isFinite(schedulePriorityTimestamp(event)))?.id)
 const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
   id:event.id, company:eventCompany(event), title:String(event.title || event.type || '未命名日程'),
@@ -266,6 +282,8 @@ watch([scheduleList, confirmationList, recentSchedules, staleApplications], () =
 })
 
 onMounted(async () => {
+  startScheduleClock()
+  window.addEventListener('focus', updateScheduleClock)
   await store.initialize()
   const cached = loadCachedQuote()
   if (store.user.value && !cached) await generateQuote(false)
@@ -385,7 +403,7 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer);if(quoteBurstTimer)clearTimeout(quoteBurstTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard" :class="{'home-entering':homeEntering}">
@@ -407,13 +425,13 @@ onUnmounted(()=>{stopHomeReveal();if(adviceTimer)clearTimeout(adviceTimer);if(me
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
       <section ref="detailsSection" class="details-column" :class="{'home-visible':detailsVisible}" aria-labelledby="my-schedule-title">
-        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
+        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small :class="{'overdue-summary':overdueScheduleCount}" role="status">{{overdueScheduleCount?`${overdueScheduleCount} 项已过期，请确认完成情况`:'可编辑或完成自己的日程'}}</small></div><span>{{recentSchedules.length}} 项</span></div>
         <div v-if="recentSchedules.length" ref="scheduleList" class="schedule-list" :class="{'home-card-revealing':cardsRevealing}">
-          <article v-for="(event,index) in recentSchedules" :key="event.id" :class="{'has-date-range':eventDate(event).range}">
+          <article v-for="event in recentSchedules" :key="event.id" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event)}">
             <button type="button" class="schedule-row-target" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" @click="focusApplication(event)"></button>
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
-            <div class="schedule-copy"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
-            <div class="schedule-actions"><i v-if="index===0">下一场</i><button class="secondary icon-button schedule-edit" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button schedule-complete" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
+            <div class="schedule-copy"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
+            <div class="schedule-actions"><i v-if="event.id===nextScheduleId">下一场</i><button class="secondary icon-button schedule-edit" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button><button class="icon-button schedule-complete" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button></div>
           </article>
         </div>
         <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>

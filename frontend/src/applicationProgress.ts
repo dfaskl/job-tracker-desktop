@@ -18,6 +18,12 @@ export function schedulePriorityTimestamp(event: JobEvent) {
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY
 }
 
+export function isScheduleOverdue(event: JobEvent, now = Date.now()) {
+  if (event.completed || event.missed || event.abandoned) return false
+  const deadline = schedulePriorityTimestamp(event)
+  return Number.isFinite(deadline) && deadline < now
+}
+
 export function applicationProgressHealth(
   application: JobApplication,
   events: JobEvent[],

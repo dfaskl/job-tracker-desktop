@@ -1,9 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { applicationProgressHealth, schedulePriorityTimestamp } from './applicationProgress'
+import { applicationProgressHealth, isScheduleOverdue, schedulePriorityTimestamp } from './applicationProgress'
 import type { JobApplication, JobEvent } from './jobTrackerStore'
 
 const now = Date.parse('2026-10-11T00:00:00Z')
 const interviewApplication: JobApplication = { id: 'app-1', stage: '面试', status: '等待结果' }
+
+describe('isScheduleOverdue', () => {
+  it('flags a pending point only after its scheduled time', () => {
+    const point = { id: 'point', startsAt: '2026-11-02T10:00:00+08:00' }
+    const timestamp = Date.parse(point.startsAt)
+    expect(isScheduleOverdue(point, timestamp)).toBe(false)
+    expect(isScheduleOverdue(point, timestamp + 1)).toBe(true)
+  })
+
+  it('waits until a time range has ended', () => {
+    const range = { id: 'range', startsAt: '2026-11-01T10:00:00+08:00', endsAt: '2026-11-03T10:00:00+08:00' }
+    expect(isScheduleOverdue(range, Date.parse('2026-11-02T10:00:00+08:00'))).toBe(false)
+    expect(isScheduleOverdue(range, Date.parse(range.endsAt) + 1)).toBe(true)
+  })
+
+  it.each(['completed', 'missed', 'abandoned'])('does not flag a resolved %s schedule', flag => {
+    expect(isScheduleOverdue({ id: 'resolved', startsAt: '2026-09-18 15:00', [flag]: true }, now)).toBe(false)
+  })
+
+  it('does not flag missing or invalid dates', () => {
+    expect(isScheduleOverdue({ id: 'missing' }, now)).toBe(false)
+    expect(isScheduleOverdue({ id: 'invalid', startsAt: 'unknown' }, now)).toBe(false)
+  })
+})
 
 function event(overrides: Partial<JobEvent>): JobEvent {
   return { id: 'event-1', applicationId: 'app-1', type: '面试', startsAt: '2026-09-28T10:00:00Z', ...overrides }

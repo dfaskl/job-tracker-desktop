@@ -398,6 +398,21 @@
   border-bottom: 1px solid var(--home-line);
 }
 .schedule-list article:last-child { border-bottom: 0; }
+.schedule-list article.is-overdue {
+  border-left: 3px solid var(--color-destructive, #dc6565);
+}
+.schedule-overdue-notice {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--color-destructive, #dc6565);
+  background: color-mix(in srgb, var(--color-destructive, #dc6565) 12%, var(--color-card));
+  font-size: 12px;
+  font-weight: 600;
+}
+.column-heading small.overdue-summary { color: var(--color-destructive, #dc6565); }
 .date-block {
   display: grid;
   width: max-content;
