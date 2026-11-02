@@ -404,7 +404,7 @@
 .schedule-overdue-notice {
   display: inline-flex;
   width: fit-content;
-  margin-top: 6px;
+  flex-shrink: 0;
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--color-destructive, #dc6565);
@@ -449,7 +449,10 @@
 }
 
 .schedule-copy { display: grid; min-width: 0; gap: 6px; }
-.schedule-copy > strong {
+.schedule-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-width: 0; }
+.schedule-heading > a { max-width: 100%; overflow-wrap: anywhere; }
+.schedule-heading > strong {
+  max-width: 100%;
   overflow: hidden;
   color: var(--home-ink);
   font-size: 15px;
