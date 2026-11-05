@@ -3,8 +3,10 @@ param([string]$AppDirectory = '')
 $ErrorActionPreference = 'Stop'
 if (-not $AppDirectory) { $AppDirectory = $PSScriptRoot }
 $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-$engine = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $AppDirectory 'start.ps1') + '" -Watch'
+$engine = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$launcher = Join-Path $AppDirectory 'start-hidden.vbs'
+if (-not (Test-Path -LiteralPath $engine) -or -not (Test-Path -LiteralPath $launcher)) { throw 'The windowless service launcher is missing.' }
+$arguments = '//B //NoLogo "' + $launcher + '"'
 $action = New-ScheduledTaskAction -Execute $engine -Argument $arguments -WorkingDirectory $AppDirectory
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1)

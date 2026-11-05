@@ -14,9 +14,10 @@ $rollback = Join-Path $AppDirectory 'run\rollback.jar'
 Copy-Item -LiteralPath $jar -Destination $rollback -Force
 try {
     Copy-Item -LiteralPath $JarPath -Destination $jar -Force
-    foreach ($script in @('start.ps1','stop.ps1','install-task.ps1','configure-firewall.ps1')) {
+    foreach ($script in @('start.ps1','start-hidden.vbs','stop.ps1','install-task.ps1','configure-firewall.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "deploy\windows\$script") -Destination (Join-Path $AppDirectory $script) -Force
     }
+    & (Join-Path $AppDirectory 'install-task.ps1') -AppDirectory $AppDirectory
     Start-ScheduledTask -TaskName 'CareerFlow Local Service'
     $started = $false
     for ($attempt = 0; $attempt -lt 45; $attempt++) {

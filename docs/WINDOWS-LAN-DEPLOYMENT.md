@@ -9,7 +9,7 @@
 - `logs/app.log`、`logs/error.log`：运行日志。
 - `backups/`：每小时生成的一致性数据库备份，只保留最新一份；以及当前版本的 JAR。应额外在其他磁盘保留重要备份，避免同一磁盘损坏导致数据和备份一起丢失。
 
-Windows 任务 `CareerFlow Local Service` 在当前用户登录后启动，并在 Java 进程退出后尝试恢复。电脑必须开机、保持登录、不休眠。没有保存 Windows 密码。网络防火墙规则仅允许本机所在子网访问 TCP 18080。
+Windows 任务 `CareerFlow Local Service` 通过无窗口启动器 `start-hidden.vbs` 在当前用户登录后于后台启动，并在 Java 进程退出后尝试恢复；无需保留终端、Codex 或 VS Code 窗口。电脑必须开机、保持登录、不休眠。没有保存 Windows 密码。网络防火墙规则仅允许本机所在子网访问 TCP 18080。
 
 启动与停止：
 
