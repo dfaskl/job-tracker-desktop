@@ -830,6 +830,7 @@ public class AiService {
             先判断邮件是否明确表示招聘流程结束、岗位不匹配、申请/简历未通过、岗位取消或停止招聘。若是终止结果：noticeType 和 scheduleTitle 填未通过，suggestedStage 填已结束，suggestedStatus 按邮件事实选择未通过、已放弃或已结束；startsAt、endsAt、location 留空。不要把结束通知识别为未来日程，也不要推断安排时间。只有邮件明确表示仍有后续环节或要求参加活动时，才提取日程。
             AI 面试、智能面试或由 AI 自动完成的面试评估统一归类为测评，noticeType、suggestedStage 均填测评，scheduleTitle 仍保留邮件明确的“AI 面试”“智能面试”等具体名称。只有真人面试官参与时才归类为面试。
             对仍在进行的招聘流程，按邮件实际内容填写通知类型和当前阶段；没有明确结果时，suggestedStatus 填等待结果。
+            预约 Offer 沟通、电话谈薪、意向交流不等于正式录用。若只是在安排沟通，没有明确录用结果，noticeType 填其他，保留“Offer沟通”“薪资沟通”等具体安排名称，suggestedStage 填已投递、suggestedStatus 填等待结果；不要因为标题或正文出现 Offer 就判定为已通过。
 
             时间与地点
             startsAt、endsAt 使用 YYYY-MM-DD HH:mm。只填写邮件明确给出的时间，不猜测缺失值。只有开始和结束边界都明确且结束晚于开始时才填写 endsAt。
@@ -1051,6 +1052,10 @@ public class AiService {
         String scheduleTitle = optional(result, "scheduleTitle", 160);
         if (scheduleTitle.isEmpty()) scheduleTitle = noticeType;
         String status = enumValue(optional(result, "suggestedStatus", 20), STATUSES, "等待结果");
+        if ("其他".equals(noticeType) && ("Offer".equals(stage) || "已通过".equals(status))) {
+            stage = "已投递";
+            status = "等待结果";
+        }
         return new RecognitionResult(
             optional(result, "company", 120), optional(result, "position", 160), noticeType, scheduleTitle,
             stage, status, startsAt, endsAt, optional(result, "location", 1_000), optional(result, "notes", 4_000), ""

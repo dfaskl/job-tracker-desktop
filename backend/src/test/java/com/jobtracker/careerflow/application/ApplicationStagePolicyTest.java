@@ -23,6 +23,12 @@ class ApplicationStagePolicyTest {
     @Test void ranksByLadderInsteadOfInsertionOrder() throws Exception {
         stage(data("测评", "等待结果", event("面试", false) + "," + event("笔试", false) + "," + event("测评", false)), "面试");
     }
+    @Test void otherOfferDiscussionDoesNotAdvanceInterviewProgress() throws Exception {
+        ObjectNode root = data("面试", "等待结果", event("面试", false)
+            + ", {\"applicationId\":\"a\",\"type\":\"其他\",\"title\":\"电话Offer沟通\"}");
+        stage(root, "面试");
+        assertThat(root.path("applications").get(0).path("status").asText()).isEqualTo("等待结果");
+    }
     @Test void abandonedExamFallsBackToAssessmentOrApplied() throws Exception {
         stage(data("笔试", "等待结果", event("测评", false) + "," + event("笔试", true)), "测评");
         stage(data("笔试", "等待结果", event("笔试", true)), "已投递");

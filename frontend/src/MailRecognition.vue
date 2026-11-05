@@ -46,7 +46,7 @@ const previewSrcdoc = computed(() => previewHtml.value
   : '')
 
 const matchedApplication = computed(() => store.applications.value.find(item => item.id === selectedApplicationId.value))
-const terminalNotice = computed(() => result.noticeType === '未通过' || result.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(result.suggestedStatus))
+const terminalNotice = computed(() => result.noticeType === '未通过')
 const terminalStatus = computed(() => ['未通过','已放弃','已结束'].includes(result.suggestedStatus) ? result.suggestedStatus : result.noticeType === '未通过' ? '未通过' : '已结束')
 const rankedApplications = computed(() => store.applications.value.slice().sort((a,b) =>
   applicationMatchScore(b, result.company, result.position) - applicationMatchScore(a, result.company, result.position)
@@ -57,7 +57,7 @@ const canCreateSchedule = computed(() => Boolean(result.startsAt))
 const actionSummary = computed(() => hasResult.value
   ? terminalNotice.value
     ? (matchedApplication.value ? `只更新“${matchedApplication.value.company} · ${matchedApplication.value.position}”的结束状态，不创建日程` : '结束类通知不能新建投递或日程')
-    : `${matchedApplication.value ? '更新已有投递' : '新建一条投递'}，并自动创建关联日程`
+    : `${matchedApplication.value ? '为已有投递添加日程' : '新建一条投递并添加日程'}`
   : '')
 
 watch(selectedApplicationId, () => {
@@ -239,6 +239,7 @@ async function recognize() {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
     Object.assign(result, value, { scheduleTitle: value.scheduleTitle?.trim() || value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
     if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
+      result.noticeType = '未通过'
       result.startsAt = ''; result.endsAt = ''; result.location = ''
     }
     selectedApplicationId.value = suggestApplication(value.company,value.position)?.id || ''
@@ -252,8 +253,8 @@ function applicationPayload(item?: JobApplication) {
   const payload = {
     company: String(item?.company || result.company).trim(), position: String(item?.position || result.position).trim(),
     city: String(item?.city || ''), channel: String(item?.channel || '邮件识别'),
-    appliedDate: String(item?.appliedDate || today()), stage: result.suggestedStage,
-    status: result.suggestedStatus, notes: String(item?.notes || ''),
+    appliedDate: String(item?.appliedDate || today()), stage: String(item?.stage || '已投递'),
+    status: String(item?.status || '等待结果'), notes: String(item?.notes || ''),
     expectedUpdatedAt: String(item?.updatedAt || '')
   }
   if(item)return payload
@@ -280,7 +281,7 @@ async function saveResult() {
       return
     }
     const response = matched
-      ? await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(applicationPayload(matched)) })
+      ? { application: matched }
       : await api<{ application: JobApplication }>('/api/poc/application-sandbox/applications', { method: 'POST', body: JSON.stringify(applicationPayload()) })
     let duplicateSchedule=false
     let updatedScheduleNote=false
@@ -350,7 +351,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
       <section class="card review-panel">
         <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
-          <label class="wide application-match"><span>{{terminalNotice?'关联要结束的已有投递':'关联已有投递'}}</span><BaseSelect v-model="selectedApplicationId" :options="terminalNotice ? [{value:'',label:'请选择已有投递（不会新建）'},...rankedApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))] : [{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{terminalNotice ? (matchedApplication ? '确认后只会把这条投递标记为已结束，不会创建日程。' : '结束类通知不能新建投递或日程，请选择一条已有投递。') : matchedApplication ? '将更新该投递的阶段和状态；识别出有效时间时会自动创建关联日程。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
+          <label class="wide application-match"><span>{{terminalNotice?'关联要结束的已有投递':'关联已有投递'}}</span><BaseSelect v-model="selectedApplicationId" :options="terminalNotice ? [{value:'',label:'请选择已有投递（不会新建）'},...rankedApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))] : [{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{terminalNotice ? (matchedApplication ? '确认后只会把这条投递标记为已结束，不会创建日程。' : '结束类通知不能新建投递或日程，请选择一条已有投递。') : matchedApplication ? '按所选类型添加日程，投递阶段随日程自动计算。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
           <div v-if="terminalNotice" class="terminal-notice wide" role="status"><AppIcon name="info" :size="18" /><div><strong>邮件可能表示招聘流程已结束或岗位不匹配</strong><span>已关闭日程录入。请确认是否要结束关联投递。</span></div></div>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
           <label><span>岗位 *</span><input v-model="result.position" maxlength="160" required /></label>

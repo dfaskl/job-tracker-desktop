@@ -129,6 +129,23 @@ class AiServiceTest {
         assertThat(unnamed.scheduleTitle()).isEqualTo("笔试");
     }
     @Test
+    void otherOfferDiscussionCannotCarryAnAcceptedOfferSuggestion() throws Exception {
+        ApplicationService sandbox = mock(ApplicationService.class);
+        AiService service = service(new MockEnvironment(), sandbox);
+        var result = service.recognition(new ObjectMapper().readTree(
+            "{\"noticeType\":\"其他\",\"scheduleTitle\":\"电话Offer沟通\",\"suggestedStage\":\"Offer\",\"suggestedStatus\":\"已通过\"}"
+        ));
+        assertThat(result.noticeType()).isEqualTo("其他");
+        assertThat(result.scheduleTitle()).isEqualTo("电话Offer沟通");
+        assertThat(result.suggestedStage()).isEqualTo("已投递");
+        assertThat(result.suggestedStatus()).isEqualTo("等待结果");
+        var offer = service.recognition(new ObjectMapper().readTree(
+            "{\"noticeType\":\"Offer\",\"scheduleTitle\":\"正式录用\",\"suggestedStage\":\"Offer\",\"suggestedStatus\":\"已通过\"}"
+        ));
+        assertThat(offer.suggestedStage()).isEqualTo("Offer");
+        assertThat(offer.suggestedStatus()).isEqualTo("已通过");
+    }
+    @Test
     void buildsJsonModeRequestWithExampleAndRetryFeedback() {
         ApplicationService sandbox = mock(ApplicationService.class);
         when(sandbox.status()).thenReturn(new ApplicationService.SandboxStatus(true, true, true, "已开启"));
