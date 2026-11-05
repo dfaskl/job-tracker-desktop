@@ -9,6 +9,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# A migrated workstation becomes the default destination. Explicit -Server
+# remains available for a deliberate future return to server deployment.
+if (-not $PSBoundParameters.ContainsKey('Server') -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'local-deployment.json'))) {
+    & (Join-Path $PSScriptRoot 'deploy-local.ps1') -JarPath $JarPath
+    return
+}
+
 if ($Server -notmatch '^[A-Za-z0-9._-]+(@[A-Za-z0-9.-]+)?$') {
     throw '服务器名称包含不受支持的字符。'
 }

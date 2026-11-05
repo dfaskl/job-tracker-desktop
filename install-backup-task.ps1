@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param([string]$TaskName = 'CareerFlow Hourly Local Backup')
 $ErrorActionPreference = 'Stop'
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'local-deployment.json')) {
+    throw 'This workstation is now the production service. Its database is backed up hourly by the application; do not re-enable the old server polling task.'
+}
 $script = Join-Path $PSScriptRoot 'backup-server.ps1'
 if (-not (Test-Path -LiteralPath $script)) { throw 'Backup script is missing.' }
 $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name

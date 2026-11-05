@@ -15,3 +15,4 @@ dist/
 .design-qa/
 server-backup/
 scripts/__pycache__/
+local-deployment.json

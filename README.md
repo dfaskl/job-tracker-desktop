@@ -78,6 +78,10 @@ java -jar .\dist\job-tracker.jar
 
 ## 部署
 
+### Windows 局域网部署
+
+已迁移到本机时，运行目录为 `D:\CareerFlow`，数据库位于 `data/jobtracker.db`。Windows 登录任务负责启动和退出恢复，数据库每小时备份一次，只保留最新一份。本机的 `local-deployment.json` 将原部署命令默认转到 `deploy-local.ps1`，不再上传旧服务器。详见 [Windows 局域网部署](docs/WINDOWS-LAN-DEPLOYMENT.md)。
+
 ### Linux 单机部署
 
 运行 `.\build-jar.ps1 -Deploy` 完成测试、打包和部署；也可以运行 `.\build-jar.ps1` 生成 `dist/job-tracker.jar`，再通过 `.\deploy-server.ps1` 单独更新服务器。GitHub Actions 不再由 push 自动运行；只有需要重新生成自带 Java 21 JRE 的完整部署包时，才在仓库的 **Actions → Manual package → Run workflow** 中手动执行。
@@ -86,7 +90,7 @@ java -jar .\dist\job-tracker.jar
 
 ## 数据安全
 
-- 服务器最新 JAR、SQLite 和恢复配置会同步到本机 `server-backup/current/`；部署后全量覆盖，数据库由 Windows 计划任务每小时同步。只保留一个本地版本，详见 [本机备份说明](docs/LOCAL-BACKUP.md)。
+- 使用服务器部署时，最新 JAR、SQLite 和恢复配置同步到本机 `server-backup/current/`，详见 [本机备份说明](docs/LOCAL-BACKUP.md)。迁移到 Windows 本地部署后，该目录保留最后的迁移快照，原服务器定时拉取任务停用；正式数据和每小时最新备份位于 `D:\CareerFlow`。
 - SQLite 数据库默认位于 `data/jobtracker.db`。
 - SQLite 可每天生成一致性备份，并按配置自动轮换。
 - `.env`、数据库、日志、备份和密钥文件均被 Git 忽略。

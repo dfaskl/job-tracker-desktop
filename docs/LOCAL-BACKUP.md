@@ -1,5 +1,7 @@
 # 本机最新部署备份
 
+> 已改为 Windows 本地正式部署时，以下服务器拉取任务停用；`server-backup/current` 保留迁移前最后快照。当前数据库与每小时备份见 [Windows 局域网部署](WINDOWS-LAN-DEPLOYMENT.md)。不要重新启用旧服务器任务来覆盖正式数据。
+
 本机备份目录为 `server-backup/current/`，整个 `server-backup/` 被 Git 忽略。目录权限限制为当前 Windows 用户、SYSTEM 和本机管理员；其中 `.env` 包含恢复加密配置所需的密钥，不能提交 Git 或公开分享。
 
 ## 备份内容
