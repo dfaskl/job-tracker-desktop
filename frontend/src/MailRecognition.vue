@@ -17,6 +17,13 @@ const status = ref<AiStatus | null>(null)
 const mailBody = ref('')
 const result = reactive({ company: '', position: '', noticeType: '其他', scheduleTitle: '', suggestedStage: '已投递', suggestedStatus: '等待结果', startsAt: '', endsAt: '', location: '', summary: '', notes: '' })
 const hasResult = ref(false)
+const recognitionDetails = ref<Recognition | null>(null)
+const recognitionDetailsDialog = ref<HTMLDialogElement | null>(null)
+const recognitionFieldLabels: Record<string, string> = {
+  company: '公司', position: '岗位', noticeType: '通知类型', scheduleTitle: '安排名称',
+  suggestedStage: '建议阶段', suggestedStatus: '建议状态', startsAt: '开始时间',
+  endsAt: '结束时间', location: '地点 / 视频链接', notes: '备注', summary: '摘要'
+}
 const timeMode = ref<'point' | 'range'>('point')
 const checkingStatus = ref(false)
 const recognizing = ref(false)
@@ -77,7 +84,10 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => previewThemeObserver?.disconnect())
 onActivated(() => { entranceActive.value = true })
-onDeactivated(() => { entranceActive.value = false })
+onDeactivated(() => {
+  entranceActive.value = false
+  recognitionDetailsDialog.value?.close()
+})
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
 function companyKey(value: unknown) { return normalize(value).replace(/股份有限公司|有限责任公司|有限公司|集团|公司$/g, '') }
 function textSimilarity(left: unknown, right: unknown) {
@@ -237,6 +247,7 @@ async function recognize() {
   recognizing.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
     const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
+    recognitionDetails.value = value
     Object.assign(result, value, { scheduleTitle: value.scheduleTitle?.trim() || value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
     if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
       result.noticeType = '未通过'
@@ -349,7 +360,15 @@ function preventImplicitSubmit(event: KeyboardEvent) {
       </section>
 
       <section class="card review-panel">
-        <div class="panel-title"><div><span class="step">2</span><h3>核对并录入</h3></div><span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span></div>
+        <div class="panel-title">
+          <div>
+            <span class="step">2</span><h3>核对并录入</h3>
+            <button v-if="hasResult" class="secondary icon-button compact-icon" type="button" aria-label="查看邮件识别字段" aria-haspopup="dialog" title="查看邮件识别字段" @click="recognitionDetailsDialog?.showModal()">
+              <AppIcon name="info" />
+            </button>
+          </div>
+          <span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span>
+        </div>
         <form v-if="hasResult" class="result-form" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
           <label class="wide application-match"><span>{{terminalNotice?'关联要结束的已有投递':'关联已有投递'}}</span><BaseSelect v-model="selectedApplicationId" :options="terminalNotice ? [{value:'',label:'请选择已有投递（不会新建）'},...rankedApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))] : [{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{terminalNotice ? (matchedApplication ? '确认后只会把这条投递标记为已结束，不会创建日程。' : '结束类通知不能新建投递或日程，请选择一条已有投递。') : matchedApplication ? '按所选类型添加日程，投递阶段随日程自动计算。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
           <div v-if="terminalNotice" class="terminal-notice wide" role="status"><AppIcon name="info" :size="18" /><div><strong>邮件可能表示招聘流程已结束或岗位不匹配</strong><span>已关闭日程录入。请确认是否要结束关联投递。</span></div></div>
@@ -372,6 +391,22 @@ function preventImplicitSubmit(event: KeyboardEvent) {
     <p v-if="message" class="feedback success">{{ message }}</p>
     <p v-if="error" class="feedback danger" role="alert">{{ error }}</p>
     <Transition name="process-notice"><div v-if="processNotice" class="process-notice" role="status"><span aria-hidden="true">✓</span>{{processNotice}}</div></Transition>
+
+    <dialog ref="recognitionDetailsDialog" class="recognition-details" aria-labelledby="recognition-details-title">
+      <header>
+        <div>
+          <h2 id="recognition-details-title">邮件识别结果</h2>
+          <p>识别接口返回的字段，可与当前表单核对。</p>
+        </div>
+        <button class="secondary icon-button" type="button" aria-label="关闭识别结果" title="关闭" autofocus @click="recognitionDetailsDialog?.close()"><AppIcon name="close" /></button>
+      </header>
+      <dl class="recognition-fields" tabindex="0" aria-label="识别字段">
+        <div v-for="(value, key) in recognitionDetails" :key="key">
+          <dt>{{ recognitionFieldLabels[key] ?? key }}</dt>
+          <dd>{{ value === '' || value == null ? '未返回' : typeof value === 'string' ? value : JSON.stringify(value, null, 2) }}</dd>
+        </div>
+      </dl>
+    </dialog>
 
     <dialog ref="previewDialog" class="mail-preview" aria-labelledby="mail-preview-title" @close="previewMail = null; previewHtml = ''; previewLoading = false">
       <article v-if="previewMail" class="mail-preview-card">
@@ -401,6 +436,40 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 .card { margin-top: 0 !important; }
 .panel-title { min-height: 44px; }
 .panel-title h3 { margin: 0; font-size: 17px; }
+.recognition-details {
+  width: min(600px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  color: var(--color-card-foreground);
+  background: var(--color-card);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.recognition-details[open] { display: flex; flex-direction: column; }
+.recognition-details::backdrop { background: rgb(15 23 42 / 48%); }
+.recognition-details > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.recognition-details h2 { margin: 0; font-size: 18px; }
+.recognition-details p { margin: 4px 0 0; color: var(--color-muted-foreground); font-size: 13px; }
+.recognition-fields { min-height: 0; margin: 0; padding: 4px 20px; overflow: auto; }
+.recognition-fields > div {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 24%) minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 14px;
+}
+.recognition-fields > div + div { border-top: 1px solid var(--color-border); }
+.recognition-fields dt { color: var(--color-muted-foreground); overflow-wrap: anywhere; }
+.recognition-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .result-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
 .result-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }
 .result-form .wide { grid-column: 1 / -1; }
