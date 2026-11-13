@@ -44,7 +44,7 @@
 .quote-trigger:hover { background: var(--surface-hover); }
 .quote-trigger:disabled { cursor: wait; }
 .quote-trigger > span { display:grid;place-items:center;line-height:1; }
-.quote-copy { display: grid; min-width: 0; max-width: 72ch; flex: 0 1 auto; }
+.quote-copy { display: grid; min-width: 0; flex: 1; }
 .quote-strip small { color: var(--accent, var(--color-primary)); font-size: 10px; font-weight: 700; }
 .quote-strip strong {
   overflow-wrap: anywhere;
