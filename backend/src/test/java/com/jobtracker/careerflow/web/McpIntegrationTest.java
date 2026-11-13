@@ -95,7 +95,6 @@ class McpIntegrationTest {
         JsonNode created = data(call(f, secret, "create_application", "{\"company\":\"测试公司\",\"position\":\"后端工程师\",\"notes\":\"岗位备注\"}"));
         String appId = created.path("id").asText();
         assertThat(appId).isNotBlank();
-        verifyNoInteractions(f.companies);
         var appUpdate = f.mapper.createObjectNode().put("id", appId).put("expectedUpdatedAt", created.path("updatedAt").asText()).put("city", "上海");
         JsonNode appChanged = data(call(f, secret, "update_application", appUpdate.toString()));
         assertThat(appChanged.path("company").asText()).isEqualTo("测试公司");
@@ -190,10 +189,9 @@ class McpIntegrationTest {
         accounts.register(OWNER, "mcp-owner-password", ""); accounts.register(OTHER, "mcp-other-password", "");
         var events = new EventService(env, applications, new EventDocumentMutator(mapper));
         var tokens = new McpTokenStore(env);
-        var companies = mock(CompanyIndustryService.class);
-        var tools = new McpTools(applications, events, companies, tokens, mapper);
-        return new Fixture(url, mapper, applications, accounts, events, tokens, companies, new McpController(tokens, tools, mapper));
+        var tools = new McpTools(applications, events, tokens, mapper);
+        return new Fixture(url, mapper, applications, accounts, events, tokens, new McpController(tokens, tools, mapper));
     }
     private record Fixture(String url, ObjectMapper mapper, ApplicationService applications, AccountService accounts, EventService events,
-                           McpTokenStore tokens, CompanyIndustryService companies, McpController controller) { }
+                           McpTokenStore tokens, McpController controller) { }
 }

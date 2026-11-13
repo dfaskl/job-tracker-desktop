@@ -11,20 +11,13 @@ import tools.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 @Component
 public class BackupService {
-    private static final String SALARY_ESTIMATE_VERSION = "salary-v6";
-    private static final Duration SALARY_RETRY_DELAY = Duration.ofHours(6);
     private final Environment environment;
     private final ApplicationService applicationSandboxService;
     private final BackupDocumentValidator validator;
@@ -60,19 +53,6 @@ public class BackupService {
             return data;
         }
     }
-    public CompanyLinks companyLinks(String email) throws Exception {
-        try (Connection connection = openConnection(); PreparedStatement statement = connection.prepareStatement(
-            "SELECT COALESCE(c.items,'[]'::jsonb)::text,c.updated_at FROM users u LEFT JOIN company_links c ON c.user_id=u.id WHERE lower(u.email)=? AND u.disabled_at IS NULL"
-        )) {
-            statement.setString(1, normalizeEmail(email));
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                return new CompanyLinks(objectMapper.readTree(result.getString(1)),
-                    result.getObject(2) == null ? "" : instant(result, "updated_at"));
-            }
-        }
-    }
-
     public CompanyLinks saveCompanyLinks(String email, JsonNode source) throws Exception {
         if (source == null || !source.isArray() || source.size() > 500) throw new IllegalArgumentException("官网链接数据格式无效");
         try (Connection connection = openConnection()) {
@@ -86,7 +66,6 @@ public class BackupService {
                         userId = result.getLong(1);
                     }
                 }
-                Map<String, JsonNode> storedByCompany = existingCompanyLinks(connection, userId);
                 var clean = objectMapper.createArrayNode();
                 for (JsonNode item : source) {
                     String company = item.path("company").asText("").trim();
@@ -95,31 +74,7 @@ public class BackupService {
                         || (!url.isEmpty() && !(url.startsWith("https://") || url.startsWith("http://")))) {
                         throw new IllegalArgumentException("公司名称或官网地址无效");
                     }
-                    JsonNode previous = storedByCompany.get(companyKey(company));
-                    var normalized = clean.addObject().put("company", company).put("url", url);
-                    String industryVersion = item.path("industryVersion").asText("").trim();
-                    if (industryVersion.isEmpty() && previous != null) industryVersion = previous.path("industryVersion").asText("").trim();
-                    String industry = item.path("industry").asText("").trim();
-                    if (industry.isEmpty() && previous != null) industry = previous.path("industry").asText("").trim();
-                    String industryError = item.path("industryError").asText("").trim();
-                    if (industryError.isEmpty() && previous != null) industryError = previous.path("industryError").asText("").trim();
-                    if (!industry.isEmpty() && CompanyIndustryCatalog.ALLOWED.contains(industry)
-                        && CompanyIndustryCatalog.VERSION.equals(industryVersion)) {
-                        normalized.put("industry", industry);
-                    }
-                    String industryStatus = item.path("industryStatus").asText("").trim();
-                    if (industryStatus.isEmpty() && previous != null) industryStatus = previous.path("industryStatus").asText("").trim();
-                    if (!CompanyIndustryCatalog.VERSION.equals(industryVersion) || !CompanyIndustryCatalog.ALLOWED.contains(industry)) {
-                        industryStatus = "pending";
-                        industryVersion = CompanyIndustryCatalog.VERSION;
-                        industryError = "";
-                    }
-                    if (!industryStatus.isEmpty()) normalized.put("industryStatus", industryStatus);
-                    if (!industryVersion.isEmpty()) normalized.put("industryVersion", industryVersion);
-                    if (!industryError.isEmpty()) normalized.put("industryError", industryError.substring(0, Math.min(300, industryError.length())));
-                    JsonNode salaryEstimates = item.path("salaryEstimates");
-                    if (previous != null && previous.path("salaryEstimates").isArray() && !previous.path("salaryEstimates").isEmpty()) salaryEstimates = previous.path("salaryEstimates");
-                    if (salaryEstimates.isArray() && !salaryEstimates.isEmpty()) normalized.set("salaryEstimates", salaryEstimates.deepCopy());
+                    clean.addObject().put("company", company).put("url", url);
                 }
                 String updatedAt;
                 try (PreparedStatement save = connection.prepareStatement(
@@ -137,251 +92,6 @@ public class BackupService {
         }
     }
 
-    public CompanyLinks ensureCompanyEntries(String email, List<String> companyNames) throws Exception {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                long userId;
-                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
-                    user.setString(1, normalizeEmail(email));
-                    try (ResultSet result = user.executeQuery()) {
-                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                        userId = result.getLong(1);
-                    }
-                }
-                JsonNode stored = currentCompanyLinks(connection, userId);
-                var items = stored.isArray() ? (tools.jackson.databind.node.ArrayNode) stored.deepCopy() : objectMapper.createArrayNode();
-                Map<String, tools.jackson.databind.node.ObjectNode> byCompany = new LinkedHashMap<>();
-                for (JsonNode item : items) {
-                    String company = item.path("company").asText("").trim();
-                    if (!company.isEmpty()) byCompany.putIfAbsent(companyKey(company), (tools.jackson.databind.node.ObjectNode) item);
-                }
-                boolean changed = false;
-                for (String rawName : companyNames == null ? List.<String>of() : companyNames) {
-                    String company = rawName == null ? "" : rawName.trim();
-                    if (company.isEmpty() || company.length() > 120) continue;
-                    String key = companyKey(company);
-                    var entry = byCompany.get(key);
-                    if (entry == null) {
-                        entry = items.addObject().put("company", company).put("url", "").put("industryStatus", "pending")
-                            .put("industryVersion", CompanyIndustryCatalog.VERSION);
-                        byCompany.put(key, entry);
-                        changed = true;
-                    } else if (!CompanyIndustryCatalog.VERSION.equals(entry.path("industryVersion").asText(""))) {
-                        entry.remove("industry");
-                        entry.remove("industryError");
-                        entry.put("industryStatus", "pending").put("industryVersion", CompanyIndustryCatalog.VERSION);
-                        changed = true;
-                    } else if (entry.path("industry").asText("").isBlank()
-                        && !Set.of("pending", "failed").contains(entry.path("industryStatus").asText(""))) {
-                        entry.put("industryStatus", "pending").remove("industryError");
-                        changed = true;
-                    }
-                }
-                String updatedAt;
-                if (changed) {
-                    try (PreparedStatement save = connection.prepareStatement(
-                        "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
-                    )) {
-                        save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
-                        try (ResultSet saved = save.executeQuery()) { saved.next(); updatedAt = instant(saved, "updated_at"); }
-                    }
-                } else {
-                    try (PreparedStatement read = connection.prepareStatement("SELECT updated_at FROM company_links WHERE user_id=?")) {
-                        read.setLong(1, userId);
-                        try (ResultSet result = read.executeQuery()) { updatedAt = result.next() ? instant(result, "updated_at") : ""; }
-                    }
-                }
-                connection.commit();
-                return new CompanyLinks(items, updatedAt);
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-    }
-
-    public CompanyLinks saveIndustryResults(String email, Map<String, String> industries, String error) throws Exception {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                long userId;
-                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
-                    user.setString(1, normalizeEmail(email));
-                    try (ResultSet result = user.executeQuery()) {
-                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                        userId = result.getLong(1);
-                    }
-                }
-                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
-                Map<String, String> normalizedResults = new LinkedHashMap<>();
-                if (industries != null) industries.forEach((name, industry) -> normalizedResults.put(companyKey(name), industry));
-                for (JsonNode node : items) {
-                    var entry = (tools.jackson.databind.node.ObjectNode) node;
-                    String key = companyKey(entry.path("company").asText(""));
-                    String industry = normalizedResults.get(key);
-                    if (industry != null && CompanyIndustryCatalog.ALLOWED.contains(industry)) {
-                        entry.put("industry", industry).put("industryStatus", "classified")
-                            .put("industryVersion", CompanyIndustryCatalog.VERSION).remove("industryError");
-                    } else if (error != null && !error.isBlank() && "pending".equals(entry.path("industryStatus").asText(""))) {
-                        entry.put("industryStatus", "failed").put("industryVersion", CompanyIndustryCatalog.VERSION)
-                            .put("industryError", error.substring(0, Math.min(300, error.length())));
-                    }
-                }
-                try (PreparedStatement save = connection.prepareStatement(
-                    "INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at"
-                )) {
-                    save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
-                    String updatedAt;
-                    try (ResultSet saved = save.executeQuery()) {
-                        if (!saved.next()) throw new IllegalStateException("公司行业标签保存失败");
-                        updatedAt = instant(saved, "updated_at");
-                    }
-                    connection.commit();
-                    return new CompanyLinks(items, updatedAt);
-                }
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-    }
-
-    public CompanyLinks ensureSalaryEntries(String email, List<com.jobtracker.careerflow.database.AiService.CompanyPosition> positions) throws Exception {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                long userId;
-                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
-                    user.setString(1, normalizeEmail(email));
-                    try (ResultSet result = user.executeQuery()) {
-                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                        userId = result.getLong(1);
-                    }
-                }
-                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
-                Map<String, tools.jackson.databind.node.ObjectNode> byCompany = new LinkedHashMap<>();
-                for (JsonNode node : items) if (node instanceof tools.jackson.databind.node.ObjectNode entry)
-                    byCompany.putIfAbsent(companyKey(entry.path("company").asText("")), entry);
-                boolean changed = false;
-                for (var position : positions == null ? List.<com.jobtracker.careerflow.database.AiService.CompanyPosition>of() : positions) {
-                    String company = position.company() == null ? "" : position.company().trim();
-                    String title = position.position() == null ? "" : position.position().trim();
-                    if (company.isEmpty() || title.isEmpty()) continue;
-                    var entry = byCompany.get(companyKey(company));
-                    if (entry == null || !"classified".equals(entry.path("industryStatus").asText(""))) continue;
-                    var estimates = entry.path("salaryEstimates").isArray()
-                        ? (tools.jackson.databind.node.ArrayNode) entry.path("salaryEstimates") : entry.putArray("salaryEstimates");
-                    tools.jackson.databind.node.ObjectNode existing = null;
-                    for (JsonNode estimate : estimates) if (positionKey(estimate.path("position").asText("")).equals(positionKey(title))) {
-                        if (estimate instanceof tools.jackson.databind.node.ObjectNode object) existing = object;
-                        break;
-                    }
-                    if (existing == null) {
-                        estimates.addObject().put("position", title).put("status", "pending").put("version", SALARY_ESTIMATE_VERSION);
-                        changed = true;
-                    } else if (!SALARY_ESTIMATE_VERSION.equals(existing.path("version").asText(""))) {
-                        existing.put("position", title).put("version", SALARY_ESTIMATE_VERSION);
-                        if (!"classified".equals(existing.path("status").asText("")) || existing.path("range").asText("").isBlank()) {
-                            existing.put("status", "pending");
-                            existing.remove("range");
-                            existing.remove("error");
-                            existing.remove("retryAfter");
-                        }
-                        changed = true;
-                    } else if ("failed".equals(existing.path("status").asText(""))) {
-                        Instant retryAfter = null;
-                        try { retryAfter = Instant.parse(existing.path("retryAfter").asText("")); }
-                        catch (RuntimeException ignored) { }
-                        if (retryAfter == null || !retryAfter.isAfter(Instant.now())) {
-                            existing.put("position", title).put("status", "pending");
-                            existing.remove("error");
-                            existing.remove("retryAfter");
-                            changed = true;
-                        }
-                    }
-                }
-                String updatedAt = writeCompanyLinks(connection, userId, items, changed);
-                connection.commit();
-                return new CompanyLinks(items, updatedAt);
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-    }
-
-    public CompanyLinks saveSalaryResults(String email, List<AiService.CompanyPosition> batch, Map<String, String> salaryRanges, String error) throws Exception {
-        try (Connection connection = openConnection()) {
-            connection.setAutoCommit(false);
-            try {
-                long userId;
-                try (PreparedStatement user = connection.prepareStatement("SELECT id FROM users WHERE lower(email)=? AND disabled_at IS NULL FOR UPDATE")) {
-                    user.setString(1, normalizeEmail(email));
-                    try (ResultSet result = user.executeQuery()) {
-                        if (!result.next()) throw new SandboxDataNotFoundException("测试库中没有当前账号");
-                        userId = result.getLong(1);
-                    }
-                }
-                var items = (tools.jackson.databind.node.ArrayNode) currentCompanyLinks(connection, userId).deepCopy();
-                Map<String, String> results = new LinkedHashMap<>();
-                if (salaryRanges != null) salaryRanges.forEach((key, value) -> results.put(key, value));
-                Set<String> targetKeys = new java.util.HashSet<>();
-                if (batch != null) for (AiService.CompanyPosition position : batch)
-                    targetKeys.add(salaryKey(position.company(), position.position()));
-                for (JsonNode node : items) if (node instanceof tools.jackson.databind.node.ObjectNode company && company.path("salaryEstimates").isArray()) {
-                    for (JsonNode estimateNode : company.path("salaryEstimates")) if (estimateNode instanceof tools.jackson.databind.node.ObjectNode estimate
-                        && "pending".equals(estimate.path("status").asText(""))) {
-                        String key = salaryKey(company.path("company").asText(""), estimate.path("position").asText(""));
-                        if (!targetKeys.contains(key)) continue;
-                        String range = results.get(key);
-                        if (range != null) estimate.put("range", range).put("status", "classified").put("version", SALARY_ESTIMATE_VERSION).remove("error");
-                        else {
-                            String failure = error == null || error.isBlank() ? "模型未能为该岗位返回有效薪资范围" : error.substring(0, Math.min(300, error.length()));
-                            estimate.put("status", "failed").put("version", SALARY_ESTIMATE_VERSION)
-                                .put("error", failure).put("retryAfter", Instant.now().plus(SALARY_RETRY_DELAY).toString());
-                        }
-                    }
-                }
-                String updatedAt = writeCompanyLinks(connection, userId, items, true);
-                connection.commit();
-                return new CompanyLinks(items, updatedAt);
-            } catch (Exception exception) { connection.rollback(); throw exception; }
-        }
-    }
-
-    private String writeCompanyLinks(Connection connection, long userId, JsonNode items, boolean changed) throws Exception {
-        if (changed) {
-            try (PreparedStatement save = connection.prepareStatement("INSERT INTO company_links(user_id,items) VALUES(?,?::jsonb) ON CONFLICT(user_id) DO UPDATE SET items=EXCLUDED.items,updated_at=NOW() RETURNING updated_at")) {
-                save.setLong(1, userId); save.setString(2, objectMapper.writeValueAsString(items));
-                try (ResultSet saved = save.executeQuery()) { saved.next(); return instant(saved, "updated_at"); }
-            }
-        }
-        try (PreparedStatement read = connection.prepareStatement("SELECT updated_at FROM company_links WHERE user_id=?")) {
-            read.setLong(1, userId);
-            try (ResultSet result = read.executeQuery()) { return result.next() ? instant(result, "updated_at") : ""; }
-        }
-    }
-
-    private String positionKey(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
-    }
-
-    private String salaryKey(String company, String position) { return SalaryEstimateKey.of(company, position); }
-
-    private Map<String, JsonNode> existingCompanyLinks(Connection connection, long userId) throws Exception {
-        JsonNode items = currentCompanyLinks(connection, userId);
-        Map<String, JsonNode> result = new LinkedHashMap<>();
-        if (items.isArray()) for (JsonNode item : items) {
-            String company = item.path("company").asText("").trim();
-            if (!company.isEmpty()) result.putIfAbsent(companyKey(company), item);
-        }
-        return result;
-    }
-
-    private JsonNode currentCompanyLinks(Connection connection, long userId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("SELECT items::text FROM company_links WHERE user_id=? FOR UPDATE")) {
-            statement.setLong(1, userId);
-            try (ResultSet result = statement.executeQuery()) { return result.next() ? objectMapper.readTree(result.getString(1)) : objectMapper.createArrayNode(); }
-        }
-    }
-
-    private static String companyKey(String value) {
-        if (value == null) return "";
-        return value.toLowerCase(Locale.ROOT).replaceAll("[\\s·•・()（）\\[\\]【】._-]+", "")
-            .replaceAll("(股份)?有限公司$|有限责任公司$|集团$|公司$", "");
-    }
     public BackupPage backups(String email) throws Exception {
         try (Connection connection = openConnection()) {
             UserDocument current = currentUserDocument(connection, email, false);

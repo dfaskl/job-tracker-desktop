@@ -14,7 +14,7 @@
 }
 html { font-family: var(--font-ui); }
 body { background: var(--color-background); }
-#app :is(time, input[type="date"], input[type="datetime-local"], .date-block, .flow-node small, .metrics strong, .summary-grid strong, .trend-bar b, .salary-tag, .guide-progress) { font-variant-numeric: tabular-nums; }
+#app :is(time, input[type="date"], input[type="datetime-local"], .date-block, .flow-node small, .metrics strong, .summary-grid strong, .trend-bar b, .guide-progress) { font-variant-numeric: tabular-nums; }
 #app :is(h1, h2, h3, .brand, .nav-copy strong, .home-dashboard, .metrics strong, .summary-grid strong) { font-family: var(--font-ui); }
 #app h1 { font-weight: 650; letter-spacing: -.025em; }
 #app h2 { font-size: 18px; font-weight: 650; letter-spacing: -.015em; }

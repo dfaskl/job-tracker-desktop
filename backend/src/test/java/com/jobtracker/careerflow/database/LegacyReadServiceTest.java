@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,14 +57,17 @@ class LegacyReadServiceTest {
         var links = service.mapCompanyLinks("""
             [
               {"company":"Beta","url":"https://beta.example/jobs"},
-              {"company":"Alpha","url":"http://alpha.example/careers"},
+              {"company":"Alpha","url":"http://alpha.example/careers","industry":"互联网","salaryEstimates":[{"range":"20-25k/月"}]},
+              {"company":"Pending","url":"","industryStatus":"pending"},
               {"company":"Skip","url":"javascript:alert(1)"},
               {"company":"","url":"https://empty.example"}
             ]
             """);
 
-        assertEquals(2, links.size());
-        assertEquals("Alpha", links.getFirst().company());
-        assertEquals("http://alpha.example/careers", links.getFirst().url());
+        assertEquals(List.of(
+            new LegacyReadService.CompanyLink("Alpha", "http://alpha.example/careers"),
+            new LegacyReadService.CompanyLink("Beta", "https://beta.example/jobs"),
+            new LegacyReadService.CompanyLink("Pending", "")
+        ), links);
     }
 }

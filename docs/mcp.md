@@ -65,7 +65,7 @@ codex mcp add careerflow --url http://10.12.152.159:18080/mcp --bearer-token-env
 
 修改前先查询记录的 `id` 和 `updatedAt`，将其作为 `expectedUpdatedAt` 传入。网页和 Codex 同时修改同一条记录会报告冲突，必须重新查询后核对修改。未提供的字段保留原值，岗位备注和日程备注分别更新。只有已完成且未标为错过或放弃的日程允许填写面试回顾；需要时先按用户要求标记完成，再使用返回的新版本保存回顾。
 
-MCP 工具不需要调用站内大模型。`create_application` 的 `generateCompanyInsights` 默认 `false`；设置为 `true` 会触发站内公司的分类与薪资估算并产生相应 API 用量。之后进入网站相关页面，网站原有的异步补全机制仍可能运行。保存面试回顾不会通过 MCP 自动执行全量考点重建。
+MCP 工具不需要调用站内大模型。保存面试回顾不会通过 MCP 自动执行全量考点重建。
 
 ## 常见问题
 

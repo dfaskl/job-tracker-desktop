@@ -41,7 +41,6 @@ const lastPageBeforeGuide = ref<Page>('home')
 const guideCloseRequest = ref(0)
 const navigationItems = computed(() => mobileViewport.value ? [...mobilePages.value, guidePage] : [...visiblePages.value, guidePage])
 const focusApplicationId = ref('')
-const companyTypeFilter = ref('')
 const applicationWorkspaceReady = ref(false)
 const primaryNavigation = ref<HTMLElement | null>(null)
 const navIndicatorStyle = ref<Record<string, string>>({ width: '0px', height: '0px', transform: 'translate3d(0,0,0)', opacity: '0' })
@@ -122,7 +121,6 @@ function syncHash() {
   }
   activePage.value = route.page
   focusApplicationId.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('focus') || '' : ''
-  companyTypeFilter.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('companyType') || '' : ''
   if (route.applicationId) store.requestApplicationDetail(route.applicationId)
 }
 
@@ -341,7 +339,7 @@ onBeforeUnmount(() => {
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'guide-content-shell': activePage === 'guide', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
-          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId, companyTypeFilter } : activePage === 'guide' ? { closeRequest: guideCloseRequest } : {}" @workspace-ready="applicationWorkspaceReady = true" @exit-location="exitApplicationLocation" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { closeRequest: guideCloseRequest } : {}" @workspace-ready="applicationWorkspaceReady = true" @exit-location="exitApplicationLocation" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
         </KeepAlive>
       </div>
     </main>

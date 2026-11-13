@@ -3,7 +3,6 @@ package com.jobtracker.careerflow.mcp;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.ApplicationInput;
 import com.jobtracker.careerflow.application.ApplicationDocumentMutator.ApplicationView;
 import com.jobtracker.careerflow.database.ApplicationService;
-import com.jobtracker.careerflow.database.CompanyIndustryService;
 import com.jobtracker.careerflow.database.EventService;
 import com.jobtracker.careerflow.event.EventDocumentMutator.EventInput;
 import com.jobtracker.careerflow.event.EventDocumentMutator.EventView;
@@ -29,20 +28,19 @@ public class McpTools {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT);
     private final ApplicationService applications;
     private final EventService events;
-    private final CompanyIndustryService companies;
     private final McpTokenStore tokens;
     private final ObjectMapper mapper;
     private final Map<String, Tool> tools = new LinkedHashMap<>();
 
-    public McpTools(ApplicationService applications, EventService events, CompanyIndustryService companies, McpTokenStore tokens, ObjectMapper mapper) {
-        this.applications = applications; this.events = events; this.companies = companies; this.tokens = tokens; this.mapper = mapper;
+    public McpTools(ApplicationService applications, EventService events, McpTokenStore tokens, ObjectMapper mapper) {
+        this.applications = applications; this.events = events; this.tokens = tokens; this.mapper = mapper;
         register("search_applications", "查询投递", "applications:read", true,
             "搜索当前账户的投递。返回记录 ID 和 updatedAt；修改前先读取。分页返回，不包含其他账户数据。",
             fields("query", text("公司、岗位、城市或备注关键词", 120), "stage", text("当前阶段，可留空", 20), "limit", integer(1, 50), "offset", integer(0, 10000)));
         register("get_application", "读取投递详情", "applications:read", true, "读取当前账户的一条投递及其岗位备注。",
             fields("id", text("投递 ID", 120)), "id");
         register("create_application", "新增投递", "applications:write", false,
-            "新增投递。notes 仅为岗位备注。generateCompanyInsights=true 会触发站内 AI 分类与薪资估算，默认不立即调用站内 AI。",
+            "新增投递。notes 仅为岗位备注。",
             applicationFields(false), "company", "position");
         register("update_application", "修改投递", "applications:write", false,
             "只修改明确提供的字段。notes 是岗位备注，不能用于保存日程备注。需提供先前读取的 updatedAt 作为 expectedUpdatedAt；冲突时重新读取。",
@@ -96,8 +94,6 @@ public class McpTools {
             case "get_application" -> mapper.valueToTree(application(email, args.path("id").asText()));
             case "create_application" -> {
                 var result = applications.create(email, applicationInput(args, null), null);
-                if (args.path("generateCompanyInsights").asBoolean(false))
-                    companies.enqueueAfterApplicationWrite(email, result.application().company(), result.application().position());
                 yield mapper.valueToTree(result.application());
             }
             case "update_application" -> {
@@ -199,7 +195,6 @@ public class McpTools {
             "stage", choice("已投递", "测评", "笔试", "面试", "Offer", "已结束"),
             "status", choice("等待结果", "已通过", "未通过", "已放弃", "已结束"), "notes", text("仅为岗位备注", 4000));
         if (update) addIdentity(fields);
-        else fields.set("generateCompanyInsights", mapper.createObjectNode().put("type", "boolean").put("description", "是否立即触发站内 AI 分类与薪资估算，默认 false"));
         return fields;
     }
     private ObjectNode eventFields(boolean update) {

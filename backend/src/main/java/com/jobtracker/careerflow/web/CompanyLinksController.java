@@ -1,8 +1,6 @@
 package com.jobtracker.careerflow.web;
 
-import com.jobtracker.careerflow.database.ApplicationService;
 import com.jobtracker.careerflow.database.BackupService;
-import com.jobtracker.careerflow.database.CompanyIndustryService;
 import com.jobtracker.careerflow.database.LegacyReadService;
 import com.jobtracker.careerflow.database.LegacyReadService.LegacyUser;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,15 +21,13 @@ public class CompanyLinksController {
     private static final Logger LOGGER = LoggerFactory.getLogger(CompanyLinksController.class);
     private final AuthController auth;
     private final LegacyReadService legacy;
-    private final ApplicationService sandbox;
     private final BackupService backup;
-    private final CompanyIndustryService industries;
-    public CompanyLinksController(AuthController auth, LegacyReadService legacy, ApplicationService sandbox, BackupService backup, CompanyIndustryService industries) { this.auth=auth;this.legacy=legacy;this.sandbox=sandbox;this.backup=backup;this.industries=industries; }
+    public CompanyLinksController(AuthController auth, LegacyReadService legacy, BackupService backup) { this.auth=auth;this.legacy=legacy;this.backup=backup; }
 
     @GetMapping("/company-links")
     public ResponseEntity<?> links(@CookieValue(value=AuthController.COOKIE_NAME,required=false) String token) {
         try { Optional<LegacyUser> user=auth.authenticatedUser(token); if(user.isEmpty()) return error(HttpStatus.UNAUTHORIZED,"请先登录");
-            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(sandbox.status().enabled()?industries.prepareAndQueue(user.get().email()):legacy.findCompanyLinks(user.get().id()));
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(legacy.findCompanyLinks(user.get().id()));
         } catch(Exception e){LOGGER.warn("company links read failed",e);return error(HttpStatus.SERVICE_UNAVAILABLE,"数据库暂时不可用");}
     }
     @PostMapping("/company-links")

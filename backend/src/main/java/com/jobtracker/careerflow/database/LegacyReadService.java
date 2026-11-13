@@ -16,7 +16,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.Set;
 
 @Component
 public class LegacyReadService {
@@ -148,14 +147,8 @@ public class LegacyReadService {
         for (JsonNode item : source) {
             String company = text(item, "company", 120);
             String url = text(item, "url", 2048);
-            String industry = text(item, "industry", 80);
-            if (!CompanyIndustryCatalog.ALLOWED.contains(industry)) industry = "";
-            String industryStatus = text(item, "industryStatus", 20);
-            if (!Set.of("pending", "classified", "failed").contains(industryStatus)) industryStatus = "";
-            String industryError = text(item, "industryError", 300);
             if (!company.isBlank() && (url.isBlank() || isHttpUrl(url)))
-                items.add(new CompanyLink(company, url, industry, industryStatus, industryError,
-                    item.path("salaryEstimates").isArray() ? item.path("salaryEstimates") : objectMapper.createArrayNode()));
+                items.add(new CompanyLink(company, url));
         }
         items.sort(Comparator.comparing(link -> link.company().toLowerCase()));
         return List.copyOf(items);
@@ -228,7 +221,7 @@ public class LegacyReadService {
         }
     }
 
-    public record CompanyLink(String company, String url, String industry, String industryStatus, String industryError, JsonNode salaryEstimates) {}
+    public record CompanyLink(String company, String url) {}
     public record CompanyLinks(List<CompanyLink> items, String updatedAt) {}
 
     public record ApplicationSummary(
