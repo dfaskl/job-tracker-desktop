@@ -25,16 +25,39 @@ const quoteDay = computed(() => {
   const date = new Date(scheduleNow.value)
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
 })
-const quoteOverride = ref<{ day: number; index: number }>()
+const quoteCursorKey = 'careerflow_quote_cursor_v1'
+const quoteCursor = ref(readQuoteCursor())
 const quoteIndex = computed(() => {
-  if (quoteOverride.value?.day === quoteDay.value) return quoteOverride.value.index
+  const cursor = quoteCursor.value
+  if (cursor) return (cursor.index + Number(cursor.day !== quoteDay.value)) % dailyQuotes.length
   return quoteDay.value % dailyQuotes.length
 })
 const quote = computed(() => dailyQuotes[quoteIndex.value])
+function readQuoteCursor(): { day: number; index: number } | null {
+  try {
+    const cursor = JSON.parse(localStorage.getItem(quoteCursorKey) || 'null')
+    if (Number.isInteger(cursor?.day) && Number.isInteger(cursor?.index)
+      && cursor.index >= 0 && cursor.index < dailyQuotes.length) return cursor
+  } catch { /* 浏览器禁用存储时，继续在当前页面轮换。 */ }
+  return null
+}
+function saveQuoteCursor(index: number) {
+  quoteCursor.value = { day: quoteDay.value, index }
+  try {
+    localStorage.setItem(quoteCursorKey, JSON.stringify(quoteCursor.value))
+  } catch { /* 当前页面仍保留轮换位置。 */ }
+}
 function nextQuote() {
   updateScheduleClock()
-  quoteOverride.value = { day: quoteDay.value, index: (quoteIndex.value + 1) % dailyQuotes.length }
+  quoteCursor.value = readQuoteCursor() ?? quoteCursor.value
+  saveQuoteCursor((quoteIndex.value + 1) % dailyQuotes.length)
 }
+function syncQuoteCursor(event: StorageEvent) {
+  if (event.key === quoteCursorKey) quoteCursor.value = readQuoteCursor()
+}
+watch([quoteDay, () => store.user.value], () => {
+  if (store.user.value && quoteCursor.value?.day !== quoteDay.value) saveQuoteCursor(quoteIndex.value)
+}, { immediate: true })
 let scheduleClock: ReturnType<typeof setInterval> | null = null
 function updateScheduleClock() { scheduleNow.value = Date.now() }
 function startScheduleClock() {
@@ -182,6 +205,7 @@ const staleApplications = computed(() => store.applications.value.map(item => ({
 onMounted(() => {
   startScheduleClock()
   window.addEventListener('focus', updateScheduleClock)
+  window.addEventListener('storage', syncQuoteCursor)
   void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
@@ -275,14 +299,14 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
     <Teleport defer to="#home-quote-slot">
       <section class="quote-strip" aria-label="《毛泽东选集》摘句">
         <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" @click="nextQuote">
-          <AppIcon name="refresh" :size="16" />
+          换
         </button>
         <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
       </section>

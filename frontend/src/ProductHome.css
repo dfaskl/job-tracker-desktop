@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Ma Shan Zheng";
-  src: url("/fonts/ma-shan-zheng-quotes.woff2") format("woff2");
+  src: url("/fonts/ma-shan-zheng-home.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
@@ -34,22 +34,23 @@
   color: var(--home-ink);
   background: var(--color-card);
 }
-.quote-trigger {
+#app .quote-trigger {
   display: grid;
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  flex: 0 0 30px;
+  width: 44px;
+  min-height: 44px;
+  flex: 0 0 44px;
   padding: 0;
   place-items: center;
-  border: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: var(--accent, var(--color-primary));
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: var(--quote-seal-ink);
+  background: transparent;
+  font: 400 22px/1 "Ma Shan Zheng", "Kaiti SC", KaiTi, serif;
   cursor: pointer;
 }
-.quote-trigger:hover { background: var(--surface-hover); }
-.quote-trigger > span { display:grid;place-items:center;line-height:1; }
+.quote-strip { --quote-seal-ink: #9b4036; }
+:root[data-theme="dark"] .quote-strip { --quote-seal-ink: #efa39a; }
+#app .quote-trigger:hover { background: color-mix(in srgb, var(--quote-seal-ink) 10%, transparent); }
 .quote-copy {
   flex: 1;
   min-width: 0;

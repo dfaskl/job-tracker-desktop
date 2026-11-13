@@ -172,7 +172,7 @@ h1, .topbar h1 { font-family: var(--font-button); letter-spacing: -.035em; }
 #app :is(.danger, .error) { color: var(--color-destructive); }
 #app .danger-button { color: #fff; background: var(--color-destructive); }
 #app .success { color: var(--color-success); }
-#app :is(.primary-action, .login-submit, .topbar > button, .access form > button, .commit-box button, .ai-button, .quote-trigger, .advice-trigger) { color: #fff; }
+#app :is(.primary-action, .login-submit, .topbar > button, .access form > button, .commit-box button, .ai-button, .advice-trigger) { color: #fff; }
 #app button.offer { color: #fff; background: #15803d; }
 #app button.abandon { color: #fff; background: #9a570d; }
 #app button.reject { color: #fff; background: #c92f2a; }
@@ -414,7 +414,6 @@ body { background: var(--color-background); }
   .commit-box button,
   .topbar > button,
   .access form > button,
-  .quote-trigger,
   .advice-trigger
 ) {
   border-color: #555a63 !important;
@@ -427,7 +426,6 @@ body { background: var(--color-background); }
   .commit-box button,
   .topbar > button,
   .access form > button,
-  .quote-trigger,
   .advice-trigger
 ):not(:disabled):hover { background: #343940 !important; }
 :root[data-theme="dark"] #app :is(.overdue-alert, .duplicate-warning) {
