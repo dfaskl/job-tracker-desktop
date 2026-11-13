@@ -213,7 +213,7 @@ const EyeDot = defineComponent({
 <style scoped>
 .auth-illustration{position:relative;width:550px;height:400px;flex:0 0 auto}
 .auth-creature{position:absolute;bottom:0;transform-origin:bottom center;transition:all .7s ease-in-out;will-change:height,transform}
-.purple{border-radius:10px 10px 0 0;background:#6c3ff5}.black{border-radius:8px 8px 0 0;background:#2d2d2d}.orange{border-radius:120px 120px 0 0;background:#ff9b6b}.yellow{border-radius:70px 70px 0 0;background:#e8d754}
+.purple{border-radius:10px 10px 0 0;background:var(--illustration-purple,#6c3ff5)}.black{border-radius:8px 8px 0 0;background:var(--illustration-dark,#2d2d2d)}.orange{border-radius:120px 120px 0 0;background:var(--illustration-orange,#ff9b6b)}.yellow{border-radius:70px 70px 0 0;background:var(--illustration-yellow,#e8d754)}
 .auth-face{position:absolute;display:flex;align-items:center;transition:all .7s ease-in-out}.purple-face{gap:32px}.black-face{gap:24px}.orange-face{gap:32px;transition-duration:.2s}.yellow-face{gap:24px;transition-duration:.2s}
 :deep(.auth-eye){display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:999px;background:#fff;transition:all .15s ease}
 :deep(.auth-eye b){display:block;border-radius:999px;background:#2d2d2d;transition:transform .1s ease-out}
