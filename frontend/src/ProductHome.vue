@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
-import { api, apiCached, ApiError } from './api'
+import { api, ApiError } from './api'
 import { applicationProgressHealth, isScheduleOverdue, schedulePriorityTimestamp } from './applicationProgress'
+import { dailyQuotes } from './dailyQuotes'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import { confirmDialog } from './modalDialogs'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
-type AiStatus = { callsEnabled: boolean; message: string }
-type Quote = { date: string; quote: string; author: string; generated: boolean }
 type TimelineEntry = { id:string; label:string; date:string; start:string; end:string; status:'normal'|'tight'|'conflict'; flexible:boolean; showWindow:boolean; windowStart?:string; windowEnd?:string }
 type ScheduleAdvice = { summary: string; plans: string[]; timeline?: TimelineEntry[]; warnings?: string[]; conflicts: string[] }
 type TimelineLabel = { text:string; status:'normal'|'tight'|'conflict' }
@@ -18,14 +17,24 @@ type TeamTimelineEntry = { id:string;email:string;name:string;color:string;date:
 type TeamConflict = { id:string; text:string }
 const emit = defineEmits<{ navigate: [page: Page, applicationId?: string, behavior?: 'detail' | 'focus'] }>()
 const store = useJobTrackerStore()
-const quoteKey = 'job_tracker_daily_quote_vue_v2'
-const legacyQuoteKey = 'job_tracker_daily_quote_vue_v1'
-const quote = ref<Quote>(fallbackQuote())
-const quoteLoading = ref(false)
 const message = ref('')
 const error = ref('')
 const busyId = ref('')
 const scheduleNow = ref(Date.now())
+const quoteDay = computed(() => {
+  const date = new Date(scheduleNow.value)
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+})
+const quoteOverride = ref<{ day: number; index: number }>()
+const quoteIndex = computed(() => {
+  if (quoteOverride.value?.day === quoteDay.value) return quoteOverride.value.index
+  return quoteDay.value % dailyQuotes.length
+})
+const quote = computed(() => dailyQuotes[quoteIndex.value])
+function nextQuote() {
+  updateScheduleClock()
+  quoteOverride.value = { day: quoteDay.value, index: (quoteIndex.value + 1) % dailyQuotes.length }
+}
 let scheduleClock: ReturnType<typeof setInterval> | null = null
 function updateScheduleClock() { scheduleNow.value = Date.now() }
 function startScheduleClock() {
@@ -170,12 +179,10 @@ const teamConflicts=computed(()=>teamSchedule.value.conflicts)
 const teamConflictSummary=computed(()=>teamConflicts.value.length?'请优先协调时间轴上标出的日程。':'小组内时间点日程之间均至少间隔 1 小时。')
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
   .filter(row => row.health && row.health.days >= 22).sort((a,b) => (b.health?.days || 0) - (a.health?.days || 0)))
-onMounted(async () => {
+onMounted(() => {
   startScheduleClock()
   window.addEventListener('focus', updateScheduleClock)
-  await store.initialize()
-  const cached = loadCachedQuote()
-  if (store.user.value && !cached) await generateQuote(false)
+  void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
 function localText(date=new Date()){return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`}
@@ -255,26 +262,6 @@ function eventDate(event:JobEvent){
   const endTime=range?`${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`:''
   return {tag:same?'今天':'',date:dateText,time,range,endDate:endDateText,endTime}
 }
-function fallbackQuote():Quote{const items=['今天多走一步，明天就多一个选择。','把注意力放在能推进的下一步上。','每一次认真准备，都在靠近更合适的机会。','慢一点没有关系，只要方向仍在向前。','机会会迟到，但你的积累不会白费。','先完成今天能完成的，再把答案交给时间。','保持行动，好的结果往往在坚持之后出现。'];return {date:today(),quote:items[new Date().getDay()],author:'',generated:false}}
-function quoteCacheKey(){return quoteKey+'_'+String(store.user.value?.email||'guest').toLowerCase()}
-function loadCachedQuote(){try{const cached=JSON.parse(localStorage.getItem(quoteCacheKey())||localStorage.getItem(legacyQuoteKey)||'null') as Quote|null;if(cached?.date===today()&&cached.quote){quote.value=cached;localStorage.setItem(quoteCacheKey(),JSON.stringify(cached));return true}}catch{/* 使用本地内容 */}return false}
-async function generateQuote(force:boolean){
-  if(!store.user.value||quoteLoading.value)return
-  quoteLoading.value=true
-  error.value=''
-  try{
-    const status=await apiCached<AiStatus>('/api/poc/ai-sandbox/status')
-    if(!status.callsEnabled){quote.value=fallbackQuote();return}
-    const value=await api<{quote:string;author:string}>('/api/poc/ai-sandbox/daily-quote',{method:'POST',body:JSON.stringify({date:today()})})
-    quote.value={date:today(),quote:value.quote,author:value.author||'',generated:true}
-    localStorage.setItem(quoteCacheKey(),JSON.stringify(quote.value))
-  }catch(cause){
-    quote.value=fallbackQuote()
-    error.value=cause instanceof Error?cause.message:'每日一语生成失败'
-  }finally{
-    quoteLoading.value=false
-  }
-}
 async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';message.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();await loadSharedTimelines();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
 async function markRejected(item:JobApplication){if(!await confirmDialog(`确认将“${item.company} · ${item.position}”标记为未通过吗？`,{title:'结束投递',confirmText:'标记未通过',tone:'warning'}))return;busyId.value=item.id;error.value='';message.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
@@ -292,7 +279,14 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
-    <Teleport defer to="#home-quote-slot"><section class="quote-strip" :class="{'is-refreshing':quoteLoading}" :aria-busy="quoteLoading"><button class="quote-trigger" :disabled="quoteLoading" title="换一句" aria-label="刷新每日一语" @click="generateQuote(true)"><AppIcon name="refresh" class="quote-glyph" :size="16" /></button><span class="quote-copy"><small>每日一语</small><strong :title="quote.author?`${quote.quote} — ${quote.author}`:quote.quote">{{quote.quote}}<em v-if="quote.author"> — {{quote.author}}</em></strong></span></section></Teleport>
+    <Teleport defer to="#home-quote-slot">
+      <section class="quote-strip" aria-label="《毛泽东选集》摘句">
+        <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" @click="nextQuote">
+          <AppIcon name="refresh" :size="16" />
+        </button>
+        <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
+      </section>
+    </Teleport>
     <section class="dashboard-panel">
       <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>

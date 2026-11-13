@@ -1,7 +1,6 @@
 /* Continuous work surfaces: rhythm comes from type, columns and rules. */
 #app .home-quote-slot { width: 100%; min-width: 0; flex: 1 1 100%; }
 #app .quote-strip { width: 100%; max-width: none; flex: 1 1 100%; }
-#app .quote-copy strong { white-space: normal; }
 #app .home-dashboard { gap: 28px; }
 #app .dashboard-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 #app .dashboard-panel > .panel-head { padding: 0 0 15px; border-bottom: 1px solid var(--color-border); }
@@ -172,7 +171,6 @@
   #app .admin-grid > .audit-card { padding: 18px 0 0; border-top: 1px solid var(--color-border); }
 }
 @media (max-width: 820px) {
-  #app .quote-copy strong { overflow: visible; text-overflow: clip; white-space: normal; }
   #app .dashboard-panel { padding: 0; }
   #app .schedule-list article { padding: 14px; }
   #app .workspace > .grid { padding-right: 0; }

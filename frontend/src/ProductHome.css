@@ -1,3 +1,10 @@
+@font-face {
+  font-family: "Ma Shan Zheng";
+  src: url("/fonts/ma-shan-zheng-quotes.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
 .home-dashboard {
   --home-ink: var(--color-foreground);
   --home-muted: var(--color-muted-foreground);
@@ -42,18 +49,18 @@
   cursor: pointer;
 }
 .quote-trigger:hover { background: var(--surface-hover); }
-.quote-trigger:disabled { cursor: wait; }
 .quote-trigger > span { display:grid;place-items:center;line-height:1; }
-.quote-copy { display: grid; min-width: 0; flex: 1; }
-.quote-strip small { color: var(--accent, var(--color-primary)); font-size: 10px; font-weight: 700; }
-.quote-strip strong {
+.quote-copy {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   overflow-wrap: anywhere;
-  font-size: 12px;
-  font-weight: 550;
-  line-height: 1.45;
-  white-space: normal;
+  color: var(--color-foreground);
+  font-family: "Ma Shan Zheng", "Kaiti SC", KaiTi, serif;
+  font-size: clamp(18px, 1.4vw, 22px);
+  font-weight: 400;
+  line-height: 1.55;
 }
-.quote-strip em { color: var(--home-muted); font-style: normal; }
 .quote-trigger:focus-visible,
 .text-link:focus-visible,
 .advice-trigger:focus-visible,
@@ -63,9 +70,6 @@
   outline-offset: 2px;
 }
 
-.quote-strip.is-refreshing .quote-glyph { animation: quote-refresh-spin .85s linear infinite; }
-@keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .quote-strip.is-refreshing .quote-glyph { animation:none; } }
 @keyframes advice-icon-blink { 0%,100% { opacity:1; transform:scale(1); filter:drop-shadow(0 0 0 transparent); } 50% { opacity:.28; transform:scale(.88); filter:drop-shadow(0 0 7px rgba(255,255,255,.68)); } }
 @keyframes advice-icon-fade { 0%,100% { opacity:1; } 50% { opacity:.35; } }
 .dashboard-panel {

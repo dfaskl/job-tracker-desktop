@@ -15,7 +15,7 @@
 html { font-family: var(--font-ui); }
 body { background: var(--color-background); }
 #app :is(time, input[type="date"], input[type="datetime-local"], .date-block, .flow-node small, .metrics strong, .summary-grid strong, .trend-bar b, .salary-tag, .guide-progress) { font-variant-numeric: tabular-nums; }
-#app :is(h1, h2, h3, .brand, .nav-copy strong, .home-dashboard, .quote-strip strong, .metrics strong, .summary-grid strong) { font-family: var(--font-ui); }
+#app :is(h1, h2, h3, .brand, .nav-copy strong, .home-dashboard, .metrics strong, .summary-grid strong) { font-family: var(--font-ui); }
 #app h1 { font-weight: 650; letter-spacing: -.025em; }
 #app h2 { font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
 #app h3 { font-size: 15px; font-weight: 600; }
@@ -61,10 +61,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .home-dashboard { gap: 20px; padding-top: 24px; }
 #app .home-quote-slot { justify-content: flex-start; }
 #app .quote-strip { justify-content: flex-start; padding: 6px 0 6px 14px; border: 0; border-inline-start: 2px solid var(--color-border-strong); border-radius: 0; background: transparent; box-shadow: none; }
-#app .quote-strip strong { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.65; }
-#app .quote-strip small { color: var(--color-foreground); font-size: 12px; font-weight: 650; }
 #app .home-quote-slot .quote-trigger { width: 34px; min-width: 34px; height: 34px; min-height: 34px; border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border)); border-radius: 8px; color: var(--color-primary); background: var(--surface-selected); }
-#app .home-quote-slot .quote-trigger:disabled { opacity: .8; }
 :root[data-theme="dark"] #app .home-quote-slot .quote-trigger { border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border)) !important; color: var(--color-primary) !important; background: var(--color-muted) !important; }
 #app .dashboard-panel { padding: 24px; }
 #app .panel-head { padding-left: 0; }
