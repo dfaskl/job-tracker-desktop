@@ -552,7 +552,7 @@
 @media (max-width: 900px) {
   .dashboard-panel { padding: 21px 18px; border-radius: 15px; }
   .schedule-list article { grid-template-columns: max-content minmax(0,1fr); }
-  .schedule-actions { grid-column: 2; justify-content: flex-start; }
+  .schedule-actions { grid-column: 1 / -1; }
   .schedule-actions > i { display: none; }
 }
 @media (max-width: 680px) {
@@ -562,9 +562,9 @@
   .timeline-list article { scroll-snap-align: start; }
   .panel-head, .advice-head { align-items: flex-start; }
   .advice-head { flex-direction: column; }
-  .schedule-list article { grid-template-columns: max-content minmax(0,1fr) max-content; align-items: start; column-gap: 8px; row-gap: 12px; }
+  .schedule-list article { align-items: start; column-gap: 8px; row-gap: 12px; }
   :global(#app .schedule-list article) { column-gap: 8px; }
-  .schedule-list article.has-date-range { grid-template-columns: minmax(0,1fr) max-content; }
+  .schedule-list article.has-date-range { grid-template-columns: minmax(0,1fr); }
   .date-block { width: 70px; min-width: 70px; align-self: start; padding: 8px 7px; }
   .date-block strong { font-size: 15px; }
   .date-block small { font-size: 12px; }
@@ -572,10 +572,9 @@
   .date-range > .date-block { width: 70px; min-width: 70px; }
   .schedule-copy { grid-column: 2; }
   .schedule-copy p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .schedule-actions { grid-column: 3; align-self: start; gap: 6px; flex-wrap: nowrap; }
+  .schedule-actions { gap: 6px; }
   .schedule-actions button { width: 48px; min-width: 48px; height: 48px; min-height: 48px; padding: 0; }
   .has-date-range .schedule-copy { grid-column: 1; }
-  .has-date-range .schedule-actions { grid-column: 2; }
   .confirmation-list article { align-items: stretch; flex-direction: column; }
   .progress-line { width: 100%; overflow-x: auto; }
 }
