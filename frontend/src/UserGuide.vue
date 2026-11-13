@@ -3,22 +3,22 @@ import { computed, onActivated, onMounted, onBeforeUnmount, ref, nextTick, watch
 import AppIcon from './AppIcon.vue'
 
 const emit = defineEmits<{ navigate: [page: string]; close: [] }>()
-const props = defineProps<{ guideOrigin: { x: number; y: number }; closeRequest: number }>()
+const props = defineProps<{ closeRequest: number }>()
 const current = ref(0)
 const hoveredIndex = ref<number | null>(null)
 const guideRoot = ref<HTMLElement | null>(null)
 let closing = false
 const pages = [
-  { eyebrow: 'WELCOME · 01', title: '先完成基础配置', description: '配置好这些功能，CareerFlow 才能更完整地协助你管理求职过程和准备面试。暂时不配置也可以继续手动使用。', next: '从一条投递开始' },
-  { eyebrow: 'TRACK · 02', title: '从新建投递开始管理进度', description: '先为公司和岗位建立一条投递记录。收到笔试或面试安排后，再把日程添加到这条投递下，进展就能集中查看。', next: '也可以用邮件自动整理' },
-  { eyebrow: 'INBOX · 03', title: '用邮件识别减少手动录入', description: '连接邮箱后，在邮件识别页粘贴招聘或面试邮件。检查识别出的信息，再保存为投递或日程。保存前请核对关键信息。', next: '面试结束后记录问题' },
-  { eyebrow: 'REVIEW · 04', title: '留下问题，整理成复习资料', description: '面试结束后，编辑对应面试日程并记录面试官的问题。之后在面试总结中分类查看问题和学习讲解，复习知识点并准备后续面试。', next: '开始使用 CareerFlow' }
+  { title: '先完成基础配置', description: '可以先添加简历、连接模型和邮箱，也可以直接手动记录投递。' },
+  { title: '从新建投递开始管理进度', description: '先为公司和岗位建立一条投递记录。收到笔试或面试安排后，再把日程添加到这条投递下，进展就能集中查看。' },
+  { title: '用邮件识别减少手动录入', description: '选中邮件或粘贴正文，核对公司、岗位和时间后再录入。' },
+  { title: '留下问题，整理成复习资料', description: '面试结束后，编辑对应面试日程并记录面试官的问题。之后在面试总结中分类查看问题和学习讲解，复习知识点并准备后续面试。' }
 ]
 const progress = computed(() => `${String(current.value + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}`)
 const configVisuals = [
   { title: '我的简历', location: '个人设置 → 我的简历', page: '个人主页', kicker: '教育 · 实习 · 项目', target: '补充经历后，项目考点可以结合你的背景整理。', kind: 'resume' },
   { title: '大模型 API', location: '个人设置 → 大模型 API', page: '智能能力', kicker: 'API 配置', target: '连接模型服务，启用 AI 总结与学习讲解。', kind: 'api' },
-  { title: '邮件 API', location: '个人设置 → 邮件配置', page: '邮件接入', kicker: '连接邮箱', target: '连接邮箱后，识别邮件并辅助创建求职日程。', kind: 'mail-config' }
+  { title: '邮件配置', location: '个人设置 → 邮件配置', page: '邮件接入', kicker: '连接邮箱', target: '连接邮箱后，识别邮件并辅助创建求职日程。', kind: 'mail-config' }
 ]
 const applicationVisuals = [
   { title: '找到「新建投递」', location: '投递记录页面右上方', page: '投递记录', kicker: '新增一条投递', target: '点这里创建一条公司与岗位记录。', kind: 'new-application' },
@@ -37,50 +37,28 @@ const dockItems = [
 ]
 function previous() { if (current.value > 0) current.value -= 1 }
 function next() { if (current.value < pages.length - 1) current.value += 1 }
-function getOriginInGuide(element: HTMLElement) {
-  const rect = element.getBoundingClientRect()
-  return { x: props.guideOrigin.x - rect.left, y: props.guideOrigin.y - rect.top }
-}
-async function playOpenAnimation() {
-  await nextTick()
+function animateGuide(from: number, to: number) {
   const element = guideRoot.value
-  if (!element || typeof element.animate !== 'function') return
-  const origin = getOriginInGuide(element)
-  const keyframes: Keyframe[] = [
-    { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(.025)', opacity: 0.12 },
-    { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(1)', opacity: 1 }
-  ]
-  const animation = element.animate(keyframes, { duration: 920, easing: 'cubic-bezier(.2,.72,.25,1)', fill: 'both' })
-  try { await animation.finished } catch { /* Opening can be interrupted by navigation. */ }
-  // A retained transform changes the containing block of fixed navigation controls.
-  animation.cancel()
+  if (!element || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  return element.animate([{ opacity: from }, { opacity: to }], { duration: 140, easing: 'ease-out' })
 }
-async function closeToOrigin(action: () => void = () => emit('close')) {
+async function closeGuide(action: () => void = () => emit('close')) {
   if (closing) return
   closing = true
-  const element = guideRoot.value
-  if (element && typeof element.animate === 'function') {
-    const origin = getOriginInGuide(element)
-    const animation = element.animate([
-      { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(1)', opacity: 1 },
-      { transformOrigin: `${origin.x}px ${origin.y}px`, transform: 'scale(.025)', opacity: 0.12 }
-    ], { duration: 760, easing: 'cubic-bezier(.55,0,.8,.35)', fill: 'forwards' })
-    try { await animation.finished } catch { /* The route may be interrupted by browser navigation. */ }
-    animation.cancel()
-  }
+  try { await animateGuide(1, 0)?.finished } catch { /* Navigation may interrupt the animation. */ }
   closing = false
   action()
 }
-function navigateFromGuide(page: string) { void closeToOrigin(() => emit('navigate', page)) }
+function navigateFromGuide(page: string) { void closeGuide(() => emit('navigate', page)) }
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowLeft') { event.preventDefault(); previous() }
   if (event.key === 'ArrowRight') { event.preventDefault(); next() }
-  if (event.key === 'Escape') { event.preventDefault(); void closeToOrigin() }
+  if (event.key === 'Escape') { event.preventDefault(); void closeGuide() }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onActivated(() => { void playOpenAnimation() })
+onActivated(() => { void nextTick(() => animateGuide(0, 1)) })
 watch(() => props.closeRequest, (request, previous) => {
-  if (request !== previous) void closeToOrigin()
+  if (request !== previous) void closeGuide()
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
@@ -88,9 +66,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <section ref="guideRoot" class="guide-page" aria-label="CareerFlow 新手指南">
     <header class="guide-header">
-      <div class="guide-brand"><span class="guide-brand-icon"><AppIcon name="sparkles" :size="19" /></span><div><span>CAREERFLOW GUIDE</span><strong>新手指南</strong></div></div>
+      <div class="guide-brand"><strong>新手指南</strong></div>
       <div class="guide-progress"><span>{{ progress }}</span><div><i :style="{ width: `${(current + 1) * 25}%` }"></i></div></div>
-      <button type="button" class="guide-close" aria-label="关闭新手指南" title="关闭指南" @click="closeToOrigin()"><AppIcon name="close" :size="21" /><span>关闭</span></button>
+      <button type="button" class="guide-close" aria-label="关闭新手指南" title="关闭指南" @click="closeGuide()"><AppIcon name="close" :size="21" /><span>关闭</span></button>
     </header>
 
     <button type="button" class="guide-arrow guide-arrow-left" :disabled="current === 0" aria-label="上一页" title="上一页" @click="previous"><AppIcon name="chevron-left" :size="25" /></button>
@@ -99,14 +77,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <Transition name="guide-turn" mode="out-in">
       <main :key="current" class="guide-content">
         <div class="guide-copy">
-          <span class="guide-eyebrow">{{ pages[current].eyebrow }}</span>
           <h1>{{ pages[current].title }}</h1>
           <p>{{ pages[current].description }}</p>
         </div>
 
         <div v-if="current === 0" class="visual-grid config-grid">
           <article v-for="visual in configVisuals" :key="visual.kind" class="guide-visual-card">
-            <div class="visual-card-heading"><div><span>配置入口</span><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div><AppIcon name="chevron-right" :size="18" /></div>
+            <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>个人设置</i></div>
               <div class="mini-layout"><aside><b>设置</b><span>个人中心</span><span :class="{ selected: visual.kind === 'resume' }">我的简历</span><span :class="{ selected: visual.kind === 'api' }">大模型 API</span><span :class="{ selected: visual.kind === 'mail-config' }">邮件配置</span></aside>
@@ -122,7 +99,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div v-else-if="current === 1" class="visual-grid two-grid">
           <article v-for="visual in applicationVisuals" :key="visual.kind" class="guide-visual-card">
-            <div class="visual-card-heading"><div><span>手动管理</span><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div><AppIcon name="chevron-right" :size="18" /></div>
+            <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window application-mini" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>{{ visual.page }}</i></div>
               <div class="application-mini-body"><div class="mini-toolbar"><strong>{{ visual.page }}</strong><div v-if="visual.kind === 'new-application'" class="mini-primary">＋ 新建投递</div></div>
@@ -137,7 +114,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div v-else-if="current === 2" class="mail-page-layout">
           <article class="guide-visual-card mail-visual-card">
-            <div class="visual-card-heading"><div><span>自动整理</span><h2>{{ mailVisual.title }}</h2><p>{{ mailVisual.location }}</p></div><AppIcon name="chevron-right" :size="18" /></div>
+            <div class="visual-card-heading"><div><h2>{{ mailVisual.title }}</h2><p>{{ mailVisual.location }}</p></div></div>
             <div class="mini-window mail-mini" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>邮件识别</i></div>
               <div class="mail-mini-body"><section><small>粘贴邮件原文</small><div class="mail-text-lines"><i></i><i></i><i></i><i></i><i></i></div><div class="mini-primary">开始识别</div></section><span class="mini-arrow">→</span><section class="recognized"><small>核对识别结果</small><div class="form-line"><span>公司</span><i>星河科技</i></div><div class="form-line"><span>岗位</span><i>开发工程师</i></div><div class="form-line"><span>面试时间</span><i>周四 14:00</i></div><div class="mini-button">确认并保存</div></section></div>
@@ -150,7 +127,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div v-else class="visual-grid two-grid">
           <article v-for="visual in interviewVisuals" :key="visual.kind" class="guide-visual-card">
-            <div class="visual-card-heading"><div><span>面试复盘</span><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div><AppIcon name="chevron-right" :size="18" /></div>
+            <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window interview-mini" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>{{ visual.page }}</i></div>
               <div class="interview-mini-body"><aside><b>{{ visual.kind === 'interview-edit' ? '投递详情' : '面试回顾' }}</b><span>基本信息</span><span>安排记录</span><span>状态历史</span></aside>
@@ -168,7 +145,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <button type="button" class="guide-jump guide-mobile-prev" :disabled="current === 0" @click="previous"><AppIcon name="chevron-left" :size="16" /> 上一步</button>
           <button type="button" class="guide-jump" @click="navigateFromGuide(current === 0 ? 'profile' : current === 1 ? 'applications' : current === 2 ? 'mail' : 'interview-summary')">{{ current === 0 ? '去配置' : current === 1 ? '去投递记录' : current === 2 ? '去邮件识别' : '去面试总结' }}</button>
           <button v-if="current < pages.length - 1" type="button" class="guide-next" @click="next">下一步 <span aria-hidden="true">→</span></button>
-          <button v-else type="button" class="guide-next" @click="closeToOrigin()">完成指引 <span aria-hidden="true">✓</span></button>
+          <button v-else type="button" class="guide-next" @click="closeGuide()">完成指引 <span aria-hidden="true">✓</span></button>
         </footer>
       </main>
     </Transition>
@@ -187,8 +164,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .guide-page{position:relative;display:flex;min-height:calc(100dvh - 32px);flex-direction:column;overflow:clip;color:var(--color-foreground);background:radial-gradient(ellipse at 50% 14%,color-mix(in srgb,var(--color-primary) 12%,transparent),transparent 48%),var(--color-background)}
 .guide-header{position:sticky;top:0;z-index:12;display:flex;min-height:68px;align-items:center;justify-content:space-between;gap:24px;padding:0 clamp(14px,3vw,42px);border-bottom:1px solid var(--color-border);background:color-mix(in srgb,var(--color-background) 90%,transparent);backdrop-filter:blur(16px)}
 .guide-brand{display:flex;align-items:center;gap:11px}.guide-brand-icon{display:grid;width:38px;height:38px;place-items:center;border:1px solid color-mix(in srgb,var(--color-primary) 35%,var(--color-border));border-radius:12px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 12%,var(--color-card))}.guide-brand>div{display:grid;gap:2px}.guide-brand span:not(.guide-brand-icon){color:var(--color-muted-foreground);font-size:9px;font-weight:800;letter-spacing:.14em}.guide-brand strong{font-size:15px}.guide-progress{display:flex;flex:1;align-items:center;justify-content:center;gap:12px}.guide-progress>span{color:var(--color-muted-foreground);font-size:11px;font-variant-numeric:tabular-nums;font-weight:700}.guide-progress>div{width:min(220px,28vw);height:4px;overflow:hidden;border-radius:10px;background:var(--color-muted)}.guide-progress i{display:block;height:100%;border-radius:inherit;background:var(--color-primary);transition:width .45s cubic-bezier(.22,1,.36,1)}.guide-close{display:flex;min-width:88px;min-height:44px;align-items:center;justify-content:center;gap:8px;border:1px solid var(--color-border);border-radius:11px;color:var(--color-muted-foreground);background:var(--color-card);font-size:13px;font-weight:650}.guide-close:hover{border-color:var(--color-border-strong);color:var(--color-foreground);background:var(--color-muted)}
-.guide-content{display:grid;width:100%;min-height:0;flex:1;align-self:center;grid-template-rows:132px minmax(360px,1fr) 62px;gap:16px;padding:clamp(22px,4vh,44px) clamp(58px,4vw,64px) 24px}.guide-copy{display:grid;width:100%;height:132px;grid-template-rows:14px 46px 48px;align-content:center;justify-items:center;gap:5px;margin:0 auto;text-align:center;overflow:hidden}.guide-eyebrow{align-self:end;color:var(--color-primary);font-size:10px;font-weight:850;letter-spacing:.16em;line-height:14px}.guide-copy h1{display:-webkit-box;max-width:100%;align-self:center;margin:0;overflow:hidden;font-size:clamp(25px,3vw,36px);letter-spacing:-.035em;line-height:1.2;-webkit-box-orient:vertical;-webkit-line-clamp:1}.guide-copy>p{display:-webkit-box;width:100%;max-width:840px;align-self:start;margin:0 auto;overflow:hidden;color:var(--color-muted-foreground);font-size:14px;line-height:24px;-webkit-box-orient:vertical;-webkit-line-clamp:2}
-.visual-grid{display:grid;min-height:0;height:100%;align-items:stretch;gap:16px}.config-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.two-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.guide-visual-card{position:relative;display:grid;min-width:0;min-height:0;height:100%;grid-template-rows:72px minmax(0,1fr) 40px;gap:10px;padding:15px;border:1px solid var(--color-border);border-radius:16px;background:color-mix(in srgb,var(--color-card) 88%,transparent);box-shadow:var(--shadow-sm);overflow:hidden}.guide-visual-card::before{position:absolute;top:0;right:0;left:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--color-primary) 55%,transparent),transparent);content:''}.visual-card-heading{display:flex;min-width:0;height:72px;align-items:center;justify-content:space-between;gap:12px;margin:0;overflow:hidden}.visual-card-heading>div{display:grid;min-width:0;grid-template-rows:14px 20px 30px;align-content:center;gap:3px;overflow:hidden}.visual-card-heading>div>span{color:var(--color-primary);font-size:10px;font-weight:750;line-height:14px}.visual-card-heading h2{overflow:hidden;margin:0;font-size:15px;line-height:20px;text-overflow:ellipsis;white-space:nowrap}.visual-card-heading p{display:-webkit-box;max-height:30px;margin:0;overflow:hidden;color:var(--color-muted-foreground);font-size:11px;line-height:15px;-webkit-box-orient:vertical;-webkit-line-clamp:2}.visual-card-heading>svg{flex:none;color:var(--color-primary)}.guide-visual-card>.mini-window{display:flex;min-height:0;height:100%;flex:1;flex-direction:column}.guide-visual-card>.visual-note{display:-webkit-box;min-height:40px;height:40px;margin:0 1px;overflow:hidden;color:var(--color-muted-foreground);font-size:12px;line-height:20px;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.guide-content{display:grid;width:100%;min-height:0;flex:1;align-self:center;grid-template-rows:auto minmax(360px,1fr) 62px;gap:16px;padding:clamp(22px,4vh,44px) clamp(58px,4vw,64px) 24px}.guide-copy{display:grid;width:100%;height:132px;grid-template-rows:14px 46px 48px;align-content:center;justify-items:center;gap:5px;margin:0 auto;text-align:center;overflow:hidden}.guide-copy h1{display:-webkit-box;max-width:100%;align-self:center;margin:0;overflow:hidden;font-size:clamp(25px,3vw,36px);letter-spacing:-.035em;line-height:1.2;-webkit-box-orient:vertical;-webkit-line-clamp:1}.guide-copy>p{display:-webkit-box;width:100%;max-width:840px;align-self:start;margin:0 auto;overflow:hidden;color:var(--color-muted-foreground);font-size:14px;line-height:24px;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.visual-grid{display:grid;min-height:0;height:100%;align-items:stretch;gap:16px}.config-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.two-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.guide-visual-card{position:relative;display:grid;min-width:0;min-height:0;height:100%;grid-template-rows:72px minmax(0,1fr) 40px;gap:10px;padding:15px;border:1px solid var(--color-border);border-radius:16px;background:color-mix(in srgb,var(--color-card) 88%,transparent);box-shadow:var(--shadow-sm);overflow:hidden}.guide-visual-card::before{position:absolute;top:0;right:0;left:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--color-primary) 55%,transparent),transparent);content:''}.visual-card-heading{display:flex;min-width:0;height:72px;align-items:center;justify-content:space-between;gap:12px;margin:0;overflow:hidden}.visual-card-heading>div{display:grid;min-width:0;grid-template-rows:auto auto;align-content:center;gap:3px;overflow:hidden}.visual-card-heading>div>span{color:var(--color-primary);font-size:10px;font-weight:750;line-height:14px}.visual-card-heading h2{overflow:hidden;margin:0;font-size:15px;line-height:20px;text-overflow:ellipsis;white-space:nowrap}.visual-card-heading p{display:-webkit-box;max-height:30px;margin:0;overflow:hidden;color:var(--color-muted-foreground);font-size:11px;line-height:15px;-webkit-box-orient:vertical;-webkit-line-clamp:2}.visual-card-heading>svg{flex:none;color:var(--color-primary)}.guide-visual-card>.mini-window{display:flex;min-height:0;height:100%;flex:1;flex-direction:column}.guide-visual-card>.visual-note{display:-webkit-box;min-height:40px;height:40px;margin:0 1px;overflow:hidden;color:var(--color-muted-foreground);font-size:12px;line-height:20px;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .mini-window{position:relative;min-height:286px;overflow:hidden;border:1px solid color-mix(in srgb,var(--color-border) 82%,#8792b6);border-radius:12px;color:#e9ebf4;background:#13151b;box-shadow:0 7px 18px #0002}.mini-topbar{display:flex;height:34px;align-items:center;gap:5px;padding:0 11px;border-bottom:1px solid #2c303b;background:#1b1e27}.mini-topbar>span{width:6px;height:6px;border-radius:50%;background:#5a6070}.mini-topbar>b{margin-left:6px;color:#f0f1f5;font-size:10px}.mini-topbar>i{margin-left:auto;color:#aab0c3;font-size:10px;font-style:normal}.mini-layout{display:grid;min-height:250px;grid-template-columns:112px minmax(0,1fr)}.mini-layout>aside,.interview-mini-body>aside{display:grid;align-content:start;gap:9px;padding:14px 9px;border-right:1px solid #2a2e38;color:#a6acc0;font-size:10px}.mini-layout>aside b,.interview-mini-body>aside b{margin-bottom:3px;color:#e5e7f1;font-size:11px}.mini-layout>aside span,.interview-mini-body>aside span{padding:7px 6px;border-radius:5px}.mini-layout>aside span.selected{color:#c0c5ff;background:#383b52}.mini-main{position:relative;display:grid;align-content:start;gap:9px;padding:15px}.mini-main>small,.application-mini-body small,.interview-mini-body small{color:#b5bbff;font-size:10px;font-weight:750}.mini-main>strong,.application-mini-body strong,.interview-mini-body>section>strong{font-size:13px}.mini-target{position:relative;display:grid;min-height:76px;align-content:center;gap:7px;padding:11px;border:1px solid #3a4052;border-radius:7px;background:#1d2029}.mini-target span{color:#d6d9e4;font-size:10px}.mini-target i{display:block;width:68%;height:5px;border-radius:4px;background:#343846}.mini-target i:last-child{width:44%}.mini-button,.mini-primary{width:max-content;padding:7px 11px;border-radius:6px;color:#fff;background:#6268cf;font-size:10px;font-weight:700}.mini-api .mini-target,.mini-mail-config .mini-target,.mini-resume .mini-target{outline:1px solid #99a1ff;outline-offset:2px}.visual-note{min-height:38px}
 .application-mini{min-height:330px}.application-mini-body{position:relative;min-height:295px;padding:18px}.mini-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.mini-toolbar strong{font-size:14px}.mini-row{display:grid;grid-template-columns:1fr 1.4fr auto;align-items:center;gap:10px;padding:18px 12px;border:1px solid #343947;border-radius:8px;background:#1e212a;font-size:11px}.mini-row span{color:#b0b5c4}.mini-row i{color:#aeb5ff;font-size:10px;font-style:normal}.mini-primary{position:relative;z-index:1;padding:9px 13px;color:#fff;background:#646bdb}.new-application .mini-focus{position:absolute;top:42px;right:13px;width:112px;height:34px;border:2px solid #a4aaff;border-radius:7px;box-shadow:0 0 0 100vmax #090b1266}.mini-form{display:grid;gap:10px;padding:12px;border:1px solid #343947;border-radius:8px;background:#1e212a}.mini-form>b{margin-bottom:2px;font-size:11px}.form-line{display:grid;grid-template-columns:100px 1fr;align-items:center;gap:10px;font-size:10px}.form-line span{color:#b4bacb}.form-line i{padding:8px;border:1px solid #3b4050;border-radius:5px;color:#e0e2ec;background:#171920;font-size:10px;font-style:normal}.mini-form .mini-primary{justify-self:end;margin-top:4px}.application-form .mini-focus{position:absolute;top:113px;left:21px;width:min(88%,360px);height:40px;border:2px solid #a4aaff;border-radius:6px;box-shadow:0 0 0 100vmax #090b1266}
 .mail-page-layout{display:grid;min-height:0;height:100%;grid-template-columns:minmax(0,1fr) 275px;align-items:stretch;gap:24px}.mail-visual-card{width:100%;max-width:1000px;justify-self:center}.mail-mini{min-height:0}.mail-mini-body{display:grid;min-height:0;flex:1;grid-template-columns:1fr 40px 1fr;align-items:center;gap:12px;padding:19px;overflow:hidden}.mail-mini-body section{display:grid;min-height:0;align-content:start;gap:13px;padding:14px;border:1px solid #353a48;border-radius:9px;background:#1b1e27}.mail-mini-body section>small{color:#b5bbff;font-size:11px;font-weight:750}.mail-text-lines{display:grid;gap:11px;padding:12px;border:1px dashed #596075;border-radius:7px}.mail-text-lines i{height:7px;border-radius:5px;background:#424758}.mail-text-lines i:nth-child(2){width:82%}.mail-text-lines i:nth-child(4){width:68%}.mail-mini-body .mini-primary,.mail-mini-body .mini-button{justify-self:end}.recognized .form-line{grid-template-columns:68px 1fr}.mini-arrow{color:#abb1ff;text-align:center;font-size:20px}.mail-recognition{position:absolute;inset:40px 15px 15px;border:2px solid #a4aaff;border-radius:10px;pointer-events:none;box-shadow:0 0 0 100vmax #090b1266}.guide-side-note{display:flex;align-items:center;gap:12px;padding:19px 15px;border:1px solid color-mix(in srgb,var(--color-primary) 25%,var(--color-border));border-radius:13px;background:color-mix(in srgb,var(--color-primary) 7%,var(--color-card));overflow:hidden}.note-icon{display:grid;width:34px;height:34px;flex:none;place-items:center;border-radius:9px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 14%,var(--color-card))}.guide-side-note strong{font-size:13px}.guide-side-note p{margin:6px 0 0;color:var(--color-muted-foreground);font-size:12px;line-height:1.65}
@@ -211,4 +188,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   .guide-footer { flex-wrap:wrap; gap:8px; }
   .guide-mobile-prev { display:inline-flex; align-items:center; gap:3px; }
 }
+ .guide-page .guide-copy { grid-template-rows:auto auto; height:auto; min-height:0; }
+.guide-page .guide-copy :is(h1,p) { display:block; max-height:none; }
 </style>

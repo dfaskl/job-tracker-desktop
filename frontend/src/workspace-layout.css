@@ -1,8 +1,8 @@
 /* Continuous work surfaces: rhythm comes from type, columns and rules. */
 #app .home-quote-slot { width: 100%; min-width: 0; flex: 1 1 100%; }
 #app .quote-strip { width: 100%; max-width: none; flex: 1 1 100%; }
-#app .quote-copy { width: 100%; max-width: none; flex: 1 1 auto; }
-#app .quote-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#app .quote-copy { min-width: 0; flex: 0 1 76ch; }
+#app .quote-copy strong { white-space: normal; }
 #app .home-dashboard { gap: 28px; }
 #app .dashboard-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 #app .dashboard-panel > .panel-head { padding: 0 0 15px; border-bottom: 1px solid var(--color-border); }
@@ -26,7 +26,8 @@
 :root[data-theme="dark"] #app .timeline-column { background: transparent; }
 #app .team-timeline { margin-top: 16px; border-top: 1px solid var(--color-border); }
 #app .dashboard-panel > .team-timeline { margin-top: 0; padding-top: 0; border-top: 0; }
-#app .member-legend { padding: 8px 0 8px 6px; border: 0; border-radius: 0; overflow: visible; }
+#app .member-legend { padding: 8px 0 4px 3px; border: 0; background: transparent; overflow: visible; }
+:root[data-theme="dark"] #app .member-legend { background: transparent; }
 #app .member-legend > span { overflow: visible; }
 #app .member-legend i { box-sizing: border-box; width: 12px; height: 12px; flex-basis: 12px; margin-left: 2px; }
 #app .schedule-advice { margin-top: 20px; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
@@ -48,23 +49,12 @@
   box-shadow: var(--shadow-panel);
 }
 #app button.application[class*="tone-"] {
-  --gradient-start: 26%;
-  --gradient-middle: 13%;
-  --gradient-end: 3%;
-  background-color: var(--color-card) !important;
-  background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-start), var(--color-card)) 0%,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-middle), var(--color-card)) 48%,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-end), var(--color-card)) 100%) !important;
+  background: color-mix(in srgb, var(--stage-tint) 5%, var(--color-card)) !important;
 }
-:root[data-theme="dark"] #app button.application[class*="tone-"] {
-  --gradient-start: 36%;
-  --gradient-middle: 18%;
-  --gradient-end: 6%;
-  background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-start), var(--color-card)) 0%,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-middle), var(--color-card)) 48%,
-    color-mix(in srgb, var(--stage-tint) var(--gradient-end), var(--color-card)) 100%) !important;
+@media (hover: hover) and (pointer: fine) {
+  #app button.application[class*="tone-"]:hover {
+    background: color-mix(in srgb, var(--stage-tint) 9%, var(--color-card)) !important;
+  }
 }
 #app .workspace > .grid > .application:last-child { border-bottom: 1px solid var(--color-border); }
 #app .workspace > .grid > .application {
@@ -74,6 +64,9 @@
 #app button.application:hover { border-color: var(--color-border-strong); border-left-color: var(--stage-tint, var(--color-primary)); box-shadow: 0 2px 10px rgb(24 32 56 / 5%); }
 #app button.application:focus-visible { outline-offset: -3px; }
 #app .application-overview { min-width: 0; }
+:root[data-theme="dark"] #app .application .flow-node > i {
+  box-shadow: 0 0 0 4px var(--color-card);
+}
 #app .application .flow-node:is(.success, .failed) { background: transparent !important; }
 #app .application-arrival { position: relative; }
 #app .application-arrival::after { position: absolute; inset: 0; z-index: 1; border: 1px solid var(--color-primary); background: color-mix(in srgb, var(--color-primary) 18%, transparent); content: ""; pointer-events: none; animation: application-arrival-flash 1.45s ease-in-out both; }
@@ -219,7 +212,7 @@
   border-color: var(--color-border) !important;
   border-left-color: var(--stage-tint) !important;
 }
-:root[data-theme="dark"] #app .application-title :is(span, small, i) { color: var(--color-muted-foreground) !important; }
+:root[data-theme="dark"] #app .application-title :is(small, i) { color: var(--color-muted-foreground); }
 :root[data-theme="dark"] #app .mail-cards article { background: transparent !important; }
 :root[data-theme="dark"] #app .mail-cards article:hover { background: var(--surface-hover) !important; }
 :root[data-theme="dark"] #app .mail-cards article.selected { background: var(--surface-selected) !important; }
@@ -253,7 +246,7 @@
 #app .schedule-advice { margin-top: 8px; padding-top: 0; }
 
 /* Mail: keep the three work areas distinct by spacing, not column rules. */
-#app .mail-grid { gap: 14px; border: 0; }
+#app .mail-grid { gap: clamp(14px, 1.35vw, 24px); border: 0; }
 #app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) {
   border: 0; border-radius: 12px; background: var(--color-card);
 }

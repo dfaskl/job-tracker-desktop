@@ -6,11 +6,11 @@
       <stop offset="1" stop-color="#A4ADFF" stop-opacity=".12"/>
     </linearGradient>
     <radialGradient id="wash" cx="0" cy="0" r="1" gradientTransform="matrix(-510 350 -270 -390 1120 335)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7887F0" stop-opacity=".18"/>
+      <stop stop-color="#7887F0" stop-opacity=".12"/>
       <stop offset="1" stop-color="#7887F0" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <g>
+  <g opacity=".66">
     <ellipse cx="1120" cy="335" rx="510" ry="350" fill="url(#wash)"/>
     <path d="M120 780C300 706 358 612 520 604c190-10 224-190 416-180 142 7 174-94 390-216" stroke="url(#route)" stroke-width="3"/>
     <path d="M166 838c182-76 250-101 372-106 180-7 250-190 410-184 162 6 230-114 363-180" stroke="#54B8AD" stroke-opacity=".17" stroke-width="2"/>

@@ -41,7 +41,7 @@
   background: var(--accent, var(--color-primary));
   cursor: pointer;
 }
-.quote-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
+.quote-trigger:hover { background: var(--surface-hover); }
 .quote-trigger:disabled { cursor: wait; }
 .quote-trigger > span { display:grid;place-items:center;line-height:1; }
 .quote-copy { display: grid; min-width: 0; max-width: 72ch; flex: 0 1 auto; }
@@ -63,53 +63,11 @@
   outline-offset: 2px;
 }
 
-.quote-strip { position: relative; isolation: isolate; transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
-.quote-strip.is-refreshing {
-  border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 48%, var(--color-border));
-  animation: quote-breathe 1.25s ease-in-out infinite;
-}
-.quote-strip.is-refreshing > .quote-trigger > .quote-glyph { animation: quote-refresh-spin .85s linear infinite; }
-.quote-strip.is-refreshed {
-  border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 62%, var(--color-border));
-  background: color-mix(in srgb, var(--accent, var(--color-primary)) 5%, var(--color-card));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--color-primary)) 10%, transparent);
-}
-.quote-sparks { position:absolute; inset:0; z-index:3; overflow:visible; pointer-events:none; }
-.quote-sparks > i {
-  position:absolute;
-  top:50%;
-  left:50%;
-  width:9px;
-  height:9px;
-  border-radius:1px;
-  background:var(--accent, var(--color-primary));
-  clip-path:polygon(50% 0,62% 36%,100% 50%,62% 64%,50% 100%,38% 64%,0 50%,38% 36%);
-  opacity:0;
-  filter:drop-shadow(0 0 3px color-mix(in srgb,var(--accent,var(--color-primary)) 34%,transparent));
-  animation:quote-spark .82s cubic-bezier(.16,.78,.24,1) forwards;
-}
-.quote-sparks > i:nth-child(even){width:7px;height:7px;background:#e7ad38}
-.quote-sparks > i:nth-child(1){--spark-x:-30px;--spark-y:-24px;left:5%;top:16%;animation-delay:.02s}
-.quote-sparks > i:nth-child(2){--spark-x:-18px;--spark-y:-30px;left:27%;top:5%;animation-delay:.1s}
-.quote-sparks > i:nth-child(3){--spark-x:12px;--spark-y:-32px;left:52%;top:4%;animation-delay:.04s}
-.quote-sparks > i:nth-child(4){--spark-x:29px;--spark-y:-23px;left:90%;top:14%;animation-delay:.12s}
-.quote-sparks > i:nth-child(5){--spark-x:31px;--spark-y:24px;left:94%;top:80%;animation-delay:.05s}
-.quote-sparks > i:nth-child(6){--spark-x:10px;--spark-y:30px;left:63%;top:94%;animation-delay:.14s}
-.quote-sparks > i:nth-child(7){--spark-x:-29px;--spark-y:23px;left:10%;top:84%;animation-delay:.08s}
-@keyframes quote-breathe {
-  0%,100% { box-shadow:0 0 0 0 color-mix(in srgb,var(--accent,var(--color-primary)) 6%,transparent); }
-  50% { box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
-}
+.quote-strip.is-refreshing .quote-glyph { animation: quote-refresh-spin .85s linear infinite; }
 @keyframes quote-refresh-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .quote-strip.is-refreshing .quote-glyph { animation:none; } }
 @keyframes advice-icon-blink { 0%,100% { opacity:1; transform:scale(1); filter:drop-shadow(0 0 0 transparent); } 50% { opacity:.28; transform:scale(.88); filter:drop-shadow(0 0 7px rgba(255,255,255,.68)); } }
 @keyframes advice-icon-fade { 0%,100% { opacity:1; } 50% { opacity:.35; } }
-@keyframes quote-spark {
-  0% { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(0); }
-  26% { opacity:1; transform:translate(-50%,-50%) scale(1.15) rotate(35deg); }
-  62% { opacity:.9; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.92) rotate(82deg); }
-  100% { opacity:0; transform:translate(calc(-50% + var(--spark-x)),calc(-50% + var(--spark-y))) scale(.28) rotate(135deg); }
-}
-
 .dashboard-panel {
   position: relative;
   overflow: hidden;
@@ -186,11 +144,11 @@
 .team-timeline-list article i,
 .team-timeline-list article:nth-child(n) i { background:var(--member-color); box-shadow:0 0 0 2px color-mix(in srgb,var(--member-color) 50%,#fff); }
 .team-timeline-list article em { display:grid; gap:1px; max-width:210px; border-color:color-mix(in srgb,var(--member-color) 52%,#dce4e9); color:color-mix(in srgb,var(--member-color) 58%,#263d42); background:color-mix(in srgb,var(--member-color) 24%,#fff); box-shadow:0 2px 7px color-mix(in srgb,var(--member-color) 12%,transparent); }
-.team-timeline-list article em strong { overflow:hidden; color:var(--member-color); font-size:10px; text-overflow:ellipsis; }
+.team-timeline-list article em strong { overflow:hidden; color:color-mix(in srgb,var(--member-color) 60%,var(--color-foreground)); font-size:10px; text-overflow:ellipsis; }
 .team-timeline-list .team-node-warning { position:absolute; z-index:3; top:10px; left:calc(50% + 5px); display:block; width:14px; height:13px; padding:0; }
-.team-conflict-alert { display:grid; gap:5px; padding:10px 12px; border-left:4px solid #c4413b; border-radius:8px; color:#922f2a; background:#fff0ee; font-size:11px; line-height:1.55; }
+.team-conflict-alert { display:flex; flex-wrap:wrap; gap:4px 10px; padding:8px 0; color:var(--color-destructive); font-size:12px; line-height:1.55; }
 .team-conflict-alert strong { font-size:12px; }
-.team-conflict-alert span::before { content:"• "; }
+.team-conflict-alert span { min-width:0; overflow-wrap:anywhere; }
 .column-heading,
 .timeline-user-head {
   display: flex;
@@ -323,7 +281,7 @@
   right: 14px;
   left: 14px;
   height: 2px;
-  background: linear-gradient(90deg, var(--home-progress), #b7d2c8 70%, var(--home-deadline));
+  background: var(--color-border-strong);
 }
 .timeline-list article {
   position: relative;
@@ -365,7 +323,6 @@
 }
 .timeline-list em.tight { color: #875716; background: #fff0c9; }
 .timeline-list em.conflict { color: #a43731; background: #ffe4e1; }
-.team-timeline-list article.conflict em { outline:2px solid color-mix(in srgb,#c4413b 72%,transparent); outline-offset:1px; }
 .team-timeline-list article.conflict i { background:var(--member-color); box-shadow:0 0 0 2px color-mix(in srgb,var(--member-color) 50%,#fff),0 0 0 5px color-mix(in srgb,#c4413b 32%,transparent); }
 
 .advice-warnings,

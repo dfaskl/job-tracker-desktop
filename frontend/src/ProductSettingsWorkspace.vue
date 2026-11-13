@@ -115,7 +115,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="profile-workspace">
     <header class="settings-heading">
-      <div><span>账户与偏好</span><h1>个人主页</h1><p>集中管理个人资料、面试简历、模型和邮箱连接及数据安全。</p></div>
+      <div><h1>个人设置</h1></div>
     </header>
     <div class="settings-layout">
       <nav class="settings-nav" aria-label="个人主页分区">
@@ -125,11 +125,10 @@ onBeforeUnmount(() => {
       </nav>
       <main class="settings-content">
         <section :id="`profile-section-${sections[0].id}`" :ref="element => setSectionRef('center', element as Element | null)" class="profile-section">
-          <div class="section-title"><h2>个人中心</h2><p>管理个人资料、账户安全和登录状态。</p></div>
+          <div class="section-title"><h2>个人中心</h2></div>
           <AccountManagement />
         </section>
         <section :id="`profile-section-${sections[1].id}`" :ref="element => setSectionRef('resume', element as Element | null)" class="profile-section">
-          <div class="section-title"><p>维护教育、实习和项目经历，供面试复习按需参考。</p></div>
           <ResumeSettings />
         </section>
         <section :id="`profile-section-${sections[2].id}`" :ref="element => setSectionRef('ai', element as Element | null)" class="profile-section">

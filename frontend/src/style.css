@@ -69,24 +69,6 @@
   --color-avatar-foreground: #eceef5;
   --color-avatar-border: #626e86;
   --page-background-image: url('/page-background-dark.svg');
-  --application-pending-surface: #172433;
-  --application-pending-border: #466e9e;
-  --application-pending-accent: #6da7e6;
-  --application-interview-surface: #241d31;
-  --application-interview-border: #725c94;
-  --application-interview-accent: #aa8adb;
-  --application-assessment-surface: #2a2114;
-  --application-assessment-border: #80642f;
-  --application-assessment-accent: #e0a747;
-  --application-applied-surface: #1b211f;
-  --application-applied-border: #53635d;
-  --application-applied-accent: #91a29a;
-  --application-stopped-surface: #2a1b1d;
-  --application-stopped-border: #814b4a;
-  --application-stopped-accent: #dc7771;
-  --application-offer-surface: #15251d;
-  --application-offer-border: #3f7456;
-  --application-offer-accent: #67b486;
   --color-paper: #191b23;
   --color-canvas: #101116;
   --color-rail: #333847;
@@ -309,7 +291,6 @@ body { background: var(--color-background); }
 #app :is(.event-chip,.backup-list article,.users-card article) { transition:border-color .18s ease,background-color .18s ease,box-shadow .18s ease; }
 #app :is(.event-chip,.backup-list article,.users-card article):hover { border-color:color-mix(in srgb,var(--color-primary) 42%,var(--color-border)); box-shadow:0 5px 16px rgba(23,75,79,.07); }
 #app :is(.application,.event-chip) { border-radius:10px; }
-#app .application { background-image:linear-gradient(90deg,rgba(255,255,255,.28),transparent 42%); }
 #app :is(.calendar-pane,.month-card) { background:var(--color-paper); }
 #app :is(.calendar-grid,.month-grid) { border-color:var(--color-rail); }
 #app :is(.calendar-grid,.month-grid) .day { background:color-mix(in srgb,var(--color-paper) 96%,var(--color-background)); }
@@ -421,61 +402,6 @@ body { background: var(--color-background); }
   color: var(--color-foreground) !important;
   background: #24282e !important;
 }
-:root[data-theme="dark"] #app .application {
-  --card-bg: color-mix(in srgb, var(--card-accent, #7f8e87) 10%, var(--color-card));
-  color: var(--color-card-foreground) !important;
-  background: var(--card-bg) !important;
-  background-image: none !important;
-}
-:root[data-theme="dark"] #app .application.tone-pending {
-  --card-bg: var(--application-pending-surface);
-  --card-border: var(--application-pending-border);
-  --card-accent: var(--application-pending-accent);
-}
-:root[data-theme="dark"] #app .application.tone-interview {
-  --card-bg: var(--application-interview-surface);
-  --card-border: var(--application-interview-border);
-  --card-accent: var(--application-interview-accent);
-}
-:root[data-theme="dark"] #app .application.tone-assessment {
-  --card-bg: var(--application-assessment-surface);
-  --card-border: var(--application-assessment-border);
-  --card-accent: var(--application-assessment-accent);
-}
-:root[data-theme="dark"] #app .application.tone-applied {
-  --card-bg: var(--application-applied-surface);
-  --card-border: var(--application-applied-border);
-  --card-accent: var(--application-applied-accent);
-}
-:root[data-theme="dark"] #app .application.tone-stopped {
-  --card-bg: var(--application-stopped-surface);
-  --card-border: var(--application-stopped-border);
-  --card-accent: var(--application-stopped-accent);
-}
-:root[data-theme="dark"] #app .application.tone-offer {
-  --card-bg: var(--application-offer-surface);
-  --card-border: var(--application-offer-border);
-  --card-accent: var(--application-offer-accent);
-}
-:root[data-theme="dark"] #app .application[class*="tone-"] {
-  border-color: var(--card-border) !important;
-  border-left-color: var(--card-accent) !important;
-}
-:root[data-theme="dark"] #app .application-overview > em.health-good {
-  border: 1px solid var(--application-offer-border);
-  color: var(--application-offer-accent);
-  background: var(--application-offer-surface);
-}
-:root[data-theme="dark"] #app .application-overview > em.health-watch {
-  border: 1px solid var(--application-assessment-border);
-  color: var(--application-assessment-accent);
-  background: var(--application-assessment-surface);
-}
-:root[data-theme="dark"] #app .application-overview > em.health-risk {
-  border: 1px solid var(--application-stopped-border);
-  color: var(--application-stopped-accent);
-  background: var(--application-stopped-surface);
-}
 :root[data-theme="dark"] #app :is(.flow-node, .compact-node) {
   --node-soft: color-mix(in srgb, var(--node-color) 16%, #20242a);
 }
@@ -504,7 +430,7 @@ body { background: var(--color-background); }
   .quote-trigger,
   .advice-trigger
 ):not(:disabled):hover { background: #343940 !important; }
-:root[data-theme="dark"] #app :is(.overdue-alert, .team-conflict-alert, .duplicate-warning) {
+:root[data-theme="dark"] #app :is(.overdue-alert, .duplicate-warning) {
   border-color: color-mix(in srgb, var(--color-destructive) 55%, var(--color-border)) !important;
   color: #ffaaa4 !important;
   background: color-mix(in srgb, var(--color-destructive) 12%, var(--color-card)) !important;

@@ -2,16 +2,19 @@
 :root {
   --font-ui: "Segoe UI", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
   --surface-hover: #f0f2f8;
+  --color-elevated: #fff;
   --surface-selected: #eceefa;
   --shadow-panel: 0 1px 3px rgb(24 32 56 / 3%);
 }
 :root[data-theme="dark"] {
-  --surface-hover: #262a36;
+  --surface-hover: #292d38;
+  --color-elevated: #242733;
   --surface-selected: #2b3050;
   --shadow-panel: 0 1px 3px rgb(0 0 0 / 10%);
 }
 html { font-family: var(--font-ui); }
 body { background: var(--color-background); }
+#app :is(time, input[type="date"], input[type="datetime-local"], .date-block, .flow-node small, .metrics strong, .summary-grid strong, .trend-bar b, .salary-tag, .guide-progress) { font-variant-numeric: tabular-nums; }
 #app :is(h1, h2, h3, .brand, .nav-copy strong, .home-dashboard, .quote-strip strong, .metrics strong, .summary-grid strong) { font-family: var(--font-ui); }
 #app h1 { font-weight: 650; letter-spacing: -.025em; }
 #app h2 { font-size: 18px; font-weight: 650; letter-spacing: -.015em; }
@@ -57,12 +60,12 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 /* The home workspace starts with the personal agenda. */
 #app .home-dashboard { gap: 20px; padding-top: 24px; }
 #app .home-quote-slot { justify-content: flex-start; }
-#app .quote-strip { justify-content: flex-start; padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
+#app .quote-strip { justify-content: flex-start; padding: 6px 0 6px 14px; border: 0; border-inline-start: 2px solid var(--color-border-strong); border-radius: 0; background: transparent; box-shadow: none; }
 #app .quote-strip strong { color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.65; }
-#app .quote-strip small { font-size: 12px; font-weight: 600; }
+#app .quote-strip small { color: var(--color-foreground); font-size: 12px; font-weight: 650; }
 #app .home-quote-slot .quote-trigger { width: 34px; min-width: 34px; height: 34px; min-height: 34px; border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border)); border-radius: 8px; color: var(--color-primary); background: var(--surface-selected); }
 #app .home-quote-slot .quote-trigger:disabled { opacity: .8; }
-:root[data-theme="dark"] #app .home-quote-slot .quote-trigger { border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border)) !important; color: var(--color-primary) !important; background: var(--surface-selected) !important; }
+:root[data-theme="dark"] #app .home-quote-slot .quote-trigger { border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border)) !important; color: var(--color-primary) !important; background: var(--color-muted) !important; }
 #app .dashboard-panel { padding: 24px; }
 #app .panel-head { padding-left: 0; }
 #app .panel-head h2 { font-size: 18px; }
@@ -238,4 +241,15 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
   #app .calendar-pane .calendar-head { flex-direction: column; align-items: stretch; gap: 12px; }
   #app .calendar-pane .calendar-head > div { justify-content: space-between; }
   #app .calendar-pane .calendar-head :is(strong, button, span) { white-space: nowrap; }
+}
+
+/* Editing and confirmation surfaces sit one level above work areas. */
+:root[data-theme="dark"] body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) :is(.modal, .detail-modal, .link-modal, .edit-modal),
+:root[data-theme="dark"] #app :is(.system-dialog, .recognition-details, .mail-preview-card) {
+  background: var(--color-elevated) !important;
+}
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+  #app button.icon-button:not(:disabled):hover,
+  #app :is(.primary-action,.commit-box button):not(:disabled):hover,
+  body .modal button:not(:disabled):hover { translate: 0 1px; }
 }
