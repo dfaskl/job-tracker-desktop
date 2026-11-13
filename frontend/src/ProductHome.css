@@ -541,28 +541,6 @@
   box-shadow: 0 12px 34px rgba(20,35,54,.16);
 }
 
-.quote-strip.home-quote-entering:not(.is-refreshing) .quote-trigger { animation:home-quote-light 420ms ease-out both; }
-.quote-strip.home-quote-entering .quote-copy { animation:home-section-in 400ms ease-out 100ms both; }
-.home-entering :is(.team-timeline,.schedule-advice,.details-column,.confirmation-panel):not(.home-visible) { opacity:0; }
-.home-entering :is(.team-timeline,.details-column,.confirmation-panel).home-visible { animation:home-section-in 340ms ease-out both; animation-delay:var(--home-section-delay,0ms); }
-.home-entering .team-timeline.home-visible .member-legend { animation:home-section-in 300ms ease-out 140ms both; }
-.home-entering .team-timeline.home-visible .team-timeline-list::before { transform-origin:left center; animation:home-track-draw 600ms ease-out 190ms both; }
-.home-entering .team-timeline.home-visible .team-timeline-list article { animation:home-node-in 380ms ease-out both; animation-delay:calc(400ms + var(--home-node-delay)); }
-.home-entering .schedule-advice:not(.home-visible) { animation:none; }
-.home-entering .schedule-advice.home-visible { animation:home-advice-in 420ms ease-out both; animation-delay:var(--home-section-delay,0ms); }
-.home-entering .details-column { overflow-x:clip; }
-.home-entering .details-column.home-visible > .column-heading { animation:home-section-in 300ms ease-out both; }
-.home-card-revealing article:not(.home-card-visible) { opacity:0; }
-.home-card-revealing.schedule-list article.home-card-visible { animation:home-schedule-fly 520ms cubic-bezier(.18,.76,.24,1) both; animation-delay:var(--home-card-delay,0ms); }
-.home-card-revealing.confirmation-list article.home-card-visible { animation:home-node-in 520ms ease-out both; animation-delay:var(--home-card-delay,0ms); }
-.home-entering .confirmation-panel.home-visible .panel-head { animation:home-section-in 300ms ease-out both; }
-.home-entering :is(.details-column,.confirmation-panel).home-visible > .empty { animation:home-section-in 320ms ease-out 140ms both; }
-@keyframes home-quote-light { from { opacity:.35; transform:scale(.9); } 70% { opacity:1; transform:scale(1.055); } to { opacity:1; transform:scale(1); } }
-@keyframes home-section-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-@keyframes home-track-draw { from { transform:scaleX(0); } to { transform:scaleX(1); } }
-@keyframes home-node-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-@keyframes home-advice-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-@keyframes home-schedule-fly { from { opacity:0; transform:translateX(64px) scale(.985); } to { opacity:1; transform:translateX(0) scale(1); } }
 @keyframes track-reveal {
   from { opacity: 0; transform: translateY(8px) scale(.995); }
   to { opacity: 1; transform: none; }

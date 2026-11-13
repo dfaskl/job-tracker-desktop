@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
 .brand strong { font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
 .brand small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 .sidebar nav { position: relative; isolation: isolate; display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; padding-top: 12px; border-top: 1px solid var(--color-border); overflow-y: auto; scrollbar-width: thin; }
-.nav-active-indicator { position: absolute; z-index: 0; top: 0; left: 0; border: 1px solid color-mix(in srgb,var(--color-primary) 18%,transparent); border-radius: 11px; background: color-mix(in srgb,var(--color-primary) 10%,var(--color-card)); box-shadow: inset 0 1px 0 color-mix(in srgb,#fff 5%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 8%,transparent); pointer-events: none; transition: transform .66s cubic-bezier(.2,.82,.25,1.28),width .48s cubic-bezier(.2,.82,.25,1.18),height .48s cubic-bezier(.2,.82,.25,1.18),opacity .16s ease; will-change:transform,width,height; }
+.nav-active-indicator { position: absolute; z-index: 0; top: 0; left: 0; border: 1px solid color-mix(in srgb,var(--color-primary) 18%,transparent); border-radius: 11px; background: color-mix(in srgb,var(--color-primary) 10%,var(--color-card)); box-shadow: inset 0 1px 0 color-mix(in srgb,#fff 5%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 8%,transparent); pointer-events: none; transition: transform 100ms ease-out, opacity 100ms ease-out; will-change:transform,width,height; }
 nav button { position: relative; z-index: 1; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
 nav button:hover { background: var(--color-muted); }
 nav button.active { border-color: transparent; background: transparent; }
@@ -415,7 +415,6 @@ nav button.active::before { content: none; }
   padding: 10px 0;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-background) 92%, transparent);
-  backdrop-filter: blur(16px);
 }
 .topbar > button {
   min-width: 116px;

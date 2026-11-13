@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
 import { api, apiCached, ApiError } from './api'
 import { type JobApplication, useJobTrackerStore } from './jobTrackerStore'
 import BaseSelect from './BaseSelect.vue'
@@ -47,7 +47,6 @@ const previewLoading = ref(false)
 const previewError = ref('')
 const previewDarkTheme = ref(document.documentElement.dataset.theme === 'dark')
 let previewThemeObserver: MutationObserver | null = null
-const entranceActive = ref(false)
 const previewSrcdoc = computed(() => previewHtml.value
   ? `${previewHtml.value}${previewDarkTheme.value ? '<style>html{background:#fff!important;filter:invert(1) hue-rotate(180deg)!important}</style>' : ''}`
   : '')
@@ -83,9 +82,7 @@ onMounted(async () => {
   await Promise.all([checkStatus(), loadInbox(true)])
 })
 onBeforeUnmount(() => previewThemeObserver?.disconnect())
-onActivated(() => { entranceActive.value = true })
 onDeactivated(() => {
-  entranceActive.value = false
   recognitionDetailsDialog.value?.close()
 })
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
@@ -335,7 +332,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 </script>
 
 <template>
-  <section class="mail-page" :class="{'mail-entering':entranceActive}">
+  <section class="mail-page">
     <div class="mail-grid">
       <section class="card inbox-panel">
         <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击填入正文，双击查看原文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
@@ -475,11 +472,6 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 .result-form .wide { grid-column: 1 / -1; }
 .application-match{padding:12px;border:1px solid #dbe3f4;border-radius:10px;background:#f7f9ff}.application-match small{color:var(--color-muted-foreground);font-weight:400}
 .mail-grid { display: grid; min-height: 0; grid-template-columns: minmax(260px, .82fr) minmax(300px, 1fr) minmax(380px, 1.28fr); gap: 16px; padding-bottom: 18px; }
-.mail-entering :is(.inbox-panel,.compose-panel,.review-panel) { animation:mail-panel-brighten 360ms ease-out both; }
-.mail-entering .compose-panel { animation-delay:100ms; }
-.mail-entering .review-panel { animation-delay:200ms; }
-.mail-entering :is(.inbox-panel,.compose-panel,.review-panel):focus-within { animation:none; filter:none; }
-@keyframes mail-panel-brighten { from { filter:brightness(.76); } to { filter:brightness(1); } }
 .inbox-panel, .compose-panel, .review-panel { min-width: 0; min-height: 0; height: 100%; box-sizing: border-box; }
 .inbox-panel, .compose-panel { display: flex; flex-direction: column; }
 .review-panel { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }

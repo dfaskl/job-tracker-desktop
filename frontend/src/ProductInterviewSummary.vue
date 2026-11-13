@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { api } from './api'
 import { notifyInterviewSummaryUpdated, summarizeInterviewReviewsStream } from './interviewSummary'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
@@ -28,9 +28,7 @@ const mobileTopicMenuOpen = ref(false)
 const mobileTopicMenuLevel = ref<1 | 2>(1)
 const reviewsCollapsed = ref(false)
 const workbenchScroll = ref<HTMLElement | null>(null)
-const pageEntered = ref(false)
 let autoAttemptedKey = ''
-let pageEnterFrame = 0
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
 const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
@@ -127,21 +125,6 @@ async function onSummarizeClick() {
 }
 
 function activate() { void store.refresh(false, false, false).then(() => loadState()) }
-function startPageEntrance() {
-  pageEntered.value = false
-  if (pageEnterFrame) cancelAnimationFrame(pageEnterFrame)
-  void nextTick(() => {
-    pageEnterFrame = requestAnimationFrame(() => {
-      pageEntered.value = true
-      pageEnterFrame = 0
-    })
-  })
-}
-function stopPageEntrance() {
-  if (pageEnterFrame) cancelAnimationFrame(pageEnterFrame)
-  pageEnterFrame = 0
-  pageEntered.value = false
-}
 async function openReview(id: string) {
   selectedReviewId.value = id
   await nextTick()
@@ -178,9 +161,8 @@ async function chooseMobileTopic(key: string) {
   await selectTopic(key)
   mobileTopicMenuOpen.value = false
 }
-onActivated(() => { startPageEntrance(); activate() })
-onDeactivated(() => { stopPageEntrance(); closeReview() })
-onBeforeUnmount(stopPageEntrance)
+onActivated(activate)
+onDeactivated(closeReview)
 watch(reviewSignature, (next, previous) => { if (previous && next !== previous) void loadState() })
 watch(topicEntries, entries => {
   if (!entries.some(item => item.key === selectedTopicKey.value)) selectedTopicKey.value = entries[0]?.key || ''
@@ -217,11 +199,11 @@ watch(topicEntries, entries => {
         </div>
       </div>
     </nav>
-    <div class="summary-columns" :class="{ 'is-entered': pageEntered, 'reviews-collapsed': reviewsCollapsed }">
+    <div class="summary-columns" :class="{ 'reviews-collapsed': reviewsCollapsed }">
       <section id="review-list-panel" class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
-          <ol v-else class="review-list"><li v-for="(item, index) in reviews" :key="item.event.id"><button type="button" class="review-card" :style="{ '--review-index': index }" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
+          <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
       <div class="review-collapse-divider" aria-hidden="false"><button type="button" class="review-collapse-toggle" :aria-expanded="!reviewsCollapsed" aria-controls="review-list-panel" :aria-label="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" :title="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" @click="reviewsCollapsed = !reviewsCollapsed"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12 4-6 6 6 6" /></svg></button></div>
       <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
@@ -237,7 +219,7 @@ watch(topicEntries, entries => {
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
         <div v-if="hasResume" ref="workbenchScroll" class="pane-scroll workbench-content">
-          <Transition name="workbench-flip" mode="out-in"><div :key="activeTopicKind" class="workbench-page">
+          <div class="workbench-page">
           <section v-if="summarizing" class="stream-preview" aria-label="实时生成的复习内容">
             <div class="stream-status" role="status" aria-live="polite" aria-atomic="true"><span class="stream-spinner" aria-hidden="true"></span><span>{{ streamingStatus }}</span><span v-if="streamingQuestions.length" class="stream-count">已生成 {{ streamingQuestions.length }} 题</span></div>
             <div v-if="streamingBatch" class="batch-progress" role="progressbar" :aria-label="`当前第 ${streamingBatch.current} 批，共 ${streamingBatch.total} 批`" :aria-valuemin="1" :aria-valuemax="streamingBatch.total" :aria-valuenow="streamingBatch.current"><span class="batch-progress-label">第 {{ streamingBatch.current }} 批 / 共 {{ streamingBatch.total }} 批</span><span class="batch-progress-track" aria-hidden="true"><span :style="{ width: `${streamingBatch.percent}%` }"></span></span></div>
@@ -246,9 +228,9 @@ watch(topicEntries, entries => {
           </section>
           <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
           <p v-else-if="(!summary || summary.stale) && !summarizing" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
-          <Transition v-else-if="selectedTopic" name="topic-detail-zoom" mode="out-in"><div :key="selectedTopic.key" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div></Transition>
+          <div v-else-if="selectedTopic" :key="selectedTopic.key" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
           <p v-else-if="!summarizing" class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
-          </div></Transition>
+          </div>
         </div>
       </section>
     </div>
@@ -348,7 +330,7 @@ watch(topicEntries, entries => {
   .summary-pane.mobile-pane-active{display:flex}
 }
 /* Keep reviews beside one unified topic workspace; only the workspace body scrolls. */
-.summary-columns{position:relative;grid-template-columns:minmax(240px,.78fr) 38px minmax(0,2fr);gap:0;transition:grid-template-columns .42s cubic-bezier(.2,.78,.2,1)}
+.summary-columns{position:relative;grid-template-columns:minmax(240px,.78fr) 38px minmax(0,2fr);gap:0;}
 .summary-columns.reviews-collapsed{grid-template-columns:38px minmax(0,1fr)}
 .review-column{transition:opacity .2s ease,transform .35s cubic-bezier(.2,.78,.2,1)}
 .reviews-collapsed .review-column{display:none}
@@ -415,21 +397,6 @@ watch(topicEntries, entries => {
 .stream-waiting{padding:14px 4px;color:var(--color-muted-foreground);font-size:13px;line-height:1.7}
 .stream-question-list{display:grid;gap:14px;margin:14px 0 0;padding:0;list-style:none}
 @keyframes interview-stream-spin{to{transform:rotate(360deg)}}
-@keyframes interview-pane-enter-left{from{transform:translateX(-52px) scale(.975)}to{transform:translateX(0) scale(1)}}
-@keyframes interview-pane-enter-right{from{transform:translateX(52px) scale(.975)}to{transform:translateX(0) scale(1)}}
-.summary-columns.is-entered .review-card{animation:interview-review-card-enter .56s cubic-bezier(.2,.72,.25,1) both;animation-delay:calc(var(--review-index,0)*280ms)}
-.summary-columns.is-entered .workbench-column{animation:interview-pane-enter-right .4s cubic-bezier(.2,.75,.25,1) .06s both}
-@keyframes interview-review-card-enter{0%{transform:translateY(20px) scale(.97);opacity:.04;filter:brightness(.42)}65%{opacity:.72;filter:brightness(.82)}100%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}}
-.topic-detail-zoom-enter-active,.topic-detail-zoom-leave-active{transition:transform .48s cubic-bezier(.2,.75,.25,1),opacity .48s ease;transform-origin:center center}
-.topic-detail-zoom-enter-from{transform:scale(.82);opacity:.15}
-.topic-detail-zoom-enter-to,.topic-detail-zoom-leave-from{transform:scale(1);opacity:1}
-.topic-detail-zoom-leave-to{transform:scale(.94);opacity:0}
-.workbench-flip-enter-active,.workbench-flip-leave-active{transition:transform .68s cubic-bezier(.35,.05,.25,1),opacity .56s ease;backface-visibility:hidden}
-.workbench-flip-enter-active{transform-origin:right center;transition-delay:.08s}
-.workbench-flip-leave-active{transform-origin:left center}
-.workbench-flip-enter-from{transform:rotateY(-76deg);opacity:0}
-.workbench-flip-enter-to,.workbench-flip-leave-from{transform:rotateY(0);opacity:1}
-.workbench-flip-leave-to{transform:rotateY(76deg);opacity:0}
 .topic-chip-enter-active,.topic-chip-leave-active,.topic-chip-move{transition:opacity .18s ease,transform .18s ease,border-color .18s ease,background-color .18s ease}
 .topic-chip-enter-from,.topic-chip-leave-to{opacity:0;transform:translateY(5px) scale(.98)}
 .topic-chip-leave-active{position:absolute}
@@ -443,7 +410,6 @@ watch(topicEntries, entries => {
   .review-collapse-divider{display:none}
   .summary-pane,.summary-pane+.summary-pane,.workbench-column{display:none;height:100%;padding:14px 0 0!important;border:0}
   .summary-pane.mobile-pane-active{display:flex}
-  .workbench-column.mobile-pane-active{animation:interview-pane-enter-right .32s cubic-bezier(.2,.75,.25,1) both}
   .workbench-header{padding-bottom:10px}
 }
 @media(max-width:620px){

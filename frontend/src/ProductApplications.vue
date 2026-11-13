@@ -14,10 +14,6 @@ const props = defineProps<{ focusApplicationId?: string }>()
 const query = ref('')
 const applicationGrid = ref<HTMLElement | null>(null)
 const highlightedApplicationId = ref('')
-const revealActive = ref(false)
-let revealObserver: IntersectionObserver | null = null
-let nextRevealStart = 0
-let focusFrame = 0
 let highlightTimer = 0
 let lastFocusedId = ''
 let pendingFocusId = ''
@@ -73,112 +69,94 @@ watch(store.applicationDetailRequest, request => {
 async function focusApplicationInList() {
   const id = props.focusApplicationId || ''
   if (!id || id === lastFocusedId || id === pendingFocusId) return
-  stopApplicationReveal()
   pendingFocusId = id
   query.value = ''
   stageFilter.value = '全部'
   selected.value = null
   await nextTick()
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
   const grid = applicationGrid.value
   const row = Array.from(grid?.querySelectorAll<HTMLElement>('[data-application-id]') || []).find(item => item.dataset.applicationId === id)
   if (!grid || !row || !row.isConnected || props.focusApplicationId !== id) { pendingFocusId = ''; return }
   lastFocusedId = id
   pendingFocusId = ''
-  cancelAnimationFrame(focusFrame)
   window.clearTimeout(highlightTimer)
   highlightedApplicationId.value = ''
 
   const innerScroll = grid.scrollHeight > grid.clientHeight + 2
-  const start = innerScroll ? (grid.scrollTop = 0) : (window.scrollTo(0, 0), window.scrollY)
-  const rowTop = row.getBoundingClientRect().top
-  const top = innerScroll
-    ? Math.max(0, Math.min(grid.scrollHeight - grid.clientHeight, rowTop - grid.getBoundingClientRect().top + grid.scrollTop - grid.clientHeight * .28))
-    : Math.max(0, rowTop + window.scrollY - window.innerHeight * .28)
-  const distance = Math.abs(top - start)
-  const duration = Math.min(1400, Math.max(650, distance * .28))
-  const started = performance.now()
-  function step(now: number) {
-    const progress = Math.min(1, (now - started) / duration)
-    const eased = progress < .5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
-    const position = start + (top - start) * eased
-    if (innerScroll) grid!.scrollTop = position
-    else window.scrollTo(0, position)
-    if (progress < 1) focusFrame = requestAnimationFrame(step)
-    else {
-      highlightedApplicationId.value = id
-      highlightTimer = window.setTimeout(() => { highlightedApplicationId.value = '' }, 1500)
-    }
+  if (innerScroll) {
+    grid.scrollTop += row.getBoundingClientRect().top - grid.getBoundingClientRect().top - grid.clientHeight * .28
+  } else {
+    window.scrollTo({ top: row.getBoundingClientRect().top + window.scrollY - window.innerHeight * .28, behavior: 'instant' })
   }
-  focusFrame = requestAnimationFrame(step)
+  highlightedApplicationId.value = id
+  highlightTimer = window.setTimeout(() => { highlightedApplicationId.value = '' }, 1500)
 }
-function stopApplicationReveal() {
-  revealObserver?.disconnect()
-  revealObserver = null
-  revealActive.value = false
-  applicationGrid.value?.querySelectorAll<HTMLElement>('.application-fade-in').forEach(card => {
-    card.classList.remove('application-fade-in')
-    card.style.removeProperty('--application-reveal-delay')
-  })
+const listTime = ref(Date.now())
+let listClock: number | undefined
+onActivated(() => {
+  companyLinksPageActive = true
+  companyLinksPollAttempts = 0
+  listTime.value = Date.now()
+  listClock = window.setInterval(() => { listTime.value = Date.now() }, 30_000)
+  void focusApplicationInList()
+  void loadCompanyLinks()
+})
+function stopApplicationView() {
+  window.clearInterval(listClock)
+  window.clearTimeout(highlightTimer)
+  highlightedApplicationId.value = ''
+  lastFocusedId = ''
+  pendingFocusId = ''
+  window.clearTimeout(companyLinksPollTimer)
+  companyLinksPollTimer = 0
+  companyLinksPageActive = false
 }
-function observeApplicationCards() {
-  const grid = applicationGrid.value
-  if (!grid || !revealObserver || !revealActive.value) return
-  revealObserver.disconnect()
-  grid.querySelectorAll<HTMLElement>('.application:not(.application-fade-in)').forEach(card => revealObserver?.observe(card))
-}
-async function startApplicationReveal() {
-  stopApplicationReveal()
-  if (props.focusApplicationId) return
-  revealActive.value = true
-  await nextTick()
-  const grid = applicationGrid.value
-  if (!grid || !revealActive.value || typeof IntersectionObserver === 'undefined') {
-    revealActive.value = false
-    return
-  }
-  const duration = 520
-  const interval = duration * .3
-  grid.style.setProperty('--application-reveal-duration', `${duration}ms`)
-  nextRevealStart = performance.now()
-  const scrollRoot = grid.scrollHeight > grid.clientHeight + 2 ? grid : null
-  revealObserver = new IntersectionObserver(entries => {
-    const cards = Array.from(grid.querySelectorAll('.application'))
-    const visible = entries.filter(entry => entry.isIntersecting)
-      .sort((left, right) => cards.indexOf(left.target) - cards.indexOf(right.target))
-    const now = performance.now()
-    nextRevealStart = Math.max(now, Math.min(nextRevealStart, now + duration))
-    visible.forEach(entry => {
-      const card = entry.target as HTMLElement
-      card.style.setProperty('--application-reveal-delay', `${Math.max(0, nextRevealStart - now)}ms`)
-      card.classList.add('application-fade-in')
-      nextRevealStart += interval
-      revealObserver?.unobserve(card)
-    })
-  }, { root: scrollRoot, threshold: .05 })
-  observeApplicationCards()
-}
-onActivated(() => { companyLinksPageActive = true; companyLinksPollAttempts = 0; window.addEventListener('resize', stopApplicationReveal); void startApplicationReveal(); void focusApplicationInList(); void loadCompanyLinks() })
-function stopFocusAnimation() { cancelAnimationFrame(focusFrame); window.clearTimeout(highlightTimer); highlightedApplicationId.value = ''; lastFocusedId = ''; pendingFocusId = '' }
-function stopCompanyLinksPolling() { window.clearTimeout(companyLinksPollTimer); companyLinksPollTimer = 0; companyLinksPageActive = false }
-onDeactivated(() => { stopCompanyLinksPolling(); window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
-onBeforeUnmount(() => { stopCompanyLinksPolling(); window.removeEventListener('resize', stopApplicationReveal); stopApplicationReveal(); stopFocusAnimation() })
+onDeactivated(stopApplicationView)
+onBeforeUnmount(stopApplicationView)
 
+const eventsByApplication = computed(() => {
+  const grouped = new Map<string, JobEvent[]>()
+  for (const event of store.events.value) {
+    const id = String(event.applicationId || '')
+    const group = grouped.get(id)
+    if (group) group.push(event)
+    else grouped.set(id, [event])
+  }
+  return grouped
+})
+const applicationRows = computed(() => {
+  const now = listTime.value
+  return store.applications.value.map(item => {
+    const events = eventsByApplication.value.get(item.id) ?? []
+    const tone = cardTone(item, events, now)
+    const applied = timeOf(item.appliedDate || item.createdAt)
+    let latest = -Infinity
+    let pending = Infinity
+    for (const event of events) {
+      const time = timeOf(eventDeadline(event))
+      if (time) latest = Math.max(latest, time)
+      if (tone !== 'offer' && tone !== 'stopped' && !event.completed && !event.missed && time >= now) {
+        pending = Math.min(pending, time)
+      }
+    }
+    return {
+      item, tone, applied, rank: currentStageRank(item),
+      pending, latest: Number.isFinite(latest) ? latest : applied,
+      searchText: Object.values(item).join(' ').toLowerCase(),
+      health: health(item, events, now),
+      nodes: flow(item, events, now),
+    }
+  }).sort((a,b) => (a.pending === b.pending ? 0 : a.pending - b.pending)
+    || a.rank - b.rank || b.latest - a.latest || b.applied - a.applied
+    || String(a.item.id).localeCompare(String(b.item.id), 'zh-CN'))
+})
 const filtered = computed(() => {
-  const keyword=query.value.trim().toLowerCase()
-  const inCurrentStage = store.applications.value.filter(item => stageFilter.value==='全部'||applicationCategory(item)===stageFilter.value)
-  return inCurrentStage.filter(item => !keyword || Object.values(item).join(' ').toLowerCase().includes(keyword))
-    .sort(compareApplications)
+  const keyword = query.value.trim().toLowerCase()
+  const category = applicationCategories.find(entry => entry.label === stageFilter.value)
+  return applicationRows.value.filter(row => (!category || row.tone === category.tone)
+    && (!keyword || row.searchText.includes(keyword)))
 })
-watch(filtered, () => {
-  if (!revealActive.value) return
-  void nextTick(() => {
-    if (!applicationGrid.value) stopApplicationReveal()
-    else observeApplicationCards()
-  })
-})
-watch([query, stageFilter], stopApplicationReveal)
-watch([() => props.focusApplicationId, () => filtered.value.some(item => item.id === props.focusApplicationId)], ([id, found]) => {
+watch([() => props.focusApplicationId, () => filtered.value.some(row => row.item.id === props.focusApplicationId)], ([id, found]) => {
   if (!id) { lastFocusedId = ''; return }
   if (found) void focusApplicationInList()
 }, { immediate: true })
@@ -202,15 +180,23 @@ const applicationHeatCells=computed(()=>{
   return Array.from({length:42},(_,index)=>{const date=new Date(first);date.setDate(first.getDate()+index);const key=applicationDateKey(date),count=counts.get(key)||0;return{key,count,inMonth:date.getMonth()===month,level:count?Math.max(1,Math.ceil(count/maximum*4)):0}})
 })
 watch(applicationMonthBounds,bounds=>{applicationHeatMonth.value=clampApplicationMonth(applicationHeatMonth.value,bounds)},{immediate:true})
-const selectedEvents = computed(() => selected.value ? store.events.value.filter(event=>event.applicationId===selected.value?.id).slice().sort((a,b)=>eventRecordTime(a).localeCompare(eventRecordTime(b))) : [])
+const selectedEvents = computed(() => selected.value ? (eventsByApplication.value.get(selected.value.id) ?? []).slice().sort((a,b)=>eventRecordTime(a).localeCompare(eventRecordTime(b))) : [])
 const selectedTimeline = computed(() => Array.isArray(selected.value?.timeline) ? selected.value.timeline as Record<string,unknown>[] : [])
-const flowSlots = computed(() => Math.max(1, ...filtered.value.map(item => flow(item).length)))
+const flowSlots = computed(() => Math.max(1, ...filtered.value.map(row => row.nodes.length)))
 const officialMatches = computed(() => {
   const key=normalizeCompanyName(form.company)
   if(!key)return []
   return companyLinks.value.map(item=>{const itemKey=normalizeCompanyName(item.company),exact=itemKey===key;return{...item,exact,related:exact||itemKey.includes(key)||key.includes(itemKey)}}).filter(item=>item.related&&item.url).sort((a,b)=>Number(b.exact)-Number(a.exact)||a.company.localeCompare(b.company,'zh-CN')).slice(0,8)
 })
-function companyDirectoryEntry(company:unknown){const key=normalizeCompanyName(company);return companyLinks.value.find(item=>normalizeCompanyName(item.company)===key)}
+const companyDirectory = computed(() => {
+  const entries = new Map<string, CompanyDirectoryEntry>()
+  for (const item of companyLinks.value) {
+    const key = normalizeCompanyName(item.company)
+    if (!entries.has(key)) entries.set(key, item)
+  }
+  return entries
+})
+function companyDirectoryEntry(company: unknown) { return companyDirectory.value.get(normalizeCompanyName(company)) }
 function companyIndustry(company:unknown){return companyDirectoryEntry(company)?.industry||''}
 function companyIndustryLabel(company:unknown){const entry=companyDirectoryEntry(company);return entry?.industry||(entry?.industryStatus==='pending'?'识别中':entry?.industryStatus==='failed'?'分类失败':'')}
 function companyIndustryClass(company:unknown){return {pending:!companyIndustry(company)&&companyDirectoryEntry(company)?.industryStatus==='pending',failed:!companyIndustry(company)&&companyDirectoryEntry(company)?.industryStatus==='failed'}}
@@ -241,16 +227,25 @@ function stageCategory(item:JobApplication){if(item.stage==='已结束'||['未�
 function eventDeadline(item:Record<string,unknown>){return String(item.endsAt||item.end||item.startsAt||item.start||item.date||'')}
 function eventOccurrenceTime(item:Record<string,unknown>){return String(item.startsAt||item.start||item.date||item.at||'')}
 function eventRecordTime(item:Record<string,unknown>){return eventOccurrenceTime(item)}
-function health(item:JobApplication){
-  const progress=applicationProgressHealth(item,store.events.value)
+function health(item: JobApplication, events: JobEvent[], now: number) {
+  const progress = applicationProgressHealth(item, events, now)
   if(!progress)return null
   const days=progress.days
   return {days,label:days<=7?'进展正常':days<=21?'等待较久':'建议确认',tone:days<=7?'good':days<=21?'watch':'risk'}
 }
-function cardTone(item:JobApplication){if(item.stage==='Offer'||item.status==='已通过')return 'offer';if(stageCategory(item)==='已结束')return 'stopped';const events=store.events.value.filter(e=>e.applicationId===item.id&&!e.completed&&!e.missed&&!e.abandoned);if(events.some(e=>new Date(eventDeadline(e).replace(' ','T')).getTime()>=Date.now()))return 'pending';if(item.stage==='面试')return 'interview';if(['测评','笔试'].includes(String(item.stage)))return 'assessment';return 'applied'}
-function applicationCategory(item:JobApplication){const tone=cardTone(item);return applicationCategories.find(category=>category.tone===tone)?.label||'仅投递'}
+function cardTone(item: JobApplication, events: JobEvent[], now: number) {
+  if (item.stage === 'Offer' || item.status === '已通过') return 'offer'
+  if (stageCategory(item) === '已结束') return 'stopped'
+  if (events.some(event => !event.completed && !event.missed && !event.abandoned
+    && timeOf(eventDeadline(event)) >= now)) return 'pending'
+  if (item.stage === '面试') return 'interview'
+  return item.stage === '测评' || item.stage === '笔试' ? 'assessment' : 'applied'
+}
 function timeOf(value:unknown){const time=new Date(String(value||'').replace(' ','T')).getTime();return Number.isFinite(time)?time:0}
-function hasInterviewProgress(item:JobApplication){return ['面试','Offer'].includes(String(item.stage))||item.status==='已通过'||store.events.value.some(event=>event.applicationId===item.id&&!event.abandoned&&(isFormalInterview(event)||event.type==='Offer'))}
+function hasInterviewProgress(item: JobApplication, events: JobEvent[]) {
+  return ['面试', 'Offer'].includes(String(item.stage)) || item.status === '已通过'
+    || events.some(event => !event.abandoned && (isFormalInterview(event) || event.type === 'Offer'))
+}
 function currentStageRank(item:JobApplication){
   const stage=stageCategory(item)
   if(stage==='Offer')return 0
@@ -259,48 +254,19 @@ function currentStageRank(item:JobApplication){
   if(stage==='仅投递')return 3
   return 4
 }
-function latestScheduleTime(item:JobApplication){
-  const scheduleTimes=store.events.value
-    .filter(event=>event.applicationId===item.id)
-    .map(event=>timeOf(eventDeadline(event)))
-    .filter(Boolean)
-  return scheduleTimes.length?Math.max(...scheduleTimes):timeOf(item.appliedDate||item.createdAt)
-}
-function pendingScheduleTime(item:JobApplication){
-  if(item.stage==='Offer'||item.status==='已通过'||stageCategory(item)==='已结束')return Infinity
-  const now=Date.now()
-  const pendingTimes=store.events.value
-    .filter(event=>event.applicationId===item.id&&!event.completed&&!event.missed)
-    .map(event=>timeOf(eventDeadline(event)))
-    .filter(time=>time>=now)
-  return pendingTimes.length?Math.min(...pendingTimes):Infinity
-}
-function compareApplications(a:JobApplication,b:JobApplication){
-  const aPendingTime=pendingScheduleTime(a),bPendingTime=pendingScheduleTime(b)
-  const aPending=Number.isFinite(aPendingTime),bPending=Number.isFinite(bPendingTime)
-  if(aPending!==bPending)return aPending?-1:1
-  if(aPending&&bPending&&aPendingTime!==bPendingTime)return aPendingTime-bPendingTime
-  const stageDifference=currentStageRank(a)-currentStageRank(b)
-  if(stageDifference)return stageDifference
-  const scheduleDifference=latestScheduleTime(b)-latestScheduleTime(a)
-  if(scheduleDifference)return scheduleDifference
-  const appliedDifference=timeOf(b.appliedDate||b.createdAt)-timeOf(a.appliedDate||a.createdAt)
-  if(appliedDifference)return appliedDifference
-  return String(a.id).localeCompare(String(b.id),'zh-CN')
-}
 function flowVisual(label:unknown,type:unknown=''){const value=`${type||''} ${label||''}`;if(/未通过|错过|放弃/.test(value))return{style:'failed',icon:'×'};if(/Offer|录用|通过/.test(value))return{style:'offer',icon:'★'};if(value.includes('测评'))return{style:'assessment',icon:'◇'};if(value.includes('笔试'))return{style:'test',icon:'✎'};if(/面试|[一二三四五六七八九]面|HR/.test(value))return{style:'interview',icon:'◎'};if(value.includes('电话'))return{style:'phone',icon:'☎'};if(value.includes('等待'))return{style:'waiting',icon:'◷'};if(value.includes('投递'))return{style:'applied',icon:'↗'};return{style:'other',icon:'＋'}}
 function eventFlowDate(item:Record<string,unknown>){const start=eventOccurrenceTime(item),end=String(item.endsAt||item.end||'');return end?`${start.slice(0,10)} 至 ${end.slice(0,10)}`:start.slice(0,10)}
-function flow(item:JobApplication){
-  const events=store.events.value.filter(e=>e.applicationId===item.id).slice().sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
+function flow(item: JobApplication, relatedEvents: JobEvent[], now: number) {
+  const events = relatedEvents.slice().sort((a,b)=>eventDeadline(a).localeCompare(eventDeadline(b)))
   const applied=flowVisual('已投递')
   const nodes=[{label:'已投递',at:String(item.appliedDate||''),kind:events.length||item.stage!=='已投递'?'done':'current',abandoned:false,...applied}]
   events.forEach(event=>{
     const abandoned=Boolean(event.abandoned||(!event.completed&&item.status==='已放弃'))
-    const deadline=timeOf(eventDeadline(event)),kind=abandoned?'abandoned':event.missed?'failed':event.completed?'done':deadline>Date.now()?'upcoming':'current'
+    const deadline=timeOf(eventDeadline(event)),kind=abandoned?'abandoned':event.missed?'failed':event.completed?'done':deadline>now?'upcoming':'current'
     const title=String(event.title||event.type||'日程')
     nodes.push({label:abandoned?`${title}（已放弃）`:title,at:eventFlowDate(event),kind,abandoned,...flowVisual(event.title||event.type,event.type)})
   })
-  const last=nodes[nodes.length-1],latest=events[events.length-1],latestPending=latest&&!latest.completed&&!latest.missed,terminal=['未通过','已放弃','已结束'].includes(String(item.status||'')),offer=item.stage==='Offer'||item.status==='已通过',enteredInterview=hasInterviewProgress(item)
+  const last=nodes[nodes.length-1],latest=events[events.length-1],latestPending=latest&&!latest.completed&&!latest.missed,terminal=['未通过','已放弃','已结束'].includes(String(item.status||'')),offer=item.stage==='Offer'||item.status==='已通过',enteredInterview=hasInterviewProgress(item, events)
   let statusLabel=offer?'Offer':terminal?String(item.status):String(item.status||'')
   if(statusLabel==='等待结果'&&!enteredInterview)statusLabel=''
   if(statusLabel&&statusLabel!==last.label&&!(statusLabel==='等待结果'&&latestPending)){nodes.push({label:statusLabel,at:offer?'':'当前状态',kind:offer?'success':terminal?'failed':'current',abandoned:false,...flowVisual(statusLabel)})}
@@ -459,10 +425,10 @@ async function removeEvent(item:JobEvent){
   </div>
 </Teleport>
 <section class="card workspace">
-  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :class="{ 'application-revealing': revealActive }">
-    <button v-for="item in filtered" :key="item.id" :data-application-id="item.id" class="application" :class="[`tone-${cardTone(item)}`, { 'application-arrival': highlightedApplicationId === item.id }]" @click="selected=item">
-      <div class="application-overview"><div class="application-title"><strong>{{text(item.company,'未填写公司')}}</strong><span v-if="companyIndustryLabel(item.company)" class="industry-tag" :class="companyIndustryClass(item.company)">{{companyIndustryLabel(item.company)}}</span><i>·</i><span>{{text(item.position,'未填写岗位')}}</span><span v-if="companySalaryLabel(item.company,item.position)" class="salary-tag" :title="companySalaryTitle(item.company,item.position)">{{companySalaryLabel(item.company,item.position)}}</span><i>·</i><small>{{text(item.city,'地点未填')}}</small><i>·</i><small>{{text(item.channel,'渠道未填')}}</small></div><span v-if="String(item.notes||'').trim()" class="application-note" :title="text(item.notes)"><b>备注：</b>{{text(item.notes)}}</span><em v-if="health(item)" :class="`health-${health(item)?.tone}`">{{health(item)?.label}} · {{health(item)?.days}}天</em></div>
-      <div class="flow" :style="{'--flow-slots':flowSlots}" aria-label="投递流程"><span v-for="(node,index) in flow(item)" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
+  <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :style="{ '--flow-slots': flowSlots }">
+    <button v-for="row in filtered" :key="row.item.id" v-memo="[row, companyLinks, highlightedApplicationId === row.item.id]" :data-application-id="row.item.id" class="application" :class="[`tone-${row.tone}`, { 'application-arrival': highlightedApplicationId === row.item.id }]" @click="selected=row.item">
+      <div class="application-overview"><div class="application-title"><strong>{{text(row.item.company,'未填写公司')}}</strong><span v-if="companyIndustryLabel(row.item.company)" class="industry-tag" :class="companyIndustryClass(row.item.company)">{{companyIndustryLabel(row.item.company)}}</span><i>·</i><span>{{text(row.item.position,'未填写岗位')}}</span><span v-if="companySalaryLabel(row.item.company,row.item.position)" class="salary-tag" :title="companySalaryTitle(row.item.company,row.item.position)">{{companySalaryLabel(row.item.company,row.item.position)}}</span><i>·</i><small>{{text(row.item.city,'地点未填')}}</small><i>·</i><small>{{text(row.item.channel,'渠道未填')}}</small></div><span v-if="String(row.item.notes||'').trim()" class="application-note" :title="text(row.item.notes)"><b>备注：</b>{{text(row.item.notes)}}</span><em v-if="row.health" :class="`health-${row.health?.tone}`">{{row.health?.label}} · {{row.health?.days}}天</em></div>
+      <div class="flow" aria-label="投递流程"><span v-for="(node,index) in row.nodes" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
     </button>
   </div>
   <p v-else-if="store.user.value" class="empty">没有符合条件的投递记录。</p><p v-else>登录后查看和管理投递。</p>
@@ -550,14 +516,14 @@ async function removeEvent(item:JobEvent){
 .application-overview{display:flex;align-items:center;justify-content:space-between;gap:18px}.application-title{display:flex;align-items:center;flex-wrap:wrap;row-gap:4px;color:var(--color-muted-foreground);font-size:13px}.application-title strong{color:var(--color-foreground);font-size:16px}.application-title>span{color:#526159}.application-title>i{margin:0 9px;color:#a0aaa4;font-style:normal}.application-title>small{color:var(--color-muted-foreground);font-size:13px}.application-overview>em{flex:0 0 auto;padding:4px 7px;border-radius:999px;font-size:11px;font-style:normal}.health-good{color:#167647;background:#e9f8ef}.health-watch{color:#8a5608;background:#fff3d6}.health-risk{color:#a52d2d;background:#fceaea}.application.tone-pending{border-left:5px solid #d89226}.application.tone-interview{border-left:5px solid #7a60d1}.application.tone-assessment{border-left:5px solid #4382c4}.application.tone-offer{border-left:5px solid #248459}.application.tone-stopped{border-left:5px solid #a5acb9}.flow{display:grid!important;grid-template-columns:repeat(var(--flow-slots,1),minmax(76px,1fr));align-items:flex-start;min-width:0;margin-top:17px;padding:2px 3px 4px;overflow-x:auto}.flow-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid!important;width:100%;min-width:76px;justify-items:center;gap:0!important;text-align:center}.flow-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 15px);top:14px;width:calc(100% - 30px);height:2px;border-radius:99px;background:#dce3df}.flow-node>i{position:relative;z-index:1;display:grid;width:30px;height:30px;place-items:center;padding:0!important;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:10px;background:var(--node-soft)!important;color:var(--node-color)!important;font:800 16px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 4px #eef6ff,0 3px 8px color-mix(in srgb,var(--node-color) 16%,transparent)}.flow-node>b{max-width:124px;margin-top:7px;padding:0!important;overflow:hidden;background:none!important;color:var(--node-color)!important;font-size:13px!important;text-overflow:ellipsis;white-space:nowrap}.flow-node>small{margin-top:3px;color:var(--color-muted-foreground);font-size:11px;white-space:nowrap}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.flow-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:14px;height:14px;place-items:center;border:2px solid #eef6ff;border-radius:50%;background:var(--node-color);color:#fff;font-size:9px}.flow-node.done>i{opacity:.82}.flow-node.current>i,.flow-node.upcoming>i{border-color:var(--node-color);box-shadow:0 0 0 4px #eef6ff,0 0 0 6px color-mix(in srgb,var(--node-color) 13%,transparent),0 5px 12px color-mix(in srgb,var(--node-color) 20%,transparent)}.flow-node.upcoming>i{border-style:dashed}.flow-node.failed>i,.flow-node.success>i{background:var(--node-color)!important;color:#fff!important}.official{display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;color:var(--color-card-foreground);background:var(--color-muted);text-decoration:none}.head,.toolbar,.detail-head,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.head span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.1em}.head h2{margin:4px 0}.toolbar{margin:18px 0}.toolbar input{flex:1}.toolbar select{width:150px}.secondary{color:var(--color-card-foreground);background:var(--color-muted)}.grid{display:grid;grid-template-columns:1fr;gap:12px}.application{display:block;padding:17px 21px 16px;color:var(--color-foreground);border:1px solid #b9d3fa;background:#eef6ff;text-align:left}.badges{display:flex;gap:7px}.badges b,.badges i{padding:5px 8px;border-radius:999px;background:#edf1ff;color:#3d55bd;font-size:12px;font-style:normal}.application i,.badges i{color:var(--color-muted-foreground);background:#eef2f6}.backdrop{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:rgba(17,24,39,.58)}.modal{position:relative;width:min(760px,100%);max-height:90vh;overflow:auto;padding:28px;border-radius:18px;background:#fff}.close{position:absolute;top:12px;right:12px;padding:4px 11px;color:var(--color-muted-foreground);background:#eef2f6;font-size:22px}.detail-head{padding-right:35px}.detail-head h2{margin:0}.actions{justify-content:flex-start;flex-wrap:wrap;margin:18px 0}.ai-button{background:#6b4fd3}.ai-review{padding:12px;border-radius:10px;background:#f4f1ff}.ai-review p{margin:4px 0;color:#476050;font-size:12px}.ai-review .warn{color:#8a5608}.offer{background:var(--color-success)}.abandon{background:#c47a1b}.reject,.danger-button{background:var(--color-destructive)}dl{display:grid;grid-template-columns:1fr 1fr;gap:10px}dl div{padding:12px;border-radius:10px;background:#f7f9fc}dl .wide,.form .wide{grid-column:1/-1}dt{color:var(--color-muted-foreground);font-size:11px}dd{margin:5px 0 0;white-space:pre-wrap}.timeline{display:grid;gap:8px}.timeline article{display:grid;gap:4px;padding:11px;border-left:3px solid #8396e9;background:#f7f9fc}.timeline span{color:var(--color-muted-foreground);font-size:12px}.form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form h2{grid-column:1/-1}.form label{display:grid;gap:7px;color:var(--color-muted-foreground);font-size:13px;font-weight:700}.form select,.form textarea{width:100%;padding:12px 14px;border:1px solid #d4dbea;border-radius:10px;background:#fff;font:inherit}.official-link-field{padding:14px;border:1px solid #d9e2ef;border-radius:12px;background:#f7f9fc}.official-link-field>span{display:flex;align-items:center;justify-content:space-between;gap:12px}.official-link-field>span small,.official-link-field>small{color:#758196;font-size:11px;font-weight:500}.official-link-field input{width:100%}.feedback{position:sticky;bottom:16px;z-index:20;margin:14px auto;padding:12px 16px;border-radius:12px;color:#167647;background:#e9f8ef;box-shadow:0 8px 30px rgba(0,0,0,.12)}.feedback.danger{color:#a52d2d;background:#fceaea}.feedback button{margin-left:12px;padding:7px 11px}.empty{color:var(--color-muted-foreground)}.application-toolbar-portal{display:grid;width:100%;min-width:0;align-content:center}.application-toolbar-portal .head span{font-size:9px}.application-toolbar-portal .head h2{margin:0;font-size:17px}.application-toolbar-portal .toolbar{margin:4px 0}.application-toolbar-portal .toolbar input,.application-toolbar-portal .toolbar select{padding:8px 11px}.application-toolbar-portal .toolbar button{padding:8px 13px}.application-toolbar-portal .application-legend{margin:1px 2px 0}.application-filter-stack{width:fit-content;max-width:100%;min-width:0;flex:0 1 auto}.application-filter-fields{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px}.application-filter-fields input,.application-filter-fields select{width:100%;height:38px;min-width:0;padding:0 12px;border:1px solid #cbd5e1;border-radius:9px;outline:none;color:#25324a;background:#fff;font:inherit;font-size:13px;line-height:38px;box-shadow:0 1px 2px rgba(31,48,78,.04);transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}.application-filter-fields :deep(.select-trigger){height:38px}
 .application-filter-fields input::placeholder{color:#8b96a8}.application-filter-fields select{padding:0 34px;appearance:none;text-align:center;text-align-last:center;line-height:normal;background-color:#fff;background-image:linear-gradient(45deg,transparent 50%,#65728a 50%),linear-gradient(135deg,#65728a 50%,transparent 50%);background-position:calc(100% - 16px) 16px,calc(100% - 11px) 16px;background-repeat:no-repeat;background-size:5px 5px;cursor:pointer}.application-filter-fields select option{text-align:center}.application-filter-fields input:hover,.application-filter-fields select:hover{border-color:#9eacc1;background-color:#fbfcff}.application-filter-fields input:focus,.application-filter-fields select:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(82,109,221,.13)}.application-toolbar-portal .toolbar{align-items:flex-start}.application-filter-stack .application-legend{width:100%;justify-content:flex-start}.application-heatmap{display:flex;min-width:225px;align-items:center;justify-content:flex-end;gap:12px;padding-left:14px;border-left:1px solid #d9e0eb}.heatmap-grid{display:grid;grid-template-columns:repeat(7,8px);grid-template-rows:repeat(6,8px);gap:2px}.heatmap-grid i{width:8px;height:8px;border-radius:2px;background:#e8edf5}.heatmap-grid i.outside{opacity:.28}.heatmap-grid i.level-1{background:#cddcff}.heatmap-grid i.level-2{background:#94b5f4}.heatmap-grid i.level-3{background:#5d8ddd}.heatmap-grid i.level-4{background:#2e61b5}.heatmap-controls{display:grid;min-width:82px;gap:7px;justify-items:center}.heatmap-controls strong{color:var(--color-card-foreground);font-size:12px;white-space:nowrap}.heatmap-controls>div{display:flex;gap:5px}.heatmap-controls button{display:flex;width:26px;height:24px;align-items:center;justify-content:center;padding:0;border:1px solid #ccd6e6;border-radius:7px;color:#42526c;background:#f6f8fc;font-size:16px}.heatmap-controls button>span{display:block;width:12px;height:16px;transform:translateY(-1px);font-family:Arial,sans-serif;font-size:17px;font-weight:700;line-height:16px;text-align:center}.heatmap-controls button:disabled{cursor:not-allowed;opacity:.3}.workspace{margin-top:12px!important}.application-legend{display:flex;align-items:center;gap:15px;margin:0 2px 10px;padding:0 4px;overflow-x:auto;color:var(--color-muted-foreground);font-size:11px;line-height:1.4;scrollbar-width:none;white-space:nowrap}.application-legend::-webkit-scrollbar{display:none}.application-legend .legend-title{padding-right:2px;color:#8a94a3;font-size:10px;font-weight:700;letter-spacing:.04em}.application-legend>span{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}.application-legend i{width:9px;height:9px;flex:0 0 9px;border:1px solid transparent;border-radius:3px}.application-legend .pending{background:#4b87cf;border-color:#3774bc}.application-legend .interview{background:#8b6cc7;border-color:#7657b3}.application-legend .assessment{background:#dc9b32;border-color:#c5841e}.application-legend .applied{background:#8b9891;border-color:#74827b}.application-legend .stopped{background:#d5665e;border-color:#bd5049}.application-legend .offer{background:#35b870;border-color:#249d5b}
 .application{--card-bg:#f7f8f8;background:var(--card-bg);transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}.application.tone-pending{--card-bg:color-mix(in srgb,#4388d0 14%,#fff);border-color:color-mix(in srgb,#4388d0 38%,var(--color-border));border-left:5px solid #4388d0}.application.tone-interview{--card-bg:color-mix(in srgb,#8968c4 13%,#fff);border-color:color-mix(in srgb,#8968c4 37%,var(--color-border));border-left:5px solid #8968c4}.application.tone-assessment{--card-bg:color-mix(in srgb,#dc9629 14%,#fff);border-color:color-mix(in srgb,#dc9629 37%,var(--color-border));border-left:5px solid #dc9629}.application.tone-applied{--card-bg:color-mix(in srgb,#7f8e87 8%,#fff);border-color:color-mix(in srgb,#7f8e87 27%,var(--color-border));border-left:5px solid #7f8e87}.application.tone-stopped{--card-bg:color-mix(in srgb,#d45f57 13%,#fff);border-color:color-mix(in srgb,#d45f57 37%,var(--color-border));border-left:5px solid #d45f57}.application.tone-offer{--card-bg:color-mix(in srgb,#2eaf69 15%,#fff);border-color:color-mix(in srgb,#2eaf69 42%,var(--color-border));border-left:5px solid #2eaf69}.application:hover{box-shadow:0 7px 20px rgba(44,61,86,.1)}.application.tone-pending:hover{border-color:color-mix(in srgb,#4388d0 58%,var(--color-border))}.application.tone-interview:hover{border-color:color-mix(in srgb,#8968c4 56%,var(--color-border))}.application.tone-assessment:hover{border-color:color-mix(in srgb,#dc9629 55%,var(--color-border))}.application.tone-applied:hover{border-color:color-mix(in srgb,#7f8e87 43%,var(--color-border))}.application.tone-stopped:hover{border-color:color-mix(in srgb,#d45f57 56%,var(--color-border))}.application.tone-offer:hover{border-color:color-mix(in srgb,#27ad5d 46%,var(--color-border));box-shadow:0 8px 24px color-mix(in srgb,#45c878 13%,transparent)}.flow-node>i{box-shadow:0 0 0 4px var(--card-bg),0 3px 8px color-mix(in srgb,var(--node-color) 16%,transparent)}.flow-node.done>i::after{border-color:var(--card-bg)}.flow-node.current>i,.flow-node.upcoming>i{box-shadow:0 0 0 4px var(--card-bg),0 0 0 6px color-mix(in srgb,var(--node-color) 13%,transparent),0 5px 12px color-mix(in srgb,var(--node-color) 20%,transparent)}
-:global(#app .application){--card-border:#b9d3fa;--card-accent:#b9d3fa;border-color:var(--card-border);border-left-color:var(--card-accent);transition:transform .14s ease,box-shadow .14s ease;transform:translateY(0) scale(1)}
+:global(#app .application){--card-border:#b9d3fa;--card-accent:#b9d3fa;border-color:var(--card-border);border-left-color:var(--card-accent);transition:border-color 80ms ease-out, background-color 80ms ease-out}
 :global(#app .application.tone-pending){--card-border:color-mix(in srgb,#4388d0 38%,var(--color-border));--card-accent:#4388d0}
 :global(#app .application.tone-interview){--card-border:color-mix(in srgb,#8968c4 37%,var(--color-border));--card-accent:#8968c4}
 :global(#app .application.tone-assessment){--card-border:color-mix(in srgb,#dc9629 37%,var(--color-border));--card-accent:#dc9629}
 :global(#app .application.tone-applied){--card-border:color-mix(in srgb,#7f8e87 27%,var(--color-border));--card-accent:#7f8e87}
 :global(#app .application.tone-stopped){--card-border:color-mix(in srgb,#d45f57 37%,var(--color-border));--card-accent:#d45f57}
 :global(#app .application.tone-offer){--card-border:color-mix(in srgb,#2eaf69 42%,var(--color-border));--card-accent:#2eaf69}
-@media(hover:hover) and (pointer:fine){:global(#app .application:hover){border-color:var(--card-border);border-left-color:var(--card-accent);background-color:var(--card-bg);transform:translateY(2px) scale(.997);box-shadow:inset 0 2px 5px rgba(31,48,78,.1),0 1px 2px rgba(31,48,78,.05)}}
+@media(hover:hover) and (pointer:fine){:global(#app .application:hover){border-color:var(--card-border);border-left-color:var(--card-accent);background-color:var(--card-bg);box-shadow:0 2px 6px rgba(31,48,78,.08)}}
 :global(#app .application:active){border-color:var(--card-border);border-left-color:var(--card-accent);background-color:var(--card-bg);transform:translateY(3px) scale(.994);box-shadow:inset 0 3px 7px rgba(31,48,78,.14)}
 .detail-modal{width:min(1180px,calc(100vw - 48px));max-height:94vh;padding:32px;border-radius:18px}.detail-title{margin:0 0 34px;font-size:22px}.detail-company-row{display:flex;align-items:center;justify-content:space-between;gap:24px}.company-identity{min-width:0}.company-name-line{display:flex;align-items:center;gap:8px}.company-name-line>a{display:flex;min-width:0;align-items:center;gap:10px;color:var(--color-foreground);text-decoration:none}.company-name-line strong{font-size:25px}.company-name-line>a:hover strong{color:#315fb6}.company-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:50%;color:#315fb6;background:#e9f1ff;font-size:18px;font-weight:800}.company-name-line .official-link-edit{width:26px;min-width:26px;height:26px;min-height:26px;flex:0 0 26px;padding:0;border-radius:7px}.company-identity p{margin:8px 0 0;color:#596579;font-size:16px}.official-link-backdrop{z-index:60}.official-link-modal{display:grid;width:min(540px,100%);gap:16px}.official-link-modal h2,.official-link-modal p{margin:0}.official-link-modal label{display:grid;gap:7px;color:var(--color-muted-foreground);font-size:13px;font-weight:700}.official-link-modal input{width:100%}.official-link-modal .actions{margin:2px 0 0}.detail-actions{padding:18px 0;border-bottom:1px solid #d8e0eb}.detail-actions button{min-width:76px}.detail-actions .push-right{margin-left:auto}.section-heading{margin:26px 0 12px}.basic-info{padding:16px;border-radius:12px;background:var(--color-muted)}.basic-info>div{display:flex;align-items:center;gap:12px}.basic-info strong{color:var(--color-card-foreground);font-size:13px}.basic-info span{margin-right:12px;color:var(--color-muted-foreground)}.basic-info p{margin:15px 0 0;color:var(--color-muted-foreground)}.event-records{display:grid;gap:12px}.event-record{position:relative;display:grid;grid-template-columns:22px 105px minmax(0,1fr) auto;align-items:center;min-height:110px;padding:14px 16px 14px 0;border:1px solid var(--color-border);border-radius:13px;background:var(--color-card);box-shadow:var(--shadow-sm)}.event-rail{position:relative;align-self:stretch}.event-rail::before{content:"";position:absolute;left:7px;top:-27px;bottom:-27px;width:1px;background:var(--color-border)}.event-record:first-child .event-rail::before{top:50%}.event-record:last-child .event-rail::before{bottom:50%}.event-rail i{position:absolute;z-index:1;left:1px;top:50%;width:12px;height:12px;transform:translateY(-50%);border:2px solid var(--color-card);border-radius:50%;background:#3f75c5;box-shadow:0 0 0 1px #7ca1d8}.event-date{display:grid;gap:4px;padding-right:14px;border-right:1px solid var(--color-border)}.event-date strong{color:#2f63b3;font-size:17px}.event-date span{color:var(--color-muted-foreground);font-size:12px}.event-body{display:grid;min-width:0;gap:7px;padding:0 16px}.event-body>strong{font-size:15px}.event-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--color-muted-foreground);font-size:12px}.event-meta a{color:#205fc1}.event-meta b{padding:4px 8px;border:1px solid var(--color-border-strong);border-radius:8px;color:var(--color-card-foreground);background:var(--color-muted)}.event-meta i{font-style:normal;color:var(--color-muted-foreground)}.event-body p{margin:0;padding:7px 10px;border-radius:7px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:12px}.event-row-actions{display:flex;align-items:center;gap:8px}.event-row-actions button{padding:9px 12px}.event-row-actions .event-delete{color:#b83d36;background:var(--color-card);border:1px solid #e5b9b5}.history-list{display:grid;margin-left:8px}.history-list article{position:relative;display:flex;gap:18px;padding:4px 0 18px 20px;border-left:2px solid var(--color-border)}.history-list article:last-child{padding-bottom:4px}.history-list article>i{position:absolute;left:-7px;top:7px;width:12px;height:12px;border:2px solid var(--color-card);border-radius:50%;background:#5eb288}.history-list article>div{display:grid;gap:5px}.history-list article strong{font-size:14px}.history-list article span{color:var(--color-muted-foreground);font-size:12px}@media(min-width:721px) and (min-height:620px){.workspace{display:flex;height:calc(100vh - 108px);min-height:0;flex-direction:column;overflow:hidden}.workspace>.head,.workspace>.toolbar,.workspace>.application-legend{flex:0 0 auto}.workspace>.grid{min-height:0;flex:1 1 auto;align-content:start;grid-auto-rows:max-content;overflow-y:auto;overscroll-behavior:contain;padding:12px 7px 18px 2px;border-top:1px solid var(--color-border);scrollbar-width:thin;scrollbar-color:var(--color-border-strong) transparent}.workspace>.grid::-webkit-scrollbar{width:7px}.workspace>.grid::-webkit-scrollbar-track{background:transparent}.workspace>.grid::-webkit-scrollbar-thumb{border-radius:99px;background:var(--color-border-strong)}.workspace>.empty{min-height:0;flex:1 1 auto;padding-top:18px;border-top:1px solid var(--color-border)}}
 @media(max-width:720px){.application-toolbar-portal,.application-filter-stack{box-sizing:border-box;width:100%;max-width:100%;min-width:0}.application-toolbar-portal{overflow:visible}.application-toolbar-portal .toolbar{margin:4px 0 0}.application-filter-fields{width:100%;grid-template-columns:minmax(0,1fr)}.application-filter-fields>*{width:100%;max-width:100%;min-width:0}.application-filter-fields :deep(.base-select),.application-filter-fields :deep(.select-trigger){width:100%;max-width:100%;min-width:0}.application-heatmap{width:100%;min-width:0;justify-content:space-between;gap:16px;padding:12px 2px 2px;border-top:1px solid #d9e0eb;border-left:0}.application-legend{width:100%;max-width:100%;flex-wrap:wrap;gap:6px 12px;margin:9px 0 0;padding:0 2px 3px;overflow:visible;white-space:normal}.application-legend>span{white-space:nowrap}.toolbar{width:100%;max-width:100%;min-width:0;align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{min-width:0;grid-template-columns:1fr}.application{width:100%;min-width:0;padding:16px 14px}.application-overview{align-items:flex-start;flex-direction:column}.application-title{min-width:0}.application-title strong{font-size:15px}.application-title>i{margin-inline:5px}.flow{width:100%;max-width:100%;scroll-snap-type:x proximity}.flow-node{scroll-snap-align:start}.form .wide,dl .wide{grid-column:auto}.detail-modal{width:100%;padding:22px 16px}.detail-title{margin-bottom:24px}.detail-company-row{align-items:flex-start}.company-name-line strong{font-size:21px}.detail-actions .push-right{margin-left:0}.basic-info>div{align-items:flex-start;flex-direction:column;gap:5px}.event-record{grid-template-columns:16px 78px minmax(0,1fr);padding-right:10px}.event-body{padding:0 10px}.event-row-actions{grid-column:2/-1;justify-content:flex-end;margin-top:10px}.event-date strong{font-size:14px}}

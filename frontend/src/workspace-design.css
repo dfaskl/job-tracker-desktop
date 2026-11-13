@@ -143,7 +143,7 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 }
 
 /* Teleported dialogs use the same tokens as the workspace. */
-body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { background: rgb(15 18 30 / 55%); backdrop-filter: blur(3px); }
+body :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop) { background: rgb(15 18 30 / 55%); }
 body :is(.modal, .detail-modal, .link-modal, .edit-modal) { color: var(--color-foreground); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-card); box-shadow: var(--shadow-lg); font-family: var(--font-ui); }
 body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(input, textarea, select) { color: var(--color-foreground); border-color: var(--color-border); border-radius: 8px; background: var(--color-card); }
 body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-border-strong); font: inherit; font-size: 14px; }
@@ -167,7 +167,6 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
 #app dialog[class][open]::backdrop,
 #app :is(.backdrop, .modal-backdrop, .link-backdrop, .edit-backdrop)[class] {
   background: rgb(13 17 27 / 58%);
-  backdrop-filter: blur(4px);
 }
 #app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { color: var(--color-foreground); font-family: var(--font-ui); }
 #app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal) :is(p, small) { color: var(--color-muted-foreground); }
