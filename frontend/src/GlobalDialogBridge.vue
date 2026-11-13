@@ -12,6 +12,7 @@ watch(activeDialog, async request => {
     return
   }
   await nextTick()
+  if (activeDialog.value !== request) return
   if (!dialog.value?.open) dialog.value?.showModal()
   if (request.mode === 'prompt') {
     await nextTick()
@@ -40,7 +41,7 @@ function confirm() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="system-dialog" :class="`tone-${activeDialog?.tone || 'neutral'}`" :aria-labelledby="activeDialog ? 'system-dialog-title' : undefined" @close="cancel">
+  <dialog ref="dialog" class="system-dialog" :class="`tone-${activeDialog?.tone || 'neutral'}`" :aria-labelledby="activeDialog ? 'system-dialog-title' : undefined" @cancel.prevent="cancel">
     <form v-if="activeDialog" class="system-dialog-content" @submit.prevent="confirm">
       <div class="system-dialog-icon" aria-hidden="true"><AppIcon :name="activeDialog.tone === 'danger' ? 'trash' : activeDialog.tone === 'warning' ? 'info' : 'check'" :size="21" /></div>
       <div class="system-dialog-copy">

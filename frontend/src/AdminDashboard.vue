@@ -18,6 +18,7 @@ type UserBusinessData={user:{id:string;email:string};data:BusinessData}
 type Overview={currentUser:{id:string;email:string};summary:Summary;groups:InterviewGroup[];users:User[];usersTruncated:boolean;audit:Audit[]}
 const status=ref<AdminStatus|null>(null),overview=ref<Overview|null>(null),selected=ref<User|null>(null),detail=ref<UserDetails|null>(null)
 const query=ref(''),stateFilter=ref('all'),sortMode=ref('created-old'),loading=ref(false),busyUser=ref(''),error=ref(''),message=ref('')
+const expandedUserId = ref('')
 const registrationCode=ref('')
 const currentTime=ref(Date.now())
 let relativeClockTimer:number|undefined
@@ -136,7 +137,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
               <colgroup><col class="account-column"><col class="status-column"><col class="group-column"><col class="data-column"><col class="active-column"><col class="config-column"><col class="actions-column"></colgroup>
               <thead><tr><th scope="col">账号</th><th scope="col">状态</th><th scope="col">协作小组</th><th scope="col">业务数据</th><th scope="col">最近在线</th><th scope="col">配置</th><th scope="col" class="table-actions-heading">操作</th></tr></thead>
               <tbody>
-                <tr v-for="user in filteredUsers" :key="user.id" class="user-table-row" :class="{disabled:user.disabled}">
+                <tr v-for="user in filteredUsers" :key="user.id" class="user-table-row" :class="{disabled:user.disabled, 'user-row-expanded':expandedUserId===user.id}">
                   <td class="user-account-cell">
                     <span class="avatar"><img v-if="user.avatar" :src="user.avatar" alt=""><span v-else aria-hidden="true">{{(user.displayName||user.email).slice(0,1).toUpperCase()}}</span></span>
                     <div class="table-account-copy">
@@ -145,12 +146,14 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
                       <small class="user-email" :title="user.email">{{user.email}}</small>
                     </div>
                   </td>
-                  <td><span class="user-status" :class="user.isAdmin?'admin':user.disabled?'disabled':'enabled'">{{user.isAdmin?'管理员':user.disabled?'已停用':'正常'}}</span><small class="table-secondary">注册于 {{formatDate(user.createdAt)}}</small></td>
-                  <td><select class="table-group-select" :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></td>
-                  <td><span class="table-data-count"><b>{{user.applicationCount}}</b> 投递</span><span class="table-data-count"><b>{{user.eventCount}}</b> 日程</span></td>
-                  <td><span class="table-last-active" :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></td>
-                  <td><div v-if="missingUserSetup(user).length" class="table-missing-config"><span v-for="item in missingUserSetup(user)" :key="item">缺{{item}}</span></div><span v-else class="config-complete">完整</span></td>
-                  <td><div class="table-actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的原始 JSON'" title="导出原始 JSON" @click="downloadUserData(user,'raw')"><AppIcon name="database" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的规范 Excel'" title="导出规范 Excel" @click="downloadUserData(user,'readable')"><AppIcon name="file-spreadsheet" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div></td>
+                  <td class="user-status-cell"><span class="user-status" :class="user.isAdmin?'admin':user.disabled?'disabled':'enabled'">{{user.isAdmin?'管理员':user.disabled?'已停用':'正常'}}</span><small class="table-secondary">注册于 {{formatDate(user.createdAt)}}</small></td>
+                  <td class="user-group-cell"><select class="table-group-select" :value="user.groupId||''" :disabled="busyUser===user.id" :aria-label="'设置 '+user.email+' 的协作小组'" @change="assignGroupFromEvent(user,$event)"><option value="">未分组</option><option v-for="group in overview.groups" :key="group.id" :value="group.id">{{group.name}}</option></select></td>
+                  <td class="user-extra-cell"><span class="table-data-count"><b>{{user.applicationCount}}</b> 投递</span><span class="table-data-count"><b>{{user.eventCount}}</b> 日程</span></td>
+                  <td class="user-extra-cell"><span class="table-last-active" :title="'最后活跃：'+formatDate(user.lastActiveAt)">{{relativeDate(user.lastActiveAt)}}</span></td>
+                  <td class="user-extra-cell"><div v-if="missingUserSetup(user).length" class="table-missing-config"><span v-for="item in missingUserSetup(user)" :key="item">缺{{item}}</span></div><span v-else class="config-complete">完整</span></td>
+                  <td class="user-actions-cell">
+                    <button type="button" class="secondary user-row-more" :aria-expanded="expandedUserId===user.id" :aria-label="`${user.displayName || user.email} 的更多操作`" @click="expandedUserId=expandedUserId===user.id?'':user.id">{{expandedUserId===user.id?'收起':'更多'}}</button>
+                    <div class="table-actions"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'查看 '+user.email+' 的详情'" title="查看详情" @click="openDetails(user)"><AppIcon name="info" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的原始 JSON'" title="导出原始 JSON" @click="downloadUserData(user,'raw')"><AppIcon name="database" /></button><button type="button" class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'导出 '+user.email+' 的规范 Excel'" title="导出规范 Excel" @click="downloadUserData(user,'readable')"><AppIcon name="file-spreadsheet" /></button><template v-if="!user.isAdmin"><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="'让 '+user.email+' 下线'" title="撤销全部登录会话" @click="revokeSessions(user)"><AppIcon name="logout" /></button><button class="secondary icon-button" :disabled="busyUser===user.id" :aria-label="(user.disabled?'启用 ':'停用 ')+user.email" :title="user.disabled?'启用账号':'停用账号'" @click="setDisabled(user)"><AppIcon name="power" /></button><button class="danger-button icon-button" :disabled="busyUser===user.id" :aria-label="'删除账号 '+user.email" title="删除账号" @click="deleteUser(user)"><AppIcon name="trash" /></button></template></div></td>
                 </tr>
                 <tr v-if="!filteredUsers.length"><td colspan="7" class="empty">没有符合条件的用户</td></tr>
               </tbody>
@@ -477,4 +480,24 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
 .user-expanded .actions{justify-self:end;margin-right:46px}
 @media(max-width:720px){.user-summary{grid-template-columns:42px minmax(0,1fr) auto 24px}.group-pill{max-width:110px}.user-expanded{grid-template-columns:1fr;align-items:stretch;padding-left:58px}.user-expanded .group-assignment,.user-expanded .actions{width:100%;margin-left:0;flex-basis:auto}.user-expanded .actions{justify-content:flex-start}}
 @media(max-width:480px){.user-summary{grid-template-columns:42px minmax(0,1fr) 24px}.group-pill{grid-column:2;justify-self:start}.expand-icon{grid-column:3;grid-row:1/3}.user-expanded{padding-left:12px}}
+ .user-row-more { display:none; }
+@media (max-width: 1100px) {
+  .user-table-scroll { max-height:none; overflow:visible; }
+  .user-table { display:block; min-width:0; }
+  .user-table colgroup,.user-table thead { display:none; }
+  .user-table tbody { display:block; }
+  .user-table-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; padding:8px 10px; border-bottom:1px solid var(--color-border); background:var(--color-card); }
+  .user-table-row td { padding:5px; border:0; background:transparent; }
+  .user-table-row .user-account-cell { grid-column:1; grid-row:1; }
+  .user-table-row .user-status-cell { grid-column:2; grid-row:1; text-align:right; }
+  .user-status-cell .table-secondary { display:none; }
+  .user-table-row .user-group-cell { grid-column:1; grid-row:2; }
+  .user-table-row .user-actions-cell { display:contents; }
+  .user-row-more { display:block; grid-column:2; grid-row:2; margin:4px; min-height:44px; }
+  .user-table-row .user-extra-cell { display:none; }
+  .user-row-expanded .user-extra-cell { display:block; grid-column:1 / -1; }
+  .user-table-row .table-actions { display:none; }
+  .user-row-expanded .table-actions { display:flex; flex-wrap:wrap; grid-column:1 / -1; padding:5px; }
+  .user-row-expanded .table-actions button { min-width:44px; min-height:44px; }
+}
 </style>

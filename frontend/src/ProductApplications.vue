@@ -5,13 +5,20 @@ import { summarizeInterviewReviews } from './interviewSummary'
 import { isFormalInterview } from './eventClassification'
 import { applicationProgressHealth } from './applicationProgress'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
+import EditorDialog from './EditorDialog.vue'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
+import { companyKey as normalizeCompanyName, companyType } from './companyType'
 import { confirmDialog } from './modalDialogs'
 
 const store = useJobTrackerStore()
-const props = defineProps<{ focusApplicationId?: string }>()
+const props = defineProps<{ focusApplicationId?: string; companyTypeFilter?: string }>()
+const emit = defineEmits<{ 'exit-location': [] }>()
+const industryFilter = ref('')
+const locationFilterActive = ref(true)
 const query = ref('')
+const applicationBatchSize = 60
+const visibleCount = ref(applicationBatchSize)
 const applicationGrid = ref<HTMLElement | null>(null)
 const highlightedApplicationId = ref('')
 let highlightTimer = 0
@@ -23,6 +30,7 @@ const editing = ref(false)
 const eventEditor = ref(false)
 const editingEvent = ref<JobEvent | null>(null)
 const busy = ref(false)
+let editorSnapshot = ''
 const message = ref('')
 const error = ref('')
 const aiChanges = ref<string[]>([])
@@ -58,8 +66,6 @@ watch(store.applicationDetailRequest, request => {
   if (!request.applicationId) return
   const application = store.applications.value.find(item => item.id === request.applicationId)
   if (!application) return
-  query.value = ''
-  stageFilter.value = '全部'
   selected.value = application
   editing.value = false
   eventEditor.value = false
@@ -68,11 +74,11 @@ watch(store.applicationDetailRequest, request => {
 
 async function focusApplicationInList() {
   const id = props.focusApplicationId || ''
-  if (!id || id === lastFocusedId || id === pendingFocusId) return
+  if (!locationFilterActive.value || !id || id === lastFocusedId || id === pendingFocusId) return
   pendingFocusId = id
-  query.value = ''
-  stageFilter.value = '全部'
   selected.value = null
+  const index = filtered.value.findIndex(row => row.item.id === id)
+  if (index >= visibleCount.value) visibleCount.value = Math.ceil((index + 1) / applicationBatchSize) * applicationBatchSize
   await nextTick()
   const grid = applicationGrid.value
   const row = Array.from(grid?.querySelectorAll<HTMLElement>('[data-application-id]') || []).find(item => item.dataset.applicationId === id)
@@ -135,7 +141,7 @@ const applicationRows = computed(() => {
     for (const event of events) {
       const time = timeOf(eventDeadline(event))
       if (time) latest = Math.max(latest, time)
-      if (tone !== 'offer' && tone !== 'stopped' && !event.completed && !event.missed && time >= now) {
+      if (tone !== 'offer' && tone !== 'stopped' && !event.completed && !event.missed && !event.abandoned && time >= now) {
         pending = Math.min(pending, time)
       }
     }
@@ -150,12 +156,38 @@ const applicationRows = computed(() => {
     || a.rank - b.rank || b.latest - a.latest || b.applied - a.applied
     || String(a.item.id).localeCompare(String(b.item.id), 'zh-CN'))
 })
-const filtered = computed(() => {
+const industryOptions = computed(() => [
+  { value: '', label: '全部公司类型' },
+  ...Array.from(new Set([...store.applications.value.map(item => companyType(companyDirectoryEntry(item.company))), industryFilter.value].filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN')).map(label => ({ value: label, label }))
+])
+watch(() => props.companyTypeFilter, value => {
+  if (!value) return
+  industryFilter.value = value
+  query.value = ''
+  stageFilter.value = '全部'
+}, { immediate: true })
+const filtersMatch = computed(() => {
   const keyword = query.value.trim().toLowerCase()
   const category = applicationCategories.find(entry => entry.label === stageFilter.value)
   return applicationRows.value.filter(row => (!category || row.tone === category.tone)
-    && (!keyword || row.searchText.includes(keyword)))
+    && (!keyword || row.searchText.includes(keyword))
+    && (!industryFilter.value || companyType(companyDirectoryEntry(row.item.company)) === industryFilter.value))
 })
+const filtered = computed(() => {
+  const id = locationFilterActive.value ? props.focusApplicationId : ''
+  const target = id && applicationRows.value.find(row => row.item.id === id)
+  return target && !filtersMatch.value.some(row => row.item.id === id) ? [target, ...filtersMatch.value] : filtersMatch.value
+})
+watch(() => props.focusApplicationId, () => { locationFilterActive.value = true }, { flush: 'sync' })
+watch([query, stageFilter, industryFilter], () => { visibleCount.value = applicationBatchSize }, { flush: 'sync' })
+const visibleRows = computed(() => filtered.value.slice(0, visibleCount.value))
+function exitLocationFilter() {
+  locationFilterActive.value = false
+  highlightedApplicationId.value = ''
+  lastFocusedId = ''
+  emit('exit-location')
+}
 watch([() => props.focusApplicationId, () => filtered.value.some(row => row.item.id === props.focusApplicationId)], ([id, found]) => {
   if (!id) { lastFocusedId = ''; return }
   if (found) void focusApplicationInList()
@@ -273,16 +305,24 @@ function flow(item: JobApplication, relatedEvents: JobEvent[], now: number) {
   else if(!events.length&&item.stage!=='已投递'){nodes.push({label:String(item.stage),at:'当前阶段',kind:'current',abandoned:false,...flowVisual(item.stage,item.stage)})}
   return nodes
 }
-function normalizeCompanyName(value:unknown){return String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('zh-CN')}
 function configuredOfficialUrl(item:JobApplication){const company=normalizeCompanyName(item.company);return companyLinks.value.find(link=>normalizeCompanyName(link.company)===company)?.url||''}
 function officialUrl(item:JobApplication){return configuredOfficialUrl(item)||'https://www.bing.com/search?q='+encodeURIComponent(String(item.company||'')+' 校园招聘 官网')}
 function localParts(date=new Date()){const pad=(v:number)=>String(v).padStart(2,'0');return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+'T'+pad(date.getHours())+':'+pad(date.getMinutes())}
 function today(){return localParts().slice(0,10)}
 function emptyApplication(){return {company:'',position:'',city:'',channel:'官网',appliedDate:today(),stage:'已投递',status:'等待结果',notes:''}}
 function text(value:unknown,fallback='未填写'){return String(value||fallback)}
-function openCreate(){selected.value=null;Object.assign(form,emptyApplication());officialChoice.value='__manual__';officialManual.value='';editing.value=true;message.value='';error.value='';aiChanges.value=[];aiWarnings.value=[]}
-function openEdit(item:JobApplication){selected.value=item;aiChanges.value=[];aiWarnings.value=[];Object.assign(form,{company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'其他',appliedDate:item.appliedDate||today(),stage:item.stage||'已投递',status:item.status||'等待结果',notes:item.notes||''});editing.value=true}
-function closeEditors(){editing.value=false;eventEditor.value=false;editingEvent.value=null}
+function openCreate(){selected.value=null;Object.assign(form,emptyApplication());officialChoice.value='__manual__';officialManual.value='';editing.value=true;message.value='';error.value='';aiChanges.value=[];aiWarnings.value=[];editorSnapshot=editorState()}
+function openEdit(item:JobApplication){selected.value=item;aiChanges.value=[];aiWarnings.value=[];Object.assign(form,{company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'其他',appliedDate:item.appliedDate||today(),stage:item.stage||'已投递',status:item.status||'等待结果',notes:item.notes||''});editing.value=true;editorSnapshot=editorState()}
+function editorState() {
+  return JSON.stringify(eventEditor.value ? eventForm : [form, officialChoice.value, officialManual.value])
+}
+async function closeEditors() {
+  if (busy.value) return
+  if (editorState() !== editorSnapshot && !await confirmDialog('本次修改尚未保存。', { title: '放弃修改？', confirmText: '放弃修改', cancelText: '继续编辑' })) return
+  editing.value = false
+  eventEditor.value = false
+  editingEvent.value = null
+}
 function openOfficialLinkEditor(){if(!selected.value)return;officialLinkDraft.value=configuredOfficialUrl(selected.value);officialLinkEditing.value=true;error.value='';message.value=''}
 function closeOfficialLinkEditor(){officialLinkEditing.value=false;officialLinkDraft.value=''}
 async function saveSelectedOfficialLink(){
@@ -377,6 +417,7 @@ function openEvent(item?:JobEvent){
   if(item){Object.assign(eventForm,{type:item.type||'面试',title:item.title||'',timeMode:item.endsAt||item.end?'range':'point',startsAt:toInputTime(item.startsAt||item.start||item.date),endsAt:toInputTime(item.endsAt||item.end),location:item.location||'',notes:item.notes||'',interviewQuestions:item.interviewQuestions||''})}
   else{const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);tomorrow.setHours(9,0,0,0);Object.assign(eventForm,{type:'面试',title:'',timeMode:'point',startsAt:localParts(tomorrow),endsAt:'',location:'',notes:'',interviewQuestions:''})}
   eventEditor.value=true
+  editorSnapshot=editorState()
 }
 async function saveEvent(){
   if(!selected.value)return
@@ -410,7 +451,8 @@ async function removeEvent(item:JobEvent){
 
     <div v-if="store.user.value" class="toolbar">
       <div class="application-filter-stack">
-        <div class="application-filter-fields"><input v-model="query" type="search" aria-label="在当前筛选范围内搜索投递记录" placeholder="搜索公司、岗位、地点、渠道或备注"></div>
+        <div class="application-filter-fields"><input v-model="query" type="search" aria-label="在当前筛选范围内搜索投递记录" placeholder="搜索公司、岗位、地点、渠道或备注"><BaseSelect v-model="industryFilter" :options="industryOptions" aria-label="公司类型筛选" /></div>
+        <div v-if="focusApplicationId && locationFilterActive" class="application-location-note">已定位到投递 <button type="button" class="secondary" @click="exitLocationFilter">返回筛选结果</button></div>
         <div class="application-stage-tabs" role="group" aria-label="投递阶段筛选">
           <button v-for="category in ['全部',...stageCategories]" :key="category" type="button" :aria-pressed="stageFilter===category" :class="{active:stageFilter===category}" @click="stageFilter=category">{{category}}</button>
         </div>
@@ -426,14 +468,15 @@ async function removeEvent(item:JobEvent){
 </Teleport>
 <section class="card workspace">
   <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :style="{ '--flow-slots': flowSlots }">
-    <button v-for="row in filtered" :key="row.item.id" v-memo="[row, companyLinks, highlightedApplicationId === row.item.id]" :data-application-id="row.item.id" class="application" :class="[`tone-${row.tone}`, { 'application-arrival': highlightedApplicationId === row.item.id }]" @click="selected=row.item">
+    <button v-for="row in visibleRows" :key="row.item.id" v-memo="[row, companyLinks, highlightedApplicationId === row.item.id]" :data-application-id="row.item.id" class="application" :class="[`tone-${row.tone}`, { 'application-arrival': highlightedApplicationId === row.item.id }]" @click="selected=row.item">
       <div class="application-overview"><div class="application-title"><strong>{{text(row.item.company,'未填写公司')}}</strong><span v-if="companyIndustryLabel(row.item.company)" class="industry-tag" :class="companyIndustryClass(row.item.company)">{{companyIndustryLabel(row.item.company)}}</span><i>·</i><span>{{text(row.item.position,'未填写岗位')}}</span><span v-if="companySalaryLabel(row.item.company,row.item.position)" class="salary-tag" :title="companySalaryTitle(row.item.company,row.item.position)">{{companySalaryLabel(row.item.company,row.item.position)}}</span><i>·</i><small>{{text(row.item.city,'地点未填')}}</small><i>·</i><small>{{text(row.item.channel,'渠道未填')}}</small></div><span v-if="String(row.item.notes||'').trim()" class="application-note" :title="text(row.item.notes)"><b>备注：</b>{{text(row.item.notes)}}</span><em v-if="row.health" :class="`health-${row.health?.tone}`">{{row.health?.label}} · {{row.health?.days}}天</em></div>
       <div class="flow" aria-label="投递流程"><span v-for="(node,index) in row.nodes" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
     </button>
+    <button v-if="visibleCount < filtered.length" type="button" class="secondary load-more-applications" @click="visibleCount += applicationBatchSize">显示更多投递（{{ visibleRows.length }} / {{ filtered.length }}）</button>
   </div>
   <p v-else-if="store.user.value" class="empty">没有符合条件的投递记录。</p><p v-else>登录后查看和管理投递。</p>
 </section>
-<div v-if="message||error" class="feedback" :class="{danger:error}">{{error||message}} <button v-if="undo" @click="undoDelete">撤销删除</button></div>
+<div v-if="(message||error) && !editing && !eventEditor" class="feedback" :class="{danger:error}">{{error||message}} <button v-if="undo" @click="undoDelete">撤销删除</button></div>
 
 <Teleport to="body">
 <div v-if="selected&&!editing&&!eventEditor" class="backdrop" @click.self="selected=null">
@@ -474,13 +517,13 @@ async function removeEvent(item:JobEvent){
 <div v-if="officialLinkEditing&&selected" class="backdrop official-link-backdrop" @click.self="closeOfficialLinkEditor"><form class="modal official-link-modal" role="dialog" aria-modal="true" aria-labelledby="official-link-editor-title" @submit.prevent="saveSelectedOfficialLink"><button type="button" class="close icon-button" aria-label="关闭官网链接编辑窗口" title="关闭" @click="closeOfficialLinkEditor"><AppIcon name="close" /></button><h2 id="official-link-editor-title">编辑官网链接</h2><p>{{text(selected.company)}} 的招聘官网地址</p><label><span>官网链接 *</span><input v-model="officialLinkDraft" type="url" required autofocus placeholder="https://careers.example.com" autocomplete="url"></label><p v-if="error" class="field-error" role="alert">{{error}}</p><div class="actions"><button :disabled="busy">{{busy?'正在保存…':'保存链接'}}</button><button type="button" class="secondary" :disabled="busy" @click="closeOfficialLinkEditor">取消</button></div></form></div>
 </Teleport>
 <Teleport to="body">
-<div v-if="editing" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="application-editor-title" @submit.prevent="saveApplication"><button type="button" class="close icon-button" aria-label="关闭投递编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="application-editor-title">{{selected?'编辑投递':'新建投递'}}</h2>
-<label><span>公司 *</span><input v-model="form.company" required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段（随日程自动更新）</span><input :value="form.status==='已通过'?'Offer':['未通过','已放弃','已结束'].includes(form.status)?'已结束':selected?.stage||'已投递'" readonly /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+<EditorDialog v-if="editing" backdrop-class="backdrop" labelled-by="application-editor-title" @dismiss="closeEditors"><form class="modal form" @submit.prevent="saveApplication"><button type="button" class="close icon-button" aria-label="关闭投递编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="application-editor-title">{{selected?'编辑投递':'新建投递'}}</h2>
+<label><span>公司 *</span><input v-model="form.company" autofocus required maxlength="120" @input="officialChoice=officialMatches.find(item=>item.exact)?.url||'__manual__'"></label><label><span>岗位 *</span><input v-model="form.position" required maxlength="160"></label><label v-if="!selected" class="wide official-link-field"><span>公司官网链接 <small>{{officialMatchStatus}}</small></span><BaseSelect v-model="officialChoice" :options="[{value:'__manual__',label:officialMatches.length?'手动填写其他链接':'手动填写官网链接'},...officialMatches.map(item=>({value:item.url,label:`${item.exact?'〔已匹配〕':'〔相近公司〕'} ${item.company} · ${item.url}`}))]" @update:model-value="applyOfficialCompany" /><input v-if="officialChoice==='__manual__'" v-model="officialManual" type="url" placeholder="https://careers.example.com" autocomplete="url"><small>链接按公司统一保存，同一公司的其他投递会自动复用。</small></label><label><span>地点</span><input v-model="form.city"></label><label><span>渠道</span><BaseSelect v-model="form.channel" :options="channels" /></label><label><span>投递日期</span><input v-model="form.appliedDate" type="date"></label><label><span>阶段（随日程自动更新）</span><input :value="form.status==='已通过'?'Offer':['未通过','已放弃','已结束'].includes(form.status)?'已结束':selected?.stage||'已投递'" readonly /></label><label><span>状态</span><BaseSelect v-model="form.status" :options="statuses" /></label><label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3"></textarea></label><div v-if="aiChanges.length||aiWarnings.length" class="ai-review wide"><p v-for="item in aiChanges" :key="item">✓ {{item}}</p><p v-for="item in aiWarnings" :key="item" class="warn">请核对：{{item}}</p></div><p v-if="error" class="field-error wide" role="alert">{{ error }}</p><div class="actions wide"><button type="button" class="ai-button" :disabled="busy" @click="normalizeApplication">✦ AI 规范</button><button :disabled="busy">保存</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></EditorDialog>
 </Teleport>
 
 <Teleport to="body">
-<div v-if="eventEditor&&selected" class="backdrop"><form class="modal form" role="dialog" aria-modal="true" aria-labelledby="schedule-editor-title" @submit.prevent="saveEvent"><button type="button" class="close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="schedule-editor-title">{{editingEvent?'编辑日程':'新增关联日程'}}</h2>
-<ScheduleTimeModeNotice class="wide" :mode="eventForm.timeMode" selectable @select="eventForm.timeMode=$event" /><label><span>类型</span><BaseSelect v-model="eventForm.type" :options="eventTypes" /></label><label><span>名称 *</span><input v-model="eventForm.title" required placeholder="如：一面"></label><div class="schedule-time-fields wide" :class="{'is-point':eventForm.timeMode==='point'}"><label><span>{{eventForm.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="eventForm.startsAt" type="datetime-local" required></label><label v-if="eventForm.timeMode==='range'"><span>结束时间 *</span><input v-model="eventForm.endsAt" type="datetime-local" :min="eventForm.startsAt" required></label></div><label class="wide"><span>地点 / 链接</span><input v-model="eventForm.location"></label><label class="wide"><span>备注</span><textarea v-model="eventForm.notes" maxlength="4000" rows="3"></textarea></label><label v-if="editingEvent?.completed&&!editingEvent.missed&&!editingEvent.abandoned" class="wide"><span>面试回顾 · 面试官问题清单</span><textarea v-model="eventForm.interviewQuestions" maxlength="8000" rows="6" placeholder="每行记录一个面试官提出的问题"></textarea><small>与日程备注独立保存，可在面试后随时补充。</small></label><div class="actions wide"><button :disabled="busy">{{editingEvent?'保存日程':'创建日程'}}</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></div>
+<EditorDialog v-if="eventEditor&&selected" backdrop-class="backdrop" labelled-by="schedule-editor-title" @dismiss="closeEditors"><form class="modal form" @submit.prevent="saveEvent"><button type="button" class="close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="closeEditors"><AppIcon name="close" /></button><h2 id="schedule-editor-title">{{editingEvent?'编辑日程':'新增关联日程'}}</h2>
+<ScheduleTimeModeNotice class="wide" :mode="eventForm.timeMode" selectable @select="eventForm.timeMode=$event" /><label><span>类型</span><BaseSelect v-model="eventForm.type" :options="eventTypes" /></label><label><span>名称 *</span><input v-model="eventForm.title" autofocus required placeholder="如：一面"></label><div class="schedule-time-fields wide" :class="{'is-point':eventForm.timeMode==='point'}"><label><span>{{eventForm.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="eventForm.startsAt" type="datetime-local" required></label><label v-if="eventForm.timeMode==='range'"><span>结束时间 *</span><input v-model="eventForm.endsAt" type="datetime-local" :min="eventForm.startsAt" required></label></div><label class="wide"><span>地点 / 链接</span><input v-model="eventForm.location"></label><label class="wide"><span>备注</span><textarea v-model="eventForm.notes" maxlength="4000" rows="3"></textarea></label><label v-if="editingEvent?.completed&&!editingEvent.missed&&!editingEvent.abandoned" class="wide"><span>面试回顾 · 面试官问题清单</span><textarea v-model="eventForm.interviewQuestions" maxlength="8000" rows="6" placeholder="每行记录一个面试官提出的问题"></textarea><small>与日程备注独立保存，可在面试后随时补充。</small></label><p v-if="error" class="field-error wide" role="alert">{{ error }}</p><div class="actions wide"><button :disabled="busy">{{editingEvent?'保存日程':'创建日程'}}</button><button type="button" class="secondary" @click="closeEditors">取消</button></div></form></EditorDialog>
 </Teleport>
 </template>
 
@@ -528,6 +571,8 @@ async function removeEvent(item:JobEvent){
 .detail-modal{width:min(1180px,calc(100vw - 48px));max-height:94vh;padding:32px;border-radius:18px}.detail-title{margin:0 0 34px;font-size:22px}.detail-company-row{display:flex;align-items:center;justify-content:space-between;gap:24px}.company-identity{min-width:0}.company-name-line{display:flex;align-items:center;gap:8px}.company-name-line>a{display:flex;min-width:0;align-items:center;gap:10px;color:var(--color-foreground);text-decoration:none}.company-name-line strong{font-size:25px}.company-name-line>a:hover strong{color:#315fb6}.company-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:50%;color:#315fb6;background:#e9f1ff;font-size:18px;font-weight:800}.company-name-line .official-link-edit{width:26px;min-width:26px;height:26px;min-height:26px;flex:0 0 26px;padding:0;border-radius:7px}.company-identity p{margin:8px 0 0;color:#596579;font-size:16px}.official-link-backdrop{z-index:60}.official-link-modal{display:grid;width:min(540px,100%);gap:16px}.official-link-modal h2,.official-link-modal p{margin:0}.official-link-modal label{display:grid;gap:7px;color:var(--color-muted-foreground);font-size:13px;font-weight:700}.official-link-modal input{width:100%}.official-link-modal .actions{margin:2px 0 0}.detail-actions{padding:18px 0;border-bottom:1px solid #d8e0eb}.detail-actions button{min-width:76px}.detail-actions .push-right{margin-left:auto}.section-heading{margin:26px 0 12px}.basic-info{padding:16px;border-radius:12px;background:var(--color-muted)}.basic-info>div{display:flex;align-items:center;gap:12px}.basic-info strong{color:var(--color-card-foreground);font-size:13px}.basic-info span{margin-right:12px;color:var(--color-muted-foreground)}.basic-info p{margin:15px 0 0;color:var(--color-muted-foreground)}.event-records{display:grid;gap:12px}.event-record{position:relative;display:grid;grid-template-columns:22px 105px minmax(0,1fr) auto;align-items:center;min-height:110px;padding:14px 16px 14px 0;border:1px solid var(--color-border);border-radius:13px;background:var(--color-card);box-shadow:var(--shadow-sm)}.event-rail{position:relative;align-self:stretch}.event-rail::before{content:"";position:absolute;left:7px;top:-27px;bottom:-27px;width:1px;background:var(--color-border)}.event-record:first-child .event-rail::before{top:50%}.event-record:last-child .event-rail::before{bottom:50%}.event-rail i{position:absolute;z-index:1;left:1px;top:50%;width:12px;height:12px;transform:translateY(-50%);border:2px solid var(--color-card);border-radius:50%;background:#3f75c5;box-shadow:0 0 0 1px #7ca1d8}.event-date{display:grid;gap:4px;padding-right:14px;border-right:1px solid var(--color-border)}.event-date strong{color:#2f63b3;font-size:17px}.event-date span{color:var(--color-muted-foreground);font-size:12px}.event-body{display:grid;min-width:0;gap:7px;padding:0 16px}.event-body>strong{font-size:15px}.event-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--color-muted-foreground);font-size:12px}.event-meta a{color:#205fc1}.event-meta b{padding:4px 8px;border:1px solid var(--color-border-strong);border-radius:8px;color:var(--color-card-foreground);background:var(--color-muted)}.event-meta i{font-style:normal;color:var(--color-muted-foreground)}.event-body p{margin:0;padding:7px 10px;border-radius:7px;color:var(--color-muted-foreground);background:var(--color-muted);font-size:12px}.event-row-actions{display:flex;align-items:center;gap:8px}.event-row-actions button{padding:9px 12px}.event-row-actions .event-delete{color:#b83d36;background:var(--color-card);border:1px solid #e5b9b5}.history-list{display:grid;margin-left:8px}.history-list article{position:relative;display:flex;gap:18px;padding:4px 0 18px 20px;border-left:2px solid var(--color-border)}.history-list article:last-child{padding-bottom:4px}.history-list article>i{position:absolute;left:-7px;top:7px;width:12px;height:12px;border:2px solid var(--color-card);border-radius:50%;background:#5eb288}.history-list article>div{display:grid;gap:5px}.history-list article strong{font-size:14px}.history-list article span{color:var(--color-muted-foreground);font-size:12px}@media(min-width:721px) and (min-height:620px){.workspace{display:flex;height:calc(100vh - 108px);min-height:0;flex-direction:column;overflow:hidden}.workspace>.head,.workspace>.toolbar,.workspace>.application-legend{flex:0 0 auto}.workspace>.grid{min-height:0;flex:1 1 auto;align-content:start;grid-auto-rows:max-content;overflow-y:auto;overscroll-behavior:contain;padding:12px 7px 18px 2px;border-top:1px solid var(--color-border);scrollbar-width:thin;scrollbar-color:var(--color-border-strong) transparent}.workspace>.grid::-webkit-scrollbar{width:7px}.workspace>.grid::-webkit-scrollbar-track{background:transparent}.workspace>.grid::-webkit-scrollbar-thumb{border-radius:99px;background:var(--color-border-strong)}.workspace>.empty{min-height:0;flex:1 1 auto;padding-top:18px;border-top:1px solid var(--color-border)}}
 @media(max-width:720px){.application-toolbar-portal,.application-filter-stack{box-sizing:border-box;width:100%;max-width:100%;min-width:0}.application-toolbar-portal{overflow:visible}.application-toolbar-portal .toolbar{margin:4px 0 0}.application-filter-fields{width:100%;grid-template-columns:minmax(0,1fr)}.application-filter-fields>*{width:100%;max-width:100%;min-width:0}.application-filter-fields :deep(.base-select),.application-filter-fields :deep(.select-trigger){width:100%;max-width:100%;min-width:0}.application-heatmap{width:100%;min-width:0;justify-content:space-between;gap:16px;padding:12px 2px 2px;border-top:1px solid #d9e0eb;border-left:0}.application-legend{width:100%;max-width:100%;flex-wrap:wrap;gap:6px 12px;margin:9px 0 0;padding:0 2px 3px;overflow:visible;white-space:normal}.application-legend>span{white-space:nowrap}.toolbar{width:100%;max-width:100%;min-width:0;align-items:stretch;flex-direction:column}.toolbar select{width:auto}.grid,.form,dl{min-width:0;grid-template-columns:1fr}.application{width:100%;min-width:0;padding:16px 14px}.application-overview{align-items:flex-start;flex-direction:column}.application-title{min-width:0}.application-title strong{font-size:15px}.application-title>i{margin-inline:5px}.flow{width:100%;max-width:100%;scroll-snap-type:x proximity}.flow-node{scroll-snap-align:start}.form .wide,dl .wide{grid-column:auto}.detail-modal{width:100%;padding:22px 16px}.detail-title{margin-bottom:24px}.detail-company-row{align-items:flex-start}.company-name-line strong{font-size:21px}.detail-actions .push-right{margin-left:0}.basic-info>div{align-items:flex-start;flex-direction:column;gap:5px}.event-record{grid-template-columns:16px 78px minmax(0,1fr);padding-right:10px}.event-body{padding:0 10px}.event-row-actions{grid-column:2/-1;justify-content:flex-end;margin-top:10px}.event-date strong{font-size:14px}}
 @media(min-width:721px){.application-toolbar-portal .application-legend{transform:translateY(7px)}}
+@media(min-width:721px) { .application-filter-fields { grid-template-columns: minmax(0,1fr) minmax(155px,210px); } }
+.application-location-note { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 </style>
 <style scoped>
 .detail-modal {

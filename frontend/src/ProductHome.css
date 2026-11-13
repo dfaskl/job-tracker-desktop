@@ -412,7 +412,8 @@
   font-size: 12px;
   font-weight: 600;
 }
-.column-heading small.overdue-summary { color: var(--color-destructive, #dc6565); }
+.column-heading .overdue-summary { color: var(--color-destructive, #dc6565); padding: 0; min-height: 32px; }
+.schedule-list > h3 { margin: 6px 0 0; font-size: 14px; }
 .date-block {
   display: grid;
   width: max-content;

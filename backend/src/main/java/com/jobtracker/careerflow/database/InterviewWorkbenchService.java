@@ -52,10 +52,22 @@ public class InterviewWorkbenchService {
             String currentKey = sourceKey(allReviews);
             result.put("sourceKey", currentKey);
             if (result.path("overallSummary") instanceof ObjectNode summary) {
-                String fingerprint = summaryFingerprint(summaryInput(allReviews), result.path("resume"));
+                ArrayNode selectedReviews = summaryInput(allReviews);
+                String fingerprint = summaryFingerprint(selectedReviews, result.path("resume"));
                 summary.put("stale", !fingerprint.equals(summary.path("sourceKey").asText("")));
                 result.put("requiresFullRebuild", !summary.path("reviewFingerprints").isObject()
                     || !digest(result.path("resume").toString()).equals(summary.path("resumeFingerprint").asText("")));
+                if (summary.path("stale").asBoolean() && summary.path("reviewFingerprints").isObject()) {
+                    ArrayNode changedIds = result.putArray("changedReviewIds");
+                    for (JsonNode review : changedReviews(selectedReviews, summary.path("reviewFingerprints"))) {
+                        changedIds.add(review.path("eventId").asText());
+                    }
+                    var currentFingerprints = fingerprintMap(selectedReviews);
+                    var deletedIds = result.putArray("removedReviewIds");
+                    summary.path("reviewFingerprints").properties().forEach(entry -> {
+                        if (!currentFingerprints.has(entry.getKey())) deletedIds.add(entry.getKey());
+                    });
+                }
                 removeOrphanedProjectTopics(summary, result.path("resume"));
             }
             return result;

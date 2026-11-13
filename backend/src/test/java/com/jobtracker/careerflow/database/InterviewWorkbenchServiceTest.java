@@ -274,7 +274,11 @@ class InterviewWorkbenchServiceTest {
              var statement = connection.createStatement()) {
             statement.executeUpdate("UPDATE user_data SET data=json_set(data, '$.events[0].interviewQuestions', '解释线程池实现')");
         }
-        assertThat(service.state("reviewer@example.com").path("overallSummary").path("stale").asBoolean()).isTrue();
+        JsonNode outdated = service.state("reviewer@example.com");
+        assertThat(outdated.path("overallSummary").path("stale").asBoolean()).isTrue();
+        assertThat(outdated.path("changedReviewIds").size()).isEqualTo(1);
+        assertThat(outdated.path("changedReviewIds").get(0).asText()).isEqualTo(reviews.getValue().get(0).path("eventId").asText());
+        assertThat(outdated.path("removedReviewIds").isEmpty()).isTrue();
 
         JsonNode changedResume = service.saveResume("reviewer@example.com", mapper.readTree(
             "{\"internships\":[],\"projects\":[{\"name\":\"项目乙\",\"description\":\"简介\",\"coreWork\":\"核心工作\"}]}"));

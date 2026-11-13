@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+import { defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import AccountManagement from './AccountManagement.vue'
 import ResumeSettings from './ResumeSettings.vue'
-import ProductPreferences from './ProductPreferences.vue'
-import ProductDataManagement from './ProductDataManagement.vue'
-import MailAccountSettings from './MailAccountSettings.vue'
-import BackupManagement from './BackupManagement.vue'
 import AppIcon from './AppIcon.vue'
-import McpAccessSettings from './McpAccessSettings.vue'
 import { profileSectionScrollTarget } from './profileNavigation'
+
+const ProductPreferences = defineAsyncComponent(() => import('./ProductPreferences.vue'))
+
+const ProductDataManagement = defineAsyncComponent(() => import('./ProductDataManagement.vue'))
+
+const MailAccountSettings = defineAsyncComponent(() => import('./MailAccountSettings.vue'))
+
+const BackupManagement = defineAsyncComponent(() => import('./BackupManagement.vue'))
+
+const McpAccessSettings = defineAsyncComponent(() => import('./McpAccessSettings.vue'))
 
 type SectionId = 'center' | 'resume' | 'ai' | 'mail' | 'mcp' | 'data'
 const sections: { id: SectionId; label: string; icon: string }[] = [
@@ -25,9 +30,10 @@ function sectionFromHash(): SectionId {
   return sections.some(item => item.id === section) ? section as SectionId : 'center'
 }
 const activeSection = ref<SectionId>(sectionFromHash())
+const loadedSections = ref(new Set<SectionId>(['center', 'resume', activeSection.value]))
+function loadSection(section: SectionId) { loadedSections.value.add(section) }
 const sectionRefs = ref<Partial<Record<SectionId, HTMLElement>>>({})
 let scrollFrame = 0
-let sectionScrollFrame = 0
 let pendingSectionHash: string | null = null
 function setSectionRef(section: SectionId, element: Element | null) {
   if (element instanceof HTMLElement) sectionRefs.value[section] = element
@@ -39,36 +45,16 @@ function syncActiveSectionFromScroll() {
   const visible = sections
     .map(section => ({ section, top: sectionRefs.value[section.id]?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY }))
     .filter(item => item.top <= anchorLine)
-  if (visible.length) activeSection.value = visible[visible.length - 1].section.id
-  else activeSection.value = sections[0].id
-  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8) activeSection.value = sections[sections.length - 1].id
+  activeSection.value = visible.at(-1)?.section.id || sections[0].id
+  loadSection(activeSection.value)
 }
 function onPageScroll() {
   if (!scrollFrame) scrollFrame = window.requestAnimationFrame(syncActiveSectionFromScroll)
 }
-function stopSectionScroll() {
-  if (sectionScrollFrame) window.cancelAnimationFrame(sectionScrollFrame)
-  sectionScrollFrame = 0
-}
-function scrollToSection(section: SectionId) {
-  const target = sectionRefs.value[section]
-  if (!target) return
-  stopSectionScroll()
-  const startY = window.scrollY
-  const endY = Math.max(0, target.getBoundingClientRect().top + startY - 82)
-  const distance = endY - startY
-  if (Math.abs(distance) < 2) return
-  const duration = Math.min(1400, Math.max(760, Math.abs(distance) * 0.36))
-  let startedAt = 0
-  const step = (now: number) => {
-    if (!startedAt) startedAt = now
-    const progress = Math.min(1, (now - startedAt) / duration)
-    const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2
-    window.scrollTo(0, startY + distance * eased)
-    if (progress < 1) sectionScrollFrame = window.requestAnimationFrame(step)
-    else sectionScrollFrame = 0
-  }
-  sectionScrollFrame = window.requestAnimationFrame(step)
+async function scrollToSection(section: SectionId) {
+  loadSection(section)
+  await nextTick()
+  sectionRefs.value[section]?.scrollIntoView({ behavior: 'instant', block: 'start' })
 }
 function syncSectionFromHash(shouldScroll = true) {
   activeSection.value = sectionFromHash()
@@ -118,12 +104,11 @@ const onHashChange = () => {
   } else pendingSectionHash = null
 }
 onActivated(() => syncSectionFromHash(false))
-onDeactivated(stopSectionScroll)
+onDeactivated(() => { if (scrollFrame) window.cancelAnimationFrame(scrollFrame); scrollFrame = 0 })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', onHashChange)
   window.removeEventListener('scroll', onPageScroll)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
-  stopSectionScroll()
 })
 </script>
 
@@ -144,25 +129,25 @@ onBeforeUnmount(() => {
           <AccountManagement />
         </section>
         <section :id="`profile-section-${sections[1].id}`" :ref="element => setSectionRef('resume', element as Element | null)" class="profile-section">
-          <div class="section-title"><h2>我的简历</h2><p>维护教育、实习和项目经历，供面试复习按需参考。</p></div>
+          <div class="section-title"><p>维护教育、实习和项目经历，供面试复习按需参考。</p></div>
           <ResumeSettings />
         </section>
         <section :id="`profile-section-${sections[2].id}`" :ref="element => setSectionRef('ai', element as Element | null)" class="profile-section">
           <div class="section-title"><h2>大模型 API</h2><p>配置兼容接口、模型和 API Key。</p></div>
-          <ProductPreferences />
+          <ProductPreferences v-if="loadedSections.has('ai')" />
         </section>
         <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('mail', element as Element | null)" class="profile-section mail-settings-section">
           <div class="section-title"><h2>邮件配置</h2><p>连接邮箱，让系统识别邮件并辅助创建求职日程。</p></div>
-          <MailAccountSettings />
+          <MailAccountSettings v-if="loadedSections.has('mail')" />
         </section>
         <section id="profile-section-mcp" :ref="element => setSectionRef('mcp', element as Element | null)" class="profile-section">
           <div class="section-title"><h2>MCP 访问</h2><p>授权 Codex 查询和管理当前账户的投递与日程。</p></div>
-          <McpAccessSettings />
+          <McpAccessSettings v-if="loadedSections.has('mcp')" />
         </section>
         <section id="profile-section-data" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
           <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理历史备份。</p></div>
-          <ProductDataManagement />
-          <BackupManagement />
+          <ProductDataManagement v-if="loadedSections.has('data')" />
+          <BackupManagement v-if="loadedSections.has('data')" />
         </section>
       </main>
     </div>

@@ -28,6 +28,20 @@ const timeMode = ref<'point' | 'range'>('point')
 const checkingStatus = ref(false)
 const recognizing = ref(false)
 const saving = ref(false)
+const mailStep = ref<'inbox' | 'compose' | 'review'>('inbox')
+const noteMode = ref<'keep' | 'append' | 'replace'>('keep')
+let recognitionRequest: AbortController | null = null
+const inboxHeading = ref<HTMLElement | null>(null)
+const composeHeading = ref<HTMLElement | null>(null)
+const reviewHeading = ref<HTMLElement | null>(null)
+async function openStep(step: typeof mailStep.value, focus = false) {
+  mailStep.value = step
+  if (focus && window.matchMedia('(max-width: 720px)').matches) {
+    await nextTick()
+    const heading = { inbox: inboxHeading, compose: composeHeading, review: reviewHeading }[step].value
+    heading?.focus()
+  }
+}
 const error = ref('')
 const scheduleError = ref('')
 const message = ref('')
@@ -66,6 +80,34 @@ const actionSummary = computed(() => hasResult.value
     : `${matchedApplication.value ? '为已有投递添加日程' : '新建一条投递并添加日程'}`
   : '')
 
+const duplicateEvent = computed(() => {
+  if (terminalNotice.value || !matchedApplication.value || !result.startsAt) return
+  const type = result.noticeType
+  const start = apiTime(result.startsAt)
+  const end = timeMode.value === 'range' ? apiTime(result.endsAt) : ''
+  return store.events.value.find(event => event.applicationId === matchedApplication.value?.id && event.type === type
+    && apiTime(String(event.startsAt || event.start || event.date || '')) === start
+    && apiTime(String(event.endsAt || event.end || '')) === end)
+})
+const duplicateNote = computed(() => {
+  const oldNote = String(duplicateEvent.value?.notes || '').trim()
+  const newNote = result.notes.trim()
+  if (noteMode.value === 'replace') return newNote
+  if (noteMode.value === 'append' && newNote && oldNote !== newNote) return [oldNote, newNote].filter(Boolean).join('\n\n')
+  return oldNote
+})
+watch(duplicateEvent, () => { noteMode.value = 'keep' })
+watch([mailBody, selectedMailId], () => {
+  recognitionRequest?.abort()
+  recognitionRequest = null
+  recognizing.value = false
+  hasResult.value = false
+  recognitionDetails.value = null
+  scheduleError.value = ''
+  error.value = ''
+  message.value = ''
+  if (mailStep.value === 'review') void openStep('compose')
+}, { flush: 'sync' })
 watch(selectedApplicationId, () => {
   const matched = matchedApplication.value
   if (!matched) return
@@ -81,7 +123,7 @@ onMounted(async () => {
   await store.initialize()
   await Promise.all([checkStatus(), loadInbox(true)])
 })
-onBeforeUnmount(() => previewThemeObserver?.disconnect())
+onBeforeUnmount(() => { previewThemeObserver?.disconnect(); recognitionRequest?.abort() })
 onDeactivated(() => {
   recognitionDetailsDialog.value?.close()
 })
@@ -135,9 +177,10 @@ async function loadInbox(sync = false) {
   } finally { syncing.value = false }
 }
 function selectMail(mail: CollectedMail) {
+  if (saving.value) return
   selectedMailId.value = mail.id
   mailBody.value = [mail.subject ? `主题：${mail.subject}` : '', mail.sender ? `发件人：${mail.sender}` : '', '', mail.body].join('\n').trim()
-  hasResult.value = false
+  void openStep('compose', true)
 }
 function setSmoking(ids: number[], active: boolean) {
   const next = new Set(smokingMailIds.value)
@@ -241,9 +284,12 @@ function mailDate(value: string) {
 }
 async function recognize() {
   if (recognizing.value || !status.value?.callsEnabled || !mailBody.value.trim()) return
+  const request = new AbortController()
+  recognitionRequest = request
   recognizing.value = true; error.value = ''; scheduleError.value = ''; message.value = ''; hasResult.value = false
   try {
-    const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }) })
+    const value = await api<Recognition>('/api/poc/ai-sandbox/recognize', { method: 'POST', body: JSON.stringify({ body: mailBody.value }), signal: request.signal })
+    if (recognitionRequest !== request) return
     recognitionDetails.value = value
     Object.assign(result, value, { scheduleTitle: value.scheduleTitle?.trim() || value.noticeType || '其他', startsAt: inputTime(value.startsAt), endsAt: inputTime(value.endsAt), notes: value.notes || '' })
     if (value.noticeType === '未通过' || value.suggestedStage === '已结束' || ['未通过','已放弃','已结束'].includes(value.suggestedStatus)) {
@@ -254,8 +300,15 @@ async function recognize() {
     hasResult.value = true
     timeMode.value = value.endsAt ? 'range' : 'point'
     message.value = '识别完成，请核对后确认录入'
-  } catch (cause) { error.value = failure(cause, '邮件识别失败') }
-  finally { recognizing.value = false }
+    void openStep('review', true)
+  } catch (cause) {
+    if (recognitionRequest === request) error.value = failure(cause, '邮件识别失败')
+  } finally {
+    if (recognitionRequest === request) {
+      recognitionRequest = null
+      recognizing.value = false
+    }
+  }
 }
 function applicationPayload(item?: JobApplication) {
   const payload = {
@@ -270,7 +323,8 @@ function applicationPayload(item?: JobApplication) {
   return {...payload,scheduleType:eventType,scheduleTitle:result.scheduleTitle.trim()||result.noticeType||'邮件通知',scheduleStartsAt:apiTime(result.startsAt),scheduleEndsAt:timeMode.value==='range'?apiTime(result.endsAt):'',scheduleLocation:result.location.trim(),scheduleNotes:result.notes.trim()}
 }
 async function saveResult() {
-  if (saving.value) return
+  if (saving.value || !hasResult.value) return
+  if (duplicateEvent.value && duplicateNote.value.length > 4000) { scheduleError.value = '合并备注超过 4000 字，请缩短新备注或选择其他方式。'; return }
   const matched = matchedApplication.value
   if (!String(matched?.company || result.company).trim() || !String(matched?.position || result.position).trim()) { error.value = '请补全公司和岗位后再录入'; return }
   if (terminalNotice.value && !matched) { error.value = '这是结束类通知，不会新建投递或日程。请先关联一条已有投递。'; return }
@@ -278,14 +332,17 @@ async function saveResult() {
     scheduleError.value=validateScheduleTime(timeMode.value,result.startsAt,result.endsAt)
     if(scheduleError.value){error.value='';return}
   }
+  const existingSchedule = duplicateEvent.value
+  const notesToSave = duplicateNote.value
   saving.value = true; error.value = ''; message.value = ''
   try {
     if (terminalNotice.value && matched) {
       const payload = { ...applicationPayload(matched), stage: '已结束', status: terminalStatus.value }
       await api<{ application: JobApplication }>(`/api/poc/application-sandbox/applications/${encodeURIComponent(matched.id)}`, { method: 'PUT', body: JSON.stringify(payload) })
       await store.refresh()
-      message.value = `已将 ${matched.company} · ${matched.position} 标记为${terminalStatus.value}，未创建日程`
       mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
+      void openStep('inbox', true)
+      message.value = `已将 ${matched.company} · ${matched.position} 标记为${terminalStatus.value}，未创建日程`
       return
     }
     const response = matched
@@ -296,14 +353,13 @@ async function saveResult() {
     if (matched) {
       const eventType=result.noticeType==='其他'||result.noticeType==='未通过'?'其他':result.noticeType
       const startsAt=apiTime(result.startsAt),endsAt=timeMode.value==='range'?apiTime(result.endsAt):''
-      const existingSchedule=store.events.value.find(event=>event.applicationId===response.application.id&&String(event.type||'')===eventType&&apiTime(String(event.startsAt||event.start||event.date||''))===startsAt&&apiTime(String(event.endsAt||event.end||''))===endsAt)
       duplicateSchedule=Boolean(existingSchedule)
-      if(existingSchedule&&result.notes.trim()){
+      if(existingSchedule && noteMode.value !== 'keep' && notesToSave !== String(existingSchedule.notes || '').trim()){
         await api(`/api/poc/event-sandbox/events/${encodeURIComponent(existingSchedule.id)}`,{method:'PUT',body:JSON.stringify({
           applicationId:response.application.id,type:String(existingSchedule.type||eventType),title:String(existingSchedule.title||result.scheduleTitle.trim()||eventType),
           startsAt:apiTime(String(existingSchedule.startsAt||existingSchedule.start||existingSchedule.date||'')),
           endsAt:apiTime(String(existingSchedule.endsAt||existingSchedule.end||'')),location:String(existingSchedule.location||''),
-          notes:result.notes.trim(),expectedUpdatedAt:String(existingSchedule.updatedAt||existingSchedule.createdAt||'')
+          notes:notesToSave,expectedUpdatedAt:String(existingSchedule.updatedAt||existingSchedule.createdAt||'')
         })})
         updatedScheduleNote=true
       }else if(!existingSchedule)await api('/api/poc/event-sandbox/events', { method: 'POST', body: JSON.stringify({
@@ -314,14 +370,16 @@ async function saveResult() {
       }) })
     }
     await store.refresh()
-    message.value = duplicateSchedule ? (updatedScheduleNote?'已更新投递和匹配日程备注，未重复创建日程':'已更新投递；相同日程已存在，未重复创建') : `已${matched ? '更新投递' : '新建投递'}并自动创建关联日程，写入前备份已自动生成`
     mailBody.value = ''; hasResult.value = false; selectedApplicationId.value = ''
+    void openStep('inbox', true)
+    message.value = duplicateSchedule ? (updatedScheduleNote?'已更新现有日程备注':'相同日程已存在，已保留原日程') : `已${matched ? '更新投递' : '新建投递'}并自动创建关联日程，写入前备份已自动生成`
   } catch (cause) { error.value = failure(cause, '录入识别结果失败') }
   finally { saving.value = false }
 }
 function skipTerminalUpdate() {
   hasResult.value = false
   selectedApplicationId.value = ''
+  void openStep('inbox', true)
   message.value = '未修改投递，也未创建日程；邮件仍保留在待处理列表中'
   error.value = ''
 }
@@ -333,23 +391,28 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 
 <template>
   <section class="mail-page">
-    <div class="mail-grid">
-      <section class="card inbox-panel">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3>待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 点击填入正文，双击查看原文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
+    <nav class="mail-steps" aria-label="邮件识别步骤">
+      <button type="button" class="secondary" :aria-pressed="mailStep === 'inbox'" :disabled="saving" @click="openStep('inbox')">邮件</button>
+      <button type="button" class="secondary" :aria-pressed="mailStep === 'compose'" :disabled="saving" @click="openStep('compose')">识别</button>
+      <button type="button" class="secondary" :aria-pressed="mailStep === 'review'" :disabled="!hasResult || saving" @click="openStep('review')">核对</button>
+    </nav>
+    <div class="mail-grid" :data-step="mailStep">
+      <section class="card inbox-panel" :inert="saving">
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 选择邮件填入正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingAll">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
           <div v-else class="mail-cards" aria-label="待处理邮件">
             <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
-              <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)" @dblclick.stop="openMailPreview(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-              <div class="mail-card-actions"><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
+              <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
+              <div class="mail-card-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
             </article>
           </div>
           <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{processingAll?'已清空列表，后台正在完成处理':inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
         </div>
       </section>
 
-      <section class="card compose-panel">
-        <div class="panel-title"><div><span class="step">1</span><h3>粘贴通知正文</h3></div><button class="text-button icon-button compact-icon" type="button" :disabled="!mailBody" aria-label="清空通知正文" title="清空正文" @click="mailBody = ''"><AppIcon name="broom" /></button></div>
+      <section class="card compose-panel" :inert="saving">
+        <div class="panel-title"><div><span class="step">1</span><h3 ref="composeHeading" tabindex="-1">粘贴通知正文</h3></div><button class="text-button icon-button compact-icon" type="button" :disabled="!mailBody" aria-label="清空通知正文" title="清空正文" @click="mailBody = ''"><AppIcon name="broom" /></button></div>
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
         <div v-if="status && !status.callsEnabled" class="service-unavailable">{{ status.message || '邮件识别服务当前不可用' }}</div>
@@ -359,14 +422,14 @@ function preventImplicitSubmit(event: KeyboardEvent) {
       <section class="card review-panel">
         <div class="panel-title">
           <div>
-            <span class="step">2</span><h3>核对并录入</h3>
+            <span class="step">2</span><h3 ref="reviewHeading" tabindex="-1">核对并录入</h3>
             <button v-if="hasResult" class="secondary icon-button compact-icon" type="button" aria-label="查看邮件识别字段" aria-haspopup="dialog" title="查看邮件识别字段" @click="recognitionDetailsDialog?.showModal()">
               <AppIcon name="info" />
             </button>
           </div>
           <span v-if="hasResult" class="match-badge">{{ matchedApplication ? '已匹配现有投递' : '将新建投递' }}</span>
         </div>
-        <form v-if="hasResult" class="result-form" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
+        <form v-if="hasResult" class="result-form" :inert="saving" @submit.prevent="saveResult" @keydown.enter="preventImplicitSubmit">
           <label class="wide application-match"><span>{{terminalNotice?'关联要结束的已有投递':'关联已有投递'}}</span><BaseSelect v-model="selectedApplicationId" :options="terminalNotice ? [{value:'',label:'请选择已有投递（不会新建）'},...rankedApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))] : [{value:'',label:'不关联，新建一条投递'},...recommendedApplications.map(item=>({value:item.id,label:`★ ${matchPercent(item)}%｜${item.company} · ${item.position}`,group:'★ 高匹配推荐'})),...otherApplications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`,group:'其他已有投递'}))]" /><small>{{terminalNotice ? (matchedApplication ? '确认后只会把这条投递标记为已结束，不会创建日程。' : '结束类通知不能新建投递或日程，请选择一条已有投递。') : matchedApplication ? '按所选类型添加日程，投递阶段随日程自动计算。' : '未自动匹配时可手动选择；新建投递后，有效时间也会自动生成关联日程。'}}</small></label>
           <div v-if="terminalNotice" class="terminal-notice wide" role="status"><AppIcon name="info" :size="18" /><div><strong>邮件可能表示招聘流程已结束或岗位不匹配</strong><span>已关闭日程录入。请确认是否要结束关联投递。</span></div></div>
           <label><span>公司 *</span><input v-model="result.company" maxlength="120" required /></label>
@@ -377,7 +440,12 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           <label v-if="!terminalNotice"><span>{{timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="result.startsAt" type="datetime-local" required /></label>
           <label v-if="!terminalNotice"><span>地点 / 视频链接</span><input v-model="result.location" maxlength="1000" /></label>
           <label v-if="!terminalNotice&&timeMode==='range'"><span>结束时间 *</span><input v-model="result.endsAt" type="datetime-local" :min="result.startsAt" required /></label>
-          <label class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="账号密码、考试码或其他需要记住的信息" /></label>
+          <label v-if="!terminalNotice" class="wide"><span>备注</span><textarea v-model="result.notes" rows="3" maxlength="4000" placeholder="账号密码、考试码或其他需要记住的信息" /></label>
+          <label v-if="duplicateEvent" class="wide">
+            <span>已有相同日程 · 备注处理</span>
+            <BaseSelect v-model="noteMode" aria-label="备注处理方式" :options="[{value:'keep',label:'保留原备注'},{value:'append',label:'追加新备注'},{value:'replace',label:'替换为新备注'}]" />
+            <small v-if="duplicateEvent.notes">原备注：{{ duplicateEvent.notes }}</small>
+          </label>
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
           <div class="commit-box wide"><template v-if="terminalNotice"><span>{{actionSummary}}</span><div class="terminal-actions"><button type="button" class="secondary" :disabled="saving" @click="skipTerminalUpdate">暂不修改</button><button type="submit" :disabled="saving||!matchedApplication">{{saving?'正在更新…':'标记投递已结束'}}</button></div></template><template v-else><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></template></div>
         </form>
@@ -554,4 +622,12 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 :global(:root[data-theme="dark"] .primary-action:disabled) { border-color:#414650; color:#9299a6; background:#262a32; opacity:1; }
 :global(:root[data-theme="dark"] .mail-preview-body) { color:#e8eaf1; background:#171a21; }
 :global(:root[data-theme="dark"] .mail-preview-plain) { color:#e8eaf1; background:#171a21; }
+ .mail-steps { display: none; }
+@media (max-width: 720px) {
+  .mail-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+  .mail-steps button[aria-pressed="true"] { color: var(--color-primary); border-color: var(--color-primary); }
+  .mail-grid:not([data-step="inbox"]) .inbox-panel,
+  .mail-grid:not([data-step="compose"]) .compose-panel,
+  .mail-grid:not([data-step="review"]) .review-panel { display: none !important; }
+}
 </style>

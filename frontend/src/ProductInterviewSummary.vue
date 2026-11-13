@@ -7,7 +7,7 @@ import { confirmDialog } from './modalDialogs'
 
 type Topic = { name: string; count: number; kind: 'project' | 'knowledge' | 'other'; summary: string; questionAnswers: { question: string; answer: string; answerStatus?: string; frequency?: number; sourceQuestions?: { question: string; eventId?: string }[] }[] }
 type Summary = { sourceKey: string; stale?: boolean; topics: Topic[] }
-type Workbench = { sourceKey: string; requiresFullRebuild?: boolean; overallSummary?: Summary; summaryJob?: { stage?: string; classificationBatches?: { status: string }[] } }
+type Workbench = { sourceKey: string; requiresFullRebuild?: boolean; overallSummary?: Summary; changedReviewIds?: string[]; removedReviewIds?: string[]; summaryJob?: { stage?: string; classificationBatches?: { status: string }[] } }
 type Review = { event: JobEvent; application: JobApplication; company: string; position: string; title: string; questions: string }
 
 const emit = defineEmits<{ navigate: [page: 'profile']; 'focus-resume': [] }>()
@@ -39,6 +39,10 @@ const reviews = computed<Review[]>(() => store.events.value.flatMap(event => {
 }).sort((a, b) => String(b.event.startsAt || b.event.date || '').localeCompare(String(a.event.startsAt || a.event.date || ''))))
 const reviewSignature = computed(() => reviews.value.map(item => `${item.event.id}|${item.application.id}|${item.company}|${item.position}|${item.title}|${item.questions}`).sort().join('\n'))
 const summary = computed(() => state.value?.overallSummary)
+const changedReviews = computed(() => {
+  const ids = new Set(state.value?.changedReviewIds || [])
+  return reviews.value.filter(review => ids.has(String(review.event.id)))
+})
 const hasIncompleteAnswers = computed(() => (summary.value?.topics || []).some(topic => topic.questionAnswers.some(item => !item.answer)))
 const projectTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'project').sort((a, b) => b.count - a.count))
 const knowledgeTopics = computed(() => (summary.value?.topics || []).filter(item => item.kind === 'knowledge').sort((a, b) => b.count - a.count))
@@ -51,7 +55,7 @@ const topicGroups = computed<{ kind: Topic['kind']; label: string; topics: Topic
 const activeTopicGroup = computed(() => topicGroups.value.find(group => group.kind === activeTopicKind.value)!)
 const activeTopicKindLabel = computed(() => activeTopicKind.value === 'project' ? '项目' : activeTopicKind.value === 'knowledge' ? '八股' : '其他')
 const activeTopics = computed(() => activeTopicGroup.value.topics)
-const topicEntries = computed(() => summary.value?.stale ? [] : activeTopics.value.map((topic, index) => ({
+const topicEntries = computed(() => activeTopics.value.map((topic, index) => ({
   key: `${activeTopicKind.value}:${index}:${topic.name}`, group: activeTopicGroup.value.label, topic
 })))
 const selectedTopic = computed(() => topicEntries.value.find(item => item.key === selectedTopicKey.value) || null)
@@ -194,7 +198,7 @@ watch(topicEntries, entries => {
             <div v-if="topicEntries.length" class="mobile-topic-menu-topics">
               <button v-for="entry in topicEntries" :key="entry.key" type="button" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="chooseMobileTopic(entry.key)"><span>{{ entry.topic.name }}</span><strong>{{ entry.topic.count }}</strong></button>
             </div>
-            <p v-else class="mobile-topic-menu-empty">{{ summary?.stale ? '汇总后可选择知识点' : `暂无${activeTopicGroup.label}` }}</p>
+            <p v-else class="mobile-topic-menu-empty">{{ `暂无${activeTopicGroup.label}` }}</p>
           </div>
         </div>
       </div>
@@ -214,12 +218,22 @@ watch(topicEntries, entries => {
           <button type="button" class="primary-action" @click="goToResume">去配置简历</button>
         </section>
         <div v-if="hasResume" class="workbench-header">
-          <div class="workbench-heading"><div class="workbench-heading-copy"><h2 id="topic-title" class="workbench-breadcrumb" aria-live="polite"><span>{{ activeTopicKindLabel }}</span><i aria-hidden="true">/</i><strong>{{ selectedTopic?.topic.name || (summary?.stale ? '汇总后显示知识点' : '暂无知识点') }}</strong></h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
-          <TransitionGroup v-if="summary && !summary.stale" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
+          <div class="workbench-heading"><div class="workbench-heading-copy"><h2 id="topic-title" class="workbench-breadcrumb" aria-live="polite"><span>{{ activeTopicKindLabel }}</span><i aria-hidden="true">/</i><strong>{{ selectedTopic?.topic.name || ('暂无知识点') }}</strong></h2></div><div class="topic-kind-switch" role="group" aria-label="切换考点类型"><button type="button" :aria-pressed="activeTopicKind === 'project'" @click="switchTopicKind('project')">项目</button><button type="button" :aria-pressed="activeTopicKind === 'knowledge'" @click="switchTopicKind('knowledge')">八股</button><button type="button" :aria-pressed="activeTopicKind === 'other'" @click="switchTopicKind('other')">其他</button><span class="topic-kind-indicator" :class="{ 'is-knowledge': activeTopicKind === 'knowledge', 'is-other': activeTopicKind === 'other' }" aria-hidden="true"></span></div></div>
+          <TransitionGroup v-if="summary" tag="div" name="topic-chip" class="topic-tags" role="group" :aria-label="`${activeTopicGroup.label}分类`"><button v-for="entry in topicEntries" :key="entry.key" type="button" class="topic-tag" :class="{ selected: selectedTopicKey === entry.key }" :aria-pressed="selectedTopicKey === entry.key" @click="selectTopic(entry.key)"><span class="topic-tag-name">{{ entry.topic.name }}</span><strong class="topic-tag-count">{{ entry.topic.count }}</strong></button><span v-if="!topicEntries.length" key="empty" class="topic-tag-empty">暂无{{ activeTopicGroup.label }}</span></TransitionGroup>
           <div v-else class="topic-tags topic-tags-placeholder"><span>汇总后可按考点类别筛选</span></div>
         </div>
         <div v-if="hasResume" ref="workbenchScroll" class="pane-scroll workbench-content">
           <div class="workbench-page">
+          <div v-if="summary?.stale" class="summary-note">
+            <p role="status">{{ state?.requiresFullRebuild ? '汇总资料有变更。下方仍可查看上次汇总。' : '面试回顾有更新。下方为上次汇总，可点击顶部按钮增量更新。' }}</p>
+            <details v-if="changedReviews.length || state?.removedReviewIds?.length">
+              <summary>查看回顾变更</summary>
+              <ul>
+                <li v-for="review in changedReviews" :key="review.event.id">{{ review.company }} · {{ review.title }}</li>
+                <li v-if="state?.removedReviewIds?.length">{{ state.removedReviewIds.length }} 条回顾已移除</li>
+              </ul>
+            </details>
+          </div>
           <section v-if="summarizing" class="stream-preview" aria-label="实时生成的复习内容">
             <div class="stream-status" role="status" aria-live="polite" aria-atomic="true"><span class="stream-spinner" aria-hidden="true"></span><span>{{ streamingStatus }}</span><span v-if="streamingQuestions.length" class="stream-count">已生成 {{ streamingQuestions.length }} 题</span></div>
             <div v-if="streamingBatch" class="batch-progress" role="progressbar" :aria-label="`当前第 ${streamingBatch.current} 批，共 ${streamingBatch.total} 批`" :aria-valuemin="1" :aria-valuemax="streamingBatch.total" :aria-valuenow="streamingBatch.current"><span class="batch-progress-label">第 {{ streamingBatch.current }} 批 / 共 {{ streamingBatch.total }} 批</span><span class="batch-progress-track" aria-hidden="true"><span :style="{ width: `${streamingBatch.percent}%` }"></span></span></div>
@@ -227,9 +241,9 @@ watch(topicEntries, entries => {
             <p v-else class="stream-waiting">AI 正在整理问题并撰写详细讲解，完成一题后会立即显示在这里。</p>
           </section>
           <p v-if="!reviews.length" class="empty-state">记录面试回顾后，这里会归纳问题并生成详细参考回答。</p>
-          <p v-else-if="(!summary || summary.stale) && !summarizing" class="empty-state">{{ summary?.stale ? '面试回顾或简历已更新，请重新汇总全部考点。' : '点击“AI 汇总全部考点”开始归纳。' }}</p>
+          <p v-else-if="!summary && !summarizing" class="empty-state">点击“AI 汇总全部考点”开始归纳。</p>
           <div v-else-if="selectedTopic" :key="selectedTopic.key" class="topic-detail"><p v-if="selectedTopic.topic.kind === 'project' && !hasResume" class="project-resume-hint">项目类讲解可以结合你的真实实习和项目经历进一步个性化。<button type="button" @click="goToResume">去个人主页设置简历 →</button></p><section v-if="selectedTopic.topic.summary" class="detail-section"><h4>考点总结</h4><p>{{ selectedTopic.topic.summary }}</p></section><section v-if="selectedTopic.topic.questionAnswers?.length" class="detail-section"><h4>问题与详细讲解 <span>{{ selectedTopic.topic.questionAnswers.length }} 个归纳问题</span></h4><ol class="question-answer-list"><li v-for="(item, index) in selectedTopic.topic.questionAnswers" :key="`${selectedTopic.key}:${index}:${item.question}`" class="question-answer"><h5><span>归纳题 {{ index + 1 }}</span>{{ item.question }}<small v-if="(item.frequency || 1) > 1" class="merged-frequency">合并 {{ item.frequency }} 个问法</small></h5><details v-if="item.sourceQuestions?.length" class="source-questions"><summary>查看原始问法（{{ item.sourceQuestions.length }}）</summary><ul><li v-for="(source, sourceIndex) in item.sourceQuestions" :key="`${source.eventId || ''}:${sourceIndex}`">{{ source.question }}</li></ul></details><div class="reference-answer"><strong>学习讲解</strong><p>{{ item.answer }}</p></div></li></ol></section></div>
-          <p v-else-if="!summarizing" class="empty-state">{{ summary && !summary.stale ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
+          <p v-else-if="!summarizing" class="empty-state">{{ summary ? '选择顶部的考点类别，查看详细问题和参考回答。' : '完成考点汇总后，在顶部选择类别查看详细内容。' }}</p>
           </div>
         </div>
       </section>

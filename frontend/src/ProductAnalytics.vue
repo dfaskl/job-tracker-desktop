@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
+import { companyKey, companyType } from './companyType'
 import { api } from './api'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
@@ -7,6 +8,8 @@ import { useJobTrackerStore } from './jobTrackerStore'
 const store = useJobTrackerStore()
 const analyticsMain = ref<HTMLElement | null>(null)
 const analyticsMainHeight = ref(0)
+const interviewBatchSize = 40
+const visibleInterviewCount = ref(interviewBatchSize)
 type CompanyLink = { company: string; industry?: string; industryStatus?: string }
 const companyLinks = ref<CompanyLink[]>([])
 const companyLinksLoading = ref(false)
@@ -46,15 +49,13 @@ function distribution(items: DistributionItem[], colors: string[]) {
 const stageDistribution = computed(() => distribution(byStage.value, stageColors))
 const channelDistribution = computed(() => distribution(byChannel.value, channelColors))
 const companyTypeCounts = computed(() => {
-  const byCompany = new Map<string, string>()
-  for (const item of companyLinks.value) {
-    const company = item.company.trim().toLocaleLowerCase()
-    if (!company || byCompany.has(company)) continue
-    const category = item.industry?.trim() || (item.industryStatus === 'pending' ? 'AI识别中' : item.industryStatus === 'failed' ? '识别失败' : '未分类')
-    byCompany.set(company, category)
-  }
+  const directory = new Map(companyLinks.value.map(item => [companyKey(item.company), item]))
+  const companies = new Set(store.applications.value.map(item => companyKey(item.company)).filter(Boolean))
   const counts = new Map<string, number>()
-  for (const category of byCompany.values()) counts.set(category, (counts.get(category) || 0) + 1)
+  for (const company of companies) {
+    const category = companyType(directory.get(company))
+    counts.set(category, (counts.get(category) || 0) + 1)
+  }
   return [...counts.entries()].map(([name, count], index) => ({ name, count, color: name === 'AI识别中' ? '#8290a5' : name === '识别失败' ? '#cf6962' : channelColors[index % channelColors.length] }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'))
 })
@@ -70,17 +71,29 @@ const trend = computed(() => {
   return months
 })
 const maxTrend = computed(() => Math.max(1, ...trend.value.map(item => item.count)))
+const eventsByApplication = computed(() => {
+  const grouped = new Map<string, typeof store.events.value>()
+  for (const event of store.events.value) {
+    if (!event.applicationId) continue
+    const events = grouped.get(event.applicationId) || []
+    events.push(event)
+    grouped.set(event.applicationId, events)
+  }
+  return grouped
+})
 const interviewRecords = computed(() => store.applications.value
   .filter(item => hasInterviewProgress(item))
   .map(item => {
-    const related = store.events.value
-      .filter(event => event.applicationId === item.id && !event.abandoned && isFormalInterview(event))
+    const related = (eventsByApplication.value.get(item.id) || [])
+      .filter(event => !event.abandoned && isFormalInterview(event))
       .sort((a,b) => interviewTime(b).localeCompare(interviewTime(a)))
     const ended = item.stage === '已结束' || ['未通过','已放弃','已结束'].includes(String(item.status || ''))
     const offer = item.stage === 'Offer' || item.status === '已通过'
-    return { item, related, ended, offer, latest:related[0] ? interviewTime(related[0]) : '', flow:compactFlow(item) }
+    return { item, related, ended, offer, latest:related[0] ? interviewTime(related[0]) : '' }
   })
   .sort((a,b) => Number(a.ended) - Number(b.ended) || b.latest.localeCompare(a.latest) || String(a.item.company || '').localeCompare(String(b.item.company || ''),'zh-CN')))
+const visibleInterviewRecords = computed(() => interviewRecords.value.slice(0, visibleInterviewCount.value)
+  .map(record => ({ ...record, flow: compactFlow(record.item) })))
 
 function pad(value: number) { return String(value).padStart(2, '0') }
 function interviewTime(event: Record<string, unknown>) { return String(event.completedAt || event.startsAt || event.start || event.date || '') }
@@ -113,8 +126,7 @@ function compactEventDate(event: Record<string, unknown>) {
   return end ? `${start}–${compactDate(end)}` : start
 }
 function compactFlow(item: Record<string, unknown>) {
-  const events = store.events.value
-    .filter(event => event.applicationId === item.id)
+  const events = (eventsByApplication.value.get(String(item.id)) || [])
     .slice()
     .sort((a, b) => eventDeadline(a).localeCompare(eventDeadline(b)))
   const applied = compactFlowVisual('已投递')
@@ -142,7 +154,7 @@ function compactFlow(item: Record<string, unknown>) {
 }
 function hasInterviewProgress(item: Record<string, unknown>) {
   if (['面试', 'Offer'].includes(String(item.stage || '')) || item.status === '已通过') return true
-  return store.events.value.some(event => event.applicationId === item.id && !event.abandoned && isFormalInterview(event))
+  return eventsByApplication.value.get(String(item.id))?.some(event => !event.abandoned && isFormalInterview(event)) ?? false
 }
 function grouped(field: string) {
   const counts = new Map<string, number>()
@@ -228,12 +240,12 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
       </section>
     </div>
       <section class="card company-type-card" aria-labelledby="company-type-title">
-        <header class="company-type-header"><div><h2 id="company-type-title">公司类型分布</h2><p>按公司数统计</p></div><span>{{companyTypeTotal}} 家</span></header>
+        <header class="company-type-header"><div><h2 id="company-type-title">公司类型分布</h2><p>按已投递公司去重统计</p></div><span>{{companyTypeTotal}} 家</span></header>
         <div v-if="companyTypeCounts.length" class="company-type-list" aria-label="各公司类型数量">
-          <div v-for="item in companyTypeCounts" :key="item.name" class="company-type-row">
+          <a v-for="item in companyTypeCounts" :key="item.name" class="company-type-row" :href="`#/applications?companyType=${encodeURIComponent(item.name)}`">
             <div class="company-type-label"><span :title="item.name">{{item.name}}</span><strong>{{item.count}}</strong></div>
             <div class="company-type-track" aria-hidden="true"><i :style="{width:(item.count/companyTypeMax*100)+'%',background:item.color}" /></div>
-          </div>
+          </a>
         </div>
         <p v-else-if="companyLinksLoading" class="distribution-empty">正在读取公司分类…</p>
         <p v-else-if="companyLinksError" class="distribution-empty">公司分类暂时无法读取</p>
@@ -244,7 +256,7 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
       <section class="trend-panel" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
       <header><div><h2 id="interview-records-title">面试记录</h2></div><b>{{interviewRecords.length}}</b></header>
       <div v-if="interviewRecords.length" class="interview-list" tabindex="0" aria-label="面试投递记录，可上下滚动">
-        <article v-for="record in interviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
+        <article v-for="record in visibleInterviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
           <div class="record-head"><strong>{{record.item.company||'未填写公司'}}</strong><span>{{record.offer?'Offer':record.ended?'已结束':'面试中'}}</span></div>
           <p>{{record.item.position||'未填写岗位'}}</p>
           <div class="compact-flow" :style="{'--flow-count':record.flow.length}" role="list" :aria-label="`${record.item.company||'该投递'}的投递流程`">
@@ -252,6 +264,7 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
           </div>
           <footer><span>{{record.related.length?`${record.related.length} 场正式面试`:'阶段记录显示已进入面试'}}</span></footer>
         </article>
+        <button v-if="visibleInterviewCount < interviewRecords.length" type="button" class="secondary" @click="visibleInterviewCount += interviewBatchSize">显示更多面试记录</button>
       </div>
       <p v-else class="interview-empty">暂无进入过正式面试环节的投递。</p>
     </aside>
@@ -295,7 +308,8 @@ onBeforeUnmount(() => { viewActive = false; window.clearTimeout(companyLinksPoll
 .company-type-header p { margin:4px 0 0; color:var(--color-muted-foreground); font-size:11px; }
 .company-type-header>span { flex:none; padding:4px 8px; border-radius:999px; color:var(--color-muted-foreground); background:var(--color-muted); font-size:11px; font-weight:700; }
 .company-type-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 24px; }
-.company-type-row { display:grid; min-width:0; gap:6px; }
+.company-type-row { color:inherit; text-decoration:none; display:grid; min-width:0; gap:6px; }
+.company-type-row:hover .company-type-label { color:var(--color-primary); }
 .company-type-label { display:flex; min-width:0; align-items:center; justify-content:space-between; gap:10px; color:var(--color-muted-foreground); font-size:12px; }
 .company-type-label>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .company-type-label>strong { color:var(--color-foreground); font-variant-numeric:tabular-nums; }

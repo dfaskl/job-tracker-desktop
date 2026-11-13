@@ -61,10 +61,30 @@ onActivated(() => {
 onDeactivated(() => { homeViewActive = false; stopScheduleClock() })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 
+const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
+const eventsByApplication = computed(() => {
+  const groups = new Map<string, JobEvent[]>()
+  for (const event of store.events.value) {
+    if (!event.applicationId) continue
+    const group = groups.get(event.applicationId)
+    if (group) group.push(event)
+    else groups.set(event.applicationId, [event])
+  }
+  return groups
+})
 const upcomingItems = computed(() => store.events.value.filter(item => !item.completed && !item.missed && !item.abandoned && !isEnded(appFor(item)))
   .sort((a,b) => schedulePriorityTimestamp(a)-schedulePriorityTimestamp(b)))
 const recentSchedules = computed(() => upcomingItems.value)
-const overdueScheduleCount = computed(() => recentSchedules.value.filter(scheduleOverdue).length)
+const overdueSchedules = computed(() => recentSchedules.value.filter(scheduleOverdue))
+const scheduledGroups = computed(() => [
+  { id: 'home-overdue-schedules', title: '过期待确认', events: overdueSchedules.value },
+  { id: 'home-upcoming-schedules', title: '即将到来', events: recentSchedules.value.filter(event => !scheduleOverdue(event)) }
+].filter(group => group.events.length))
+function focusOverdueSchedules() {
+  const heading = document.getElementById('home-overdue-schedules')
+  heading?.scrollIntoView({ block: 'nearest' })
+  heading?.focus({ preventScroll: true })
+}
 const nextScheduleId = computed(() => recentSchedules.value.find(event => !scheduleOverdue(event) && Number.isFinite(schedulePriorityTimestamp(event)))?.id)
 const adviceCandidates = computed(() => upcomingItems.value)
 const adviceSignature = computed(() => JSON.stringify(adviceCandidates.value.map(event => ({
@@ -221,8 +241,8 @@ function localScheduleAdvice():ScheduleAdvice{
   }finally{adviceLoading.value=false}
 }
 function isEnded(item:JobApplication|undefined){return Boolean(item)&&(item?.stage==='已结束'||['未通过','已放弃','已结束'].includes(String(item?.status||'')))}
-function progressHealth(item:JobApplication){return applicationProgressHealth(item,store.events.value)}
-function appFor(event:JobEvent){return store.applications.value.find(item=>item.id===event.applicationId)}
+function progressHealth(item:JobApplication){return applicationProgressHealth(item,eventsByApplication.value.get(item.id) || [])}
+function appFor(event:JobEvent){return event.applicationId ? applicationsById.value.get(event.applicationId) : undefined}
 function openApplicationDetail(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id))}
 function focusApplication(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id),'focus')}
 function eventCompany(event:JobEvent){return String(event.company||appFor(event)?.company||'未填写公司')}
@@ -296,9 +316,11 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
       <section class="details-column" aria-labelledby="my-schedule-title">
-        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><small :class="{'overdue-summary':overdueScheduleCount}" role="status">{{overdueScheduleCount?`${overdueScheduleCount} 项已过期，请确认完成情况`:'可编辑或完成自己的日程'}}</small></div><span>{{recentSchedules.length}} 项</span></div>
-        <div v-if="recentSchedules.length" class="schedule-list">
-          <article v-for="event in recentSchedules" :key="event.id" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event)}">
+        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><button v-if="overdueSchedules.length" type="button" class="text-link overdue-summary" @click="focusOverdueSchedules">{{ overdueSchedules.length }} 项已过期</button><small v-else>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
+        <template v-if="recentSchedules.length">
+          <div v-for="group in scheduledGroups" :key="group.id" class="schedule-list">
+          <h3 v-if="overdueSchedules.length" :id="group.id" tabindex="-1">{{ group.title }}</h3>
+          <article v-for="event in group.events" :key="event.id" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event)}">
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
             <div class="schedule-copy"><div class="schedule-heading"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span></div><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
             <div class="schedule-actions">
@@ -311,6 +333,7 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
             </div>
           </article>
         </div>
+        </template>
         <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
       </section>
     </section>

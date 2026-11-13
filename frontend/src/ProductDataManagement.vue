@@ -197,13 +197,18 @@ async function chooseImportFile(event: Event) {
 
 async function importIntoSandbox() {
   if (!sandbox.value?.enabled || !importData.value) return
+  const data = importData.value
+  if (!await confirmDialog(
+    `当前 ${store.applications.value.length} 条投递、${store.events.value.length} 项日程。导入后将变为 ${data.applications.length} 条投递、${data.events.length} 项日程。当前数据会自动备份。`,
+    { title: '覆盖当前数据？', confirmText: '覆盖并导入', tone: 'danger' }
+  ) || loading.value || importData.value !== data) return
   loading.value = true
   message.value = ''
   error.value = ''
   try {
     const result = await api<ImportResult>('/api/poc/backup-sandbox/import', {
       method: 'POST',
-      body: JSON.stringify({ data: importData.value, confirmation: '导入' })
+      body: JSON.stringify({ data, confirmation: '导入' })
     })
     message.value = `已导入数据：${result.applicationCount} 条投递、${result.eventCount} 项日程`
     await store.refresh()
@@ -293,7 +298,7 @@ function formatDate(value: string) {
         <h3>导入数据</h3>
         <p>{{ sandbox?.enabled ? '导入前会自动备份当前数据。' : (sandbox?.message || '正在读取数据状态') }}</p>
         <label class="file-picker"><span class="file-button">选择文件</span><input ref="importFileInput" type="file" accept="application/json,.json" :disabled="!sandbox?.enabled" @change="chooseImportFile" /><small>{{ importFileName || '未选择任何文件' }}</small></label>
-        <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">确认导入</button>
+        <button type="button" :disabled="loading || !sandbox?.enabled || !importData" @click="importIntoSandbox">覆盖并导入</button>
 
       </div>
 

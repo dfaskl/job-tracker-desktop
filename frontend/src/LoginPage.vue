@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
+import { ApiError } from './api'
 import AuthIllustration from './AuthIllustration.vue'
 import { useJobTrackerStore } from './jobTrackerStore'
 
@@ -10,6 +11,7 @@ const password = ref('')
 const registrationCode = ref('')
 const submitting = ref(false)
 const message = ref('')
+const showPasswordHelp = ref(false)
 const emailInput = ref<HTMLInputElement | null>(null)
 const showPassword = ref(false)
 const emailFocused = ref(false)
@@ -22,13 +24,16 @@ async function submit() {
     if (mode.value === 'login') await store.login(email.value, password.value)
     else await store.register(email.value, password.value, registrationCode.value)
   } catch (cause) {
-    message.value = cause instanceof Error ? cause.message : '登录失败，请检查账号信息后重试'
+    if (cause instanceof TypeError) message.value = '无法连接服务。请检查网络，连接恢复后再试。'
+    else if (cause instanceof ApiError && cause.status >= 500) message.value = `${cause.message}，请稍后重试。`
+    else message.value = cause instanceof Error ? cause.message : '操作失败，请稍后重试。'
   } finally {
     submitting.value = false
   }
 }
 
 async function switchMode() {
+  showPasswordHelp.value = false
   mode.value = mode.value === 'login' ? 'register' : 'login'
   password.value = ''
   showPassword.value = false
@@ -84,6 +89,10 @@ async function switchMode() {
           </button>
         </form>
 
+        <div v-if="mode === 'login'" class="login-help">
+          <button class="mode-switch" type="button" :aria-expanded="showPasswordHelp" @click="showPasswordHelp = !showPasswordHelp">忘记密码？</button>
+          <p v-if="showPasswordHelp">请联系此站点的管理员协助找回账号。提供注册邮箱即可。</p>
+        </div>
         <p class="mode-line">{{ mode === 'login' ? '还没有账户？' : '已经有账户？' }} <button class="mode-switch" type="button" :disabled="submitting" @click="switchMode">{{ mode === 'login' ? '立即创建' : '去登录' }}</button></p>
       </div>
     </section>
@@ -96,4 +105,6 @@ async function switchMode() {
 @keyframes auth-panel-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @media(min-width:1024px){.login-page{height:100dvh;grid-template-columns:1fr 1fr;overflow:hidden}.login-story{display:flex}.login-entry{min-height:0;overflow-y:auto}.mobile-brand{display:none}}
 @media(max-width:640px){.source-link{top:16px;right:16px;width:40px;padding:0}.source-link span{display:none}.login-entry{padding:76px 20px 32px}.entry-heading{margin-bottom:32px}}
+.login-help { margin-top:12px; text-align:center; }
+.login-help p { margin:4px 0; color:#d6d3d1; font-size:13px; }
 </style>

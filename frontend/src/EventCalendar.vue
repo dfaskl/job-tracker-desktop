@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useJobTrackerStore } from './jobTrackerStore'
+import EditorDialog from './EditorDialog.vue'
 import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { jsonFetch } from './api'
@@ -73,6 +74,28 @@ const events = computed<EventItem[]>(() => store.events.value.map(item => {
 }))
 const month = ref(firstOfMonth(new Date()))
 const selectedDate = ref(dateKey(new Date()))
+const mobileAgenda = ref(false)
+const agendaRows = computed(() => {
+  const prefix = dateKey(month.value).slice(0,7)
+  const today = dateKey(new Date())
+  const rows = new Map<string, CalendarEvent[]>()
+  for (const event of events.value) {
+    if (event.completed || event.missed || event.abandoned) continue
+    const start = event.startsAt.slice(0,10)
+    const end = (event.endsAt || event.startsAt).slice(0,10)
+    const first = dateKey(month.value)
+    if (!start || end < first || start.slice(0,7) > prefix) continue
+    const day = start < first ? first : start
+    const key = start < today && today <= end && today.startsWith(prefix) ? today : day
+    const group = rows.get(key) || []
+    group.push({ event, position: 'point', lane: 0, color: eventColor(event) })
+    rows.set(key, group)
+  }
+  return [...rows].sort(([left], [right]) => left.localeCompare(right)).map(([key, entries]) => ({
+    key, entries: entries.sort((left,right) => (left.event.endsAt || left.event.startsAt).localeCompare(right.event.endsAt || right.event.startsAt))
+  }))
+})
+const displayedDayGroups = computed(() => mobileAgenda.value ? agendaRows.value : [{ key: selectedDate.value, entries: selectedEvents.value }])
 const editing = ref<EventItem | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -122,6 +145,7 @@ function firstOfMonth(date: Date) { return new Date(date.getFullYear(), date.get
 function monthValue(date: Date) { return date.getFullYear() * 12 + date.getMonth() }
 function scheduleBounds() {
   const values = [
+    dateKey(firstOfMonth(new Date())).slice(0,7),
     ...applications.value.map(application => String(application.appliedDate || '').slice(0, 7)),
     ...events.value.flatMap(event => calendarEntries(event).map(entry => entry.key.slice(0, 7)))
   ].filter(value => /^\d{4}-\d{2}$/.test(value)).sort()
@@ -229,9 +253,11 @@ function changeMonth(offset: number) {
   const nextMonth = clampMonth(new Date(month.value.getFullYear(), month.value.getMonth() + offset, 1))
   if (monthValue(nextMonth) === monthValue(month.value)) return
   month.value = nextMonth
+  const day = Math.min(Number(selectedDate.value.slice(-2)) || 1, new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate())
+  selectDate(dateKey(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day)))
 }
 function resetMonth() {
-  const nextMonth = clampMonth(firstOfMonth(new Date()))
+  const nextMonth = firstOfMonth(new Date())
   const today = dateKey(new Date())
   month.value = nextMonth
   selectDate(today)
@@ -239,6 +265,13 @@ function resetMonth() {
 function selectDate(key: string) {
   if (selectedDate.value === key) return
   selectedDate.value = key
+}
+
+let editorSnapshot = ''
+async function dismissEditor() {
+  if (loading.value) return
+  if (JSON.stringify(form) !== editorSnapshot && !await confirmDialog('本次修改尚未保存。', { title: '放弃修改？', confirmText: '放弃修改', cancelText: '继续编辑' })) return
+  resetForm()
 }
 
 function edit(item: EventItem) {
@@ -254,6 +287,7 @@ function edit(item: EventItem) {
     notes: item.notes,
     interviewQuestions: item.interviewQuestions
   })
+  editorSnapshot = JSON.stringify(form)
   message.value = ''
   error.value = ''
 }
@@ -351,7 +385,11 @@ async function remove(item: EventItem) {
 
     <template v-else-if="sandbox?.enabled">
 <p v-if="message" class="success">{{ message }}</p>
-      <div class="calendar-layout">
+      <div class="calendar-view-toggle" role="group" aria-label="日程视图">
+        <button type="button" class="secondary" :aria-pressed="!mobileAgenda" @click="mobileAgenda = false">月历</button>
+        <button type="button" class="secondary" :aria-pressed="mobileAgenda" @click="mobileAgenda = true">待办列表</button>
+      </div>
+      <div class="calendar-layout" :class="{ 'is-agenda': mobileAgenda }">
         <div class="calendar-pane">
           <div class="calendar-head">
             <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
@@ -372,9 +410,12 @@ async function remove(item: EventItem) {
         </div>
 
         <aside class="selected-list">
-          <h3>{{ selectedDate }} 的日程</h3>
-          <div :key="selectedDate" class="selected-scroll">
-            <article v-for="entry in selectedEvents" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
+          <h3>{{ mobileAgenda ? '本月待办' : selectedDate + ' 的日程' }}</h3>
+          <div :key="mobileAgenda ? 'agenda' : selectedDate" class="selected-scroll">
+            <p v-if="mobileAgenda && !displayedDayGroups.length" class="empty">本月没有待办日程。</p>
+            <template v-for="group in displayedDayGroups" :key="group.key">
+            <h4 v-if="mobileAgenda" class="agenda-day">{{ group.key }}</h4>
+            <article v-for="entry in group.entries" :key="entry.event.id" :style="eventStyle(entry)" :class="{ completed:entry.event.completed, missed:entry.event.missed, abandoned:entry.event.abandoned }">
               <div class="event-main">
                 <a v-if="locationLink(entry.event.location)" class="event-title-link" :href="locationLink(entry.event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开${entry.event.company} · ${entry.event.title || entry.event.type}的日程链接`"><strong>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong><span aria-hidden="true">↗</span></a>
                 <strong v-else>{{ entry.event.company }} · {{ entry.event.title || entry.event.type }}</strong>
@@ -391,19 +432,20 @@ async function remove(item: EventItem) {
                 <button class="danger-button compact icon-button compact-icon" aria-label="删除日程" title="删除" @click="remove(entry.event)"><AppIcon name="trash" :size="16" /></button>
               </div>
             </article>
-            <div v-if="!selectedEvents.length" class="empty">当天没有日程</div>
+            </template>
+            <div v-if="!mobileAgenda && !selectedEvents.length" class="empty">当天没有日程</div>
           </div>
         </aside>
       </div>
       <Teleport to="body">
-      <div v-if="editing" class="edit-backdrop" @click.self="resetForm">
-        <form class="event-form edit-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-title" @submit.prevent="save">
-          <button type="button" class="modal-close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="resetForm"><AppIcon name="close" /></button>
+      <EditorDialog v-if="editing" backdrop-class="edit-backdrop" labelled-by="event-editor-title" @dismiss="dismissEditor">
+        <form class="event-form edit-modal" @submit.prevent="save">
+          <button type="button" class="modal-close icon-button" aria-label="关闭日程编辑窗口" title="关闭" @click="dismissEditor"><AppIcon name="close" /></button>
           <h3 id="event-editor-title" class="wide">编辑日程</h3>
           <ScheduleTimeModeNotice class="wide" :mode="form.timeMode" selectable @select="form.timeMode=$event" />
           <label class="wide"><span>关联岗位</span><BaseSelect v-model="form.applicationId" :options="applications.map(item=>({value:item.id,label:`${item.company} · ${item.position}`}))" disabled /></label>
           <label><span>类型</span><BaseSelect v-model="form.type" :options="eventTypes" /></label>
-          <label><span>安排名称 *</span><input v-model="form.title" maxlength="200" required /></label>
+          <label><span>安排名称 *</span><input v-model="form.title" autofocus maxlength="200" required /></label>
           <div class="schedule-time-fields wide" :class="{ 'is-point':form.timeMode==='point' }">
             <label><span>{{form.timeMode==='range'?'开始时间 *':'时间 *'}}</span><input v-model="form.startsAt" type="datetime-local" required /></label>
             <label v-if="form.timeMode==='range'"><span>结束时间 *</span><input v-model="form.endsAt" type="datetime-local" :min="form.startsAt" required /></label>
@@ -411,9 +453,10 @@ async function remove(item: EventItem) {
           <label class="wide"><span>地点 / 会议方式</span><input v-model="form.location" maxlength="1000" /></label>
           <label class="wide"><span>备注</span><textarea v-model="form.notes" maxlength="4000" rows="3" /></label>
           <label v-if="editing.completed && !editing.missed && !editing.abandoned" class="wide"><span>面试回顾 · 面试官问题清单</span><textarea v-model="form.interviewQuestions" maxlength="8000" rows="6" placeholder="每行记录一个面试官提出的问题" /><small>与日程备注分开保存。</small></label>
-          <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="resetForm">取消</button></div>
+          <p v-if="error" class="wide error" role="alert">{{ error }}</p>
+          <div class="form-actions wide"><button :disabled="loading">保存修改</button><button type="button" class="secondary" @click="dismissEditor">取消</button></div>
         </form>
-      </div>
+      </EditorDialog>
       </Teleport>
     </template>
 
@@ -514,4 +557,10 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 </style>
 <style scoped>
 .calendar-pane .calendar-grid .day{padding:8px;transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}.calendar-pane .calendar-grid .day-number{top:8px;left:8px}.calendar-pane .calendar-grid .day:not(:disabled):hover{position:relative;z-index:2;border-color:color-mix(in srgb,var(--color-primary) 52%,var(--color-border));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 34%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 9%,transparent)}.calendar-pane .calendar-grid .day:not(:disabled):hover .event-chip:not(.middle){filter:saturate(1.12) brightness(.98);box-shadow:0 2px 7px color-mix(in srgb,var(--event-color) 16%,transparent)}.day-events{--calendar-event-row-height:20px;min-height:0;grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height)}.day-events>.event-chip{padding-inline:7px}.day-events>.event-chip.middle{padding:0}@media(max-width:720px){.calendar-pane .calendar-grid .day{padding:4px}.calendar-pane .calendar-grid .day-number{top:4px;left:4px}.day-events{--calendar-event-row-height:9px;row-gap:2px}.day-events>.event-chip{padding:0}}
+ .calendar-view-toggle { display:flex; gap:8px; margin-bottom:10px; }
+.calendar-view-toggle button[aria-pressed="true"] { color:var(--color-primary); border-color:var(--color-primary); }
+.calendar-layout.is-agenda { grid-template-columns:minmax(0,1fr); }
+.calendar-layout.is-agenda :is(.weekdays,.calendar-grid) { display:none; }
+.calendar-layout.is-agenda .calendar-pane { min-height:0; }
+.agenda-day { margin:14px 0 0; color:var(--color-muted-foreground); }
 </style>

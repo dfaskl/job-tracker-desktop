@@ -1,14 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
-import ProductAnalytics from './ProductAnalytics.vue'
-import ProductInterviewSummary from './ProductInterviewSummary.vue'
-import ProductApplicationWorkspace from './ProductApplicationWorkspace.vue'
-import ProductCalendarWorkspace from './ProductCalendarWorkspace.vue'
-import MailRecognition from './MailRecognition.vue'
-import AdminDashboard from './AdminDashboard.vue'
-import ProductSettingsWorkspace from './ProductSettingsWorkspace.vue'
-import UserGuide from './UserGuide.vue'
 import { pageFromRoute, readHashRoute } from './routes'
 import { profileToggleDestination } from './profileNavigation'
 import { useJobTrackerStore } from './jobTrackerStore'
@@ -28,14 +20,14 @@ const pages: { id: Page; label: string; icon: string }[] = [
 
 const pageComponents: Record<Page, Component> = {
   home: ProductHome,
-  applications: ProductApplicationWorkspace,
-  calendar: ProductCalendarWorkspace,
-  mail: MailRecognition,
-  stats: ProductAnalytics,
-  'interview-summary': ProductInterviewSummary,
-  profile: ProductSettingsWorkspace,
-  admin: AdminDashboard,
-  guide: UserGuide
+  applications: defineAsyncComponent(() => import('./ProductApplicationWorkspace.vue')),
+  calendar: defineAsyncComponent(() => import('./ProductCalendarWorkspace.vue')),
+  mail: defineAsyncComponent(() => import('./MailRecognition.vue')),
+  stats: defineAsyncComponent(() => import('./ProductAnalytics.vue')),
+  'interview-summary': defineAsyncComponent(() => import('./ProductInterviewSummary.vue')),
+  profile: defineAsyncComponent(() => import('./ProductSettingsWorkspace.vue')),
+  admin: defineAsyncComponent(() => import('./AdminDashboard.vue')),
+  guide: defineAsyncComponent(() => import('./UserGuide.vue'))
 }
 
 const activePage = ref<Page>('home')
@@ -50,6 +42,8 @@ const guideOrigin = ref({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
 const guideCloseRequest = ref(0)
 const navigationItems = computed(() => mobileViewport.value ? [...mobilePages.value, guidePage] : [...visiblePages.value, guidePage])
 const focusApplicationId = ref('')
+const companyTypeFilter = ref('')
+const applicationWorkspaceReady = ref(false)
 const primaryNavigation = ref<HTMLElement | null>(null)
 const navIndicatorStyle = ref<Record<string, string>>({ width: '0px', height: '0px', transform: 'translate3d(0,0,0)', opacity: '0' })
 const mainContent = ref<HTMLElement | null>(null)
@@ -129,6 +123,7 @@ function syncHash() {
   }
   activePage.value = route.page
   focusApplicationId.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('focus') || '' : ''
+  companyTypeFilter.value = route.page === 'applications' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('companyType') || '' : ''
   if (route.applicationId) store.requestApplicationDetail(route.applicationId)
 }
 
@@ -162,6 +157,10 @@ function navigate(page: Page, applicationId?: string, behavior: 'detail' | 'focu
 }
 function toggleProfile() {
   navigate(profileToggleDestination(activePage.value, lastPageBeforeProfile.value) as Page)
+}
+function exitApplicationLocation() {
+  window.history.replaceState(null, '', '#/applications')
+  syncHash()
 }
 function closeGuide() { navigate(lastPageBeforeGuide.value === 'guide' ? 'home' : lastPageBeforeGuide.value) }
 function handleNavigation(page: Page) {
@@ -291,6 +290,7 @@ watch(store.pendingMailCount, count => {
   writeStoredNumber(MAIL_NOTICE_VISIBLE_KEY, mailBadgeVisible.value ? 1 : 0)
 })
 watch(activePage, async page => {
+  if (page !== 'applications') applicationWorkspaceReady.value = false
   await nextTick()
   mainContent.value?.focus({ preventScroll: true })
   syncNavIndicator()
@@ -342,12 +342,12 @@ onBeforeUnmount(() => {
       <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
-        <button v-if="activePage === 'applications'" type="button" @click="createApplication">＋ 新建投递</button>
+        <button v-if="activePage === 'applications'" type="button" :disabled="!applicationWorkspaceReady" @click="createApplication">＋ 新建投递</button>
       </header>
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'guide-content-shell': activePage === 'guide', 'interview-summary-content': activePage === 'interview-summary' }">
         <KeepAlive :max="8">
-          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId } : activePage === 'guide' ? { guideOrigin, closeRequest: guideCloseRequest } : {}" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
+          <component :is="pageComponents[activePage]" :key="activePage" v-bind="activePage === 'applications' ? { focusApplicationId, companyTypeFilter } : activePage === 'guide' ? { guideOrigin, closeRequest: guideCloseRequest } : {}" @workspace-ready="applicationWorkspaceReady = true" @exit-location="exitApplicationLocation" @navigate="navigate" @close="closeGuide" @focus-resume="focusResumeSettings" />
         </KeepAlive>
       </div>
     </main>
