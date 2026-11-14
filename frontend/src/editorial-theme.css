@@ -75,7 +75,7 @@
 #app .sidebar,
 #app .sidebar nav { background: var(--rail-surface); }
 #app .sidebar :is(.brand, .brand strong, .profile-entry-copy strong) { color: var(--rail-current); }
-#app .sidebar :is(.brand small, .profile-entry-copy small) { color: var(--rail-muted); }
+#app .sidebar .profile-entry-copy small { color: var(--rail-muted); }
 #app .sidebar .profile-entry > svg { color: var(--rail-muted); }
 #app .sidebar .brand strong { font-family: var(--font-display); font-size: 22px; }
 #app .sidebar nav button { color: var(--rail-text); border-radius: 4px; }

@@ -307,7 +307,7 @@ onBeforeUnmount(() => {
     <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
     <aside class="sidebar">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
-        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>CareerFlow</strong><small>求职进度本</small></div>
+        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职记录本</strong></div>
       </button>
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
@@ -355,7 +355,6 @@ onBeforeUnmount(() => {
 .brand > img { width: 34px; height: 34px; flex: none; border-radius: 10px; }
 .brand div { display: grid; gap: 3px; }
 .brand strong { font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
-.brand small { color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
 .sidebar nav { position: relative; isolation: isolate; display: grid; min-height: 0; flex: 1; align-content: start; gap: 5px; padding-top: 12px; border-top: 1px solid var(--color-border); overflow-y: auto; scrollbar-width: thin; }
 .nav-active-indicator { position: absolute; z-index: 0; top: 0; left: 0; border: 1px solid color-mix(in srgb,var(--color-primary) 18%,transparent); border-radius: 11px; background: color-mix(in srgb,var(--color-primary) 10%,var(--color-card)); box-shadow: inset 0 1px 0 color-mix(in srgb,#fff 5%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 8%,transparent); pointer-events: none; transition: transform 100ms ease-out, opacity 100ms ease-out; will-change:transform,width,height; }
 nav button { position: relative; z-index: 1; display: flex; width: 100%; min-height: 46px; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; background: transparent; text-align: left; }
@@ -478,7 +477,6 @@ nav button.active::before { content: none; }
   .skip-link { left: 12px; }
   .sidebar { inset: 0 0 auto; z-index: 30; display: grid; width: 100%; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 0 8px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
   .brand { width: fit-content; min-width: 0; padding: 0; }
-  .brand small { display: none; }
   .brand strong { font-size: 17px; }
   .theme-toggle { position: static; width: 44px; height: 44px; min-height: 44px; }
   .profile-shortcut { display: grid; position: relative; width: 44px; height: 44px; place-items: center; padding: 0; border: 1px solid var(--color-border); border-radius: 10px; color: #fff; background: var(--color-card); }
