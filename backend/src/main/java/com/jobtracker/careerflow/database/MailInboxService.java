@@ -57,18 +57,43 @@ public class MailInboxService {
         return inbox(email);
     }
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
-    public int processSelected(String email, List<Long> ids) throws Exception {
-        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
-            throw new ValidationException("请选择 1 至 100 封邮件");
-        }
-        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
-        String sql = "UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL AND id IN (" + placeholders + ")";
-        try (Connection connection = open(); PreparedStatement statement = connection.prepareStatement(sql)) {
+    public List<Long> pendingIds(String email) throws Exception {
+        try (Connection connection = open();
+             PreparedStatement statement = connection.prepareStatement("SELECT id FROM collected_mails WHERE user_id=? AND processed_at IS NULL ORDER BY id")) {
             statement.setLong(1, userId(connection, email));
-            for (int index = 0; index < ids.size(); index++) {
-                statement.setLong(index + 2, ids.get(index));
+            try (ResultSet rows = statement.executeQuery()) {
+                List<Long> ids = new ArrayList<>();
+                while (rows.next()) ids.add(rows.getLong(1));
+                return ids;
             }
-            return statement.executeUpdate();
+        }
+    }
+
+    public int processSelected(String email, List<Long> ids) throws Exception {
+        if (ids == null || ids.isEmpty() || ids.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new ValidationException("请选择有效的邮件");
+        }
+        try (Connection connection = open()) {
+            long userId = userId(connection, email);
+            connection.setAutoCommit(false);
+            int processed = 0;
+            try {
+                for (int start = 0; start < ids.size(); start += 100) {
+                    List<Long> chunk = ids.subList(start, Math.min(start + 100, ids.size()));
+                    String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
+                    String sql = "UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL AND id IN (" + placeholders + ")";
+                    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                        statement.setLong(1, userId);
+                        for (int index = 0; index < chunk.size(); index++) statement.setLong(index + 2, chunk.get(index));
+                        processed += statement.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return processed;
+            } catch (SQLException failure) {
+                connection.rollback();
+                throw failure;
+            }
         }
     }
     public int processAll(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));return s.executeUpdate();}}

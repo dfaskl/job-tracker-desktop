@@ -6,7 +6,7 @@ import BaseSelect from './BaseSelect.vue'
 import ScheduleTimeModeNotice from './ScheduleTimeModeNotice.vue'
 import { formatShanghaiDateTime, shanghaiDateKey } from './shanghaiTime'
 import { validateScheduleTime } from './scheduleValidation'
-import { confirmDialog } from './modalDialogs'
+import MailFuseButton from './MailFuseButton.vue'
 
 type AiStatus = { callsEnabled: boolean; message: string }
 type Recognition = { company: string; position: string; noticeType: string; scheduleTitle: string; suggestedStage: string; suggestedStatus: string; startsAt: string; endsAt: string; location: string; notes: string; summary: string }
@@ -49,7 +49,14 @@ const selectedApplicationId = ref('')
 const inbox = store.mailInbox
 const syncing = ref(false)
 const selectingMail = ref(false)
+const batch = ref<{ ids: number[]; all: boolean } | null>(null)
+const batchIds = computed(() => new Set(batch.value?.ids))
+const preparingBatch = ref(false)
 const processingBatch = ref(false)
+const batchBusy = computed(() => Boolean(batch.value) || preparingBatch.value || processingBatch.value)
+const moreMailActions = ref<HTMLDetailsElement | null>(null)
+const batchBar = ref<HTMLElement | null>(null)
+const batchFuseLabel = computed(() => `撤销处理 ${batch.value?.ids.length ?? 0} 封`)
 const checkedMailIds = ref<number[]>([])
 const listedMailIds = computed(() => inbox.value.messages.map(mail => mail.id))
 const allListedMailChecked = computed(() => listedMailIds.value.length > 0 && checkedMailIds.value.length === listedMailIds.value.length)
@@ -60,7 +67,8 @@ watch(listedMailIds, ids => {
 const selectedMailId = ref<number | null>(null)
 const processNotice = ref('')
 let processNoticeTimer = 0
-const smokingMailIds = ref(new Set<number>())
+const pendingMail = reactive(new Map<number, CollectedMail>())
+const visibleMail = computed(() => [...inbox.value.messages, ...[...pendingMail.values()].filter(mail => !listedMailIds.value.includes(mail.id))])
 const processingMailIds = reactive(new Set<number>())
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
@@ -69,6 +77,7 @@ const previewLoading = ref(false)
 const previewError = ref('')
 const previewDarkTheme = ref(document.documentElement.dataset.theme === 'dark')
 let previewThemeObserver: MutationObserver | null = null
+let disposed = false
 const previewSrcdoc = computed(() => previewHtml.value
   ? `${previewHtml.value}${previewDarkTheme.value ? '<style>html{background:#fff!important;filter:invert(1) hue-rotate(180deg)!important}</style>' : ''}`
   : '')
@@ -131,7 +140,12 @@ onMounted(async () => {
   await store.initialize()
   await Promise.all([checkStatus(), loadInbox(true)])
 })
-onBeforeUnmount(() => { previewThemeObserver?.disconnect(); recognitionRequest?.abort() })
+onBeforeUnmount(() => {
+  disposed = true
+  window.clearTimeout(processNoticeTimer)
+  previewThemeObserver?.disconnect()
+  recognitionRequest?.abort()
+})
 onDeactivated(() => {
   recognitionDetailsDialog.value?.close()
 })
@@ -190,47 +204,18 @@ function selectMail(mail: CollectedMail) {
   mailBody.value = [mail.subject ? `主题：${mail.subject}` : '', mail.sender ? `发件人：${mail.sender}` : '', '', mail.body].join('\n').trim()
   void openStep('compose', true)
 }
-function setSmoking(ids: number[], active: boolean) {
-  const next = new Set(smokingMailIds.value)
-  ids.forEach(id => active ? next.add(id) : next.delete(id))
-  smokingMailIds.value = next
-}
-function waitForSmoke() {
-  // Keep the card mounted until its exit effect has visibly completed.
-  return new Promise(resolve => window.setTimeout(resolve, 760))
-}
-function restoreMail(mail: CollectedMail, index: number) {
-  if (inbox.value.messages.some(item => item.id === mail.id)) return
-  const messages = [...inbox.value.messages]
-  messages.splice(Math.min(Math.max(index, 0), messages.length), 0, mail)
-  inbox.value.messages = messages
-  inbox.value.pendingCount += 1
-}
-async function processMail(mail: CollectedMail) {
-  if (processingBatch.value || processingMailIds.has(mail.id)) return
-  const index = inbox.value.messages.findIndex(item => item.id === mail.id)
-  if (index < 0) return
-  processingMailIds.add(mail.id)
-  error.value = ''
-  setSmoking([mail.id], true)
+function queueMail(mail: CollectedMail) {
+  if (batchBusy.value || pendingMail.has(mail.id) || processingMailIds.has(mail.id)) return
+  if (!listedMailIds.value.includes(mail.id)) return
+  pendingMail.set(mail.id, mail)
   if (previewMail.value?.id === mail.id) closeMailPreview()
-  const background = api(`/api/poc/mail-inbox/messages/${mail.id}/processed`, { method: 'PATCH' })
-    .then(() => ({ ok: true as const })).catch(cause => ({ ok: false as const, cause }))
-  await waitForSmoke()
-  inbox.value.messages = inbox.value.messages.filter(item => item.id !== mail.id)
-  inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - 1)
-  if (selectedMailId.value === mail.id) selectedMailId.value = null
-  setSmoking([mail.id], false)
-  const outcome = await background
-  try {
-    if (!outcome.ok) throw outcome.cause
-    showProcessNotice('邮件已处理成功')
-  } catch (cause) {
-    restoreMail(mail, index)
-    error.value = failure(cause, '处理邮件失败，已恢复卡片')
-  } finally {
-    processingMailIds.delete(mail.id)
-  }
+}
+async function processMail(id: number) {
+  if (!pendingMail.has(id) || processingMailIds.has(id)) return
+  processingMailIds.add(id)
+  await commitMail([id])
+  pendingMail.delete(id)
+  processingMailIds.delete(id)
 }
 function showProcessNotice(value: string) {
   processNotice.value = value
@@ -244,29 +229,62 @@ function toggleMailSelection() {
 function toggleAllListedMail() {
   checkedMailIds.value = allListedMailChecked.value ? [] : [...listedMailIds.value]
 }
-async function processSelectedMail() {
-  if (processingBatch.value || processingMailIds.size || !checkedMailIds.value.length) return
-  const ids = [...checkedMailIds.value]
-  if (!await confirmDialog(`将选中的 ${ids.length} 封邮件标记为已处理？`, {
-    title: '批量标记邮件', confirmText: '标记为已处理', tone: 'warning'
-  })) return
+function queueSelectedMail() {
+  if (batchBusy.value || pendingMail.size || !checkedMailIds.value.length) return
+  batch.value = { ids: [...checkedMailIds.value], all: false }
+}
+async function queueAllMail(event: MouseEvent) {
+  if (batchBusy.value || pendingMail.size || !inbox.value.pendingCount || syncing.value) return
+  preparingBatch.value = true
+  error.value = ''
+  try {
+    const { ids } = await api<{ ids: number[] }>('/api/poc/mail-inbox/messages/pending-ids')
+    if (disposed) return
+    if (moreMailActions.value) moreMailActions.value.open = false
+    if (ids.length) {
+      batch.value = { ids, all: true }
+      await nextTick()
+      if (event.detail === 0) batchBar.value?.querySelector('button')?.focus()
+      else moreMailActions.value?.querySelector('summary')?.focus()
+    } else {
+      await loadInbox()
+    }
+  } catch (cause) {
+    error.value = failure(cause, '读取待处理邮件失败')
+  } finally {
+    preparingBatch.value = false
+  }
+}
+function undoBatch() {
+  const wasAll = batch.value?.all
+  batch.value = null
+  if (wasAll && !selectingMail.value) moreMailActions.value?.querySelector('summary')?.focus()
+}
+async function processBatch() {
+  if (!batch.value || processingBatch.value) return
   processingBatch.value = true
+  const saved = await commitMail(batch.value.ids)
+  batch.value = null
+  processingBatch.value = false
+  if (saved && selectingMail.value) toggleMailSelection()
+}
+async function commitMail(ids: number[]) {
   error.value = ''
   try {
     const { processed } = await api<{ processed: number }>('/api/poc/mail-inbox/messages/batch-processed', {
       method: 'PATCH', body: JSON.stringify({ ids })
     })
+    if (disposed) return true
     const submitted = new Set(ids)
     inbox.value.messages = inbox.value.messages.filter(mail => !submitted.has(mail.id))
     inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - processed)
     if (selectedMailId.value !== null && submitted.has(selectedMailId.value)) selectedMailId.value = null
-    toggleMailSelection()
-    showProcessNotice(processed ? `已标记 ${processed} 封邮件为已处理` : '选中的邮件已不在待处理列表')
-    await loadInbox()
+    showProcessNotice(processed ? `已标记 ${processed} 封邮件为已处理` : '邮件已不在待处理列表')
+    await store.refreshMailInbox(false, false, true)
+    return true
   } catch (cause) {
-    error.value = failure(cause, '批量处理邮件失败，请重试')
-  } finally {
-    processingBatch.value = false
+    if (!disposed) error.value = failure(cause, '处理邮件失败，请重试')
+    return false
   }
 }
 async function openMailPreview(mail: CollectedMail) {
@@ -412,27 +430,47 @@ function preventImplicitSubmit(event: KeyboardEvent) {
     </nav>
     <div class="mail-grid" :data-step="mailStep">
       <section class="card inbox-panel workspace-light-surface" :inert="saving">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封<span v-if="!selectingMail"> · 选择邮件填入正文</span></small></div></div><div class="inbox-actions"><button class="secondary" type="button" :disabled="syncing||processingBatch||(!selectingMail&&!inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingBatch||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封<span v-if="!selectingMail"> · 选择邮件填入正文</span></small></div></div><div class="inbox-actions"><button class="secondary" type="button" :disabled="syncing || batchBusy || pendingMail.size > 0 || (!selectingMail && !inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button>
+          <details ref="moreMailActions" class="mail-more" @keydown.esc.stop="moreMailActions?.removeAttribute('open'); moreMailActions?.querySelector('summary')?.focus()">
+            <summary title="更多邮件操作" aria-label="更多邮件操作">···</summary>
+            <div class="mail-more-panel">
+              <button type="button" class="secondary" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.pendingCount" @click="queueAllMail">
+                {{ preparingBatch ? '正在读取…' : `处理全部 ${inbox.pendingCount} 封` }}
+              </button>
+            </div>
+          </details>
+        </div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingBatch">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
           <div v-else class="mail-cards" aria-label="待处理邮件">
-            <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:!selectingMail&&selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
+            <article v-for="mail in visibleMail" :key="mail.id" :class="{selected:!selectingMail&&selectedMailId===mail.id,'mail-card-queued': batchIds.has(mail.id)}">
               <label v-if="selectingMail" class="mail-check-row">
-                <input v-model="checkedMailIds" type="checkbox" :value="mail.id" :disabled="processingBatch" :aria-label="`勾选邮件：${mail.subject||'无主题'}`" />
+                <input v-model="checkedMailIds" type="checkbox" :value="mail.id" :disabled="batchBusy" :aria-label="`勾选邮件：${mail.subject||'无主题'}`" />
                 <span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span>
               </label>
               <template v-else>
                 <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-                <div class="mail-card-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
+                <div class="mail-card-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click="openMailPreview(mail)"><AppIcon name="eye" /></button><MailFuseButton class="processed" label="标记为已处理"
+                    :action-label="`标记邮件为已处理：${mail.subject || '无主题'}`"
+                    :window-ms="4000" :pending="pendingMail.has(mail.id)"
+                    :disabled="batchBusy" :submitting="processingMailIds.has(mail.id)"
+                    @press="queueMail(mail)" @undo="pendingMail.delete(mail.id)" @expire="processMail(mail.id)">
+                    <AppIcon name="check" />
+                  </MailFuseButton></div>
               </template>
             </article>
           </div>
-          <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
+          <div v-if="!syncing&&!visibleMail.length" class="inbox-empty">{{inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
         </div>
-        <div v-if="selectingMail" class="mail-batch-bar">
-          <button class="secondary" type="button" title="选择当前列表中的邮件" :disabled="syncing||processingBatch||!listedMailIds.length" @click="toggleAllListedMail">{{allListedMailChecked?'取消全选':'全选'}}</button>
-          <small role="status">已选 {{ checkedMailIds.length }} 封</small>
-          <button class="primary-action" type="button" :disabled="syncing||processingBatch||processingMailIds.size>0||!checkedMailIds.length" @click="processSelectedMail">{{processingBatch?'正在处理…':'标记为已处理'}}</button>
+        <div v-if="selectingMail || batch" ref="batchBar" class="mail-batch-bar">
+          <button v-if="selectingMail && !batch" class="secondary" type="button" title="选择当前列表中的邮件"
+            :disabled="syncing || batchBusy || !listedMailIds.length" @click="toggleAllListedMail">{{ allListedMailChecked ? '取消全选' : '全选' }}</button>
+          <small v-if="selectingMail && !batch" role="status">已选 {{ checkedMailIds.length }} 封</small>
+          <MailFuseButton class="secondary"
+            :label="`处理 ${checkedMailIds.length} 封`" :undo-label="batchFuseLabel"
+            :window-ms="batch?.all ? 10000 : 8000" :pending="Boolean(batch)" :submitting="processingBatch"
+            :disabled="syncing || batchBusy || pendingMail.size > 0 || !checkedMailIds.length"
+            @press="queueSelectedMail" @undo="undoBatch" @expire="processBatch" />
         </div>
       </section>
 
@@ -510,13 +548,27 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           <div><dt>收取时间</dt><dd>{{ mailDate(previewMail.receivedAt) }}</dd></div>
         </dl>
         <div class="mail-preview-body" tabindex="0"><div v-if="previewLoading" class="mail-preview-loading" role="status"><span class="recognition-spinner" aria-hidden="true"></span>正在读取邮件原始排版…</div><iframe v-else-if="previewHtml" class="mail-preview-iframe" :srcdoc="previewSrcdoc" title="邮件原文内容" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe><div v-else class="mail-preview-plain">{{ previewMail.body || '这封邮件没有可显示的正文。' }}</div></div>
-        <footer><small>{{ previewError || (previewHtml ? '邮件中的外部图片已隐藏，以保护隐私。' : '这里展示系统通过邮箱服务收取并整理后的正文内容。') }}</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" @click="processMail(previewMail)">标记为已处理</button></div></footer>
+        <footer><small>{{ previewError || (previewHtml ? '邮件中的外部图片已隐藏，以保护隐私。' : '这里展示系统通过邮箱服务收取并整理后的正文内容。') }}</small><div><button type="button" class="secondary" @click="closeMailPreview">关闭</button><button type="button" class="processed" :disabled="batchBusy || pendingMail.has(previewMail.id)" @click="queueMail(previewMail)">标记为已处理</button></div></footer>
       </article>
     </dialog>
   </section>
 </template>
 
 <style scoped>
+.mail-more { position:relative; }
+.mail-more > summary {
+  display:grid; min-width:44px; min-height:44px; place-items:center;
+  border:1px solid var(--color-border); border-radius:6px; list-style:none;
+  color:var(--color-foreground); background:var(--color-muted); cursor:pointer;
+  font-weight:700; letter-spacing:1px;
+}
+.mail-more > summary::-webkit-details-marker { display:none; }
+.mail-more-panel {
+  position:absolute; z-index:3; inset-inline-end:0; top:calc(100% + 6px);
+  width:max-content; padding:4px; border:1px solid var(--color-border);
+  border-radius:6px; background:var(--color-card);
+}
+.mail-cards article.mail-card-queued .mail-card-copy { opacity:.58; }
 .mail-check-row { display:flex; min-height:44px; align-items:center; gap:10px; padding-inline:4px; cursor:pointer; }
 .mail-check-row input { flex:none; width:17px; height:17px; margin:0; accent-color:var(--color-primary); }
 .mail-batch-bar {
@@ -580,8 +632,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 .step { display: grid; width: 28px; height: 28px; border-radius: 9px; color: #fff; background: var(--color-primary); place-items: center; font-size: 13px; font-weight: 800; }
 textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; border-radius: 10px; background: #fff; font: inherit; resize: vertical; }
 .compose-panel > textarea { min-height: 0; flex: 1 1 auto; margin: 18px 0 10px; line-height: 1.65; resize: none; }
-.inbox-heading,.inbox-heading>div,.inbox-actions,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:10px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading>div:first-child{flex:1}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.inbox-actions{min-width:max-content;flex:none;gap:6px}.sync-button,.process-all-button{min-height:38px;flex:none;padding:7px 11px;font-size:13px}.process-all-button{color:#176b4b;background:#eaf8f1;border-color:#b9d9c9}.mail-list-region{display:flex;min-height:120px;flex:1 1 auto;flex-direction:column}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}.mail-cards:empty{display:none}.mail-cards article{position:relative;align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}.inbox-loading{display:grid;min-height:140px;flex:1 1 auto;align-content:center;justify-items:center;gap:7px;color:var(--color-primary);text-align:center}.inbox-loading strong{font-size:14px}.inbox-loading small{color:var(--color-muted-foreground)}.inbox-spinner{width:34px;height:34px;margin-bottom:4px;border:3px solid color-mix(in srgb,var(--color-primary) 18%,transparent);border-top-color:var(--color-primary);border-right-color:color-mix(in srgb,var(--color-primary) 62%,#fff);border-radius:50%;animation:inbox-spin .8s linear infinite}
-.mail-card-smoking{z-index:3;isolation:isolate;pointer-events:none;overflow:visible;will-change:opacity,filter,transform;animation:mail-card-vaporize .72s cubic-bezier(.2,.68,.22,1) forwards}.mail-card-smoking::before,.mail-card-smoking::after{position:absolute;z-index:4;inset:4% 2%;content:"";pointer-events:none;background:radial-gradient(circle at 14% 64%,rgba(177,184,190,.88) 0 9%,transparent 22%),radial-gradient(circle at 38% 32%,rgba(225,228,231,.94) 0 12%,transparent 27%),radial-gradient(circle at 66% 60%,rgba(151,160,168,.86) 0 10%,transparent 25%),radial-gradient(circle at 88% 28%,rgba(231,233,235,.84) 0 9%,transparent 22%);filter:blur(1px);will-change:opacity,transform;animation:mail-smoke-cloud .72s ease-out forwards}.mail-card-smoking::after{transform:scale(.78) translateY(5px);opacity:.8;animation-delay:.06s}.mail-card-smoking :is(.mail-card-copy,.mail-card-actions){animation:mail-smoke-content .46s ease-in forwards}
+.inbox-heading,.inbox-heading>div,.inbox-actions,.mail-cards article,.mail-card-actions{display:flex;align-items:center}.inbox-heading{justify-content:space-between;gap:10px;margin-bottom:10px}.inbox-heading>div{min-width:0;gap:10px}.inbox-heading>div:first-child{flex:1}.inbox-heading h3{margin:0;font-size:16px}.inbox-heading small{display:block;margin-top:2px;color:var(--color-muted-foreground)}.inbox-step{color:var(--color-primary);background:#e8f4fa}.inbox-step svg{width:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.inbox-actions{min-width:max-content;flex:none;gap:6px}.sync-button{min-height:38px;flex:none;padding:7px 11px;font-size:13px}.mail-list-region{display:flex;min-height:120px;flex:1 1 auto;flex-direction:column}.mail-cards{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:8px;padding:3px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}.mail-cards:empty{display:none}.mail-cards article{position:relative;align-items:stretch;flex-direction:column;gap:8px;min-width:0;padding:8px;border:1px solid var(--color-border);border-left:4px solid #7aa5bb;border-radius:10px;background:#f8fbfd;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.mail-cards article:hover{transform:translateY(1px);box-shadow:inset 0 2px 4px rgba(4,31,49,.08)}.mail-cards article:focus-within,.mail-cards article.selected{border-color:var(--color-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 14%,transparent)}.mail-select{display:block;min-width:0;flex:1;padding:2px;color:inherit;background:transparent;text-align:left}.mail-card-copy{display:grid;min-width:0;gap:2px}.mail-card-copy strong,.mail-card-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-card-copy span,.mail-card-copy small{color:var(--color-muted-foreground);font-size:12px}.mail-card-actions{flex:none;gap:8px}.mail-card-actions :is(button,a){display:flex;min-height:38px;flex:1;align-items:center;justify-content:center;padding:7px 10px;border:1px solid var(--color-border);border-radius:9px;font-family:var(--font-button);font-weight:700;text-decoration:none}.mailbox-button{color:var(--color-primary);background:#edf7fc}.processed{color:#176b4b;background:#eaf8f1}.inbox-empty{padding:12px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-muted-foreground);background:#fafcfd;text-align:center}.inbox-loading{display:grid;min-height:140px;flex:1 1 auto;align-content:center;justify-items:center;gap:7px;color:var(--color-primary);text-align:center}.inbox-loading strong{font-size:14px}.inbox-loading small{color:var(--color-muted-foreground)}.inbox-spinner{width:34px;height:34px;margin-bottom:4px;border:3px solid color-mix(in srgb,var(--color-primary) 18%,transparent);border-top-color:var(--color-primary);border-right-color:color-mix(in srgb,var(--color-primary) 62%,#fff);border-radius:50%;animation:inbox-spin .8s linear infinite}
 .privacy-note { margin-bottom: 14px; color: var(--color-muted-foreground); font-size: 12px; }
 .service-unavailable { margin: 0 0 12px; padding: 9px 12px; border: 1px solid #f4c7c7; border-radius: 9px; color: #b42318; background: #fff4f2; font-size: 12px; }
 .primary-action { width: 100%; }
@@ -595,9 +646,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 .mail-preview{width:min(780px,calc(100vw - 32px));max-width:none;height:min(760px,calc(100dvh - 48px));max-height:none;padding:0;border:1px solid var(--color-border);border-radius:18px;color:var(--color-card-foreground);background:var(--color-card);box-shadow:0 24px 70px rgba(4,31,49,.24);overflow:hidden}.mail-preview::backdrop{background:rgba(10,35,51,.5);backdrop-filter:blur(4px)}.mail-preview-card{display:grid;height:100%;grid-template-rows:auto auto minmax(0,1fr) auto;background:var(--color-card)}.mail-preview-card>header,.mail-preview-card>footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px}.mail-preview-card>header{border-bottom:1px solid var(--color-border)}.mail-preview-heading{display:flex;min-width:0;align-items:center;gap:13px}.mail-preview-heading>div{min-width:0}.mail-preview-heading span{color:var(--color-primary);font-size:12px;font-weight:800;letter-spacing:.1em}.mail-preview-heading h2{margin:4px 0 0;overflow-wrap:anywhere;font-size:20px;line-height:1.35}.preview-icon{display:grid;width:42px;height:42px;flex:none;border-radius:12px;color:var(--color-on-primary);background:var(--color-primary);place-items:center}.preview-icon svg{width:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.preview-close{display:grid;width:44px;height:44px;flex:none;padding:0;border:1px solid var(--color-border);border-radius:12px;color:var(--color-primary);background:var(--color-muted);place-items:center;font-size:27px;line-height:1}.mail-preview-meta{display:grid;grid-template-columns:1.4fr 1fr .7fr;gap:0;margin:0;padding:14px 24px;border-bottom:1px solid var(--color-border);background:var(--color-muted)}.mail-preview-meta div{min-width:0;padding-right:16px}.mail-preview-meta dt{margin-bottom:4px;color:var(--color-muted-foreground);font-size:12px;font-weight:700}.mail-preview-meta dd{margin:0;color:var(--color-card-foreground);overflow-wrap:anywhere;font-size:13px}.mail-preview-body{min-height:0;margin:20px 24px;padding:20px;border:1px solid var(--color-border);border-radius:12px;color:var(--color-card-foreground);background:var(--color-background);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}.mail-preview-card>footer{border-top:1px solid var(--color-border)}.mail-preview-card>footer small{color:var(--color-muted-foreground)}.mail-preview-card>footer>div{display:flex;gap:10px}.mail-preview-card>footer button{min-height:44px}.mail-preview-card>footer .processed{padding:9px 15px;border:1px solid color-mix(in srgb,var(--color-success) 35%,var(--color-border));border-radius:10px;color:var(--color-success);background:color-mix(in srgb,var(--color-success) 10%,var(--color-card))}
 .mail-preview-body{padding:0;color:#202330;background:#fff;overflow:hidden}.mail-preview-iframe{display:block;width:100%;height:100%;min-height:320px;border:0;background:#fff}.mail-preview-plain{height:100%;padding:20px;color:#202330;white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere}.mail-preview-loading{display:flex;height:100%;min-height:180px;align-items:center;justify-content:center;gap:10px;color:#626879}.mail-preview-loading .recognition-spinner{flex:none;border-color:color-mix(in srgb,var(--color-primary) 30%,transparent);border-top-color:var(--color-primary)}
 @keyframes inbox-spin{to{transform:rotate(360deg)}}
-@keyframes mail-card-vaporize{0%{opacity:1;filter:blur(0);transform:translate(0) scale(1)}38%{opacity:.78;filter:blur(1px);transform:translate(3px,-2px) scale(.985)}100%{opacity:0;filter:blur(11px);transform:translate(12px,-8px) scale(1.04)}}
-@keyframes mail-smoke-cloud{0%{opacity:0;transform:translate(0) scale(.72)}22%{opacity:.96}100%{opacity:0;transform:translate(10px,-12px) scale(1.28)}}
-@keyframes mail-smoke-content{to{opacity:0;filter:blur(5px);transform:translateX(10px)}}
 .compose-panel > textarea{border-color:#aeb9cb;box-shadow:inset 0 1px 2px rgba(24,39,75,.06);transition:border-color .18s ease,box-shadow .18s ease}.compose-panel > textarea:focus{border-color:var(--color-primary);box-shadow:inset 0 1px 3px rgba(24,39,75,.1),0 0 0 3px color-mix(in srgb,var(--color-primary) 15%,transparent);outline:none}
 .mail-card-actions{align-self:flex-end}.mail-card-actions :is(button,a){width:38px;flex:0 0 38px}
 .primary-action{display:inline-flex;width:auto;min-width:168px;min-height:46px;align-items:center;justify-content:center;align-self:flex-end;gap:9px;padding:11px 18px;border:1px solid color-mix(in srgb,var(--color-primary) 72%,#202d61);border-radius:10px;color:var(--color-on-primary);background:var(--color-primary);box-shadow:0 5px 14px color-mix(in srgb,var(--color-primary) 24%,transparent);font-weight:800;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}.primary-action:not(:disabled):hover{background:color-mix(in srgb,var(--color-primary) 94%,var(--color-foreground))}.primary-action:disabled{border-color:var(--color-border);color:var(--color-muted-foreground);background:var(--color-muted);box-shadow:none;opacity:.68;cursor:not-allowed}.recognition-spinner{width:17px;height:17px;border:2px solid color-mix(in srgb,currentColor 34%,transparent);border-top-color:currentColor;border-radius:50%;animation:inbox-spin .72s linear infinite}.recognition-spinner.large{width:32px;height:32px;border-width:3px}.recognition-state,.empty-state{display:grid;min-height:280px;gap:10px;padding:22px;border:1px dashed #aab7cb;border-radius:14px;color:var(--color-muted-foreground);background:color-mix(in srgb,var(--color-card) 88%,var(--color-muted));place-content:center;text-align:center}.recognition-state{align-content:center;justify-items:center;border-color:color-mix(in srgb,var(--color-primary) 55%,var(--color-border));background:color-mix(in srgb,var(--color-primary) 5%,var(--color-card))}.empty-state strong,.recognition-state strong{color:var(--color-card-foreground);font-size:14px}
@@ -607,7 +655,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
-  .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:1fr 1fr}.sync-button,.process-all-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
+  .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
 </style>
@@ -633,19 +681,6 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 :global(:root[data-theme="dark"] .inbox-step) {
   color: var(--color-foreground);
   background: #24282e;
-}
-
-:global(:root[data-theme="dark"] .process-all-button) {
-  border-color: #3e5048;
-  color: #9ed9bc;
-  background: #1a2923;
-}
-
-:global(:root[data-theme="dark"] .process-all-button:disabled) {
-  border-color: var(--color-border);
-  color: #858a91;
-  background: #20242a;
-  opacity: 1;
 }
 
 :global(:root[data-theme="dark"] .compose-panel > textarea) { border-color:#505967; color:var(--color-card-foreground); background:#191c22; box-shadow:inset 0 1px 3px rgba(0,0,0,.24); }

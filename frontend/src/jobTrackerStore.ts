@@ -87,9 +87,9 @@ async function initialize() {
   await refresh()
 }
 
-function refreshMailInbox(sync = false, throwOnError = false) {
-  if (mailInboxSyncPromise) return mailInboxSyncPromise
-  if (!sync && mailInboxReadPromise) return mailInboxReadPromise
+function refreshMailInbox(sync = false, throwOnError = false, forceRead = false) {
+  if (!forceRead && mailInboxSyncPromise) return mailInboxSyncPromise
+  if (!forceRead && !sync && mailInboxReadPromise) return mailInboxReadPromise
   const requestId = ++mailInboxRequestId
   const generation = sessionGeneration
   let request!: Promise<void>

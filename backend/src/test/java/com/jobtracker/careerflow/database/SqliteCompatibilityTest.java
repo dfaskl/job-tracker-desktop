@@ -115,6 +115,24 @@ class SqliteCompatibilityTest {
         assertThat(mail.inbox("admin@example.com").messages()).extracting(MailInboxService.MailView::id).containsExactly(2L);
         assertThat(mail.inbox("mail-owner@example.com").messages()).extracting(MailInboxService.MailView::id).containsExactly(3L);
 
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                WITH RECURSIVE ids(id) AS (VALUES (4) UNION ALL SELECT id + 1 FROM ids WHERE id < 104)
+                INSERT INTO collected_mails(id,user_id,account_id,message_uid,body)
+                SELECT id,%d,1,id,'pending' FROM ids
+                """.formatted(registered.id()));
+            var snapshot = mail.pendingIds("admin@example.com");
+            assertThat(snapshot).hasSize(102).contains(2L).doesNotContain(1L, 3L);
+            statement.executeUpdate("""
+                INSERT INTO collected_mails(id,user_id,account_id,message_uid,body)
+                VALUES (105,%d,1,105,'new arrival')
+                """.formatted(registered.id()));
+            assertThat(mail.processSelected("admin@example.com", snapshot)).isEqualTo(102);
+        }
+        assertThat(mail.pendingIds("admin@example.com")).containsExactly(105L);
+        assertThat(mail.pendingIds("mail-owner@example.com")).containsExactly(3L);
+
         BackupService backups = new BackupService(
             environment, applications, new BackupDocumentValidator(mapper), mapper
         );

@@ -21,6 +21,10 @@ public class MailInboxController {
     @PatchMapping("/messages/{id}/processed") public ResponseEntity<?> processed(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,@PathVariable long id,HttpServletRequest request){if(!sameOrigin(request))return error(HttpStatus.FORBIDDEN,"请求来源无效");return withUser(token,u->{inbox.process(u.email(),id);return Map.of("ok",true);});}
     @GetMapping("/messages/{id}/original") public ResponseEntity<?> original(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,@PathVariable long id){return withUser(token,u->Map.of("bodyHtml",inbox.originalHtml(u.email(),id)));}
     @PatchMapping("/messages/processed") public ResponseEntity<?> processAll(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,HttpServletRequest request){if(!sameOrigin(request))return error(HttpStatus.FORBIDDEN,"请求来源无效");return withUser(token,u->Map.of("ok",true,"processed",inbox.processAll(u.email())));}
+    @GetMapping("/messages/pending-ids")
+    public ResponseEntity<?> pendingIds(@CookieValue(value=AuthController.COOKIE_NAME,required=false) String token) {
+        return withUser(token, user -> Map.of("ids", inbox.pendingIds(user.email())));
+    }
     @PatchMapping("/messages/batch-processed")
     public ResponseEntity<?> processSelected(@CookieValue(value=AuthController.COOKIE_NAME,required=false) String token,
                                              @RequestBody ProcessSelectedRequest body, HttpServletRequest request) {
