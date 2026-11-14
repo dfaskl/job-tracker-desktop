@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -96,6 +97,23 @@ class SqliteCompatibilityTest {
             environment, secretCrypto, new LegacySecretCryptoWriter(secretCrypto)
         );
         assertThat(mail.inbox("admin@example.com").messages()).isEmpty();
+        var otherUser = accounts.register("mail-owner@example.com", "correct-horse-battery", "invite-2026");
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                INSERT INTO mail_accounts(id,user_id,email,provider,encrypted_password,encryption_iv,auth_tag)
+                VALUES (1,%d,'admin@example.com','qq',X'',X'',X''),
+                       (2,%d,'mail-owner@example.com','qq',X'',X'',X'')
+                """.formatted(registered.id(), otherUser.id()));
+            statement.executeUpdate("""
+                INSERT INTO collected_mails(id,user_id,account_id,message_uid,body)
+                VALUES (1,%d,1,1,'selected'),(2,%d,1,2,'unselected'),(3,%d,2,1,'other owner')
+                """.formatted(registered.id(), registered.id(), otherUser.id()));
+        }
+        assertThat(mail.processSelected("admin@example.com", List.of(1L, 3L))).isEqualTo(1);
+        assertThat(mail.processSelected("admin@example.com", List.of(1L))).isZero();
+        assertThat(mail.inbox("admin@example.com").messages()).extracting(MailInboxService.MailView::id).containsExactly(2L);
+        assertThat(mail.inbox("mail-owner@example.com").messages()).extracting(MailInboxService.MailView::id).containsExactly(3L);
 
         BackupService backups = new BackupService(
             environment, applications, new BackupDocumentValidator(mapper), mapper

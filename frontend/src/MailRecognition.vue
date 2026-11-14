@@ -48,12 +48,20 @@ const message = ref('')
 const selectedApplicationId = ref('')
 const inbox = store.mailInbox
 const syncing = ref(false)
-const processingAll = ref(false)
+const selectingMail = ref(false)
+const processingBatch = ref(false)
+const checkedMailIds = ref<number[]>([])
+const listedMailIds = computed(() => inbox.value.messages.map(mail => mail.id))
+const allListedMailChecked = computed(() => listedMailIds.value.length > 0 && checkedMailIds.value.length === listedMailIds.value.length)
+watch(listedMailIds, ids => {
+  const listed = new Set(ids)
+  checkedMailIds.value = checkedMailIds.value.filter(id => listed.has(id))
+})
 const selectedMailId = ref<number | null>(null)
 const processNotice = ref('')
 let processNoticeTimer = 0
 const smokingMailIds = ref(new Set<number>())
-const processingMailIds = new Set<number>()
+const processingMailIds = reactive(new Set<number>())
 const previewMail = ref<CollectedMail | null>(null)
 const previewDialog = ref<HTMLDialogElement | null>(null)
 const previewHtml = ref('')
@@ -199,7 +207,7 @@ function restoreMail(mail: CollectedMail, index: number) {
   inbox.value.pendingCount += 1
 }
 async function processMail(mail: CollectedMail) {
-  if (processingMailIds.has(mail.id)) return
+  if (processingBatch.value || processingMailIds.has(mail.id)) return
   const index = inbox.value.messages.findIndex(item => item.id === mail.id)
   if (index < 0) return
   processingMailIds.add(mail.id)
@@ -229,31 +237,37 @@ function showProcessNotice(value: string) {
   window.clearTimeout(processNoticeTimer)
   processNoticeTimer = window.setTimeout(() => { processNotice.value = '' }, 2600)
 }
-async function processAllMail() {
-  const count=inbox.value.pendingCount
-  if(!count||!await confirmDialog(`确认将当前 ${count} 封待处理邮件全部标记为已处理吗？`,{title:'批量标记邮件',confirmText:'全部处理',tone:'warning'}))return
-  const removed=[...inbox.value.messages],previousCount=inbox.value.pendingCount
-  const removedIds=removed.map(item=>item.id)
-  processingAll.value=true;error.value='';setSmoking(removedIds,true)
-  if(previewMail.value)closeMailPreview()
-  const background=api<{processed:number}>('/api/poc/mail-inbox/messages/processed',{method:'PATCH'})
-    .then(value=>({ok:true as const,value})).catch(cause=>({ok:false as const,cause}))
-  await waitForSmoke()
-  const removedIdSet=new Set(removedIds)
-  inbox.value.messages=inbox.value.messages.filter(item=>!removedIdSet.has(item.id))
-  inbox.value.pendingCount=0;selectedMailId.value=null;setSmoking(removedIds,false)
-  const outcome=await background
+function toggleMailSelection() {
+  selectingMail.value = !selectingMail.value
+  checkedMailIds.value = []
+}
+function toggleAllListedMail() {
+  checkedMailIds.value = allListedMailChecked.value ? [] : [...listedMailIds.value]
+}
+async function processSelectedMail() {
+  if (processingBatch.value || processingMailIds.size || !checkedMailIds.value.length) return
+  const ids = [...checkedMailIds.value]
+  if (!await confirmDialog(`将选中的 ${ids.length} 封邮件标记为已处理？`, {
+    title: '批量标记邮件', confirmText: '标记为已处理', tone: 'warning'
+  })) return
+  processingBatch.value = true
+  error.value = ''
   try {
-    if(!outcome.ok)throw outcome.cause
-    const result=outcome.value
-    showProcessNotice(`已成功处理 ${Math.max(0,Number(result.processed)||count)} 封邮件`)
-  } catch(cause) {
-    const currentIds=new Set(inbox.value.messages.map(item=>item.id))
-    inbox.value.messages=[...removed.filter(item=>!currentIds.has(item.id)),...inbox.value.messages]
-    inbox.value.pendingCount=Math.max(previousCount,inbox.value.messages.length)
-    error.value=failure(cause,'批量处理邮件失败，已恢复卡片')
+    const { processed } = await api<{ processed: number }>('/api/poc/mail-inbox/messages/batch-processed', {
+      method: 'PATCH', body: JSON.stringify({ ids })
+    })
+    const submitted = new Set(ids)
+    inbox.value.messages = inbox.value.messages.filter(mail => !submitted.has(mail.id))
+    inbox.value.pendingCount = Math.max(0, inbox.value.pendingCount - processed)
+    if (selectedMailId.value !== null && submitted.has(selectedMailId.value)) selectedMailId.value = null
+    toggleMailSelection()
+    showProcessNotice(processed ? `已标记 ${processed} 封邮件为已处理` : '选中的邮件已不在待处理列表')
+    await loadInbox()
+  } catch (cause) {
+    error.value = failure(cause, '批量处理邮件失败，请重试')
+  } finally {
+    processingBatch.value = false
   }
-  finally { processingAll.value=false }
 }
 async function openMailPreview(mail: CollectedMail) {
   previewMail.value = mail
@@ -398,16 +412,27 @@ function preventImplicitSubmit(event: KeyboardEvent) {
     </nav>
     <div class="mail-grid" :data-step="mailStep">
       <section class="card inbox-panel" :inert="saving">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封 · 选择邮件填入正文</small></div></div><div class="inbox-actions"><button class="process-all-button" title="将所有待处理邮件标记为已处理" :disabled="syncing||processingAll||!inbox.pendingCount" @click="processAllMail">{{processingAll?'后台处理中…':'全部处理'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingAll||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
-        <div class="mail-list-region" :aria-busy="syncing||processingAll">
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封<span v-if="!selectingMail"> · 选择邮件填入正文</span></small></div></div><div class="inbox-actions"><button class="secondary" type="button" :disabled="syncing||processingBatch||(!selectingMail&&!inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingBatch||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
+        <div class="mail-list-region" :aria-busy="syncing||processingBatch">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
           <div v-else class="mail-cards" aria-label="待处理邮件">
-            <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
-              <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
-              <div class="mail-card-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
+            <article v-for="mail in inbox.messages" :key="mail.id" :class="{selected:!selectingMail&&selectedMailId===mail.id,'mail-card-smoking':smokingMailIds.has(mail.id)}">
+              <label v-if="selectingMail" class="mail-check-row">
+                <input v-model="checkedMailIds" type="checkbox" :value="mail.id" :disabled="processingBatch" :aria-label="`勾选邮件：${mail.subject||'无主题'}`" />
+                <span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span>
+              </label>
+              <template v-else>
+                <button class="mail-select" :aria-label="'选择邮件：'+(mail.subject||'无主题')" @click="selectMail(mail)"><span class="mail-card-copy"><strong>{{mail.subject||'（无主题）'}}</strong><span>{{mail.sender||mail.accountEmail}}</span><small>{{mailDate(mail.receivedAt)}}</small></span></button>
+                <div class="mail-card-actions"><button class="secondary icon-button compact-icon" type="button" :aria-label="`查看邮件原文：${mail.subject||'无主题'}`" title="查看原文" @click="openMailPreview(mail)"><AppIcon name="eye" /></button><button class="processed icon-button compact-icon" type="button" :aria-label="`标记邮件为已处理：${mail.subject||'无主题'}`" title="标记为已处理" @click.stop="processMail(mail)"><AppIcon name="check" /></button></div>
+              </template>
             </article>
           </div>
-          <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{processingAll?'已清空列表，后台正在完成处理':inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
+          <div v-if="!syncing&&!inbox.messages.length" class="inbox-empty">{{inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
+        </div>
+        <div v-if="selectingMail" class="mail-batch-bar">
+          <button class="secondary" type="button" title="选择当前列表中的邮件" :disabled="syncing||processingBatch||!listedMailIds.length" @click="toggleAllListedMail">{{allListedMailChecked?'取消全选':'全选'}}</button>
+          <small role="status">已选 {{ checkedMailIds.length }} 封</small>
+          <button class="primary-action" type="button" :disabled="syncing||processingBatch||processingMailIds.size>0||!checkedMailIds.length" @click="processSelectedMail">{{processingBatch?'正在处理…':'标记为已处理'}}</button>
         </div>
       </section>
 
@@ -492,6 +517,15 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 </template>
 
 <style scoped>
+.mail-check-row { display:flex; min-height:44px; align-items:center; gap:10px; padding-inline:4px; cursor:pointer; }
+.mail-check-row input { flex:none; width:17px; height:17px; margin:0; accent-color:var(--color-primary); }
+.mail-batch-bar {
+  display:flex; flex:none; flex-wrap:wrap; align-items:center; gap:8px;
+  margin-top:10px; padding:8px; border:1px solid var(--color-border); border-radius:6px;
+  background:var(--color-muted);
+}
+.mail-batch-bar small { margin-inline-end:auto; color:var(--color-muted-foreground); }
+.mail-batch-bar button { padding-inline:8px; font-size:13px; white-space:nowrap; }
 .mail-page { display: grid; height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr); padding-top: 18px; box-sizing: border-box; overflow: hidden; }
 .panel-title, .panel-title > div, .commit-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-title p { margin: 0; }

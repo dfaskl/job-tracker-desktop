@@ -386,8 +386,8 @@ async function remove(item: EventItem) {
     <template v-else-if="sandbox?.enabled">
 <p v-if="message" class="success">{{ message }}</p>
       <div class="calendar-view-toggle" role="group" aria-label="日程视图">
-        <button type="button" class="secondary" :aria-pressed="!mobileAgenda" @click="mobileAgenda = false">月历</button>
-        <button type="button" class="secondary" :aria-pressed="mobileAgenda" @click="mobileAgenda = true">待办列表</button>
+        <button type="button" :aria-pressed="!mobileAgenda" @click="mobileAgenda = false"><AppIcon name="check" :size="16" />月历</button>
+        <button type="button" :aria-pressed="mobileAgenda" @click="mobileAgenda = true"><AppIcon name="check" :size="16" />待办列表</button>
       </div>
       <div class="calendar-layout" :class="{ 'is-agenda': mobileAgenda }">
         <div class="calendar-pane">
@@ -557,10 +557,19 @@ select, textarea { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
 </style>
 <style scoped>
 .calendar-pane .calendar-grid .day{padding:8px;transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}.calendar-pane .calendar-grid .day-number{top:8px;left:8px}.calendar-pane .calendar-grid .day:not(:disabled):hover{position:relative;z-index:2;border-color:color-mix(in srgb,var(--color-primary) 52%,var(--color-border));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-primary) 34%,transparent),0 3px 10px color-mix(in srgb,var(--color-primary) 9%,transparent)}.calendar-pane .calendar-grid .day:not(:disabled):hover .event-chip:not(.middle){filter:saturate(1.12) brightness(.98);box-shadow:0 2px 7px color-mix(in srgb,var(--event-color) 16%,transparent)}.day-events{--calendar-event-row-height:20px;min-height:0;grid-template-rows:none;grid-auto-rows:var(--calendar-event-row-height)}.day-events>.event-chip{padding-inline:7px}.day-events>.event-chip.middle{padding:0}@media(max-width:720px){.calendar-pane .calendar-grid .day{padding:4px}.calendar-pane .calendar-grid .day-number{top:4px;left:4px}.day-events{--calendar-event-row-height:9px;row-gap:2px}.day-events>.event-chip{padding:0}}
- .calendar-view-toggle { display:flex; gap:8px; margin-bottom:10px; }
-.calendar-view-toggle button[aria-pressed="true"] { color:var(--color-primary); border-color:var(--color-primary); }
-.calendar-layout.is-agenda { grid-template-columns:minmax(0,1fr); }
+.calendar-view-toggle { display:flex; gap:8px; margin-bottom:10px; }
+:global(#app .calendar-view-toggle button) {
+  display:inline-flex; align-items:center; gap:5px; padding-inline:10px;
+  border-color:var(--color-border); color:var(--color-foreground); background:var(--color-card);
+}
+.calendar-view-toggle button[aria-pressed="false"] svg { visibility:hidden; }
+:global(#app .calendar-view-toggle button[aria-pressed="true"]) {
+  border-color:var(--color-primary); color:var(--color-on-primary); background:var(--color-primary);
+}
+.calendar-layout.is-agenda { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
 .calendar-layout.is-agenda :is(.weekdays,.calendar-grid) { display:none; }
 .calendar-layout.is-agenda .calendar-pane { min-height:0; }
+.is-agenda .event-main { flex:1; min-width:0; overflow-wrap:anywhere; }
+.is-agenda .event-actions { flex:none; }
 .agenda-day { margin:14px 0 0; color:var(--color-muted-foreground); }
 </style>

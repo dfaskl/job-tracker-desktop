@@ -21,6 +21,14 @@ public class MailInboxController {
     @PatchMapping("/messages/{id}/processed") public ResponseEntity<?> processed(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,@PathVariable long id,HttpServletRequest request){if(!sameOrigin(request))return error(HttpStatus.FORBIDDEN,"请求来源无效");return withUser(token,u->{inbox.process(u.email(),id);return Map.of("ok",true);});}
     @GetMapping("/messages/{id}/original") public ResponseEntity<?> original(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,@PathVariable long id){return withUser(token,u->Map.of("bodyHtml",inbox.originalHtml(u.email(),id)));}
     @PatchMapping("/messages/processed") public ResponseEntity<?> processAll(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,HttpServletRequest request){if(!sameOrigin(request))return error(HttpStatus.FORBIDDEN,"请求来源无效");return withUser(token,u->Map.of("ok",true,"processed",inbox.processAll(u.email())));}
+    @PatchMapping("/messages/batch-processed")
+    public ResponseEntity<?> processSelected(@CookieValue(value=AuthController.COOKIE_NAME,required=false) String token,
+                                             @RequestBody ProcessSelectedRequest body, HttpServletRequest request) {
+        if (!sameOrigin(request)) return error(HttpStatus.FORBIDDEN, "请求来源无效");
+        return withUser(token, user -> Map.of("processed", inbox.processSelected(user.email(), body.ids())));
+    }
+
+    public record ProcessSelectedRequest(List<Long> ids) {}
     @DeleteMapping("/messages/{id}") public ResponseEntity<?> delete(@CookieValue(value=AuthController.COOKIE_NAME,required=false)String token,@PathVariable long id,HttpServletRequest request){if(!sameOrigin(request))return error(HttpStatus.FORBIDDEN,"请求来源无效");return withUser(token,u->{inbox.delete(u.email(),id);return Map.of("ok",true);});}
     private ResponseEntity<?> withUser(String token,Work work){try{Optional<LegacyUser> user=auth.authenticatedUser(token);if(user.isEmpty())return error(HttpStatus.UNAUTHORIZED,"请先登录");return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(work.run(user.get()));}catch(ValidationException e){return error(HttpStatus.BAD_REQUEST,e.getMessage());}catch(Exception e){return error(HttpStatus.INTERNAL_SERVER_ERROR,"邮件服务暂时不可用");}}
     private boolean sameOrigin(HttpServletRequest request){String origin=request.getHeader("Origin");if(origin==null||origin.isBlank())return true;try{return request.getServerName().equalsIgnoreCase(URI.create(origin).getHost());}catch(Exception e){return false;}}

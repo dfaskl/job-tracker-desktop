@@ -57,6 +57,20 @@ public class MailInboxService {
         return inbox(email);
     }
     public void process(String email,long id)throws Exception{updateMessage(email,id,false);}
+    public int processSelected(String email, List<Long> ids) throws Exception {
+        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new ValidationException("请选择 1 至 100 封邮件");
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        String sql = "UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL AND id IN (" + placeholders + ")";
+        try (Connection connection = open(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, userId(connection, email));
+            for (int index = 0; index < ids.size(); index++) {
+                statement.setLong(index + 2, ids.get(index));
+            }
+            return statement.executeUpdate();
+        }
+    }
     public int processAll(String email)throws Exception{try(Connection c=open();PreparedStatement s=c.prepareStatement("UPDATE collected_mails SET processed_at=NOW() WHERE user_id=? AND processed_at IS NULL")){s.setLong(1,userId(c,email));return s.executeUpdate();}}
     public void delete(String email,long id)throws Exception{updateMessage(email,id,true);}
     public String originalHtml(String email,long id)throws Exception{
