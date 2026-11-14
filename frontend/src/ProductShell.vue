@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import ProductHome from './ProductHome.vue'
+import BrandFoldText from './BrandFoldText.vue'
 import { pageFromRoute, readHashRoute } from './routes'
 import { profileToggleDestination } from './profileNavigation'
 import { useJobTrackerStore } from './jobTrackerStore'
@@ -310,7 +311,7 @@ onBeforeUnmount(() => {
     <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
     <aside class="sidebar">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
-        <img src="/favicon.svg" alt="" aria-hidden="true"><div><strong>求职记录本</strong></div>
+        <img src="/favicon.svg" alt="" aria-hidden="true"><div><BrandFoldText v-if="activePage === 'home'" /><strong v-else>求职记录本</strong></div>
       </button>
       <button class="theme-toggle" type="button" :aria-label="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" :aria-pressed="theme === 'dark'" :title="theme === 'dark' ? '切换为浅色模式' : '切换为暗色模式'" @click="toggleTheme">
         <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
