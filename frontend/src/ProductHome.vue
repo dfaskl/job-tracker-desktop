@@ -27,6 +27,7 @@ const quoteDay = computed(() => {
 })
 const quoteCursorKey = 'careerflow_quote_cursor_v1'
 const quoteCursor = ref(readQuoteCursor())
+const quoteArrowSpinning = ref(false)
 const quoteIndex = computed(() => {
   const cursor = quoteCursor.value
   if (cursor) return (cursor.index + Number(cursor.day !== quoteDay.value)) % dailyQuotes.length
@@ -48,6 +49,7 @@ function saveQuoteCursor(index: number) {
   } catch { /* 当前页面仍保留轮换位置。 */ }
 }
 function nextQuote() {
+  quoteArrowSpinning.value = true
   updateScheduleClock()
   quoteCursor.value = readQuoteCursor() ?? quoteCursor.value
   saveQuoteCursor((quoteIndex.value + 1) % dailyQuotes.length)
@@ -306,7 +308,7 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
     <Teleport defer to="#home-quote-slot">
       <section class="quote-strip" aria-label="《毛泽东选集》摘句">
         <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" @click="nextQuote">
-          <svg class="quote-brush-arrow" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false">
+          <svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false">
             <!-- The open cuts and thin trails preserve the dry-brush texture at icon size. -->
             <path fill-rule="evenodd" d="
               M15 30.4 11.4 29.9 12.5 30.8C7.5 29.9 3.8 27.1 2.5 23.5L2.4 25

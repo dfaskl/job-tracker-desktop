@@ -41,15 +41,23 @@
   flex: 0 0 44px;
   padding: 0;
   place-items: center;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: 4px;
   color: #151513;
   background: transparent;
   cursor: pointer;
 }
 :root[data-theme="dark"] #app .quote-trigger { color: #f8f7f2; }
-#app .quote-trigger:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 .quote-brush-arrow { display: block; width: 28px; height: 28px; }
+@media (prefers-reduced-motion: no-preference) {
+  .quote-brush-arrow { transition: translate 180ms ease-out; }
+  .quote-trigger:focus-visible .quote-brush-arrow { translate: 0 -3px; }
+  .quote-brush-arrow.is-spinning { animation: quote-brush-spin 1.8s linear infinite; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .quote-trigger:hover .quote-brush-arrow { translate: 0 -3px; }
+}
+@keyframes quote-brush-spin { to { transform: rotate(1turn); } }
 .quote-copy {
   flex: 1;
   min-width: 0;
