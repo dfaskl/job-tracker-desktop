@@ -25,7 +25,8 @@
   align-items: center;
   justify-self: center;
   gap: 4px;
-  max-width: min(100%, 42rem);
+  min-width: 0;
+  max-width: 100%;
 }
 #app .quote-trigger {
   display: grid;
@@ -56,6 +57,7 @@
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
   color: var(--color-foreground);
   font-family: "Ma Shan Zheng", "Kaiti SC", KaiTi, serif;
   font-size: clamp(16px, 1.5vw, 19px);
