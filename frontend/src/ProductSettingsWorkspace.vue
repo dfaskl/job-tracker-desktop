@@ -118,32 +118,32 @@ onBeforeUnmount(() => {
       <div><h1>个人设置</h1></div>
     </header>
     <div class="settings-layout">
-      <nav class="settings-nav" aria-label="个人主页分区">
+      <nav class="settings-nav workspace-light-surface" aria-label="个人主页分区">
         <a v-for="section in sections" :key="section.id" :href="`#/profile?section=${section.id}`" :class="{ active: activeSection === section.id }" :aria-current="activeSection === section.id ? 'page' : undefined" @click.prevent="selectSection(section.id)">
           <AppIcon :name="section.icon" :size="18" /><span>{{ section.label }}</span><AppIcon class="section-arrow" name="chevron-right" :size="15" />
         </a>
       </nav>
       <main class="settings-content">
-        <section :id="`profile-section-${sections[0].id}`" :ref="element => setSectionRef('center', element as Element | null)" class="profile-section">
+        <section :id="`profile-section-${sections[0].id}`" :ref="element => setSectionRef('center', element as Element | null)" class="workspace-light-surface profile-section">
           <div class="section-title"><h2>个人中心</h2></div>
           <AccountManagement />
         </section>
-        <section :id="`profile-section-${sections[1].id}`" :ref="element => setSectionRef('resume', element as Element | null)" class="profile-section">
+        <section :id="`profile-section-${sections[1].id}`" :ref="element => setSectionRef('resume', element as Element | null)" class="workspace-light-surface profile-section">
           <ResumeSettings />
         </section>
-        <section :id="`profile-section-${sections[2].id}`" :ref="element => setSectionRef('ai', element as Element | null)" class="profile-section">
+        <section :id="`profile-section-${sections[2].id}`" :ref="element => setSectionRef('ai', element as Element | null)" class="workspace-light-surface profile-section">
           <div class="section-title"><h2>大模型 API</h2><p>配置兼容接口、模型和 API Key。</p></div>
           <ProductPreferences v-if="loadedSections.has('ai')" />
         </section>
-        <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('mail', element as Element | null)" class="profile-section mail-settings-section">
+        <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('mail', element as Element | null)" class="workspace-light-surface profile-section mail-settings-section">
           <div class="section-title"><h2>邮件配置</h2><p>连接邮箱，让系统识别邮件并辅助创建求职日程。</p></div>
           <MailAccountSettings v-if="loadedSections.has('mail')" />
         </section>
-        <section id="profile-section-mcp" :ref="element => setSectionRef('mcp', element as Element | null)" class="profile-section">
+        <section id="profile-section-mcp" :ref="element => setSectionRef('mcp', element as Element | null)" class="workspace-light-surface profile-section">
           <div class="section-title"><h2>MCP 访问</h2><p>授权 Codex 查询和管理当前账户的投递与日程。</p></div>
           <McpAccessSettings v-if="loadedSections.has('mcp')" />
         </section>
-        <section id="profile-section-data" :ref="element => setSectionRef('data', element as Element | null)" class="profile-section data-sections">
+        <section id="profile-section-data" :ref="element => setSectionRef('data', element as Element | null)" class="workspace-light-surface profile-section data-sections">
           <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理历史备份。</p></div>
           <ProductDataManagement v-if="loadedSections.has('data')" />
           <BackupManagement v-if="loadedSections.has('data')" />

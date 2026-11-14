@@ -433,7 +433,7 @@ async function removeEvent(item:JobEvent){
 </Teleport>
 <section class="card workspace">
   <div v-if="store.user.value&&filtered.length" ref="applicationGrid" class="grid" :style="{ '--flow-slots': flowSlots }">
-    <button v-for="row in visibleRows" :key="row.item.id" v-memo="[row, highlightedApplicationId === row.item.id]" :data-application-id="row.item.id" class="application" :class="[`tone-${row.tone}`, { 'application-arrival': highlightedApplicationId === row.item.id }]" @click="selected=row.item">
+    <button v-for="row in visibleRows" :key="row.item.id" v-memo="[row, highlightedApplicationId === row.item.id]" :data-application-id="row.item.id" class="application workspace-light-surface workspace-light-tilt" :class="[`tone-${row.tone}`, { 'application-arrival': highlightedApplicationId === row.item.id }]" @click="selected=row.item">
       <div class="application-overview"><div class="application-title"><strong>{{text(row.item.company,'未填写公司')}}</strong><i>·</i><span>{{text(row.item.position,'未填写岗位')}}</span><i>·</i><small>{{text(row.item.city,'地点未填')}}</small><i>·</i><small>{{text(row.item.channel,'渠道未填')}}</small></div><span v-if="String(row.item.notes||'').trim()" class="application-note" :title="text(row.item.notes)"><b>备注：</b>{{text(row.item.notes)}}</span><em v-if="row.health" :class="`health-${row.health?.tone}`">{{row.health?.label}} · {{row.health?.days}}天</em></div>
       <div class="flow" aria-label="投递流程"><span v-for="(node,index) in row.nodes" :key="`${node.label}-${index}`" class="flow-node" :class="[node.kind,`flow-${node.style}`]"><i>{{node.icon}}</i><b :title="node.label">{{node.label}}</b><small :title="node.at">{{node.at}}</small></span></div>
     </button>

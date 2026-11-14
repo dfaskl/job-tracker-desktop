@@ -71,8 +71,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <button type="button" class="guide-close" aria-label="关闭新手指南" title="关闭指南" @click="closeGuide()"><AppIcon name="close" :size="21" /><span>关闭</span></button>
     </header>
 
-    <button type="button" class="guide-arrow guide-arrow-left" :disabled="current === 0" aria-label="上一页" title="上一页" @click="previous"><AppIcon name="chevron-left" :size="25" /></button>
-    <button type="button" class="guide-arrow guide-arrow-right" :disabled="current === pages.length - 1" aria-label="下一页" title="下一页" @click="next"><AppIcon name="chevron-right" :size="25" /></button>
+    <button type="button" class="workspace-light-action guide-arrow guide-arrow-left" :disabled="current === 0" aria-label="上一页" title="上一页" @click="previous"><AppIcon name="chevron-left" :size="25" /></button>
+    <button type="button" class="workspace-light-action guide-arrow guide-arrow-right" :disabled="current === pages.length - 1" aria-label="下一页" title="下一页" @click="next"><AppIcon name="chevron-right" :size="25" /></button>
 
     <Transition name="guide-turn" mode="out-in">
       <main :key="current" class="guide-content">
@@ -82,7 +82,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div v-if="current === 0" class="visual-grid config-grid">
-          <article v-for="visual in configVisuals" :key="visual.kind" class="guide-visual-card">
+          <article v-for="visual in configVisuals" :key="visual.kind" class="workspace-light-surface workspace-light-tilt guide-visual-card">
             <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>个人设置</i></div>
@@ -98,7 +98,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div v-else-if="current === 1" class="visual-grid two-grid">
-          <article v-for="visual in applicationVisuals" :key="visual.kind" class="guide-visual-card">
+          <article v-for="visual in applicationVisuals" :key="visual.kind" class="workspace-light-surface workspace-light-tilt guide-visual-card">
             <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window application-mini" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>{{ visual.page }}</i></div>
@@ -113,7 +113,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div v-else-if="current === 2" class="mail-page-layout">
-          <article class="guide-visual-card mail-visual-card">
+          <article class="workspace-light-surface workspace-light-tilt guide-visual-card mail-visual-card">
             <div class="visual-card-heading"><div><h2>{{ mailVisual.title }}</h2><p>{{ mailVisual.location }}</p></div></div>
             <div class="mini-window mail-mini" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>邮件识别</i></div>
@@ -126,7 +126,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div v-else class="visual-grid two-grid">
-          <article v-for="visual in interviewVisuals" :key="visual.kind" class="guide-visual-card">
+          <article v-for="visual in interviewVisuals" :key="visual.kind" class="workspace-light-surface workspace-light-tilt guide-visual-card">
             <div class="visual-card-heading"><div><h2>{{ visual.title }}</h2><p>{{ visual.location }}</p></div></div>
             <div class="mini-window interview-mini" :class="`mini-${visual.kind}`" aria-hidden="true">
               <div class="mini-topbar"><span></span><span></span><span></span><b>CareerFlow</b><i>{{ visual.page }}</i></div>
@@ -144,8 +144,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <footer class="guide-footer">
           <button type="button" class="guide-jump guide-mobile-prev" :disabled="current === 0" @click="previous"><AppIcon name="chevron-left" :size="16" /> 上一步</button>
           <button type="button" class="guide-jump" @click="navigateFromGuide(current === 0 ? 'profile' : current === 1 ? 'applications' : current === 2 ? 'mail' : 'interview-summary')">{{ current === 0 ? '去配置' : current === 1 ? '去投递记录' : current === 2 ? '去邮件识别' : '去面试总结' }}</button>
-          <button v-if="current < pages.length - 1" type="button" class="guide-next" @click="next">下一步 <span aria-hidden="true">→</span></button>
-          <button v-else type="button" class="guide-next" @click="closeGuide()">完成指引 <span aria-hidden="true">✓</span></button>
+          <button v-if="current < pages.length - 1" type="button" class="guide-next workspace-light-action" @click="next">下一步 <span aria-hidden="true">→</span></button>
+          <button v-else type="button" class="guide-next workspace-light-action" @click="closeGuide()">完成指引 <span aria-hidden="true">✓</span></button>
         </footer>
       </main>
     </Transition>

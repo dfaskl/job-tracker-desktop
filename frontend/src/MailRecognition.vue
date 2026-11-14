@@ -411,7 +411,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
       <button type="button" class="secondary" :aria-pressed="mailStep === 'review'" :disabled="!hasResult || saving" @click="openStep('review')">核对</button>
     </nav>
     <div class="mail-grid" :data-step="mailStep">
-      <section class="card inbox-panel" :inert="saving">
+      <section class="card inbox-panel workspace-light-surface" :inert="saving">
         <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封<span v-if="!selectingMail"> · 选择邮件填入正文</span></small></div></div><div class="inbox-actions"><button class="secondary" type="button" :disabled="syncing||processingBatch||(!selectingMail&&!inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing||processingBatch||!inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button></div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingBatch">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
@@ -436,15 +436,15 @@ function preventImplicitSubmit(event: KeyboardEvent) {
         </div>
       </section>
 
-      <section class="card compose-panel" :inert="saving">
+      <section class="card compose-panel workspace-light-surface" :inert="saving">
         <div class="panel-title"><div><span class="step">1</span><h3 ref="composeHeading" tabindex="-1">粘贴通知正文</h3></div><button class="text-button icon-button compact-icon" type="button" :disabled="!mailBody" aria-label="清空通知正文" title="清空正文" @click="mailBody = ''"><AppIcon name="broom" /></button></div>
         <textarea v-model="mailBody" maxlength="100000" rows="18" placeholder="将笔试、面试、测评或 Offer 通知完整粘贴到这里……" />
         <div class="privacy-note">正文只用于本次识别，不会作为邮件原文写入投递记录。</div>
         <div v-if="status && !status.callsEnabled" class="service-unavailable">{{ status.message || '邮件识别服务当前不可用' }}</div>
-        <button class="primary-action" :disabled="recognizing || checkingStatus || !status?.callsEnabled || !mailBody.trim()" :aria-busy="recognizing" @click="recognize"><span v-if="recognizing" class="recognition-spinner" aria-hidden="true"></span><span v-else aria-hidden="true">✦</span>{{ recognizing ? '正在识别…' : checkingStatus ? '正在检查服务…' : '开始识别' }}</button>
+        <button class="primary-action workspace-light-action" :disabled="recognizing || checkingStatus || !status?.callsEnabled || !mailBody.trim()" :aria-busy="recognizing" @click="recognize"><span v-if="recognizing" class="recognition-spinner" aria-hidden="true"></span><span v-else aria-hidden="true">✦</span>{{ recognizing ? '正在识别…' : checkingStatus ? '正在检查服务…' : '开始识别' }}</button>
       </section>
 
-      <section class="card review-panel">
+      <section class="card review-panel workspace-light-surface">
         <div class="panel-title">
           <div>
             <span class="step">2</span><h3 ref="reviewHeading" tabindex="-1">核对并录入</h3>
@@ -472,7 +472,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
             <small v-if="duplicateEvent.notes">原备注：{{ duplicateEvent.notes }}</small>
           </label>
           <p v-if="scheduleError" class="schedule-error wide" role="alert">{{scheduleError}}</p>
-          <div class="commit-box wide"><template v-if="terminalNotice"><span>{{actionSummary}}</span><div class="terminal-actions"><button type="button" class="secondary" :disabled="saving" @click="skipTerminalUpdate">暂不修改</button><button type="submit" :disabled="saving||!matchedApplication">{{saving?'正在更新…':'标记投递已结束'}}</button></div></template><template v-else><span>{{ actionSummary }}</span><button type="submit" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></template></div>
+          <div class="commit-box wide"><template v-if="terminalNotice"><span>{{actionSummary}}</span><div class="terminal-actions"><button type="button" class="secondary" :disabled="saving" @click="skipTerminalUpdate">暂不修改</button><button type="submit" class="workspace-light-action" :disabled="saving||!matchedApplication">{{saving?'正在更新…':'标记投递已结束'}}</button></div></template><template v-else><span>{{ actionSummary }}</span><button type="submit" class="workspace-light-action" :disabled="saving">{{ saving ? '正在录入…' : '确认录入' }}</button></template></div>
         </form>
         <div v-else-if="recognizing" class="recognition-state" role="status" aria-live="polite" aria-busy="true"><span class="recognition-spinner large" aria-hidden="true"></span><strong>正在分析邮件内容</strong></div>
         <div v-else class="empty-state review-empty">选择邮件或粘贴通知正文，再点击「开始识别」。</div>

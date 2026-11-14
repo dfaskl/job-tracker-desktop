@@ -390,10 +390,10 @@ async function remove(item: EventItem) {
         <button type="button" :aria-pressed="mobileAgenda" @click="mobileAgenda = true"><AppIcon name="check" :size="16" />待办列表</button>
       </div>
       <div class="calendar-layout" :class="{ 'is-agenda': mobileAgenda }">
-        <div class="calendar-pane">
+        <div class="calendar-pane workspace-light-surface">
           <div class="calendar-head">
             <div><strong>{{ monthTitle }}</strong><span>当月 {{ monthEventCount }} 项日程</span></div>
-            <div><button class="secondary compact icon-button compact-icon" :disabled="!canGoPrevious" aria-label="上一个月" title="上一个月" @click="changeMonth(-1)"><AppIcon name="chevron-left" /></button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact icon-button compact-icon" :disabled="!canGoNext" aria-label="下一个月" title="下一个月" @click="changeMonth(1)"><AppIcon name="chevron-right" /></button></div>
+            <div><button class="secondary compact icon-button compact-icon workspace-light-action" :disabled="!canGoPrevious" aria-label="上一个月" title="上一个月" @click="changeMonth(-1)"><AppIcon name="chevron-left" /></button><button class="secondary compact" @click="resetMonth">本月</button><button class="secondary compact icon-button compact-icon workspace-light-action" :disabled="!canGoNext" aria-label="下一个月" title="下一个月" @click="changeMonth(1)"><AppIcon name="chevron-right" /></button></div>
           </div>
           <div class="weekdays"><b v-for="day in ['一','二','三','四','五','六','日']" :key="day">周{{ day }}</b></div>
           <div ref="calendarGrid" class="calendar-grid">
@@ -409,7 +409,7 @@ async function remove(item: EventItem) {
           </div>
         </div>
 
-        <aside class="selected-list">
+        <aside class="selected-list workspace-light-surface">
           <h3>{{ mobileAgenda ? '本月待办' : selectedDate + ' 的日程' }}</h3>
           <div :key="mobileAgenda ? 'agenda' : selectedDate" class="selected-scroll">
             <p v-if="mobileAgenda && !displayedDayGroups.length" class="empty">本月没有待办日程。</p>

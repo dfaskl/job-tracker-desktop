@@ -28,69 +28,7 @@ const quoteDay = computed(() => {
 const quoteCursorKey = 'careerflow_quote_cursor_v1'
 const quoteCursor = ref(readQuoteCursor())
 const quoteArrowSpinning = ref(false)
-let pointerFrame = 0
-let litSurface: HTMLElement | null = null
-let magneticButton: HTMLButtonElement | null = null
-const pointerMotion = window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)')
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-
-function resetPointerEffects() {
-  cancelAnimationFrame(pointerFrame)
-  if (litSurface) delete litSurface.dataset.pointerActive
-  if (magneticButton) delete magneticButton.dataset.magnetic
-  litSurface = null
-  magneticButton = null
-}
-
-function followPointer(event: PointerEvent) {
-  if (event.pointerType !== 'mouse' || !pointerMotion.matches || !(event.target instanceof Element)) return
-  if (event.buttons) {
-    resetPointerEffects()
-    return
-  }
-  const surface = event.target.closest<HTMLElement>('.home-optical-surface')
-  const button = event.target.closest<HTMLButtonElement>('.home-action:not(:disabled)')
-  const { clientX, clientY } = event
-  cancelAnimationFrame(pointerFrame)
-  pointerFrame = requestAnimationFrame(() => {
-    if (litSurface && litSurface !== surface) delete litSurface.dataset.pointerActive
-    if (magneticButton && magneticButton !== button) delete magneticButton.dataset.magnetic
-    litSurface = surface
-    magneticButton = button
-    const surfaceBounds = surface?.getBoundingClientRect()
-    const buttonBounds = button?.getBoundingClientRect()
-    if (surface && surfaceBounds?.width && surfaceBounds.height) {
-      const x = (clientX - surfaceBounds.left) / surfaceBounds.width
-      const y = (clientY - surfaceBounds.top) / surfaceBounds.height
-      surface.style.setProperty('--light-x', `${x * 100}%`)
-      surface.style.setProperty('--light-y', `${y * 100}%`)
-      surface.style.setProperty('--tilt-x', `${(.5 - y) * 3}deg`)
-      surface.style.setProperty('--tilt-y', `${(x - .5) * 3}deg`)
-      surface.dataset.pointerActive = ''
-    }
-    if (button && buttonBounds) {
-      button.style.setProperty('--magnet-x', `${(clientX - buttonBounds.left - buttonBounds.width / 2) * .2}px`)
-      button.style.setProperty('--magnet-y', `${(clientY - buttonBounds.top - buttonBounds.height / 2) * .2}px`)
-      button.dataset.magnetic = ''
-    }
-  })
-}
-
-function rippleAction(event: MouseEvent) {
-  if (reducedMotion.matches || !event.detail || !(event.target instanceof Element)) return
-  const button = event.target.closest<HTMLButtonElement>('.home-action:not(:disabled)')
-  if (!button || button.getAttribute('aria-disabled') === 'true') return
-  const bounds = button.getBoundingClientRect()
-  const ripple = document.createElement('span')
-  ripple.className = 'home-action-ripple'
-  ripple.setAttribute('aria-hidden', 'true')
-  ripple.style.left = `${event.clientX - bounds.left}px`
-  ripple.style.top = `${event.clientY - bounds.top}px`
-  button.append(ripple)
-  const animation = ripple.animate([{ transform: 'translate(-50%, -50%) scale(0)', opacity: .32 },
-    { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 420, easing: 'ease-out' })
-  animation.finished.then(() => ripple.remove(), () => ripple.remove())
-}
 const quoteIndex = computed(() => {
   const cursor = quoteCursor.value
   if (cursor) return (cursor.index + Number(cursor.day !== quoteDay.value)) % dailyQuotes.length
@@ -165,7 +103,7 @@ onActivated(() => {
   void store.refresh(false, false, false)
   void loadSharedTimelines()
 })
-onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock(); resetPointerEffects() })
+onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock() })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
@@ -283,7 +221,6 @@ onMounted(() => {
   startScheduleClock()
   window.addEventListener('focus', updateScheduleClock)
   window.addEventListener('storage', syncQuoteCursor)
-  pointerMotion.addEventListener('change', resetPointerEffects)
   void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
@@ -377,10 +314,10 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopScheduleClock();resetPointerEffects();pointerMotion.removeEventListener('change',resetPointerEffects);window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
-  <div v-if="store.user.value" class="home-dashboard" @pointermove="followPointer" @pointerleave="resetPointerEffects" @click.capture="rippleAction">
+  <div v-if="store.user.value" class="home-dashboard">
     <section class="dashboard-panel">
       <section class="timeline-column team-timeline home-optical-surface" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>

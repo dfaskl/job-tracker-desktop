@@ -105,7 +105,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
         <article class="metric-users"><i>用户</i><strong>{{overview.summary.totalUsers}}</strong><small>近 30 天活跃 {{recentUsers}}</small></article>
         <article class="metric-data"><i>业务数据</i><strong>{{overview.summary.totalApplications}}</strong><small>{{totalEvents}} 项日程</small></article>
       </div>
-          <section class="card control-card">
+          <section class="card control-card workspace-light-surface">
             <div class="section-title"><div><span>访问控制</span><h3>注册与系统状态</h3></div><b :class="overview.summary.registrationOpen?'ok':'muted'">{{overview.summary.registrationOpen?'允许注册':'停止注册'}}</b></div>
             <div class="registration"><div><strong>新用户注册</strong><small>{{overview.summary.registrationCodeEnabled?'已启用注册码验证':'无需注册码'}}</small></div><label class="switch-control"><input type="checkbox" role="switch" :checked="overview.summary.registrationOpen" :disabled="loading" :aria-label="overview.summary.registrationOpen?'关闭新用户注册':'开放新用户注册'" @change="toggleRegistration"><span aria-hidden="true"></span></label></div>
             <div class="registration-code" :class="{'registration-code-disabled':!overview.summary.registrationOpen}" :aria-disabled="!overview.summary.registrationOpen">
@@ -128,7 +128,7 @@ function relativeDate(value:string){if(!value)return '从未活跃';const time=D
         </div>
 
         <div class="users-column">
-          <section class="card users-card">
+          <section class="card users-card workspace-light-surface">
           <div class="section-title"><div><span>账号管理</span><h3>用户列表</h3></div><small>{{filteredUsers.length}} / {{overview.summary.totalUsers}}</small></div>
           <div class="user-tools"><input v-model="query" type="search" aria-label="搜索用户昵称或邮箱" placeholder="搜索用户昵称或邮箱" /><BaseSelect v-model="stateFilter" aria-label="筛选用户状态" :options="[{value:'all',label:'全部状态'},{value:'enabled',label:'正常'},{value:'disabled',label:'已停用'},{value:'admin',label:'管理员'}]" /><BaseSelect v-model="sortMode" class="sort-select" aria-label="选择用户排序方式" :options="[{value:'group',label:'按小组划分'},{value:'email-domain',label:'按邮箱类型'},{value:'created-new',label:'注册时间：新到旧'},{value:'created-old',label:'注册时间：旧到新'}]" /></div>
           <p v-if="overview.usersTruncated" class="hint">列表仅展示前 500 个账号。</p>

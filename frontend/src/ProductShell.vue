@@ -5,6 +5,7 @@ import { pageFromRoute, readHashRoute } from './routes'
 import { profileToggleDestination } from './profileNavigation'
 import { useJobTrackerStore } from './jobTrackerStore'
 import { api } from './api'
+import { useWorkspacePointerEffects } from './workspacePointerEffects'
 
 type Page = 'home' | 'applications' | 'calendar' | 'mail' | 'stats' | 'interview-summary' | 'profile' | 'admin' | 'guide'
 
@@ -31,6 +32,7 @@ const pageComponents: Record<Page, Component> = {
 }
 
 const activePage = ref<Page>('home')
+const { followPointer, resetPointerEffects, rippleAction } = useWorkspacePointerEffects()
 const lastPageBeforeProfile = ref<Page>('home')
 const isAdmin = ref(false)
 const adminAccessLoaded = ref(false)
@@ -282,6 +284,7 @@ watch(store.pendingMailCount, count => {
   writeStoredNumber(MAIL_NOTICE_VISIBLE_KEY, mailBadgeVisible.value ? 1 : 0)
 })
 watch(activePage, async page => {
+  resetPointerEffects()
   if (page !== 'applications') applicationWorkspaceReady.value = false
   await nextTick()
   mainContent.value?.focus({ preventScroll: true })
@@ -303,7 +306,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="product-shell" :class="{ 'is-home': activePage === 'home' }">
+  <div class="product-shell" :data-page="activePage" @pointermove="followPointer" @pointerleave="resetPointerEffects" @pointercancel="resetPointerEffects" @click.capture="rippleAction">
     <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
     <aside class="sidebar">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">
@@ -333,7 +336,7 @@ onBeforeUnmount(() => {
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'interview-summary-page': activePage === 'interview-summary' }">
       <header v-show="activePage === 'applications'" class="topbar">
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
-        <button v-if="activePage === 'applications'" type="button" :disabled="!applicationWorkspaceReady" @click="createApplication">＋ 新建投递</button>
+        <button v-if="activePage === 'applications'" type="button" class="workspace-light-action" :disabled="!applicationWorkspaceReady" @click="createApplication">＋ 新建投递</button>
       </header>
 
       <div class="page-content" :class="{ 'home-content': activePage === 'home', 'application-content': activePage === 'applications', 'calendar-content': activePage === 'calendar', 'mail-content': activePage === 'mail', 'profile-content': activePage === 'profile', 'admin-content': activePage === 'admin', 'stats-content': activePage === 'stats', 'guide-content-shell': activePage === 'guide', 'interview-summary-content': activePage === 'interview-summary' }">

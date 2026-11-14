@@ -549,31 +549,6 @@
   background: #2a2e34;
 }
 
-/* Home surfaces share the same light, with separate ink colors for both themes. */
-:global(.product-shell.is-home) {
-  --home-aqua: #68c9cb;
-  --home-lilac: #a29ce8;
-  --home-amber: #eac39a;
-  --home-glass: #fbfcfa;
-  --home-shade: #204853;
-}
-:global(:root[data-theme="dark"] .product-shell.is-home) {
-  --home-aqua: #3f998f;
-  --home-lilac: #6667b1;
-  --home-amber: #aa7851;
-  --home-glass: #1d2528;
-  --home-shade: #070c10;
-}
-:global(#app .product-shell.is-home .product-main) {
-  background-image:
-    radial-gradient(ellipse at 92% 5%, color-mix(in srgb, var(--home-lilac) 24%, transparent), transparent 42%),
-    radial-gradient(ellipse at 27% 21%, color-mix(in srgb, var(--home-aqua) 19%, transparent), transparent 52%);
-  background-size: 100% 100dvh;
-  background-attachment: scroll;
-}
-:global(#app .product-shell.is-home .sidebar nav button[aria-current="page"]) {
-  background: linear-gradient(100deg, var(--surface-selected), color-mix(in srgb, var(--home-aqua) 14%, transparent));
-}
 #app .home-dashboard { gap: 28px; padding: 16px 0 32px; }
 .quote-arrow-position { display: block; }
 
@@ -631,15 +606,6 @@
 #app .home-dashboard .confirmation-panel > .panel-head { border-bottom: 0; }
 
 #app button.home-action { position: relative; overflow: hidden; }
-:global(.home-action-ripple) {
-  position: absolute;
-  width: 145px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  color: inherit;
-  background: currentColor;
-  pointer-events: none;
-}
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   #app .home-dashboard .schedule-list article { transition: transform 200ms ease-out; }
   #app .home-dashboard .schedule-list article[data-pointer-active]:not(:focus-within) {

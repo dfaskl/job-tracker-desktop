@@ -5,6 +5,7 @@ import './style.css'
 import './workspace-design.css'
 import './workspace-layout.css'
 import './editorial-theme.css'
+import './workspace-surfaces.css'
 
 try {
   const savedTheme = localStorage.getItem('job-tracker-theme')

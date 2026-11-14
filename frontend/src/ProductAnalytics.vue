@@ -146,12 +146,12 @@ function grouped(field: string) {
   <div v-else class="analytics-layout">
     <div class="analytics-main">
       <div class="metrics">
-      <article><span>投递总数</span><strong>{{ total }}</strong><small>全部投递记录</small></article>
-      <article><span>有过面试</span><strong>{{ interviews }}</strong><small>占投递总数 {{ interviewRate }}%</small></article>
-      <article><span>通过 / Offer 数</span><strong>{{ offers }}</strong><small>占投递总数 {{ offerRate }}%</small></article>
+      <article class="workspace-light-surface workspace-light-tilt"><span>投递总数</span><strong>{{ total }}</strong><small>全部投递记录</small></article>
+      <article class="workspace-light-surface workspace-light-tilt"><span>有过面试</span><strong>{{ interviews }}</strong><small>占投递总数 {{ interviewRate }}%</small></article>
+      <article class="workspace-light-surface workspace-light-tilt"><span>通过 / Offer 数</span><strong>{{ offers }}</strong><small>占投递总数 {{ offerRate }}%</small></article>
     </div>
     <div class="two-column">
-      <section class="card distribution-card" aria-labelledby="stage-distribution-title">
+      <section class="card distribution-card workspace-light-surface" aria-labelledby="stage-distribution-title">
         <h2 id="stage-distribution-title">阶段分布</h2>
         <div class="distribution-content">
           <div class="donut-chart" role="img" :aria-label="`阶段分布，共 ${stageDistribution.total} 条；${stageDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，')}`">
@@ -167,7 +167,7 @@ function grouped(field: string) {
           </ul>
         </div>
       </section>
-      <section class="card distribution-card" aria-labelledby="channel-distribution-title">
+      <section class="card distribution-card workspace-light-surface" aria-labelledby="channel-distribution-title">
         <h2 id="channel-distribution-title">渠道分布</h2>
         <div class="distribution-content">
           <div class="donut-chart" role="img" :aria-label="`渠道分布，共 ${channelDistribution.total} 条；${channelDistribution.slices.map(item => `${item.name} ${item.count} 条`).join('，') || '暂无数据'}`">
@@ -185,9 +185,9 @@ function grouped(field: string) {
         </div>
       </section>
     </div>
-      <section class="card trend-panel" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
+      <section class="card trend-panel workspace-light-surface" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
     </div>
-    <aside class="interview-panel card" aria-labelledby="interview-records-title">
+    <aside class="interview-panel card workspace-light-surface" aria-labelledby="interview-records-title">
       <header><div><h2 id="interview-records-title">面试记录</h2></div><b>{{interviewRecords.length}}</b></header>
       <div v-if="interviewRecords.length" class="interview-list" role="region" aria-label="面试记录列表" tabindex="0">
         <article v-for="record in visibleInterviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">

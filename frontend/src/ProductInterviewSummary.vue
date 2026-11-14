@@ -178,7 +178,7 @@ watch(topicEntries, entries => {
     <div class="page-notices">
       <p v-if="error" class="feedback error" role="alert">{{ error }}</p><p v-if="message" class="feedback success" role="status">{{ message }}</p>
       <p class="resume-hint"><span>{{ hasResume ? '考点汇总会结合你配置的实习和项目经历。' : '使用面试总结前，请先配置至少一段实习或项目经历。' }}</span><button type="button" @click="goToResume">{{ hasResume ? '查看简历配置' : '去个人主页设置简历 →' }}</button></p>
-      <button type="button" class="primary-action summarize-action" :disabled="!hasResume || summarizing || !reviews.length" @click="onSummarizeClick">{{ !hasResume ? '请先配置简历' : summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
+      <button type="button" class="primary-action summarize-action workspace-light-action" :disabled="!hasResume || summarizing || !reviews.length" @click="onSummarizeClick">{{ !hasResume ? '请先配置简历' : summarizing ? '正在分批整理…' : summary?.stale ? (state?.requiresFullRebuild ? '简历已变更，需全量重建' : '增量更新变更回顾') : hasIncompleteAnswers ? '继续生成未完成回答' : summary ? '重新汇总全部考点' : 'AI 汇总全部考点' }}</button>
     </div>
     <nav class="mobile-pane-tabs" aria-label="面试总结栏目" @keydown.esc="mobileTopicMenuOpen = false">
       <button class="mobile-pane-button" type="button" :aria-pressed="activePane === 'reviews'" @click="activePane = 'reviews'; mobileTopicMenuOpen = false">面试回顾</button>
@@ -204,13 +204,13 @@ watch(topicEntries, entries => {
       </div>
     </nav>
     <div class="summary-columns" :class="{ 'reviews-collapsed': reviewsCollapsed }">
-      <section id="review-list-panel" class="review-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
+      <section id="review-list-panel" class="review-column summary-pane workspace-light-surface" :class="{ 'mobile-pane-active': activePane === 'reviews' }" aria-labelledby="review-list-title">
         <div class="section-heading"><div><small>原始记录</small><h2 id="review-list-title">面试回顾</h2></div><span>{{ reviews.length }} 条</span></div>
         <div class="pane-scroll"><p v-if="!reviews.length" class="empty-state">还没有已完成且写有面试回顾的日程。完成面试后可在日程编辑中记录面试官的问题。</p>
           <ol v-else class="review-list"><li v-for="item in reviews" :key="item.event.id"><button type="button" class="review-card" @click="openReview(item.event.id)"><span class="review-card-heading"><strong>{{ item.company }}</strong><span>{{ item.title }}</span></span><span class="review-card-position">{{ item.position }}</span></button></li></ol></div>
       </section>
       <div class="review-collapse-divider" aria-hidden="false"><button type="button" class="review-collapse-toggle" :aria-expanded="!reviewsCollapsed" aria-controls="review-list-panel" :aria-label="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" :title="reviewsCollapsed ? '展开面试回顾列表' : '收起面试回顾列表'" @click="reviewsCollapsed = !reviewsCollapsed"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m12 4-6 6 6 6" /></svg></button></div>
-      <section class="workbench-column summary-pane" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
+      <section class="workbench-column summary-pane workspace-light-surface" :class="{ 'mobile-pane-active': activePane === 'workbench' }" aria-labelledby="topic-title">
         <section v-if="!hasResume" class="resume-required" aria-labelledby="resume-required-title">
           <span class="resume-required-icon" aria-hidden="true">✦</span>
           <h2 id="resume-required-title">配置简历后即可使用面试总结</h2>

@@ -1,0 +1,93 @@
+/* Light and material shared by the signed-in workspaces. */
+.product-shell {
+  --home-aqua: #68c9cb;
+  --home-lilac: #a29ce8;
+  --home-amber: #eac39a;
+  --home-glass: #fbfcfa;
+  --home-shade: #204853;
+  --workspace-tint: var(--home-aqua);
+  --workspace-edge: color-mix(in srgb, var(--workspace-tint) 29%, var(--color-border));
+  --workspace-glass: color-mix(in srgb, var(--home-glass) 88%, transparent);
+}
+:root[data-theme="dark"] .product-shell {
+  --home-aqua: #3f998f;
+  --home-lilac: #6667b1;
+  --home-amber: #aa7851;
+  --home-glass: #1d2528;
+  --home-shade: #070c10;
+}
+.product-shell:is([data-page="stats"], [data-page="interview-summary"]) { --workspace-tint: var(--home-lilac); }
+.product-shell:is([data-page="calendar"], [data-page="guide"]) { --workspace-tint: var(--home-amber); }
+
+#app .product-shell .product-main {
+  background-image:
+    radial-gradient(ellipse at 92% 5%, color-mix(in srgb, var(--home-lilac) 24%, transparent), transparent 42%),
+    radial-gradient(ellipse at 27% 21%, color-mix(in srgb, var(--workspace-tint) 19%, transparent), transparent 52%);
+  background-size: 100% 100dvh;
+  background-attachment: scroll;
+}
+#app .product-shell .nav-active-indicator {
+  background: linear-gradient(100deg, var(--rail-selected), color-mix(in srgb, var(--workspace-tint) 20%, var(--rail-selected)));
+}
+:is(:root, :root[data-theme="dark"]) #app .product-shell .workspace-light-surface {
+  --surface-light: radial-gradient(ellipse 340px 210px at var(--light-x, 95%) var(--light-y, 0%), color-mix(in srgb, var(--workspace-tint) 14%, transparent), transparent);
+  border: 1px solid var(--workspace-edge);
+  border-radius: 14px;
+  background: var(--surface-light), var(--workspace-glass);
+}
+#app .product-shell :is(.mail-grid, .summary-columns) .workspace-light-surface {
+  --workspace-glass: color-mix(in srgb, var(--home-glass) 95%, transparent);
+}
+#app .product-shell .mail-grid .compose-panel {
+  --workspace-edge: color-mix(in srgb, var(--home-aqua) 55%, var(--color-border));
+}
+#app .product-shell .calendar-pane { overflow: hidden; }
+#app .product-shell .calendar-head {
+  background: linear-gradient(110deg, color-mix(in srgb, var(--workspace-tint) 16%, var(--home-glass)), var(--home-glass));
+}
+#app .product-shell .interview-summary .workbench-header {
+  background: linear-gradient(120deg, color-mix(in srgb, var(--workspace-tint) 12%, var(--home-glass)), var(--home-glass));
+}
+#app .product-shell .profile-section.workspace-light-surface { padding-inline: clamp(12px, 1.6vw, 24px); }
+#app .product-shell .profile-section > .section-title { border-color: var(--workspace-edge); }
+
+/* Keep the stage stripe and the existing arrival highlight on application cards. */
+:is(:root, :root[data-theme="dark"]) #app button.application.workspace-light-surface[class*="tone-"] {
+  border-inline-start: 3px solid var(--stage-tint, var(--color-primary));
+  border-radius: 12px;
+  background: var(--surface-light), linear-gradient(105deg, color-mix(in srgb, var(--stage-tint, var(--color-primary)) 8%, var(--home-glass)), var(--home-glass) 66%) !important;
+}
+:is(:root, :root[data-theme="dark"]) #app button.application.workspace-light-surface:hover {
+  border-color: var(--workspace-edge);
+  border-inline-start-color: var(--stage-tint, var(--color-primary));
+}
+#app .product-shell button.workspace-light-action { overflow: hidden; }
+#app .product-shell button.workspace-light-action:not(.guide-arrow) { position: relative; }
+#app .product-shell .home-action-ripple {
+  position: absolute;
+  width: var(--ripple-size, 145px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: inherit;
+  background: currentColor;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  #app .product-shell .workspace-light-tilt { transition: transform 180ms ease-out, border-color 160ms ease-out; }
+  #app .product-shell .workspace-light-tilt[data-pointer-active]:not(:focus-within, .application-arrival) {
+    transform: perspective(1100px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    border-color: color-mix(in srgb, var(--workspace-tint) 68%, var(--color-border));
+  }
+  #app .product-shell .workspace-light-tilt[data-pointer-active]:not(.application) {
+    border-color: transparent;
+    background:
+      var(--surface-light) padding-box,
+      linear-gradient(var(--home-glass), var(--home-glass)) padding-box,
+      radial-gradient(ellipse at var(--light-x) var(--light-y), var(--workspace-tint), var(--workspace-edge) 72%) border-box;
+  }
+  #app .product-shell button.workspace-light-action > svg { transition: translate 130ms ease-out; }
+  #app .product-shell button.workspace-light-action[data-magnetic] > svg { translate: var(--magnet-x) var(--magnet-y); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app .product-shell .nav-active-indicator { transition: none; }
+}
