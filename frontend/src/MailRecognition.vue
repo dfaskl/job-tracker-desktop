@@ -55,7 +55,6 @@ const preparingBatch = ref(false)
 const processingBatch = ref(false)
 const batchBusy = computed(() => Boolean(batch.value) || preparingBatch.value || processingBatch.value)
 const moreMailActions = ref<HTMLDetailsElement | null>(null)
-const batchBar = ref<HTMLElement | null>(null)
 const batchFuseLabel = computed(() => `撤销处理 ${batch.value?.ids.length ?? 0} 封`)
 const checkedMailIds = ref<number[]>([])
 const listedMailIds = computed(() => inbox.value.messages.map(mail => mail.id))
@@ -233,19 +232,15 @@ function queueSelectedMail() {
   if (batchBusy.value || pendingMail.size || !checkedMailIds.value.length) return
   batch.value = { ids: [...checkedMailIds.value], all: false }
 }
-async function queueAllMail(event: MouseEvent) {
+async function queueAllMail() {
   if (batchBusy.value || pendingMail.size || !inbox.value.pendingCount || syncing.value) return
   preparingBatch.value = true
   error.value = ''
   try {
     const { ids } = await api<{ ids: number[] }>('/api/poc/mail-inbox/messages/pending-ids')
     if (disposed) return
-    if (moreMailActions.value) moreMailActions.value.open = false
     if (ids.length) {
       batch.value = { ids, all: true }
-      await nextTick()
-      if (event.detail === 0) batchBar.value?.querySelector('button')?.focus()
-      else moreMailActions.value?.querySelector('summary')?.focus()
     } else {
       await loadInbox()
     }
@@ -256,9 +251,7 @@ async function queueAllMail(event: MouseEvent) {
   }
 }
 function undoBatch() {
-  const wasAll = batch.value?.all
   batch.value = null
-  if (wasAll && !selectingMail.value) moreMailActions.value?.querySelector('summary')?.focus()
 }
 async function processBatch() {
   if (!batch.value || processingBatch.value) return
@@ -437,9 +430,13 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           <details ref="moreMailActions" class="mail-more" @keydown.esc.stop="moreMailActions?.removeAttribute('open'); moreMailActions?.querySelector('summary')?.focus()">
             <summary title="更多邮件操作" aria-label="更多邮件操作">···</summary>
             <div class="mail-more-panel">
-              <button type="button" class="secondary" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.pendingCount" @click="queueAllMail">
-                {{ preparingBatch ? '正在读取…' : `处理全部 ${inbox.pendingCount} 封` }}
-              </button>
+              <MailFuseButton class="secondary" progress-bar
+                :label="preparingBatch ? '正在读取…' : `处理全部 ${inbox.pendingCount} 封`"
+                :undo-label="batchFuseLabel" :window-ms="10000"
+                :pending="batch?.all" :submitting="batch?.all && processingBatch"
+                :disabled="syncing || Boolean(batch) || pendingMail.size > 0 || !inbox.pendingCount"
+                :aria-busy="preparingBatch"
+                @press="queueAllMail" @undo="undoBatch" @expire="processBatch" />
             </div>
           </details>
         </div></div>
@@ -465,13 +462,13 @@ function preventImplicitSubmit(event: KeyboardEvent) {
           </div>
           <div v-if="!syncing&&!visibleMail.length" class="inbox-empty">{{inbox.accounts.length?'暂无待处理邮件':'请先在设置页面连接 QQ 或网易邮箱'}}</div>
         </div>
-        <div v-if="selectingMail || batch" ref="batchBar" class="mail-batch-bar">
+        <div v-if="selectingMail" class="mail-batch-bar">
           <button v-if="selectingMail && !batch" class="secondary" type="button" title="选择当前列表中的邮件"
             :disabled="syncing || batchBusy || !listedMailIds.length" @click="toggleAllListedMail">{{ allListedMailChecked ? '取消全选' : '全选' }}</button>
           <small v-if="selectingMail && !batch" role="status">已选 {{ checkedMailIds.length }} 封</small>
           <MailFuseButton class="secondary"
             :label="`处理 ${checkedMailIds.length} 封`" :undo-label="batchFuseLabel"
-            :window-ms="batch?.all ? 10000 : 8000" :pending="Boolean(batch)" :submitting="processingBatch"
+            :window-ms="8000" :pending="Boolean(batch && !batch.all)" :submitting="Boolean(batch && !batch.all && processingBatch)"
             :disabled="syncing || batchBusy || pendingMail.size > 0 || !checkedMailIds.length"
             @press="queueSelectedMail" @undo="undoBatch" @expire="processBatch" />
         </div>
@@ -571,6 +568,8 @@ function preventImplicitSubmit(event: KeyboardEvent) {
   width:max-content; padding:4px; border:1px solid var(--color-border);
   border-radius:6px; background:var(--color-card);
 }
+#app .mail-more-panel button.mail-fuse { min-width:150px; white-space:nowrap; }
+#app .mail-more-panel button.mail-fuse.is-pending { padding-bottom:12px; }
 .mail-cards article.mail-card-queued .mail-card-copy { opacity:.58; }
 .mail-check-row { display:flex; min-height:44px; align-items:center; gap:10px; padding-inline:4px; cursor:pointer; }
 #app .mail-check-row input[type="checkbox"] {
