@@ -430,7 +430,10 @@ function preventImplicitSubmit(event: KeyboardEvent) {
     </nav>
     <div class="mail-grid" :data-step="mailStep">
       <section class="card inbox-panel workspace-light-surface" :inert="saving">
-        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封</small></div></div><div class="inbox-actions"><button class="secondary" type="button" :disabled="syncing || batchBusy || pendingMail.size > 0 || (!selectingMail && !inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button><button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button>
+        <div class="inbox-heading"><div><span class="step inbox-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 6.5h17v12h-17z"/><path d="m4 7 8 6 8-6"/></svg></span><div><h3 ref="inboxHeading" tabindex="-1">待处理邮件</h3><small>{{inbox.pendingCount}} 封</small></div></div>
+        <div class="inbox-actions">
+          <button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button>
+          <button class="secondary" type="button" :disabled="syncing || batchBusy || pendingMail.size > 0 || (!selectingMail && !inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button>
           <details ref="moreMailActions" class="mail-more" @keydown.esc.stop="moreMailActions?.removeAttribute('open'); moreMailActions?.querySelector('summary')?.focus()">
             <summary title="更多邮件操作" aria-label="更多邮件操作">···</summary>
             <div class="mail-more-panel">
@@ -666,7 +669,7 @@ textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dbea; b
   .result-form { grid-template-columns: 1fr; }
   .result-form .wide { grid-column: auto; }
   .commit-box { align-items: stretch; flex-direction: column; }
-  .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
+  .inbox-heading{align-items:stretch;flex-direction:column}.inbox-actions{display:grid;grid-template-columns:44px minmax(0,1fr) 44px}.sync-button{width:100%}.mail-cards{max-height:300px}.mail-card-actions button{min-height:44px}
   .mail-preview{width:calc(100vw - 20px);height:calc(100dvh - 20px);border-radius:14px}.mail-preview-card>header,.mail-preview-card>footer{padding:14px}.mail-preview-heading h2{font-size:17px}.mail-preview-meta{grid-template-columns:1fr;padding:12px 14px;gap:10px}.mail-preview-body{margin:12px 14px;padding:14px}.mail-preview-card>footer{align-items:stretch;flex-direction:column}.mail-preview-card>footer>div{display:grid;grid-template-columns:1fr 1fr}
 }
 </style>
