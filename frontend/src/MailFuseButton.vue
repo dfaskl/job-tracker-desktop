@@ -5,6 +5,7 @@ const props = withDefaults(defineProps<{
   label: string
   actionLabel?: string
   undoLabel?: string
+  progressBar?: boolean
   windowMs: number
   pending?: boolean
   disabled?: boolean
@@ -62,7 +63,10 @@ onBeforeUnmount(stop)
     <span v-if="submitting">正在处理…</span>
     <template v-else-if="pending">
       <span class="undo-label">{{ undoLabel }}</span>
-      <svg class="fuse-outline" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+      <span v-if="progressBar" class="fuse-track" aria-hidden="true">
+        <span class="fuse-fill" :style="{ animationDuration: windowMs + 'ms', animationPlayState: paused ? 'paused' : 'running' }"></span>
+      </span>
+      <svg v-else class="fuse-outline" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
         <rect x="1" y="1" width="98" height="38" rx="9" pathLength="100"
           :style="{ animationDuration: windowMs + 'ms', animationPlayState: paused ? 'paused' : 'running' }" />
       </svg>
@@ -98,11 +102,32 @@ onBeforeUnmount(stop)
   vector-effect: non-scaling-stroke;
   animation: burn-fuse linear both;
 }
+.fuse-track {
+  position: absolute;
+  inset-inline: 9px;
+  bottom: 5px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-foreground) 16%, transparent);
+  pointer-events: none;
+}
+.fuse-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mail-fuse-color, #b87816);
+  transform-origin: left center;
+  animation: drain-fuse linear both;
+}
 :global(:root[data-theme="dark"]) .fuse-outline rect { --mail-fuse-color: #f5a524; }
+:global(:root[data-theme="dark"]) .fuse-fill { --mail-fuse-color: #f5a524; }
 .undo-label { animation: show-undo 180ms ease-out; }
 @keyframes burn-fuse { to { stroke-dashoffset: 100; } }
+@keyframes drain-fuse { to { transform: scaleX(0); } }
 @keyframes show-undo { from { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) {
   .fuse-outline rect, .undo-label { animation: none; }
+  .fuse-fill { animation-timing-function: steps(4, end); }
 }
 </style>
