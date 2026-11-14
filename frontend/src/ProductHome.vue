@@ -306,7 +306,10 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
     <Teleport defer to="#home-quote-slot">
       <section class="quote-strip" aria-label="《毛泽东选集》摘句">
         <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" @click="nextQuote">
-          换
+          <svg class="quote-brush-arrow" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false">
+            <path fill-rule="evenodd" d="M13.2 29.4C6.1 28.7 1.8 23.5 2 16.6 2.2 9.4 7 4 13.9 3 21 2 27.2 6.4 28.1 13.4l2.8-.6c.6-.1.9.5.5 1l-4.8 6.2c-.4.5-.9.5-1.4.2l-5.9-4.3c-.5-.4-.2-1 .4-1.1l3.8-.7C23 9.3 19.2 6.4 14.4 6.6 9.2 6.8 5.1 11.2 4.8 16.8c-.4 5.7 2.7 10.1 8.4 12.6ZM3.1 20.8c.4 3.2 2.7 6 5.7 7.1-2.4-1.7-4.5-4.3-5.7-7.1ZM7.5 7.7c2-1.4 4.1-2.3 6.4-2.8-2.3.1-4.8 1.1-6.4 2.8Z" />
+            <path opacity=".6" d="M2.2 22.8c.8 2.4 2.2 4.6 4.4 5.8-2.4-.9-4.1-3.4-4.4-5.8ZM9.1 29.8c1.3.6 2.9.9 4.1.9-1.9.2-3.2-.3-4.1-.9Z" />
+          </svg>
         </button>
         <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
       </section>

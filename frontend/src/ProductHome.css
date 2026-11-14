@@ -41,16 +41,15 @@
   flex: 0 0 44px;
   padding: 0;
   place-items: center;
-  border: 1px solid currentColor;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  color: var(--quote-seal-ink);
+  color: #151513;
   background: transparent;
-  font: 400 22px/1 "Ma Shan Zheng", "Kaiti SC", KaiTi, serif;
   cursor: pointer;
 }
-.quote-strip { --quote-seal-ink: #9b4036; }
-:root[data-theme="dark"] .quote-strip { --quote-seal-ink: #efa39a; }
-#app .quote-trigger:hover { background: color-mix(in srgb, var(--quote-seal-ink) 10%, transparent); }
+:root[data-theme="dark"] #app .quote-trigger { color: #f8f7f2; }
+#app .quote-trigger:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.quote-brush-arrow { display: block; width: 25px; height: 25px; }
 .quote-copy {
   flex: 1;
   min-width: 0;
