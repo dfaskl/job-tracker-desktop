@@ -6,9 +6,11 @@ if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'local-deployment.json')) {
 }
 $script = Join-Path $PSScriptRoot 'backup-server.ps1'
 if (-not (Test-Path -LiteralPath $script)) { throw 'Backup script is missing.' }
+$launcher = Join-Path $PSScriptRoot 'backup-server-hidden.vbs'
+if (-not (Test-Path -LiteralPath $launcher)) { throw 'Hidden backup launcher is missing.' }
 $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-$engine = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$action = New-ScheduledTaskAction -Execute $engine -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $script + '" -DatabaseOnly') -WorkingDirectory $PSScriptRoot
+$engine = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$action = New-ScheduledTaskAction -Execute $engine -Argument ('//B //Nologo "' + $launcher + '"') -WorkingDirectory $PSScriptRoot
 $hourly = New-ScheduledTaskTrigger -Once -At (Get-Date).AddHours(1) -RepetitionInterval (New-TimeSpan -Hours 1)
 $logon = New-ScheduledTaskTrigger -AtLogOn -User $userId
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew `
