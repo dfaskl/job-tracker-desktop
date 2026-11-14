@@ -28,6 +28,69 @@ const quoteDay = computed(() => {
 const quoteCursorKey = 'careerflow_quote_cursor_v1'
 const quoteCursor = ref(readQuoteCursor())
 const quoteArrowSpinning = ref(false)
+let pointerFrame = 0
+let litSurface: HTMLElement | null = null
+let magneticButton: HTMLButtonElement | null = null
+const pointerMotion = window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)')
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+function resetPointerEffects() {
+  cancelAnimationFrame(pointerFrame)
+  if (litSurface) delete litSurface.dataset.pointerActive
+  if (magneticButton) delete magneticButton.dataset.magnetic
+  litSurface = null
+  magneticButton = null
+}
+
+function followPointer(event: PointerEvent) {
+  if (event.pointerType !== 'mouse' || !pointerMotion.matches || !(event.target instanceof Element)) return
+  if (event.buttons) {
+    resetPointerEffects()
+    return
+  }
+  const surface = event.target.closest<HTMLElement>('.home-optical-surface')
+  const button = event.target.closest<HTMLButtonElement>('.home-action:not(:disabled)')
+  const { clientX, clientY } = event
+  cancelAnimationFrame(pointerFrame)
+  pointerFrame = requestAnimationFrame(() => {
+    if (litSurface && litSurface !== surface) delete litSurface.dataset.pointerActive
+    if (magneticButton && magneticButton !== button) delete magneticButton.dataset.magnetic
+    litSurface = surface
+    magneticButton = button
+    const surfaceBounds = surface?.getBoundingClientRect()
+    const buttonBounds = button?.getBoundingClientRect()
+    if (surface && surfaceBounds?.width && surfaceBounds.height) {
+      const x = (clientX - surfaceBounds.left) / surfaceBounds.width
+      const y = (clientY - surfaceBounds.top) / surfaceBounds.height
+      surface.style.setProperty('--light-x', `${x * 100}%`)
+      surface.style.setProperty('--light-y', `${y * 100}%`)
+      surface.style.setProperty('--tilt-x', `${(.5 - y) * 3}deg`)
+      surface.style.setProperty('--tilt-y', `${(x - .5) * 3}deg`)
+      surface.dataset.pointerActive = ''
+    }
+    if (button && buttonBounds) {
+      button.style.setProperty('--magnet-x', `${(clientX - buttonBounds.left - buttonBounds.width / 2) * .2}px`)
+      button.style.setProperty('--magnet-y', `${(clientY - buttonBounds.top - buttonBounds.height / 2) * .2}px`)
+      button.dataset.magnetic = ''
+    }
+  })
+}
+
+function rippleAction(event: MouseEvent) {
+  if (reducedMotion.matches || !event.detail || !(event.target instanceof Element)) return
+  const button = event.target.closest<HTMLButtonElement>('.home-action:not(:disabled)')
+  if (!button || button.getAttribute('aria-disabled') === 'true') return
+  const bounds = button.getBoundingClientRect()
+  const ripple = document.createElement('span')
+  ripple.className = 'home-action-ripple'
+  ripple.setAttribute('aria-hidden', 'true')
+  ripple.style.left = `${event.clientX - bounds.left}px`
+  ripple.style.top = `${event.clientY - bounds.top}px`
+  button.append(ripple)
+  const animation = ripple.animate([{ transform: 'translate(-50%, -50%) scale(0)', opacity: .32 },
+    { transform: 'translate(-50%, -50%) scale(1)', opacity: 0 }], { duration: 420, easing: 'ease-out' })
+  animation.finished.then(() => ripple.remove(), () => ripple.remove())
+}
 const quoteIndex = computed(() => {
   const cursor = quoteCursor.value
   if (cursor) return (cursor.index + Number(cursor.day !== quoteDay.value)) % dailyQuotes.length
@@ -50,7 +113,7 @@ function saveQuoteCursor(index: number) {
 }
 function nextQuote() {
   if (quoteArrowSpinning.value) return
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (!reducedMotion.matches) {
     quoteArrowSpinning.value = true
     return
   }
@@ -102,7 +165,7 @@ onActivated(() => {
   void store.refresh(false, false, false)
   void loadSharedTimelines()
 })
-onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock() })
+onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock(); resetPointerEffects() })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
@@ -220,6 +283,7 @@ onMounted(() => {
   startScheduleClock()
   window.addEventListener('focus', updateScheduleClock)
   window.addEventListener('storage', syncQuoteCursor)
+  pointerMotion.addEventListener('change', resetPointerEffects)
   void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
@@ -313,14 +377,15 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();resetPointerEffects();pointerMotion.removeEventListener('change',resetPointerEffects);window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
-  <div v-if="store.user.value" class="home-dashboard">
+  <div v-if="store.user.value" class="home-dashboard" @pointermove="followPointer" @pointerleave="resetPointerEffects" @click.capture="rippleAction">
     <Teleport defer to="#home-quote-slot">
-      <section class="quote-strip" aria-label="《毛泽东选集》摘句">
-        <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" :aria-disabled="quoteArrowSpinning" @click="nextQuote">
-          <svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false" @animationend="finishQuoteSpin" @animationcancel="finishQuoteSpin">
+      <section class="quote-strip home-optical-surface" aria-label="《毛泽东选集》摘句" @pointermove="followPointer" @pointerleave="resetPointerEffects" @click.capture="rippleAction">
+        <div class="quote-light" aria-hidden="true"></div>
+        <button type="button" class="quote-trigger home-action" title="换一句" aria-label="换一句" :aria-disabled="quoteArrowSpinning" @click="nextQuote">
+          <span class="quote-arrow-position" aria-hidden="true"><svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" focusable="false" @animationend="finishQuoteSpin" @animationcancel="finishQuoteSpin">
             <!-- The open cuts and thin trails preserve the dry-brush texture at icon size. -->
             <path fill-rule="evenodd" d="
               M15 30.4 11.4 29.9 12.5 30.8C7.5 29.9 3.8 27.1 2.5 23.5L2.4 25
@@ -339,13 +404,13 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
               M8.5 27.3C11.1 29.4 13.9 30.4 16.7 30.9 13.9 29.9 11.7 28.9 8.5 27.3Z
               M10.7 3.1C13.5 1.3 16.6 1 19 1.6 15.7 1.6 13.2 2.1 10.7 3.1Z
               M21.3 19.1 25.1 22 24.4 21.8 20.8 19.2Z" />
-          </svg>
+          </svg></span>
         </button>
         <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
       </section>
     </Teleport>
     <section class="dashboard-panel">
-      <section class="timeline-column team-timeline" aria-labelledby="team-timeline-title">
+      <section class="timeline-column team-timeline home-optical-surface" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
         <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time :datetime="`${item.date}T${item.start}`">{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
@@ -365,16 +430,16 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
         <template v-if="recentSchedules.length">
           <div v-for="group in scheduledGroups" :key="group.id" class="schedule-list">
           <h3 v-if="overdueSchedules.length" :id="group.id" tabindex="-1">{{ group.title }}</h3>
-          <article v-for="event in group.events" :key="event.id" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event)}">
+          <article v-for="event in group.events" :key="event.id" class="home-optical-surface" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event),'is-next':event.id===nextScheduleId}">
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
             <div class="schedule-copy"><div class="schedule-heading"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span></div><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
             <div class="schedule-actions">
               <i v-if="event.id===nextScheduleId">下一场</i>
-              <button v-if="appFor(event)" class="secondary icon-button" type="button" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" title="定位投递记录" @click="focusApplication(event)">
+              <button v-if="appFor(event)" class="secondary icon-button home-action" type="button" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" title="定位投递记录" @click="focusApplication(event)">
                 <AppIcon name="arrow-right" />
               </button>
-              <button class="secondary icon-button schedule-edit" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button>
-              <button class="icon-button schedule-complete" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button>
+              <button class="secondary icon-button schedule-edit home-action" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button>
+              <button class="icon-button schedule-complete home-action" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button>
             </div>
           </article>
         </div>

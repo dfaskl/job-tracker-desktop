@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="product-shell">
+  <div class="product-shell" :class="{ 'is-home': activePage === 'home' }">
     <a class="skip-link" href="#main-content" @click.prevent="mainContent?.focus()">跳到主内容</a>
     <aside class="sidebar">
       <button class="brand" type="button" aria-label="返回首页" @click="navigate('home')">

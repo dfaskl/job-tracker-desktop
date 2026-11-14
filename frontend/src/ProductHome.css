@@ -554,3 +554,186 @@
   color: var(--color-foreground);
   background: #2a2e34;
 }
+
+/* Home surfaces share the same light, with separate ink colors for both themes. */
+:global(.product-shell.is-home) {
+  --home-aqua: #68c9cb;
+  --home-lilac: #a29ce8;
+  --home-amber: #eac39a;
+  --home-glass: #fbfcfa;
+  --home-shade: #204853;
+  --home-glow-opacity: .48;
+}
+:global(:root[data-theme="dark"] .product-shell.is-home) {
+  --home-aqua: #3f998f;
+  --home-lilac: #6667b1;
+  --home-amber: #aa7851;
+  --home-glass: #1d2528;
+  --home-shade: #070c10;
+  --home-glow-opacity: .33;
+}
+:global(#app .product-shell.is-home .product-main) {
+  background-image:
+    radial-gradient(ellipse at 92% 5%, color-mix(in srgb, var(--home-lilac) 24%, transparent), transparent 42%),
+    radial-gradient(ellipse at 27% 21%, color-mix(in srgb, var(--home-aqua) 19%, transparent), transparent 52%);
+  background-size: 100% 100dvh;
+  background-attachment: scroll;
+}
+:global(#app .product-shell.is-home .sidebar nav button[aria-current="page"]) {
+  background: linear-gradient(100deg, var(--surface-selected), color-mix(in srgb, var(--home-aqua) 14%, transparent));
+}
+:global(#app .product-shell.is-home .topbar) {
+  background: transparent;
+}
+#app .home-dashboard { gap: 28px; padding: 16px 0 32px; }
+:is(:root, :root[data-theme="dark"]) #app .quote-strip.home-optical-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: clamp(94px, 10vw, 148px);
+  padding: clamp(12px, 2vw, 30px);
+  gap: clamp(10px, 1.7vw, 24px);
+  border: 1px solid color-mix(in srgb, var(--home-aqua) 30%, var(--color-border));
+  border-radius: 20px 20px 7px 20px;
+  background: linear-gradient(112deg, var(--home-glass) 20%, color-mix(in srgb, var(--home-glass) 78%, transparent));
+  box-shadow: 0 16px 34px -25px color-mix(in srgb, var(--home-shade) 58%, transparent);
+}
+.quote-strip::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(118deg, transparent 57%, color-mix(in srgb, var(--home-aqua) 45%, transparent) 78%, transparent 79%),
+    linear-gradient(110deg, transparent 71%, color-mix(in srgb, var(--home-lilac) 39%, transparent) 86%, transparent 90%),
+    linear-gradient(123deg, transparent 67%, color-mix(in srgb, var(--home-amber) 39%, transparent) 88%, transparent);
+}
+.quote-light {
+  position: absolute;
+  z-index: -1;
+  left: var(--light-x, 78%);
+  top: var(--light-y, 18%);
+  width: min(590px, 115%);
+  height: 270px;
+  translate: -50% -50%;
+  opacity: var(--home-glow-opacity);
+  pointer-events: none;
+  background: radial-gradient(ellipse, var(--home-aqua), color-mix(in srgb, var(--home-lilac) 45%, transparent) 36%, transparent 69%);
+}
+#app .quote-strip .quote-copy {
+  flex: 0 1 38em;
+  font-size: clamp(23px, 2.3vw, 39px);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+#app .quote-strip .quote-trigger {
+  width: 48px;
+  min-height: 48px;
+  flex-basis: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--home-aqua) 14%, transparent);
+}
+.quote-arrow-position { display: block; }
+
+#app .home-dashboard .dashboard-panel > .team-timeline {
+  padding: clamp(14px, 1.8vw, 26px);
+  border: 1px solid color-mix(in srgb, var(--home-aqua) 24%, var(--color-border));
+  border-radius: 7px 20px 20px;
+  background:
+    radial-gradient(ellipse farthest-side at var(--light-x, 94%) var(--light-y, 0%), color-mix(in srgb, var(--home-aqua) 17%, transparent), transparent),
+    color-mix(in srgb, var(--home-glass) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+#app .home-dashboard .member-legend { margin-top: 0; }
+#app .team-timeline .timeline-list::before {
+  background: linear-gradient(90deg, var(--color-border-strong), var(--home-aqua), var(--home-lilac));
+}
+:is(:root, :root[data-theme="dark"]) #app .home-dashboard .dashboard-panel > .details-column {
+  margin-top: 22px;
+  padding-top: 0;
+  border: 0;
+}
+#app .home-dashboard .column-heading strong,
+#app .home-dashboard .confirmation-panel h2 {
+  font-size: clamp(18px, 1.6vw, 24px);
+}
+#app .home-dashboard .schedule-advice { padding: 10px 2px; }
+
+:is(:root, :root[data-theme="dark"]) #app .home-dashboard .schedule-list article {
+  isolation: isolate;
+  padding: clamp(13px, 1.5vw, 22px);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--home-glass) 96%, transparent);
+  box-shadow: 0 9px 24px -22px var(--home-shade);
+}
+#app .home-dashboard .schedule-list article.is-overdue { border-inline-start: 3px solid var(--color-destructive); }
+#app .home-dashboard .schedule-list article.is-next {
+  border-color: color-mix(in srgb, var(--home-aqua) 55%, var(--color-border-strong));
+  background: linear-gradient(112deg, color-mix(in srgb, var(--home-aqua) 13%, var(--home-glass)), var(--home-glass) 55%);
+}
+:is(:root, :root[data-theme="dark"]) #app .home-dashboard .schedule-list .date-block {
+  padding-inline: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--home-aqua) 10%, var(--home-glass));
+}
+#app .home-dashboard .schedule-list .date-range .date-block {
+  background: color-mix(in srgb, var(--home-amber) 16%, var(--home-glass));
+}
+#app .home-dashboard .schedule-actions .schedule-complete {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--home-aqua) 16%, var(--home-glass));
+}
+#app .home-dashboard .schedule-actions button { min-width: 44px; min-height: 44px; }
+#app .home-dashboard .schedule-actions > i { background: color-mix(in srgb, var(--home-aqua) 22%, var(--home-glass)); }
+#app .home-dashboard .confirmation-panel > .panel-head { border-bottom: 0; }
+
+#app button.home-action { position: relative; overflow: hidden; }
+:global(.home-action-ripple) {
+  position: absolute;
+  width: 145px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: inherit;
+  background: currentColor;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .quote-light { transition: left 145ms ease-out, top 145ms ease-out; }
+  #app .home-dashboard .schedule-list article { transition: transform 200ms ease-out; }
+  #app .home-dashboard .schedule-list article[data-pointer-active]:not(:focus-within) {
+    transform: perspective(1050px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  }
+  .schedule-list article[data-pointer-active]::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(ellipse 360px 130px at var(--light-x) var(--light-y), color-mix(in srgb, var(--home-lilac) 18%, transparent), transparent);
+    pointer-events: none;
+  }
+  .schedule-list article.is-next[data-pointer-active]::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    padding: 1px;
+    border-radius: inherit;
+    background: radial-gradient(ellipse 360px 150px at var(--light-x) var(--light-y), var(--home-lilac), var(--home-aqua) 42%, transparent 75%);
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
+  #app button.home-action > :is(svg, .quote-arrow-position) { transition: transform 130ms ease-out; }
+  #app button.home-action[data-magnetic] > :is(svg, .quote-arrow-position) { transform: translate(var(--magnet-x), var(--magnet-y)); }
+}
+@media (max-width: 680px) {
+  :is(:root, :root[data-theme="dark"]) #app .quote-strip.home-optical-surface { min-height: 84px; }
+  #app .quote-strip .quote-copy { font-size: clamp(19px, 5vw, 24px); }
+  #app .home-dashboard .schedule-list article { gap: 10px; }
+  #app .home-dashboard .schedule-actions > i { display: inline-block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .schedule-advice, .advice-trigger.is-loading > .advice-glyph, .timeline-loading > i { animation: none; }
+}
