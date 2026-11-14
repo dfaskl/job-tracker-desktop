@@ -570,7 +570,15 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 }
 .mail-cards article.mail-card-queued .mail-card-copy { opacity:.58; }
 .mail-check-row { display:flex; min-height:44px; align-items:center; gap:10px; padding-inline:4px; cursor:pointer; }
-.mail-check-row input { flex:none; width:17px; height:17px; margin:0; accent-color:var(--color-primary); }
+#app .mail-check-row input[type="checkbox"] {
+  flex:none; width:17px; height:17px; min-height:0; margin:0;
+  accent-color:var(--color-primary);
+}
+#app .mail-check-row input[type="checkbox"]:focus { box-shadow:none; }
+#app .mail-check-row input[type="checkbox"]:focus-visible {
+  outline:2px solid var(--color-primary);
+  outline-offset:2px;
+}
 .mail-batch-bar {
   display:flex; flex:none; flex-wrap:wrap; align-items:center; gap:8px;
   margin-top:10px; padding:8px; border:1px solid var(--color-border); border-radius:6px;
