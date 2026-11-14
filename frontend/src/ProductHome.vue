@@ -323,12 +323,12 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
       </section>
 
       <section v-if="adviceLoading||scheduleAdvice||teamConflicts.length" class="schedule-advice" aria-live="polite">
-        <div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议</strong><small>{{adviceLoading?'正在计算安排建议…':teamConflictSummary}}</small></div></div></div>
+        <div class="advice-head"><div class="advice-title"><button class="advice-trigger" :class="{'is-loading':adviceLoading}" :disabled="adviceLoading" title="重新生成安排建议" aria-label="重新生成安排建议" @click="generateScheduleAdvice(adviceSignature,0,true)"><span class="advice-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h4.5a3.5 3.5 0 0 1 0 7H10a3 3 0 0 0 0 6h7"></path></svg></span></button><div><strong>安排建议：</strong><small>{{adviceLoading?'正在计算…':teamConflictSummary}}</small></div></div></div>
         <p v-if="adviceNotice&&!adviceLoading" class="advice-notice">{{adviceNotice}}</p>
         <div v-if="scheduleAdvice?.warnings?.length" class="advice-warnings"><strong>时间紧张</strong><span v-for="item in scheduleAdvice.warnings" :key="item">{{item}}</span></div>
       </section>
       <section class="details-column" aria-labelledby="my-schedule-title">
-        <div class="column-heading"><div><strong id="my-schedule-title">我的日程详情</strong><button v-if="overdueSchedules.length" type="button" class="text-link overdue-summary" @click="focusOverdueSchedules">{{ overdueSchedules.length }} 项已过期</button><small v-else>可编辑或完成自己的日程</small></div><span>{{recentSchedules.length}} 项</span></div>
+        <div class="column-heading"><div><strong id="my-schedule-title">日程详情</strong><button v-if="overdueSchedules.length" type="button" class="text-link overdue-summary" @click="focusOverdueSchedules">{{ overdueSchedules.length }} 项已过期</button></div><span>{{recentSchedules.length}} 项</span></div>
         <template v-if="recentSchedules.length">
           <div v-for="group in scheduledGroups" :key="group.id" class="schedule-list">
           <h3 v-if="overdueSchedules.length" :id="group.id" tabindex="-1">{{ group.title }}</h3>

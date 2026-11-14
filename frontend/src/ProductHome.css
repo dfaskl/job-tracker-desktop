@@ -252,7 +252,7 @@
 .advice-trigger:hover { box-shadow: 0 0 0 4px color-mix(in srgb,var(--accent,var(--color-primary)) 12%,transparent); }
 .advice-trigger:disabled { cursor: wait; }
 .advice-glyph{display:grid;width:20px;height:20px;place-items:center;transform-origin:center}.advice-glyph svg{width:20px;height:20px;overflow:visible;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.advice-trigger.is-loading > .advice-glyph{animation:advice-icon-blink .78s ease-in-out infinite}
-.advice-title > div { display: grid; min-width: 0; gap: 3px; }
+.advice-title > div { min-width: 0; line-height: 1.5; }
 .advice-title strong { font-size: 16px; }
 .advice-title small { color:var(--home-muted);line-height:1.5; }
 .advice-notice { margin: 0; color: #8a5608; font-size: 12px; }
