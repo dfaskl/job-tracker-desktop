@@ -33,19 +33,24 @@
   background: var(--color-background);
 }
 :root[data-theme="dark"] {
-  --color-background: #151b18;
-  --color-card: #1e2722;
-  --color-elevated: #28342d;
+  --color-background: #191917;
+  --color-card: #232320;
+  --color-paper: var(--color-card);
+  --color-canvas: var(--color-background);
+  --color-elevated: #2d2d29;
   --color-foreground: #f1eee3;
-  --color-muted-foreground: #aebeb3;
-  --color-muted: #253129;
-  --color-border: #35483d;
-  --color-border-strong: #71877a;
+  --color-muted-foreground: #bdbbb0;
+  --color-muted: #2a2a26;
+  --color-border: #3d3d36;
+  --color-border-strong: #807f73;
   --color-primary: #9ad7b9;
   --color-on-primary: #152b20;
   --surface-selected: #2b4437;
-  --surface-hover: #2b3b32;
-  --rail-surface: #101b16;
+  --surface-hover: #30302b;
+  --rail-surface: #141412;
+  --rail-text: var(--color-foreground);
+  --rail-muted: var(--color-muted-foreground);
+  --rail-control-surface: var(--color-muted);
   --rail-selected: #243b30;
   --seal-color: #efa39a;
   color: var(--color-foreground);
@@ -82,7 +87,7 @@
 #app .sidebar .guide-nav-item .nav-icon { background: transparent; }
 #app .sidebar :is(button.theme-toggle, .profile-shortcut, .admin-shortcut) {
   color: var(--rail-text);
-  background: var(--rail-selected);
+  background: var(--rail-control-surface, var(--rail-selected));
   border-color: transparent;
 }
 
