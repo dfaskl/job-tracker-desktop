@@ -49,7 +49,7 @@
 }
 :root[data-theme="dark"] #app .quote-trigger { color: #f8f7f2; }
 #app .quote-trigger:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
-.quote-brush-arrow { display: block; width: 25px; height: 25px; }
+.quote-brush-arrow { display: block; width: 28px; height: 28px; }
 .quote-copy {
   flex: 1;
   min-width: 0;
