@@ -110,20 +110,11 @@
   min-height: 0; padding: 17px 18px; border: 0; border-right: 1px solid var(--color-border);
   border-radius: 0; background: transparent; box-shadow: none;
 }
-#app .analytics-main .metrics article:first-child,
 #app .summary-grid article:nth-child(odd) { padding-left: 0; }
 #app .analytics-main .metrics article:last-child,
 #app .summary-grid article:nth-child(even) { border-right: 0; }
 #app .analytics-main .metrics article::before { display: none; }
 #app .analytics-main .two-column { gap: 28px; }
-#app .analytics-main .two-column > .card,
-#app .analytics-main > .card,
-#app .interview-panel {
-  margin: 0; padding: 18px 0 0; border: 0; border-top: 1px solid var(--color-border);
-  border-radius: 0; background: transparent; box-shadow: none;
-}
-#app .analytics-main .two-column > .card + .card { padding-left: 24px; border-left: 1px solid var(--color-border); }
-#app .interview-panel { padding: 18px 0 0 24px; border-top: 0; border-left: 1px solid var(--color-border); }
 #app .interview-list { gap: 0; }
 #app .interview-list article,
 :root[data-theme="dark"] #app .interview-list article {
@@ -162,7 +153,6 @@
   #app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) { padding: 18px 0; border-right: 0; border-bottom: 1px solid var(--color-border); }
   #app .mail-grid > .review-panel { border-bottom: 0; }
   #app .event-sandbox .selected-list { border-left: 0; border-top: 1px solid var(--color-border); }
-  #app .interview-panel { padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--color-border); }
   #app .admin-grid > :is(.overview-column, .users-column) { padding: 0; border-right: 0; border-bottom: 1px solid var(--color-border); }
   #app .admin-grid > .audit-card { padding: 18px 0; }
 }
@@ -175,7 +165,6 @@
   #app .schedule-list article { padding: 14px; }
   #app .workspace > .grid { padding-right: 0; }
   #app .analytics-main .metrics article { padding: 14px 10px; }
-  #app .analytics-main .two-column > .card + .card { padding-left: 0; border-left: 0; }
 }
 @media (max-width: 640px) {
   #app .home-dashboard { gap: 22px; }
@@ -196,9 +185,6 @@
 :root[data-theme="dark"] #app .event-sandbox,
 :root[data-theme="dark"] #app .event-sandbox :is(.calendar-pane, .selected-list),
 :root[data-theme="dark"] #app .selected-list :is(h3, .selected-scroll),
-:root[data-theme="dark"] #app .analytics-layout .card,
-:root[data-theme="dark"] #app .analytics-main .metrics article,
-:root[data-theme="dark"] #app .interview-panel,
 :root[data-theme="dark"] #app .settings-column > .card,
 :root[data-theme="dark"] #app .admin-grid :is(.card, .summary-grid article, .registration, .health-grid > div) {
   background: transparent !important;
@@ -256,11 +242,10 @@
 #app .analytics-main .metrics { gap: 10px; border: 0; }
 #app .analytics-main .metrics article,
 #app .summary-grid article { border: 0; border-radius: 10px; background: var(--color-muted); }
-#app .analytics-main > .card,
-#app .analytics-main .two-column > .card,
-#app .interview-panel { border: 0; border-radius: 12px; background: var(--color-card); }
-#app .analytics-main .two-column > .card + .card,
-#app .interview-panel { padding-left: 18px; }
+#app .analytics-layout :is(.distribution-card, .trend-panel, .interview-panel) {
+  min-width: 0; margin: 0; padding: clamp(12px, 1.5vw, 22px);
+  border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-card); box-shadow: none;
+}
 #app .interview-panel > header { border-bottom: 0; }
 #app .interview-list article { border-color: var(--color-border); }
 

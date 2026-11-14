@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
       <div class="sidebar-account" :inert="mobileViewport"><button v-if="store.user.value" type="button" class="profile-entry" :class="{ active: activePage === 'profile' }" :aria-label="activePage === 'profile' ? `返回上一个页面，当前用户 ${sidebarDisplayName}` : `进入个人主页，当前用户 ${sidebarDisplayName}`" :title="activePage === 'profile' ? '返回上一个页面' : sidebarDisplayName" @click="toggleProfile"><span class="profile-entry-avatar"><img v-if="store.user.value.avatar" :src="store.user.value.avatar" alt=""><AppIcon v-else name="user" :size="20" /></span><span class="profile-entry-copy"><strong>{{ sidebarDisplayName }}</strong><small>{{ activePage === 'profile' ? '返回上一个页面' : '账户与设置' }}</small></span><AppIcon name="chevron-right" :size="16" /></button></div>
     </aside>
 
-    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'stats-page-shell': activePage === 'stats', 'interview-summary-page': activePage === 'interview-summary' }">
+    <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'interview-summary-page': activePage === 'interview-summary' }">
       <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
         <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
@@ -441,28 +441,8 @@ nav button.active::before { content: none; }
 .page-content.admin-content { height: 100%; min-height: 0; }
 .page-content :deep(.card) { margin-top: 18px; }
 .page-content.admin-content :deep(.card) { margin-top: 0; }
-.page-content.stats-content :deep(.analytics-layout > .interview-panel.card) { margin-top: 0; }
 .product-main.profile-page-shell { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 44px; }
 .page-content.profile-content { height: auto; }
-
-/* The desktop analytics dashboard fits inside one viewport. Keep the outer
-   document fixed there and let the interview list own its scrollbar. */
-@media (min-width: 1181px) and (min-height: 900px) {
-  .product-main.stats-page-shell {
-    height: 100dvh;
-    min-height: 0;
-    padding-bottom: 0;
-    overflow: hidden;
-  }
-  .page-content.stats-content {
-    height: 100%;
-    min-height: 0;
-  }
-  .page-content.stats-content :deep(.analytics-layout) {
-    height: 100%;
-    min-height: 0;
-  }
-}
 
 @media (min-width: 821px) and (min-height: 620px) {
   .product-main.application-page {

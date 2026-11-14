@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { isFormalInterview } from './eventClassification'
 import { useJobTrackerStore } from './jobTrackerStore'
 
 const store = useJobTrackerStore()
-const analyticsMain = ref<HTMLElement | null>(null)
-const analyticsMainHeight = ref(0)
 const interviewBatchSize = 40
 const visibleInterviewCount = ref(interviewBatchSize)
-let mainResizeObserver: ResizeObserver | undefined
 const stages = ['已投递', '测评', '笔试', '面试', 'Offer', '已结束']
 const total = computed(() => store.applications.value.length)
 const count = (predicate: (item: Record<string, unknown>) => boolean) => store.applications.value.filter(predicate).length
 const interviews = computed(() => count(item => hasInterviewProgress(item)))
 const offers = computed(() => count(item => item.stage === 'Offer' || item.status === '已通过'))
-const interviewRate = computed(() => total.value ? Math.round(interviews.value / total.value * 100) : 0)
-const offerRate = computed(() => total.value ? Math.round(offers.value / total.value * 100) : 0)
+const percentage = (value: number) => (total.value ? value / total.value * 100 : 0).toFixed(1)
+const interviewRate = computed(() => percentage(interviews.value))
+const offerRate = computed(() => percentage(offers.value))
 const byStage = computed(() => stages.map(name => ({ name, count: count(item => item.stage === name) })))
 const byChannel = computed(() => grouped('channel'))
 const stageColors = ['#163f9f', '#1d55c4', '#286de0', '#4389f0', '#65a3f5', '#8cbcf8']
@@ -140,24 +138,13 @@ function grouped(field: string) {
   return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
 }
 
-watch(analyticsMain, element => {
-  mainResizeObserver?.disconnect()
-  mainResizeObserver = undefined
-  analyticsMainHeight.value = 0
-  if (!element) return
-  mainResizeObserver = new ResizeObserver(([entry]) => {
-    analyticsMainHeight.value = Math.ceil(entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height)
-  })
-  mainResizeObserver.observe(element)
-}, { flush: 'post' })
-onBeforeUnmount(() => mainResizeObserver?.disconnect())
 </script>
 
 <template>
   <p v-if="store.loading.value">正在汇总完整业务数据…</p>
   <section v-else-if="!store.user.value" class="card"><h2>请先登录</h2><p>登录后查看投递分析。</p></section>
-  <div v-else class="analytics-layout" :style="analyticsMainHeight ? {'--analytics-main-height':`${analyticsMainHeight}px`} : undefined">
-    <main ref="analyticsMain" class="analytics-main">
+  <div v-else class="analytics-layout">
+    <div class="analytics-main">
       <div class="metrics">
       <article><span>投递总数</span><strong>{{ total }}</strong><small>全部投递记录</small></article>
       <article><span>有过面试</span><strong>{{ interviews }}</strong><small>占投递总数 {{ interviewRate }}%</small></article>
@@ -198,9 +185,10 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
         </div>
       </section>
     </div>
-    </main>
-    <aside class="interview-panel card" aria-labelledby="interview-records-title">
-      <section class="trend-panel" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
+    </div>
+    <div class="analytics-side">
+      <section class="card trend-panel" aria-labelledby="application-trend-title"><div class="section-head"><h2 id="application-trend-title">近 12 个月投递趋势</h2></div><div class="trend"><div v-for="item in trend" :key="item.key"><span role="img" :aria-label="`${item.label}投递 ${item.count} 次`"><span class="trend-bar" :style="{height:`${Math.max(3,item.count/maxTrend*100)}%`}"><i /><b>{{ item.count }}</b></span></span><small>{{ item.label }}</small></div></div></section>
+      <aside class="interview-panel card" aria-labelledby="interview-records-title">
       <header><div><h2 id="interview-records-title">面试记录</h2></div><b>{{interviewRecords.length}}</b></header>
       <div v-if="interviewRecords.length" class="interview-list" tabindex="0" aria-label="面试投递记录，可上下滚动">
         <article v-for="record in visibleInterviewRecords" :key="record.item.id" :class="record.offer?'is-offer':record.ended?'is-ended':'is-active'">
@@ -214,12 +202,18 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
         <button v-if="visibleInterviewCount < interviewRecords.length" type="button" class="secondary" @click="visibleInterviewCount += interviewBatchSize">显示更多面试记录</button>
       </div>
       <p v-else class="interview-empty">暂无进入过正式面试环节的投递。</p>
-    </aside>
+      </aside>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.analytics-layout{display:grid;width:100%;grid-template-columns:minmax(0,1fr) minmax(340px,1fr);gap:20px;align-items:start;padding:22px 0 28px}.analytics-main{display:grid;min-width:0;gap:18px}.analytics-main .metrics{margin-top:0}
+.analytics-layout {
+  display:grid; width:100%; grid-template-columns:minmax(0,1fr) minmax(340px,1fr);
+  align-items:start; padding:22px 0 28px;
+}
+.analytics-main, .analytics-side { display:grid; min-width:0; align-content:start; gap:24px; }
+.analytics-main .metrics { margin-top:0; }
 .metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:22px; }
 .metrics article { position:relative; display:grid; min-height:142px; align-content:space-between; gap:7px; overflow:hidden; padding:20px 22px 18px 25px; border:1px solid var(--color-border); border-radius:var(--radius-panel); background:var(--color-paper); }
 .metrics article::before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:var(--color-primary); }
@@ -230,11 +224,11 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .metrics strong { color:var(--color-foreground); font-family:"Fira Code","Noto Sans SC",sans-serif; font-size:34px; line-height:1; letter-spacing:-.06em; }
 .metrics small { font-size:12px; }
 .two-column { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
-.two-column>.card { min-height:286px; }
+
 .card h2 { margin:0 0 22px; font-size:19px; }
 .distribution-card { min-width:0; }
 .distribution-card h2 { margin-bottom:18px; }
-.distribution-content { display:grid; grid-template-columns:minmax(128px,170px) minmax(0,1fr); align-items:center; gap:18px; }
+.distribution-content { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); align-items:center; gap:14px; }
 .donut-chart { position:relative; width:100%; max-width:170px; aspect-ratio:1; border-radius:50%; }
 .donut-ring { display:block; width:100%; height:100%; overflow:visible; }
 .donut-ring circle { fill:none; stroke-width:24; stroke-linecap:butt; }
@@ -246,7 +240,7 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .distribution-legend { display:grid; gap:9px; min-width:0; margin:0; padding:0; list-style:none; }
 .distribution-legend li { display:grid; grid-template-columns:9px minmax(0,1fr) auto; align-items:center; gap:8px; min-width:0; color:var(--color-muted-foreground); font-size:12px; }
 .distribution-legend i { width:9px; height:9px; border-radius:3px; }
-.distribution-legend span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.distribution-legend span { overflow-wrap:anywhere; }
 .distribution-legend strong { color:var(--color-foreground); font-size:12px; font-variant-numeric:tabular-nums; }
 .distribution-empty { margin:0; color:var(--color-muted-foreground); font-size:12px; }
 .section-head { display:flex; align-items:center; justify-content:space-between; }
@@ -259,14 +253,33 @@ onBeforeUnmount(() => mainResizeObserver?.disconnect())
 .trend i { display:block; width:min(34px,72%); height:100%; border-radius:4px 4px 0 0; background:var(--color-primary); box-shadow:inset 0 1px 0 rgba(255,255,255,.35); }
 .trend b { position:absolute; bottom:calc(100% + 4px); color:var(--color-muted-foreground); font:600 11px/1 "Fira Code",monospace; white-space:nowrap; }
 .trend small { color:var(--color-muted-foreground); font-size:11px; }
-.interview-panel{display:flex;height:var(--analytics-main-height,auto);min-width:0;min-height:0;margin:0;padding:18px;flex-direction:column;overflow:hidden}.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{--record-bg:#fff;display:grid;gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.compact-flow{display:grid;grid-template-columns:repeat(var(--flow-count),minmax(56px,1fr));min-width:max(100%,calc(var(--flow-count) * 62px));align-items:start;margin:2px 0;padding:4px 1px 3px;overflow-x:auto;scrollbar-width:none}.compact-flow::-webkit-scrollbar{display:none}.compact-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid;min-width:56px;justify-items:center;text-align:center}.compact-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 11px);top:11px;width:calc(100% - 22px);height:2px;background:color-mix(in srgb,var(--node-color) 24%,#dce3df)}.compact-node>i{position:relative;z-index:1;display:grid;width:23px;height:23px;place-items:center;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:8px;color:var(--node-color);background:var(--node-soft);font:800 12px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 3px var(--record-bg)}.compact-node>b{max-width:64px;margin-top:5px;overflow:hidden;color:var(--node-color);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.compact-node>small{margin-top:1px;color:#718079;font-size:9px;white-space:nowrap}.compact-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:12px;height:12px;place-items:center;border:2px solid var(--record-bg);border-radius:50%;color:#fff;background:var(--node-color);font-size:8px}.compact-node.current>i,.compact-node.upcoming>i{box-shadow:0 0 0 3px var(--record-bg),0 0 0 5px color-mix(in srgb,var(--node-color) 14%,transparent)}.compact-node.upcoming>i{border-style:dashed}.compact-node.failed>i,.compact-node.success>i{color:#fff;background:var(--node-color)}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
+.interview-panel { min-width:0; }
+.interview-panel>header{display:flex;flex:none;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--color-border)}.interview-panel>header>div{display:grid;min-width:0;gap:3px}.interview-panel>header span{color:var(--color-primary);font-size:11px;font-weight:800;letter-spacing:.08em}.interview-panel>header h2{margin:0;font-size:19px}.interview-panel>header p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.5}.interview-panel>header>b{flex:none;padding:5px 8px;border-radius:999px;color:#315e64;background:#e6f3f1;font-size:11px}.interview-list{display:grid;min-height:0;flex:1 1 auto;align-content:start;gap:10px;margin:14px -6px 0 0;padding-right:6px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#9ebdb7 transparent;scrollbar-width:thin}.interview-list article{--record-bg:#fff;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:13px 14px;border:1px solid;border-left-width:5px;border-radius:11px}.interview-list article.is-active{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.record-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.record-head strong{min-width:0;overflow:hidden;color:var(--color-foreground);font-size:14px;text-overflow:ellipsis;white-space:nowrap}.record-head span{flex:none;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}.is-active .record-head span{color:#12623d;background:#d1eddc}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.interview-list article>p{margin:0;color:#4e5d58;font-size:12px}.compact-flow{display:grid;grid-template-columns:repeat(var(--flow-count),minmax(56px,1fr));min-width:0;align-items:start;margin:2px 0;padding:4px 1px 3px;overflow-x:auto;scrollbar-width:thin}.compact-node{--node-color:#718078;--node-soft:#eef2ef;position:relative;display:grid;min-width:56px;justify-items:center;text-align:center}.compact-node:not(:first-child)::before{content:"";position:absolute;left:calc(-50% + 11px);top:11px;width:calc(100% - 22px);height:2px;background:color-mix(in srgb,var(--node-color) 24%,#dce3df)}.compact-node>i{position:relative;z-index:1;display:grid;width:23px;height:23px;place-items:center;border:2px solid color-mix(in srgb,var(--node-color) 72%,white);border-radius:8px;color:var(--node-color);background:var(--node-soft);font:800 12px "Segoe UI Symbol","Microsoft YaHei UI",sans-serif;box-shadow:0 0 0 3px var(--record-bg)}.compact-node>b{max-width:64px;margin-top:5px;overflow:hidden;color:var(--node-color);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.compact-node>small{margin-top:1px;color:#718079;font-size:9px;white-space:nowrap}.compact-node.done>i::after{content:"✓";position:absolute;right:-5px;top:-6px;display:grid;width:12px;height:12px;place-items:center;border:2px solid var(--record-bg);border-radius:50%;color:#fff;background:var(--node-color);font-size:8px}.compact-node.current>i,.compact-node.upcoming>i{box-shadow:0 0 0 3px var(--record-bg),0 0 0 5px color-mix(in srgb,var(--node-color) 14%,transparent)}.compact-node.upcoming>i{border-style:dashed}.compact-node.failed>i,.compact-node.success>i{color:#fff;background:var(--node-color)}.flow-applied{--node-color:#4775be;--node-soft:#eaf1fc}.flow-assessment{--node-color:#7a57ad;--node-soft:#f1ebfa}.flow-test{--node-color:#b77718;--node-soft:#fff2d9}.flow-interview{--node-color:#24828b;--node-soft:#e3f5f5}.flow-phone{--node-color:#596bc2;--node-soft:#ebedfb}.flow-offer{--node-color:#258254;--node-soft:#e3f5e9}.flow-waiting{--node-color:#b06424;--node-soft:#fff0e1}.flow-failed{--node-color:#bc4c48;--node-soft:#fde9e8}.flow-other{--node-color:#69766f;--node-soft:#edf1ef}.interview-list footer{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#68766f;font-size:10px}.interview-list time{text-align:right}.interview-empty{margin:14px 0 0;padding:24px 12px;color:var(--color-muted-foreground);background:var(--color-muted);text-align:center}
 .trend{height:158px;grid-template-columns:repeat(12,minmax(30px,1fr));gap:6px}.trend>div{grid-template-rows:120px auto}.trend>div>span{padding-top:12px}
 .interview-list article.is-active{--record-bg:#edf4ff;border-color:#b7cbed;border-left-color:#3974c6;background:var(--record-bg)}.interview-list article.is-ended{--record-bg:#fbeceb;border-color:#e2b8b4;border-left-color:#bd4942;background:var(--record-bg)}.interview-list article.is-offer{--record-bg:#eaf7ef;border-color:#a9d7bd;border-left-color:#278759;background:var(--record-bg)}.is-active .record-head span{color:#245ca6;background:#dceaff}.is-ended .record-head span{color:#98342f;background:#f4d3d0}.is-offer .record-head span{color:#12623d;background:#d1eddc}
-@media(max-width:1180px){.analytics-layout{grid-template-columns:minmax(0,1fr) minmax(300px,1fr)}.metrics{grid-template-columns:1fr 1fr}.two-column{grid-template-columns:1fr}.trend{gap:4px}}
-@media(max-width:900px){.analytics-layout{grid-template-columns:1fr}.interview-panel{height:auto;max-height:none;grid-row:2;overflow:visible}.interview-list{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}}
-@media(max-width:640px){.metrics{grid-template-columns:1fr}.metrics article{min-height:118px}}
-@media(max-width:380px){.distribution-content{grid-template-columns:120px minmax(0,1fr);gap:10px}.distribution-legend{gap:7px}}
-@media(max-width:640px){.analytics-layout{padding-top:14px}.interview-list{grid-template-columns:1fr}.interview-list footer{align-items:flex-start;flex-direction:column}.interview-list time{text-align:left}}
-.trend-panel{flex:none;min-width:0;margin-bottom:16px;overflow-x:auto}.trend-panel .section-head h2{margin:0;font-size:17px}.trend-panel .trend{height:158px;grid-template-columns:repeat(12,minmax(26px,1fr));gap:5px;margin-top:12px}.trend-panel .trend>div{grid-template-rows:120px auto;gap:6px}.trend-panel .trend>div>span{padding-top:12px}
-@media(max-width:640px){.trend-panel .trend{min-width:360px;grid-template-columns:repeat(12,minmax(26px,1fr));gap:4px}}
+.trend-panel { min-width:0; }
+.trend-panel .section-head h2 { margin:0; }
+.trend-panel .trend { height:158px; grid-template-columns:repeat(12,minmax(0,1fr)); gap:5px; margin-top:12px; }
+.trend-panel .trend > div { grid-template-rows:120px auto; gap:6px; }
+.trend-panel .trend > div > span { padding-top:12px; }
+@media (min-width: 1101px) {
+  .interview-list { max-height:max(400px, calc(100dvh - 310px)); }
+}
+@media (min-width: 821px) and (max-width: 1420px) {
+  .two-column { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width: 1100px) {
+  .analytics-layout { grid-template-columns:minmax(0,1fr); }
+  .interview-list { margin-inline-end:0; padding-inline-end:0; overflow:visible; }
+}
+@media (max-width: 640px) {
+  .analytics-layout { padding-top:14px; }
+  .two-column { grid-template-columns:minmax(0,1fr); }
+  .trend-panel .trend { gap:2px; }
+  .interview-list footer { align-items:flex-start; flex-direction:column; }
+}
+@media (max-width: 380px) {
+  .distribution-content { gap:10px; }
+  .distribution-legend { gap:7px; }
+}
 </style>
