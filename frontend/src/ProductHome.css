@@ -52,7 +52,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .quote-brush-arrow { transition: translate 180ms ease-out; }
   .quote-trigger:focus-visible .quote-brush-arrow { translate: 0 -3px; }
-  .quote-brush-arrow.is-spinning { animation: quote-brush-spin 1.8s linear infinite; }
+  .quote-brush-arrow.is-spinning { animation: quote-brush-spin 650ms ease-in-out; }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .quote-trigger:hover .quote-brush-arrow { translate: 0 -3px; }

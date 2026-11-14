@@ -49,7 +49,19 @@ function saveQuoteCursor(index: number) {
   } catch { /* 当前页面仍保留轮换位置。 */ }
 }
 function nextQuote() {
-  quoteArrowSpinning.value = true
+  if (quoteArrowSpinning.value) return
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    quoteArrowSpinning.value = true
+    return
+  }
+  advanceQuote()
+}
+function finishQuoteSpin() {
+  if (!quoteArrowSpinning.value) return
+  quoteArrowSpinning.value = false
+  advanceQuote()
+}
+function advanceQuote() {
   updateScheduleClock()
   quoteCursor.value = readQuoteCursor() ?? quoteCursor.value
   saveQuoteCursor((quoteIndex.value + 1) % dailyQuotes.length)
@@ -90,7 +102,7 @@ onActivated(() => {
   void store.refresh(false, false, false)
   void loadSharedTimelines()
 })
-onDeactivated(() => { homeViewActive = false; stopScheduleClock() })
+onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock() })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
@@ -307,8 +319,8 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
   <div v-if="store.user.value" class="home-dashboard">
     <Teleport defer to="#home-quote-slot">
       <section class="quote-strip" aria-label="《毛泽东选集》摘句">
-        <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" @click="nextQuote">
-          <svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false">
+        <button type="button" class="quote-trigger" title="换一句" aria-label="换一句" :aria-disabled="quoteArrowSpinning" @click="nextQuote">
+          <svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true" focusable="false" @animationend="finishQuoteSpin" @animationcancel="finishQuoteSpin">
             <!-- The open cuts and thin trails preserve the dry-brush texture at icon size. -->
             <path fill-rule="evenodd" d="
               M15 30.4 11.4 29.9 12.5 30.8C7.5 29.9 3.8 27.1 2.5 23.5L2.4 25
