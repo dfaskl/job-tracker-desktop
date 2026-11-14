@@ -331,8 +331,7 @@ onBeforeUnmount(() => {
     </aside>
 
     <main id="main-content" ref="mainContent" tabindex="-1" class="product-main" :class="{ 'application-page': activePage === 'applications', 'calendar-page': activePage === 'calendar', 'mail-page-shell': activePage === 'mail', 'profile-page-shell': activePage === 'profile', 'admin-page-shell': activePage === 'admin', 'interview-summary-page': activePage === 'interview-summary' }">
-      <header v-show="activePage === 'home' || activePage === 'applications'" class="topbar">
-        <div v-show="activePage === 'home'" id="home-quote-slot" class="home-quote-slot"></div>
+      <header v-show="activePage === 'applications'" class="topbar">
         <div id="application-toolbar-slot" class="application-toolbar-slot" :class="{ active: activePage === 'applications' }"></div>
         <button v-if="activePage === 'applications'" type="button" :disabled="!applicationWorkspaceReady" @click="createApplication">＋ 新建投递</button>
       </header>
@@ -414,7 +413,6 @@ nav button.active::before { content: none; }
 }
 .application-page .topbar { align-items: flex-start; }
 .application-page .topbar > button { align-self: flex-start; }
-.home-quote-slot { display: flex; min-width: 0; flex: 1; justify-content: center; }
 .application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
@@ -508,7 +506,7 @@ nav button.active::before { content: none; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
   .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 10px 0; }
-  .home-quote-slot, .application-toolbar-slot { width: 100%; max-width: 100%; flex: 0 0 100%; margin: 0; }
+  .application-toolbar-slot { width: 100%; max-width: 100%; flex: 0 0 100%; margin: 0; }
 }
 @media (max-width: 480px) {
   .sidebar { padding-inline: 12px; }

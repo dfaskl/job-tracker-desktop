@@ -381,34 +381,6 @@ onUnmounted(()=>{stopScheduleClock();resetPointerEffects();pointerMotion.removeE
 
 <template>
   <div v-if="store.user.value" class="home-dashboard" @pointermove="followPointer" @pointerleave="resetPointerEffects" @click.capture="rippleAction">
-    <Teleport defer to="#home-quote-slot">
-      <section class="quote-strip home-optical-surface" aria-label="《毛泽东选集》摘句" @pointermove="followPointer" @pointerleave="resetPointerEffects" @click.capture="rippleAction">
-        <div class="quote-light" aria-hidden="true"></div>
-        <button type="button" class="quote-trigger home-action" title="换一句" aria-label="换一句" :aria-disabled="quoteArrowSpinning" @click="nextQuote">
-          <span class="quote-arrow-position" aria-hidden="true"><svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" focusable="false" @animationend="finishQuoteSpin" @animationcancel="finishQuoteSpin">
-            <!-- The open cuts and thin trails preserve the dry-brush texture at icon size. -->
-            <path fill-rule="evenodd" d="
-              M15 30.4 11.4 29.9 12.5 30.8C7.5 29.9 3.8 27.1 2.5 23.5L2.4 25
-              C.7 21.3.7 17.4 1.8 13.5L1.2 14.1C2.2 9.8 5.5 5.9 9.4 4.2L8 4.5
-              C12.6 1.6 19.1 1.7 23.6 4.9L22.5 4.6C25.7 6.5 27.7 9.5 28.6 13.1
-              L31.4 12.6 30.8 14 31.2 13.9 26.5 20.3C26.1 20.8 25.7 20.9 25.2 20.5
-              L18.5 15.8 20.3 15.5 19.4 15.2 23.6 14.2C22.8 9.8 19.3 7 15.3 7.2
-              C10.2 7.3 6 11.3 5.5 16.4 4.8 21.8 8 27.6 15 30.4Z
-              M3.3 15.7C3.2 11.4 6.1 7.6 9.5 6.2 6.4 8.3 4.7 11.3 3.3 15.7Z
-              M11.2 5.4C14.4 3.2 19.1 3.4 22.2 5.7 18.9 4.3 14.7 4.2 11.2 5.4Z
-              M3.8 19.1C3.8 23.8 6.4 27 10.5 29 7.5 26.4 5.1 23.7 3.8 19.1Z
-              M22.2 16.2 26.1 17.8 29 14.5 26 16.9Z" />
-            <path opacity=".72" d="
-              M.5 16.9C.1 20.8.9 24 3.2 26.5 1.7 23.9.8 21.2.5 16.9Z
-              M3.1 26.8C5.6 29.8 8.4 31.2 11.1 31.4 8.2 30.4 5.9 29.3 3.1 26.8Z
-              M8.5 27.3C11.1 29.4 13.9 30.4 16.7 30.9 13.9 29.9 11.7 28.9 8.5 27.3Z
-              M10.7 3.1C13.5 1.3 16.6 1 19 1.6 15.7 1.6 13.2 2.1 10.7 3.1Z
-              M21.3 19.1 25.1 22 24.4 21.8 20.8 19.2Z" />
-          </svg></span>
-        </button>
-        <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
-      </section>
-    </Teleport>
     <section class="dashboard-panel">
       <section class="timeline-column team-timeline home-optical-surface" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
@@ -453,6 +425,32 @@ onUnmounted(()=>{stopScheduleClock();resetPointerEffects();pointerMotion.removeE
       <div v-if="staleApplications.length" class="confirmation-list"><article v-for="row in staleApplications" :key="row.item.id"><div><strong>{{row.item.company||'未填写公司'}}</strong><span>{{row.item.position||'未填写岗位'}}</span></div><div class="progress-line"><i>已投递</i><span>→</span><i>测评 / 笔试</i><span>→</span><i>面试</i><span>→</span><i class="current">等待结果</i></div><em>{{row.health?.days}}天无进展</em><button :disabled="busyId===row.item.id||store.readOnly.value" @click="markRejected(row.item)">标记未通过</button></article></div>
       <div v-else class="confirmation-empty"><span class="confirmation-empty-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M16 8h16a4 4 0 0 1 4 4v27H12V12a4 4 0 0 1 4-4Z"/><path d="M19 8V6h10v2M18 19h12M18 25h12M18 31h7"/><path class="empty-check" d="m29 33 3 3 6-7"/></svg></span><strong>目前没有需要人工确认的岗位</strong><p>暂时没有最近日程达到 3 周的面试记录。</p></div>
     </section>
+    <section class="quote-strip" aria-label="《毛泽东选集》摘句">
+      <button type="button" class="quote-trigger home-action" title="换一句" aria-label="换一句" :aria-disabled="quoteArrowSpinning" @click="nextQuote">
+        <span class="quote-arrow-position" aria-hidden="true"><svg class="quote-brush-arrow" :class="{ 'is-spinning': quoteArrowSpinning }" viewBox="0 0 32 32" fill="currentColor" focusable="false" @animationend="finishQuoteSpin" @animationcancel="finishQuoteSpin">
+          <!-- The open cuts and thin trails preserve the dry-brush texture at icon size. -->
+          <path fill-rule="evenodd" d="
+            M15 30.4 11.4 29.9 12.5 30.8C7.5 29.9 3.8 27.1 2.5 23.5L2.4 25
+            C.7 21.3.7 17.4 1.8 13.5L1.2 14.1C2.2 9.8 5.5 5.9 9.4 4.2L8 4.5
+            C12.6 1.6 19.1 1.7 23.6 4.9L22.5 4.6C25.7 6.5 27.7 9.5 28.6 13.1
+            L31.4 12.6 30.8 14 31.2 13.9 26.5 20.3C26.1 20.8 25.7 20.9 25.2 20.5
+            L18.5 15.8 20.3 15.5 19.4 15.2 23.6 14.2C22.8 9.8 19.3 7 15.3 7.2
+            C10.2 7.3 6 11.3 5.5 16.4 4.8 21.8 8 27.6 15 30.4Z
+            M3.3 15.7C3.2 11.4 6.1 7.6 9.5 6.2 6.4 8.3 4.7 11.3 3.3 15.7Z
+            M11.2 5.4C14.4 3.2 19.1 3.4 22.2 5.7 18.9 4.3 14.7 4.2 11.2 5.4Z
+            M3.8 19.1C3.8 23.8 6.4 27 10.5 29 7.5 26.4 5.1 23.7 3.8 19.1Z
+            M22.2 16.2 26.1 17.8 29 14.5 26 16.9Z" />
+          <path opacity=".72" d="
+            M.5 16.9C.1 20.8.9 24 3.2 26.5 1.7 23.9.8 21.2.5 16.9Z
+            M3.1 26.8C5.6 29.8 8.4 31.2 11.1 31.4 8.2 30.4 5.9 29.3 3.1 26.8Z
+            M8.5 27.3C11.1 29.4 13.9 30.4 16.7 30.9 13.9 29.9 11.7 28.9 8.5 27.3Z
+            M10.7 3.1C13.5 1.3 16.6 1 19 1.6 15.7 1.6 13.2 2.1 10.7 3.1Z
+            M21.3 19.1 25.1 22 24.4 21.8 20.8 19.2Z" />
+        </svg></span>
+      </button>
+      <p class="quote-copy" aria-live="polite" :title="`《毛泽东选集》·《${quote.source}》`">{{ quote.text }}</p>
+    </section>
+
   </div>
 
   <section v-else-if="store.initialized.value" class="card sign-in-card"><h2>登录后查看你的求职进展</h2><p>使用现有账号即可进入，新旧系统账号及业务数据保持兼容。</p><button @click="emit('navigate','applications')">前往登录</button></section>

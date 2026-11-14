@@ -59,8 +59,6 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 
 /* The home workspace starts with the personal agenda. */
 #app .home-dashboard { gap: 20px; padding-top: 24px; }
-#app .home-quote-slot { justify-content: flex-start; }
-#app .quote-strip { justify-content: flex-start; padding: 6px 0 6px 14px; border: 0; border-inline-start: 2px solid var(--color-border-strong); border-radius: 0; background: transparent; box-shadow: none; }
 #app .dashboard-panel { padding: 24px; }
 #app .panel-head { padding-left: 0; }
 #app .panel-head h2 { font-size: 18px; }
@@ -100,7 +98,6 @@ body :is(.backdrop, .modal-backdrop, .link-backdrop) :is(button, a, input, selec
 #app .details-column { padding: 0; border: 0; margin-top: 18px; }
 #app .schedule-actions button { border: 1px solid var(--color-border); background: var(--color-muted); }
 :root[data-theme="dark"] #app .schedule-actions > i { color: var(--color-primary); background: var(--surface-selected); }
-:root[data-theme="dark"] #app .quote-strip { background: transparent; }
 #app .heatmap-controls button { min-height: 28px; }
 #app .workspace { box-shadow: none; }
 #app .mail-toolbar, #app .admin-head { padding-left: 0; border-left: 0; }
@@ -223,7 +220,6 @@ body :is(.modal, .detail-modal, .link-modal, .edit-modal) :is(h2, h3) { font-fam
 
 @media (min-width: 821px) and (min-height: 700px) {
   #app .product-main:has(.home-content) { display: flex; height: 100dvh; min-height: 0; flex-direction: column; padding-bottom: 0; overflow: hidden; }
-  #app .product-main:has(.home-content) > .topbar { flex: none; }
   #app .home-content { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; padding-right: 6px; }
 }
 @media (max-width: 820px) {

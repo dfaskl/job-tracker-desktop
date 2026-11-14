@@ -1,6 +1,4 @@
 /* Continuous work surfaces: rhythm comes from type, columns and rules. */
-#app .home-quote-slot { width: 100%; min-width: 0; flex: 1 1 100%; }
-#app .quote-strip { width: 100%; max-width: none; flex: 1 1 100%; }
 #app .home-dashboard { gap: 28px; }
 #app .dashboard-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 #app .dashboard-panel > .panel-head { padding: 0 0 15px; border-bottom: 1px solid var(--color-border); }

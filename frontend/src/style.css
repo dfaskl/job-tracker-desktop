@@ -231,7 +231,7 @@ body { background: var(--color-background); }
   --home-paper: var(--color-card);
   --home-line: var(--color-border);
 }
-:root[data-theme="dark"] #app :is(.quote-strip, .timeline-column, .details-column, .member-legend, .timeline-user-card, .schedule-advice, .advice-timeline) {
+:root[data-theme="dark"] #app :is(.timeline-column, .details-column, .member-legend, .timeline-user-card, .schedule-advice, .advice-timeline) {
   border-color: var(--color-border);
   color: var(--color-card-foreground);
   background: var(--color-card);

@@ -21,18 +21,11 @@
 }
 
 .quote-strip {
-  display: inline-flex;
-  width: fit-content;
-  max-width: min(880px, 100%);
-  min-width: 0;
+  display: flex;
   align-items: center;
-  gap: 11px;
-  margin: 0;
-  padding: 9px 12px;
-  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 24%, var(--color-border));
-  border-radius: 7px;
-  color: var(--home-ink);
-  background: var(--color-card);
+  justify-self: center;
+  gap: 4px;
+  max-width: min(100%, 42rem);
 }
 #app .quote-trigger {
   display: grid;
@@ -48,7 +41,7 @@
   cursor: pointer;
 }
 :root[data-theme="dark"] #app .quote-trigger { color: #f8f7f2; }
-.quote-brush-arrow { display: block; width: 28px; height: 28px; }
+.quote-brush-arrow { display: block; width: 22px; height: 22px; }
 @media (prefers-reduced-motion: no-preference) {
   .quote-brush-arrow { transition: translate 180ms ease-out; }
   .quote-trigger:focus-visible .quote-brush-arrow { translate: 0 -3px; }
@@ -65,7 +58,7 @@
   overflow-wrap: anywhere;
   color: var(--color-foreground);
   font-family: "Ma Shan Zheng", "Kaiti SC", KaiTi, serif;
-  font-size: clamp(18px, 1.4vw, 22px);
+  font-size: clamp(16px, 1.5vw, 19px);
   font-weight: 400;
   line-height: 1.55;
 }
@@ -527,7 +520,6 @@
 }
 @media (max-width: 680px) {
   .home-dashboard { gap: 14px; padding-top: 10px; }
-  .quote-strip { width: 100%; }
   .timeline-scroll { margin-inline: -4px; padding-inline: 4px; scroll-snap-type: x proximity; }
   .timeline-list article { scroll-snap-align: start; }
   .panel-head, .advice-head { align-items: flex-start; }
@@ -562,7 +554,6 @@
   --home-amber: #eac39a;
   --home-glass: #fbfcfa;
   --home-shade: #204853;
-  --home-glow-opacity: .48;
 }
 :global(:root[data-theme="dark"] .product-shell.is-home) {
   --home-aqua: #3f998f;
@@ -570,7 +561,6 @@
   --home-amber: #aa7851;
   --home-glass: #1d2528;
   --home-shade: #070c10;
-  --home-glow-opacity: .33;
 }
 :global(#app .product-shell.is-home .product-main) {
   background-image:
@@ -582,59 +572,7 @@
 :global(#app .product-shell.is-home .sidebar nav button[aria-current="page"]) {
   background: linear-gradient(100deg, var(--surface-selected), color-mix(in srgb, var(--home-aqua) 14%, transparent));
 }
-:global(#app .product-shell.is-home .topbar) {
-  background: transparent;
-}
 #app .home-dashboard { gap: 28px; padding: 16px 0 32px; }
-:is(:root, :root[data-theme="dark"]) #app .quote-strip.home-optical-surface {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  min-height: clamp(94px, 10vw, 148px);
-  padding: clamp(12px, 2vw, 30px);
-  gap: clamp(10px, 1.7vw, 24px);
-  border: 1px solid color-mix(in srgb, var(--home-aqua) 30%, var(--color-border));
-  border-radius: 20px 20px 7px 20px;
-  background: linear-gradient(112deg, var(--home-glass) 20%, color-mix(in srgb, var(--home-glass) 78%, transparent));
-  box-shadow: 0 16px 34px -25px color-mix(in srgb, var(--home-shade) 58%, transparent);
-}
-.quote-strip::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(118deg, transparent 57%, color-mix(in srgb, var(--home-aqua) 45%, transparent) 78%, transparent 79%),
-    linear-gradient(110deg, transparent 71%, color-mix(in srgb, var(--home-lilac) 39%, transparent) 86%, transparent 90%),
-    linear-gradient(123deg, transparent 67%, color-mix(in srgb, var(--home-amber) 39%, transparent) 88%, transparent);
-}
-.quote-light {
-  position: absolute;
-  z-index: -1;
-  left: var(--light-x, 78%);
-  top: var(--light-y, 18%);
-  width: min(590px, 115%);
-  height: 270px;
-  translate: -50% -50%;
-  opacity: var(--home-glow-opacity);
-  pointer-events: none;
-  background: radial-gradient(ellipse, var(--home-aqua), color-mix(in srgb, var(--home-lilac) 45%, transparent) 36%, transparent 69%);
-}
-#app .quote-strip .quote-copy {
-  flex: 0 1 38em;
-  font-size: clamp(23px, 2.3vw, 39px);
-  line-height: 1.45;
-  text-wrap: pretty;
-}
-#app .quote-strip .quote-trigger {
-  width: 48px;
-  min-height: 48px;
-  flex-basis: 48px;
-  border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--home-aqua) 14%, transparent);
-}
 .quote-arrow-position { display: block; }
 
 #app .home-dashboard .dashboard-panel > .team-timeline {
@@ -701,7 +639,6 @@
   pointer-events: none;
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .quote-light { transition: left 145ms ease-out, top 145ms ease-out; }
   #app .home-dashboard .schedule-list article { transition: transform 200ms ease-out; }
   #app .home-dashboard .schedule-list article[data-pointer-active]:not(:focus-within) {
     transform: perspective(1050px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
@@ -729,8 +666,6 @@
   #app button.home-action[data-magnetic] > :is(svg, .quote-arrow-position) { transform: translate(var(--magnet-x), var(--magnet-y)); }
 }
 @media (max-width: 680px) {
-  :is(:root, :root[data-theme="dark"]) #app .quote-strip.home-optical-surface { min-height: 84px; }
-  #app .quote-strip .quote-copy { font-size: clamp(19px, 5vw, 24px); }
   #app .home-dashboard .schedule-list article { gap: 10px; }
   #app .home-dashboard .schedule-actions > i { display: inline-block; }
 }
