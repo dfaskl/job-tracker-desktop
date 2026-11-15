@@ -6,7 +6,7 @@ export function profileToggleDestination(activePage: string, previousPage: strin
   return previousPage === 'profile' ? 'home' : previousPage
 }
 
-/** The default profile section is the page entry point, so keep the page heading visible. */
+/** The default profile section opens at the top of the page. */
 export function profileSectionScrollTarget(hash: string): string | null {
   const route = hash.replace(/^#\/?/, '')
   if (!['profile', 'settings'].includes(route.split('?')[0] || '')) return null

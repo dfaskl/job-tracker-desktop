@@ -206,11 +206,11 @@ body :is(dialog, .modal, .detail-modal, .edit-modal, .link-modal) h2 {
 }
 #app .workbench-page { max-width: 100%; }
 #app :is(.review-card, .topic-tag, .question-answer, .guide-visual-card, .guide-demo) { border-radius: 5px; }
-#app :is(.settings-nav a.active, .topic-tag.selected, .admin-subnav button[aria-pressed="true"]) {
+#app :is(.topic-tag.selected, .admin-subnav button[aria-pressed="true"]) {
   color: var(--color-primary);
   background: var(--surface-selected);
 }
-#app :is(.profile-section, .admin-shell) .section-title h3 { font-family: var(--font-display); }
+#app .admin-shell .section-title h3 { font-family: var(--font-display); }
 #app .users-card th { background: var(--color-muted); }
 
 #app :is(dialog[class], .modal, .detail-modal, .link-modal, .edit-modal),

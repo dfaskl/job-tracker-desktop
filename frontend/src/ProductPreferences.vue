@@ -80,7 +80,6 @@ async function saveConfig() {
 
 <template>
   <section class="card preference-card api-card">
-    <div class="section-head"><div><span>智能能力</span><h2>大模型 API</h2></div><i title="用于邮件识别、投递信息规范化和每日一句">ⓘ</i></div>
     <p>支持 OpenAI 兼容接口。API Key 加密保存在服务器中，点击眼睛可查看已保存的密钥。</p>
     <form class="api-form" @submit.prevent="saveConfig">
       <label class="wide"><span>API 地址</span><input v-model="form.apiUrl" type="url" maxlength="2048" required /></label>
@@ -101,11 +100,6 @@ async function saveConfig() {
 
 <style scoped>
 .preference-card { display: grid; gap: 14px; }
-.api-card { grid-area: api; }
-.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-head h2 { margin: 4px 0 0; }
-.section-head span { color: var(--accent, var(--color-primary)); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
-.section-head > i { color: #758198; font-style: normal; }
 .preference-card > p { margin: 0; }
 .api-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .api-form label { display: grid; gap: 7px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 700; }

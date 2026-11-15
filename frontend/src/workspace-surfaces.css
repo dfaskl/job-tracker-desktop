@@ -49,7 +49,6 @@
   background: linear-gradient(120deg, color-mix(in srgb, var(--workspace-tint) 12%, var(--home-glass)), var(--home-glass));
 }
 #app .product-shell .profile-section.workspace-light-surface { padding-inline: clamp(12px, 1.6vw, 24px); }
-#app .product-shell .profile-section > .section-title { border-color: var(--workspace-edge); }
 
 /* Keep the stage stripe and the existing arrival highlight on application cards. */
 :is(:root, :root[data-theme="dark"]) #app button.application.workspace-light-surface[class*="tone-"] {

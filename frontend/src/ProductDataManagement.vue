@@ -276,7 +276,7 @@ function formatDate(value: string) {
 <template>
   <section class="card data-card">
     <div class="section-head">
-      <div><span class="section-kicker">数据管理</span><h2>公司库与业务数据</h2></div>
+      <h2>公司库与业务数据</h2>
       <button class="secondary" type="button" @click="openCompanyLinks">{{ links.length ? '官网库详情' : '＋ 添加第一条公司链接' }}</button>
     </div>
 

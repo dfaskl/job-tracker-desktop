@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import AccountManagement from './AccountManagement.vue'
 import ResumeSettings from './ResumeSettings.vue'
 import AppIcon from './AppIcon.vue'
 import { profileSectionScrollTarget } from './profileNavigation'
-
-const ProductPreferences = defineAsyncComponent(() => import('./ProductPreferences.vue'))
-
-const ProductDataManagement = defineAsyncComponent(() => import('./ProductDataManagement.vue'))
-
-const MailAccountSettings = defineAsyncComponent(() => import('./MailAccountSettings.vue'))
-
-const BackupManagement = defineAsyncComponent(() => import('./BackupManagement.vue'))
-
-const McpAccessSettings = defineAsyncComponent(() => import('./McpAccessSettings.vue'))
+import ProductPreferences from './ProductPreferences.vue'
+import ProductDataManagement from './ProductDataManagement.vue'
+import MailAccountSettings from './MailAccountSettings.vue'
+import BackupManagement from './BackupManagement.vue'
+import McpAccessSettings from './McpAccessSettings.vue'
 
 type SectionId = 'center' | 'resume' | 'ai' | 'mail' | 'mcp' | 'data'
 const sections: { id: SectionId; label: string; icon: string }[] = [
@@ -30,8 +25,20 @@ function sectionFromHash(): SectionId {
   return sections.some(item => item.id === section) ? section as SectionId : 'center'
 }
 const activeSection = ref<SectionId>(sectionFromHash())
-const loadedSections = ref(new Set<SectionId>(['center', 'resume', activeSection.value]))
-function loadSection(section: SectionId) { loadedSections.value.add(section) }
+const activeIndex = computed(() => sections.findIndex(section => section.id === activeSection.value))
+const navigation = ref<HTMLElement | null>(null)
+const burst = ref<{ section: SectionId; id: number } | null>(null)
+let burstId = 0
+const particles = Array.from({ length: 15 }, (_, index) => {
+  const angle = index * 2.39996
+  const distance = 24 + (index * 11 % 29)
+  return {
+    '--particle-x': `${Math.cos(angle) * distance}px`,
+    '--particle-y': `${Math.sin(angle) * distance * .65}px`,
+    '--particle-size': `${8 + index % 4 * 2}px`,
+    '--particle-time': `${450 + index * 53 % 290}ms`,
+  }
+})
 const sectionRefs = ref<Partial<Record<SectionId, HTMLElement>>>({})
 let scrollFrame = 0
 let pendingSectionHash: string | null = null
@@ -41,58 +48,54 @@ function setSectionRef(section: SectionId, element: Element | null) {
 }
 function syncActiveSectionFromScroll() {
   scrollFrame = 0
-  const anchorLine = 150
+  if (!navigation.value) return
+  const anchorLine = navigation.value.getBoundingClientRect().bottom + 20
+  const root = document.documentElement
+  if (root.scrollHeight > root.clientHeight && root.scrollHeight - root.clientHeight - window.scrollY <= 1) {
+    activeSection.value = 'data'
+    return
+  }
   const visible = sections
     .map(section => ({ section, top: sectionRefs.value[section.id]?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY }))
     .filter(item => item.top <= anchorLine)
   activeSection.value = visible.at(-1)?.section.id || sections[0].id
-  loadSection(activeSection.value)
 }
 function onPageScroll() {
   if (!scrollFrame) scrollFrame = window.requestAnimationFrame(syncActiveSectionFromScroll)
 }
 async function scrollToSection(section: SectionId) {
-  loadSection(section)
   await nextTick()
-  sectionRefs.value[section]?.scrollIntoView({ behavior: 'instant', block: 'start' })
+  const target = sectionRefs.value[section]
+  const nav = navigation.value
+  if (!target || !nav) return
+  const navBottom = nav.offsetHeight + (parseFloat(getComputedStyle(nav).top) || 0)
+  window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top - navBottom - 16, behavior: 'instant' })
 }
 function syncSectionFromHash(shouldScroll = true) {
   activeSection.value = sectionFromHash()
   if (!shouldScroll) return
   const target = profileSectionScrollTarget(window.location.hash)
   void nextTick(() => {
-    if (target) scrollToSection(target as SectionId)
+    if (target) void scrollToSection(target as SectionId)
     else window.scrollTo({ top: 0, behavior: 'auto' })
   })
 }
-function flashSection(section: SectionId) {
-  const target = sectionRefs.value[section]
-  if (!target) return
-  target.classList.remove('section-highlight')
-  void target.offsetWidth
-  target.classList.add('section-highlight')
-  window.setTimeout(() => target.classList.remove('section-highlight'), 1300)
-}
 function selectSection(section: SectionId) {
+  if (section !== activeSection.value && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    burst.value = { section, id: ++burstId }
+  }
   activeSection.value = section
   const nextHash = `#/profile?section=${section}`
-  if (window.location.hash === nextHash) scrollToSection(section)
-  else {
+  if (window.location.hash !== nextHash) {
     pendingSectionHash = nextHash
     window.location.hash = `/profile?section=${section}`
-    scrollToSection(section)
   }
-  window.setTimeout(() => flashSection(section), 220)
+  void scrollToSection(section)
 }
 onMounted(() => {
   window.addEventListener('hashchange', onHashChange)
   window.addEventListener('scroll', onPageScroll, { passive: true })
-  void nextTick(() => {
-    const target = profileSectionScrollTarget(window.location.hash)
-    if (target) sectionRefs.value[target as SectionId]?.scrollIntoView({ behavior: 'auto', block: 'start' })
-    else window.scrollTo({ top: 0, behavior: 'auto' })
-    syncActiveSectionFromScroll()
-  })
+  syncSectionFromHash()
 })
 const onHashChange = () => {
   const page = window.location.hash.replace(/^#\/?/, '').split('?')[0]
@@ -104,7 +107,7 @@ const onHashChange = () => {
   } else pendingSectionHash = null
 }
 onActivated(() => syncSectionFromHash(false))
-onDeactivated(() => { if (scrollFrame) window.cancelAnimationFrame(scrollFrame); scrollFrame = 0 })
+onDeactivated(() => { if (scrollFrame) window.cancelAnimationFrame(scrollFrame); scrollFrame = 0; burst.value = null })
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', onHashChange)
   window.removeEventListener('scroll', onPageScroll)
@@ -114,56 +117,158 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="profile-workspace">
-    <header class="settings-heading">
-      <div><h1>个人设置</h1></div>
-    </header>
-    <div class="settings-layout">
-      <nav class="settings-nav workspace-light-surface" aria-label="个人主页分区">
-        <a v-for="section in sections" :key="section.id" :href="`#/profile?section=${section.id}`" :class="{ active: activeSection === section.id }" :aria-current="activeSection === section.id ? 'page' : undefined" @click.prevent="selectSection(section.id)">
-          <AppIcon :name="section.icon" :size="18" /><span>{{ section.label }}</span><AppIcon class="section-arrow" name="chevron-right" :size="15" />
-        </a>
-      </nav>
-      <main class="settings-content">
-        <section :id="`profile-section-${sections[0].id}`" :ref="element => setSectionRef('center', element as Element | null)" class="workspace-light-surface profile-section">
-          <div class="section-title"><h2>个人中心</h2></div>
-          <AccountManagement />
-        </section>
-        <section :id="`profile-section-${sections[1].id}`" :ref="element => setSectionRef('resume', element as Element | null)" class="workspace-light-surface profile-section">
-          <ResumeSettings />
-        </section>
-        <section :id="`profile-section-${sections[2].id}`" :ref="element => setSectionRef('ai', element as Element | null)" class="workspace-light-surface profile-section">
-          <div class="section-title"><h2>大模型 API</h2><p>配置兼容接口、模型和 API Key。</p></div>
-          <ProductPreferences v-if="loadedSections.has('ai')" />
-        </section>
-        <section :id="`profile-section-${sections[3].id}`" :ref="element => setSectionRef('mail', element as Element | null)" class="workspace-light-surface profile-section mail-settings-section">
-          <div class="section-title"><h2>邮件配置</h2><p>连接邮箱，让系统识别邮件并辅助创建求职日程。</p></div>
-          <MailAccountSettings v-if="loadedSections.has('mail')" />
-        </section>
-        <section id="profile-section-mcp" :ref="element => setSectionRef('mcp', element as Element | null)" class="workspace-light-surface profile-section">
-          <div class="section-title"><h2>MCP 访问</h2><p>授权 Codex 查询和管理当前账户的投递与日程。</p></div>
-          <McpAccessSettings v-if="loadedSections.has('mcp')" />
-        </section>
-        <section id="profile-section-data" :ref="element => setSectionRef('data', element as Element | null)" class="workspace-light-surface profile-section data-sections">
-          <div class="section-title"><h2>数据管理</h2><p>导入导出业务数据，管理历史备份。</p></div>
-          <ProductDataManagement v-if="loadedSections.has('data')" />
-          <BackupManagement v-if="loadedSections.has('data')" />
-        </section>
-      </main>
+    <nav ref="navigation" class="settings-nav workspace-light-surface" aria-label="个人设置目录">
+      <svg class="nav-filter" aria-hidden="true" width="0" height="0">
+        <filter id="profile-nav-goo" x="-30%" y="-50%" width="160%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+          <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -6" />
+        </filter>
+      </svg>
+      <span class="nav-indicator-track" aria-hidden="true">
+        <span class="nav-indicator" :style="{ '--index': activeIndex, '--column': activeIndex % 3, '--row': Math.floor(activeIndex / 3) }"></span>
+      </span>
+      <a v-for="section in sections" :id="`profile-nav-${section.id}`" :key="section.id" :href="`#/profile?section=${section.id}`" :aria-current="activeSection === section.id ? 'location' : undefined" @click.left.exact.prevent="selectSection(section.id)">
+        <span v-if="burst?.section === section.id" :key="burst.id" class="nav-burst" aria-hidden="true" @animationend.self="burst = null">
+          <i v-for="(particle, index) in particles" :key="index" :style="particle"></i>
+        </span>
+        <span class="nav-label"><AppIcon :name="section.icon" :size="18" /><span>{{ section.label }}</span></span>
+      </a>
+    </nav>
+    <div class="settings-content">
+      <section v-for="section in sections" :id="`profile-section-${section.id}`" :key="section.id" :ref="element => setSectionRef(section.id, element as Element | null)" :aria-labelledby="`profile-nav-${section.id}`" class="workspace-light-surface profile-section" :class="{ 'data-sections': section.id === 'data' }">
+        <AccountManagement v-if="section.id === 'center'" />
+        <ResumeSettings v-else-if="section.id === 'resume'" />
+        <ProductPreferences v-else-if="section.id === 'ai'" />
+        <MailAccountSettings v-else-if="section.id === 'mail'" />
+        <McpAccessSettings v-else-if="section.id === 'mcp'" />
+        <template v-else>
+          <ProductDataManagement />
+          <BackupManagement />
+        </template>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
-.profile-workspace{width:min(1540px,100%);min-height:100%;margin:0 auto;padding:30px 0 36px}.settings-heading{display:flex;align-items:flex-end;justify-content:space-between;margin:0 0 20px}.settings-heading>div>span{color:var(--color-primary);font-size:12px;font-weight:700}.settings-heading h1{margin:5px 0;font-size:clamp(27px,3vw,36px)}.settings-heading p,.view-heading p{margin:0;color:var(--color-muted-foreground);font-size:13px;line-height:1.55}.settings-layout{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:22px}.settings-nav{position:sticky;top:12px;z-index:5;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:8px;border:1px solid var(--color-border);border-radius:14px;background:color-mix(in srgb,var(--color-card) 94%,transparent);box-shadow:var(--shadow-sm);backdrop-filter:blur(14px)}.settings-nav a{display:flex;min-width:0;min-height:46px;align-items:center;justify-content:center;gap:9px;padding:10px 12px;border:1px solid transparent;border-radius:9px;color:var(--color-muted-foreground);font-size:14px;font-weight:600;text-decoration:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}.settings-nav a:hover{color:var(--color-foreground);background:var(--color-muted)}.settings-nav a.active{border-color:color-mix(in srgb,var(--color-primary) 30%,var(--color-border));color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 9%,var(--color-card))}.section-arrow{display:none}.settings-content{display:grid;min-width:0;gap:28px}.profile-section{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-flow:row;min-width:0;gap:12px;scroll-margin-top:82px}.profile-section>*{width:100%;min-width:0}.section-title{padding:0 2px}.section-title h2{margin:0 0 4px;font-size:20px}.section-title p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.55}.profile-section :deep(.card){width:100%;min-width:0;margin:0!important;border:1px solid var(--color-border);box-shadow:var(--shadow-sm)}.profile-section :deep(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range])),.profile-section :deep(textarea),.profile-section :deep(select){max-width:min(900px,100%)}.profile-section :deep(.api-form .wide input),.profile-section :deep(.password-field input),.profile-section :deep(.api-key-field input){max-width:none}.profile-section.data-sections{grid-template-columns:minmax(0,1fr);gap:14px}.data-sections :deep(.data-card),.data-sections :deep(.mail-account-card),.data-sections :deep(.backup-card){padding:22px}.data-sections :deep(.data-card>p),.data-sections :deep(.mail-account-card>p),.data-sections :deep(.backup-copy p){font-size:12px;color:var(--color-muted-foreground)}
-/* Keep all profile modules mounted in one page; the rail only changes the scroll target. */
-.settings-content{display:grid;min-width:0;gap:28px}.profile-section{display:grid;min-width:0;gap:12px;scroll-margin-top:24px}.section-title{padding:0 2px}.section-title h2{margin:0 0 4px;font-size:20px}.section-title p{margin:0;color:var(--color-muted-foreground);font-size:12px;line-height:1.55}.profile-section :deep(.card){min-width:0;margin:0!important;border:1px solid var(--color-border);box-shadow:var(--shadow-sm)}.profile-section :deep(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range])),.profile-section :deep(textarea),.profile-section :deep(select){max-width:720px}.profile-section :deep(.api-form .wide input),.profile-section :deep(.password-field input),.profile-section :deep(.api-key-field input){max-width:none}.profile-section.data-sections{gap:14px}.data-sections :deep(.data-card),.data-sections :deep(.mail-account-card),.data-sections :deep(.backup-card){padding:20px}.data-sections :deep(.data-card>p),.data-sections :deep(.mail-account-card>p),.data-sections :deep(.backup-copy p){font-size:12px;color:var(--color-muted-foreground)}.profile-section.section-highlight :deep(.card){animation:profile-section-pulse 1.05s ease-in-out 2}@keyframes profile-section-pulse{0%,100%{border-color:var(--color-border);box-shadow:var(--shadow-sm)}45%,70%{border-color:var(--color-primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--color-primary) 17%,transparent),var(--shadow-md)}}
-@keyframes section-arrive{from{opacity:.78;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.profile-section>*{grid-area:auto!important;width:100%;min-width:0}
-@media(max-width:900px){.profile-workspace{padding-top:20px}.settings-layout{gap:18px}.settings-nav{top:76px;padding:6px}.settings-nav a{min-height:46px}}
-@media(max-width:560px){.profile-workspace{padding:14px 0 22px}.settings-heading{margin-bottom:16px}.settings-nav{top:74px;gap:4px}.settings-nav a{gap:6px;padding:8px 5px;font-size:12px}.settings-nav a :deep(svg){width:16px;height:16px}.section-title h2{font-size:18px}.settings-content{gap:22px}.data-sections :deep(.data-card),.data-sections :deep(.mail-account-card),.data-sections :deep(.backup-card){padding:16px}}
-</style>
-<style scoped>
-.settings-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
-.mail-settings-section :deep(.mail-account-card){grid-area:auto;padding:20px}
-@media(max-width:560px){.settings-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.mail-settings-section :deep(.mail-account-card){padding:16px}}
+.profile-workspace {
+  min-height: 100%;
+  margin: 0 auto;
+  padding-bottom: 36px;
+}
+.settings-nav {
+  --nav-columns: 6;
+  --nav-gap: 8px;
+  --nav-padding: 8px;
+  --nav-height: 46px;
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(var(--nav-columns), minmax(0, 1fr));
+  gap: var(--nav-gap);
+  padding: var(--nav-padding);
+  overflow: hidden;
+  background-color: var(--color-card);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(14px);
+}
+.nav-filter { position: absolute; pointer-events: none; }
+.nav-indicator-track {
+  position: absolute;
+  inset: var(--nav-padding);
+  pointer-events: none;
+}
+.nav-indicator {
+  --cell-width: calc((100% - (var(--nav-columns) - 1) * var(--nav-gap)) / var(--nav-columns));
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--cell-width);
+  height: var(--nav-height);
+  translate: calc(var(--index) * (100% + var(--nav-gap))) 0;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 36%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 15%, var(--color-card));
+}
+.settings-nav a {
+  position: relative;
+  display: grid;
+  height: var(--nav-height);
+  min-width: 0;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.settings-nav a[aria-current] { color: var(--color-primary); }
+.settings-nav a:hover { color: var(--color-foreground); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
+.settings-nav a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.nav-label { position: relative; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.nav-burst { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-indicator { transition: translate 420ms cubic-bezier(.25, .75, .25, 1.12); }
+  .settings-nav a { transition: color 180ms ease, background-color 180ms ease; }
+  .nav-burst {
+    position: absolute;
+    inset: 0;
+    display: block;
+    color: var(--color-primary);
+    filter: url(#profile-nav-goo);
+    pointer-events: none;
+    animation: profile-nav-fade 760ms both;
+  }
+  .nav-burst i {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--particle-size);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: currentColor;
+    animation: profile-nav-particle var(--particle-time) cubic-bezier(.18, .68, .35, 1) both;
+  }
+  .nav-burst i:nth-child(3n) { color: var(--workspace-tint); }
+}
+@keyframes profile-nav-particle {
+  from { transform: translate(-50%, -50%) scale(1.25); }
+  72% { transform: translate(calc(-50% + var(--particle-x)), calc(-50% + var(--particle-y))) scale(.85); }
+  to { transform: translate(calc(-50% + var(--particle-x)), calc(-50% + var(--particle-y))) scale(0); }
+}
+@keyframes profile-nav-fade {
+  from { opacity: .8; }
+  65% { opacity: .65; }
+  to { opacity: 0; }
+}
+
+.settings-content { display: grid; min-width: 0; gap: 24px; margin-top: 20px; }
+.profile-section { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 12px; padding-block: var(--workspace-inset); }
+.profile-section > * { width: 100%; min-width: 0; }
+.profile-section :deep(.card) { min-width: 0; margin: 0; border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
+.profile-section :deep(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range])),
+.profile-section :deep(textarea),
+.profile-section :deep(select) { max-width: min(720px, 100%); }
+.profile-section :deep(.api-form .wide input),
+.profile-section :deep(.password-field input),
+.profile-section :deep(.api-key-field input) { max-width: none; }
+.profile-section.data-sections { gap: 14px; }
+.profile-section :deep(:is(.data-card, .mail-account-card, .backup-card)) { padding: 20px; }
+.data-sections :deep(.data-card > p),
+.data-sections :deep(.backup-copy p) { font-size: 12px; color: var(--color-muted-foreground); }
+
+@media (max-width: 820px) {
+  .settings-nav { --nav-padding: 6px; top: 74px; }
+}
+@media (max-width: 700px) {
+  .settings-nav { --nav-columns: 3; --nav-gap: 4px; }
+  .nav-indicator { translate: calc(var(--column) * (100% + var(--nav-gap))) calc(var(--row) * (100% + var(--nav-gap))); }
+  .settings-nav a { font-size: 12px; }
+  .nav-label { gap: 4px; }
+  .nav-label :deep(svg) { width: 15px; height: 15px; flex: none; }
+  .settings-content { gap: 18px; margin-top: 16px; }
+  .profile-section :deep(:is(.data-card, .mail-account-card, .backup-card)) { padding: 16px; }
+}
 </style>
