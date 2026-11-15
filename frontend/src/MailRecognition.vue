@@ -54,7 +54,9 @@ const batchIds = computed(() => new Set(batch.value?.ids))
 const preparingBatch = ref(false)
 const processingBatch = ref(false)
 const batchBusy = computed(() => Boolean(batch.value) || preparingBatch.value || processingBatch.value)
-const moreMailActions = ref<HTMLDetailsElement | null>(null)
+const moreMailActionsOpen = ref(false)
+const moreMailActionsTrigger = ref<HTMLButtonElement | null>(null)
+let moreMailActionsCloseTimer = 0
 const batchFuseLabel = computed(() => `撤销处理 ${batch.value?.ids.length ?? 0} 封`)
 const checkedMailIds = ref<number[]>([])
 const listedMailIds = computed(() => inbox.value.messages.map(mail => mail.id))
@@ -141,13 +143,49 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  window.clearTimeout(moreMailActionsCloseTimer)
   window.clearTimeout(processNoticeTimer)
   previewThemeObserver?.disconnect()
   recognitionRequest?.abort()
 })
 onDeactivated(() => {
+  closeMoreMailActions()
   recognitionDetailsDialog.value?.close()
 })
+function closeMoreMailActions() {
+  window.clearTimeout(moreMailActionsCloseTimer)
+  moreMailActionsOpen.value = false
+}
+function enterMoreMailActions(event: PointerEvent) {
+  if (event.pointerType !== 'mouse') return
+  window.clearTimeout(moreMailActionsCloseTimer)
+  moreMailActionsOpen.value = true
+}
+function leaveMoreMailActions(event: PointerEvent) {
+  if (event.pointerType !== 'mouse') return
+  const menu = event.currentTarget as HTMLElement
+  window.clearTimeout(moreMailActionsCloseTimer)
+  moreMailActionsCloseTimer = window.setTimeout(() => {
+    if (!menu.querySelector(':focus-visible')) closeMoreMailActions()
+  }, 140)
+}
+function toggleMoreMailActions(event: MouseEvent) {
+  if (event instanceof PointerEvent && event.pointerType === 'mouse' && event.detail > 0) {
+    enterMoreMailActions(event)
+  } else if (moreMailActionsOpen.value) {
+    closeMoreMailActions()
+  } else {
+    moreMailActionsOpen.value = true
+  }
+}
+function leaveMoreMailActionsFocus(event: FocusEvent) {
+  const menu = event.currentTarget as HTMLElement
+  if (!(event.relatedTarget instanceof Node && menu.contains(event.relatedTarget)) && !menu.matches(':hover')) closeMoreMailActions()
+}
+function dismissMoreMailActions() {
+  moreMailActionsTrigger.value?.focus()
+  closeMoreMailActions()
+}
 function normalize(value: unknown) { return String(value || '').trim().toLocaleLowerCase().replace(/[^0-9a-z一-龥]/gi, '') }
 function companyKey(value: unknown) { return normalize(value).replace(/股份有限公司|有限责任公司|有限公司|集团|公司$/g, '') }
 function textSimilarity(left: unknown, right: unknown) {
@@ -427,9 +465,11 @@ function preventImplicitSubmit(event: KeyboardEvent) {
         <div class="inbox-actions">
           <button class="secondary sync-button icon-button" type="button" aria-label="立即收取新邮件" :title="syncing?'正在收取邮件':'收取新邮件'" :disabled="syncing || batchBusy || pendingMail.size > 0 || !inbox.accounts.length" @click="loadInbox(true)"><AppIcon name="refresh" /></button>
           <button class="secondary" type="button" :disabled="syncing || batchBusy || pendingMail.size > 0 || (!selectingMail && !inbox.messages.length)" @click="toggleMailSelection">{{selectingMail?'取消选择':'选择'}}</button>
-          <details ref="moreMailActions" class="mail-more" @keydown.esc.stop="moreMailActions?.removeAttribute('open'); moreMailActions?.querySelector('summary')?.focus()">
-            <summary title="更多邮件操作" aria-label="更多邮件操作">···</summary>
-            <div class="mail-more-panel">
+          <div class="mail-more" @pointerenter="enterMoreMailActions" @pointerleave="leaveMoreMailActions"
+            @focusout="leaveMoreMailActionsFocus" @keydown.esc.stop="dismissMoreMailActions">
+            <button ref="moreMailActionsTrigger" type="button" class="mail-more-trigger" title="更多邮件操作" aria-label="更多邮件操作"
+              aria-controls="mail-more-panel" :aria-expanded="moreMailActionsOpen" @click="toggleMoreMailActions">···</button>
+            <div id="mail-more-panel" class="mail-more-panel" :class="{ 'is-open': moreMailActionsOpen }">
               <MailFuseButton class="secondary" progress-bar
                 :label="preparingBatch ? '正在读取…' : `处理全部 ${inbox.pendingCount} 封`"
                 :undo-label="batchFuseLabel" :window-ms="10000"
@@ -438,7 +478,7 @@ function preventImplicitSubmit(event: KeyboardEvent) {
                 :aria-busy="preparingBatch"
                 @press="queueAllMail" @undo="undoBatch" @expire="processBatch" />
             </div>
-          </details>
+          </div>
         </div></div>
         <div class="mail-list-region" :aria-busy="syncing||processingBatch">
           <div v-if="syncing" class="inbox-loading" role="status" aria-live="polite"><span class="inbox-spinner" aria-hidden="true"></span><strong>正在收取邮件</strong><small>新邮件会自动出现在这里</small></div>
@@ -556,17 +596,20 @@ function preventImplicitSubmit(event: KeyboardEvent) {
 
 <style scoped>
 .mail-more { position:relative; }
-.mail-more > summary {
+.mail-more > .mail-more-trigger {
   display:grid; min-width:44px; min-height:44px; place-items:center;
   border:1px solid var(--color-border); border-radius:6px; list-style:none;
   color:var(--color-foreground); background:var(--color-muted); cursor:pointer;
   font-weight:700; letter-spacing:1px;
 }
-.mail-more > summary::-webkit-details-marker { display:none; }
 .mail-more-panel {
   position:absolute; z-index:3; inset-inline-end:0; top:calc(100% + 6px);
   width:max-content; padding:4px; border:1px solid var(--color-border);
-  border-radius:6px; background:var(--color-card);
+  border-radius:6px; background:var(--color-card); visibility:hidden;
+}
+.mail-more-panel.is-open { visibility:visible; }
+@media (hover:hover) and (pointer:fine) {
+  .mail-more-panel::before { content:""; position:absolute; z-index:-1; inset:-10px; }
 }
 #app .mail-more-panel button.mail-fuse { min-width:150px; white-space:nowrap; }
 #app .mail-more-panel button.mail-fuse.is-pending { padding-bottom:12px; }
