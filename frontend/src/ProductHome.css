@@ -574,7 +574,7 @@
 #app .home-dashboard .confirmation-panel h2 {
   font-size: clamp(18px, 1.6vw, 24px);
 }
-#app .home-dashboard .schedule-advice { padding: 10px 2px; }
+#app .home-dashboard .schedule-advice { padding:10px 6px; }
 
 :is(:root, :root[data-theme="dark"]) #app .home-dashboard .schedule-list article {
   isolation: isolate;

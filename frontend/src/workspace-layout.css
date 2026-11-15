@@ -36,7 +36,7 @@
 
 /* Application records can be individual cards within one scrollable list. */
 #app .workspace { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-#app .workspace > .grid { gap: 12px; padding: 2px 8px 16px 0; }
+#app .workspace > .grid { gap:12px; padding:6px var(--workspace-inset) 16px; }
 #app button.application,
 :root:not([data-theme="dark"]) #app button.application[class*="tone-"],
 :root[data-theme="dark"] #app button.application[class*="tone-"] {
@@ -88,7 +88,7 @@
 
 /* The calendar grid is the structure; the event rail needs only a divider. */
 #app .event-sandbox { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-#app .event-sandbox .calendar-layout { gap: 0; border-top: 1px solid var(--color-border); }
+#app .event-sandbox .calendar-layout { gap:var(--workspace-inset); border-top: 1px solid var(--color-border); }
 #app .event-sandbox :is(.calendar-pane, .selected-list) { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 #app .event-sandbox .selected-list { border-left: 1px solid var(--color-border); }
 #app .selected-list article,
@@ -154,7 +154,6 @@
 @media (max-width: 820px) {
   #app .dashboard-panel { padding: 0; }
   #app .schedule-list article { padding: 14px; }
-  #app .workspace > .grid { padding-right: 0; }
 }
 @media (max-width: 640px) {
   #app .home-dashboard { gap: 22px; }
@@ -220,7 +219,7 @@
 #app .mail-grid > :is(.inbox-panel, .compose-panel, .review-panel) {
   border: 0; border-radius: 12px; background: var(--color-card);
 }
-#app .mail-cards { gap: 6px; }
+#app .mail-cards { gap:6px; padding:4px; }
 #app .mail-cards article,
 #app .mail-grid .application-match { border: 0; border-radius: 8px; }
 #app .mail-cards article.selected { border: 0; background: var(--surface-selected); }
@@ -239,8 +238,6 @@
 #app .detail-section,
 #app .workbench-header { border: 0; }
 #app .summary-columns { gap: 16px; }
-#app .summary-columns > .summary-pane + .summary-pane,
-#app .topic-column { padding-left: 0; }
 #app .topic-section + .topic-section,
 #app .topic-column .topic-section + .topic-section,
 #app .detail-section { margin-top: 18px; padding-top: 0; }
@@ -266,7 +263,11 @@
 #app .admin-grid :is(.control-card, .group-manager-card, .users-card, .audit-card) {
   border: 0; border-radius: 12px; background: var(--color-card);
 }
-#app .admin-grid .health-grid > div { border: 0; border-radius: 8px; background: var(--color-muted); }
+#app .admin-grid :is(.control-card, .group-manager-card, .users-card) {
+  padding-inline: var(--workspace-inset);
+}
+#app .admin-grid .registration { padding-inline: 12px; }
+#app .admin-grid .health-grid > div { padding-inline: 10px; border: 0; border-radius: 8px; background: var(--color-muted); }
 #app .admin-grid .group-manager-card { margin-bottom: 8px; }
 #app .users-card { gap: 6px; }
 #app .audit-scroll > div,
@@ -297,6 +298,4 @@
   #app .admin-grid > :is(.overview-column, .users-column, .audit-card),
   #app .event-sandbox .selected-list,
   #app .interview-panel { border: 0; }
-  #app .summary-columns > .summary-pane,
-  #app .topic-column { padding-top: 0; border: 0; }
 }

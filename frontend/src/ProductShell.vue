@@ -396,7 +396,7 @@ nav button.active::before { content: none; }
 .menu-toggle { display: none; }
 .profile-shortcut { display: none; }
 .admin-shortcut { display: none; }
-.product-main { width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 28px 32px; background-color: transparent; background-image: var(--page-background-image); background-position: center top; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; }
+.product-main { --workspace-gutter: clamp(24px, 2vw, 40px); --workspace-inset: clamp(14px, 1.25vw, 22px); width: auto; min-width: 0; margin: 0 0 0 var(--sidebar-width); padding: 0 var(--workspace-gutter) 32px; background-color: transparent; background-image: var(--page-background-image); background-position: center top; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; }
 .topbar {
   position: sticky;
   top: 0;
@@ -406,7 +406,9 @@ nav button.active::before { content: none; }
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 10px 0;
+  padding: 12px var(--workspace-inset);
+  margin-top: 12px;
+  border-radius: 12px;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-background) 92%, transparent);
 }
@@ -417,7 +419,7 @@ nav button.active::before { content: none; }
 }
 .application-page .topbar { align-items: flex-start; }
 .application-page .topbar > button { align-self: flex-start; }
-.application-toolbar-slot { display: none; min-width: 0; flex: 1; margin: 7px 18px 7px 0; }
+.application-toolbar-slot { display: none; min-width: 0; flex: 1; }
 .application-toolbar-slot.active { display: flex; }
 .page-content { width: min(1240px, 100%); margin: 0 auto; }
 .page-content.stats-content { display: flow-root; }
@@ -504,17 +506,17 @@ nav button.active::before { content: none; }
   .nav-status-dot { position: absolute; top: 2px; right: calc(50% - 19px); width: 8px; height: 8px; margin: 0; }
   .sidebar-account { display: none; }
   .profile-entry { max-width: 100%; }
-  .product-main { width: 100%; max-width: 100%; margin-left: 0; padding: 76px 16px calc(98px + env(safe-area-inset-bottom)); }
+  .product-main { --workspace-gutter:16px; --workspace-inset:12px; width: 100%; max-width: 100%; margin-left: 0; padding: 76px var(--workspace-gutter) calc(98px + env(safe-area-inset-bottom)); }
   .product-main { background-position: center top 64px; background-size: cover; }
   .product-main.application-page, .product-main.calendar-page, .product-main.mail-page-shell, .product-main.profile-page-shell, .product-main.admin-page-shell { height: auto; overflow: visible; padding-bottom: 32px; }
   .page-content { min-width: 0; max-width: 100%; }
   .page-content.calendar-content, .page-content.mail-content, .page-content.profile-content, .page-content.admin-content { height: auto; }
-  .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; padding: 10px 0; }
+  .topbar { position: relative; top: auto; min-height: 0; flex-wrap: wrap; gap:12px; margin-top:0; }
   .application-toolbar-slot { width: 100%; max-width: 100%; flex: 0 0 100%; margin: 0; }
 }
 @media (max-width: 480px) {
   .sidebar { padding-inline: 12px; }
-  .product-main { padding-right: 12px; padding-left: 12px; }
+  .product-main { --workspace-gutter:12px; }
   .topbar > button { width: 100%; }
 }
 </style>
