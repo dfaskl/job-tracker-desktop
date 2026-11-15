@@ -99,20 +99,13 @@
 #app .selected-list article::before { content: ""; width: 3px; align-self: stretch; flex: none; background: var(--event-color); }
 #app .selected-list .selected-scroll { padding-inline: 16px; }
 
-/* Analytics uses open sections and a ruled interview rail. */
-#app .analytics-layout { gap: 28px; }
-#app .analytics-main { gap: 24px; }
-#app .analytics-main .metrics { gap: 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
-#app .analytics-main .metrics article,
+/* Summary metrics and the interview records list. */
 #app .summary-grid article {
   min-height: 0; padding: 17px 18px; border: 0; border-right: 1px solid var(--color-border);
   border-radius: 0; background: transparent; box-shadow: none;
 }
 #app .summary-grid article:nth-child(odd) { padding-left: 0; }
-#app .analytics-main .metrics article:last-child,
 #app .summary-grid article:nth-child(even) { border-right: 0; }
-#app .analytics-main .metrics article::before { display: none; }
-#app .analytics-main .two-column { gap: 28px; }
 #app .interview-list { gap: 0; }
 #app .interview-list article,
 :root[data-theme="dark"] #app .interview-list article {
@@ -162,13 +155,9 @@
   #app .dashboard-panel { padding: 0; }
   #app .schedule-list article { padding: 14px; }
   #app .workspace > .grid { padding-right: 0; }
-  #app .analytics-main .metrics article { padding: 14px 10px; }
 }
 @media (max-width: 640px) {
   #app .home-dashboard { gap: 22px; }
-  #app .analytics-main .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  #app .analytics-main .metrics article { padding: 14px 8px; }
-  #app .analytics-main .metrics article strong { font-size: 25px; }
   #app .interview-list { grid-template-columns: 1fr; }
   #app .settings-column .metrics-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #app .settings-column .metrics-row div { padding: 10px 8px; }
@@ -236,14 +225,8 @@
 #app .mail-grid .application-match { border: 0; border-radius: 8px; }
 #app .mail-cards article.selected { border: 0; background: var(--surface-selected); }
 
-/* Analytics */
-#app .analytics-main .metrics { gap: 10px; border: 0; }
-#app .analytics-main .metrics article,
+/* Analytics and summary */
 #app .summary-grid article { border: 0; border-radius: 10px; background: var(--color-muted); }
-#app .analytics-layout :is(.distribution-card, .trend-panel, .interview-panel) {
-  min-width: 0; margin: 0; padding: clamp(12px, 1.5vw, 22px);
-  border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-card); box-shadow: none;
-}
 #app .interview-panel > header { border-bottom: 0; }
 #app .interview-list article { border-color: var(--color-border); }
 

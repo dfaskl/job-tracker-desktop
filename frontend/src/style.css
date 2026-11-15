@@ -315,7 +315,7 @@ body { background: var(--color-background); }
 
 /* Night theme surface normalization: remove light-mode fills left in scoped components. */
 :root[data-theme="dark"] #app :is(
-  .card,
+  .card:where(:not(.analytics-tile)),
   .modal,
   .detail-modal,
   .link-modal,
