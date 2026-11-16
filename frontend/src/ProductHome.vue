@@ -143,7 +143,7 @@ const scheduledGroups = computed(() => [
 ].filter(group => group.events.length))
 const catPerch = ref(0)
 const catReaction = ref<'startle' | 'fall' | 'land' | 'sleep' | null>(null)
-const catPose = computed(() => catReaction.value ?? (displayedSchedules.value.length ? 'walk' : 'sleep'))
+const catPose = computed(() => catReaction.value ?? (displayedSchedules.value.length ? 'routine' : 'sleep'))
 const dissolvingEventId = ref('')
 let scheduleMotionStopped = false
 const scheduleAnimations = new Set<Animation>()
