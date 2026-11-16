@@ -92,6 +92,9 @@ const sharedTimelines = ref<SharedTimelineUser[]>([])
 const sharedGroupName = ref('')
 const sharedTimelinesLoading = ref(false)
 const sharedTimelinesNotice = ref('')
+const teamTimelineList = ref<HTMLElement | null>(null)
+const timelineEntrancePending = ref(false)
+let timelineEntranceAnimations: Animation[] = []
 let adviceTimer: ReturnType<typeof setTimeout> | null = null
 let messageTimer: ReturnType<typeof setTimeout> | null = null
 let homeViewActive = false
@@ -99,11 +102,17 @@ let sharedTimelineRequest = 0
 
 onActivated(() => {
   homeViewActive = true
+  timelineEntrancePending.value = !reducedMotion.matches
   startScheduleClock()
   void store.refresh(false, false, false)
   void loadSharedTimelines()
 })
-onDeactivated(() => { homeViewActive = false; quoteArrowSpinning.value = false; stopScheduleClock() })
+onDeactivated(() => {
+  homeViewActive = false
+  quoteArrowSpinning.value = false
+  stopTimelineEntrance()
+  stopScheduleClock()
+})
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
@@ -213,6 +222,23 @@ const teamSchedule=computed<{items:TeamTimelineEntry[];conflicts:TeamConflict[]}
   return {items:entries.map(item=>({...item,conflict:conflictIds.has(item.id)})),conflicts}
 })
 const teamTimeline=computed(()=>teamSchedule.value.items)
+watch([teamTimelineList, timelineEntrancePending], ([list, pending]) => {
+  if (!list || !pending) return
+  timelineEntrancePending.value = false
+
+  const nodes = Array.from(list.querySelectorAll('.team-timeline-node'))
+  const stagger = Math.min(95, 760 / Math.max(1, nodes.length - 1))
+  timelineEntranceAnimations = nodes.map((node, index) => node.animate(
+    [{ transform: 'translateX(88px)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }],
+    { delay: index * stagger, duration: 460, easing: 'cubic-bezier(.2,.75,.28,1)', fill: 'backwards' },
+  ))
+}, { flush: 'post' })
+
+function stopTimelineEntrance() {
+  timelineEntrancePending.value = false
+  for (const animation of timelineEntranceAnimations) animation.cancel()
+  timelineEntranceAnimations = []
+}
 const teamConflicts=computed(()=>teamSchedule.value.conflicts)
 const teamConflictSummary=computed(()=>teamConflicts.value.length?'请优先协调时间轴上标出的日程。':'小组内时间点日程之间均至少间隔 1 小时。')
 const staleApplications = computed(() => store.applications.value.map(item => ({ item, health: progressHealth(item) }))
@@ -221,6 +247,7 @@ onMounted(() => {
   startScheduleClock()
   window.addEventListener('focus', updateScheduleClock)
   window.addEventListener('storage', syncQuoteCursor)
+  reducedMotion.addEventListener('change', stopTimelineEntrance)
   void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
@@ -314,7 +341,7 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();reducedMotion.removeEventListener('change',stopTimelineEntrance);window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
@@ -322,7 +349,7 @@ onUnmounted(()=>{stopScheduleClock();window.removeEventListener('focus',updateSc
       <section class="timeline-column team-timeline home-optical-surface" aria-labelledby="team-timeline-title">
         <div class="column-heading"><div><strong id="team-timeline-title">{{sharedGroupName||'我的'}}日程时间轴</strong></div><span>{{timelineMembers.length}} 人 · {{teamTimeline.length}} 项</span></div>
         <div v-if="timelineMembers.length" class="member-legend" aria-label="小组成员颜色图例"><span v-for="member in timelineMembers" :key="member.email"><i :style="{'--member-color':member.color}" aria-hidden="true"></i><b>{{member.name}}</b><small>{{member.events.length}} 项</small></span></div>
-        <div v-if="teamTimeline.length" class="timeline-scroll"><div class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><time :datetime="`${item.date}T${item.start}`">{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></article></div></div>
+        <div v-if="teamTimeline.length" class="timeline-scroll"><div ref="teamTimelineList" class="timeline-list team-timeline-list"><article v-for="item in teamTimeline" :key="item.id" :class="{conflict:item.conflict}" :style="{'--member-color':item.color}" :aria-label="`${item.name}，${item.date} ${item.start}，${item.label}${item.conflict?'，与小组其他日程冲突':''}`"><div class="team-timeline-node"><time :datetime="`${item.date}T${item.start}`">{{item.date.slice(5).replace('-','月')+'日'}}</time><span v-if="item.conflict" class="warning-triangle team-node-warning" aria-hidden="true"><svg viewBox="0 0 24 22"><path d="M10.2 1.8a2.1 2.1 0 0 1 3.6 0l9.4 16.3a2.1 2.1 0 0 1-1.8 3.1H2.6a2.1 2.1 0 0 1-1.8-3.1L10.2 1.8Z"></path><path class="warning-mark" d="M12 7v6.2M12 17.2v.1"></path></svg></span><i></i><span><b>{{item.start}}</b><em><strong>{{item.name}}</strong>{{item.label}}</em></span></div></article></div></div>
         <div v-if="teamConflicts.length" class="team-conflict-alert" role="alert"><strong>小组日程冲突</strong><span v-for="item in teamConflicts" :key="item.id">{{item.text}}</span></div>
         <div v-if="!teamTimeline.length&&sharedTimelinesLoading" class="timeline-loading" role="status"><i aria-hidden="true"></i><span>正在加载小组日程…</span></div>
         <p v-else-if="!teamTimeline.length&&sharedTimelinesNotice" class="timeline-notice">{{sharedTimelinesNotice}}</p>
