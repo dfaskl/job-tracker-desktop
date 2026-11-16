@@ -387,18 +387,28 @@ async function playScheduleCompletion(event: JobEvent, applyCompletion: () => vo
   dissolvingEventId.value = event.id
   if (cat) catReaction.value = 'startle'
 
-  await animateSchedule(card, [
+  const dissolve = animateSchedule(card, [
     { opacity: 1, filter: 'blur(0)', translate: '0 0' },
     { opacity: .68, filter: 'blur(2px)', translate: '0 -4px', offset: .46 },
     { opacity: 0, filter: 'blur(12px)', translate: '0 -16px' },
   ], { duration: 430, easing: 'ease-in', fill: 'forwards' })
 
   if (cat && !scheduleMotionStopped) {
+    await animateSchedule(cat, [
+      { translate: '0 0' }, { translate: '0 -5px', offset: .58 }, { translate: '0 -2px' },
+    ], { duration: 340, easing: 'ease-out', fill: 'forwards' })
+  }
+  if (cat && !scheduleMotionStopped) {
     catReaction.value = 'fall'
-    await animateSchedule(cat, [{ translate: '0 0' }, { translate: `0 ${landingTop - firstTop}px` }], {
-      duration: entries.length > 1 ? 330 : 200, easing: 'cubic-bezier(.5,0,.95,.62)', fill: 'forwards',
+    const drop = landingTop - firstTop
+    const fall = animateSchedule(cat, [{ translate: '0 -2px' }, { translate: `0 ${drop}px` }], {
+      duration: Math.min(470, Math.max(205, Math.sqrt(Math.max(0, drop)) * 29)),
+      easing: 'cubic-bezier(.44,.04,.78,.49)', fill: 'forwards',
     })
+    await Promise.all([dissolve, fall])
     if (!scheduleMotionStopped) catReaction.value = 'land'
+  } else {
+    await dissolve
   }
 
   const previousStageTop = stage.getBoundingClientRect().top
@@ -415,7 +425,7 @@ async function playScheduleCompletion(event: JobEvent, applyCompletion: () => vo
   const stageShift = previousStageTop - stage.getBoundingClientRect().top
   const lift = (element: Element, distance: number) => animateSchedule(element, [
     { translate: `0 ${distance}px` }, { translate: '0 0' },
-  ], { delay: cat ? 110 : 0, duration: 360, easing: 'cubic-bezier(.22,.75,.25,1)', fill: 'backwards' })
+  ], { delay: cat ? 145 : 0, duration: 390, easing: 'cubic-bezier(.32,.03,.2,1)', fill: 'backwards' })
   const moving = Array.from(stage.querySelectorAll<HTMLElement>('.schedule-entry'), entry => {
     const distance = (before.get(entry.dataset.scheduleId) ?? entry.offsetTop) - entry.offsetTop + stageShift
     return distance ? lift(entry, distance) : undefined
