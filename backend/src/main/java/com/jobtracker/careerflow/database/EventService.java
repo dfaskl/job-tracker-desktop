@@ -15,8 +15,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 
 @Component
@@ -156,14 +158,7 @@ public class EventService {
                     groupId = result.getObject("group_id") == null ? "" : String.valueOf(result.getLong("group_id"));
                     groupName = result.getString("group_name") == null ? "" : result.getString("group_name");
                     try {
-                        List<SharedEvent> events = mutator.page(result.getString("data"), MAX_EVENTS).events().stream()
-                            .filter(event -> !event.completed() && !event.missed() && !event.abandoned())
-                            .filter(event -> isPointEvent(event.startsAt(), event.endsAt()))
-                            .map(event -> new SharedEvent(
-                                event.id(), event.type(), event.title(), event.startsAt(), event.endsAt(), event.company()
-                            ))
-                            .sorted(Comparator.comparing(SharedEvent::startsAt).thenComparing(SharedEvent::id))
-                            .toList();
+                        List<SharedEvent> events = sharedEvents(mutator.page(result.getString("data"), MAX_EVENTS));
                         if (!events.isEmpty()) timelines.add(new UserTimeline(result.getString("email"), result.getString("display_name"), events));
                     } catch (Exception exception) {
                         LOGGER.warn("Skipping invalid shared timeline for user {}", result.getLong("id"), exception);
@@ -172,6 +167,24 @@ public class EventService {
             }
             return new SharedTimelines(groupId, groupName, List.copyOf(timelines));
         }
+    }
+
+    static List<SharedEvent> sharedEvents(EventPage page) {
+        Map<String, String> companiesByApplication = new HashMap<>();
+        for (var application : page.applications()) {
+            if (!application.id().isBlank() && !application.company().isBlank()) {
+                companiesByApplication.putIfAbsent(application.id(), application.company().trim());
+            }
+        }
+        return page.events().stream()
+            .filter(event -> !event.completed() && !event.missed() && !event.abandoned())
+            .filter(event -> isPointEvent(event.startsAt(), event.endsAt()))
+            .map(event -> new SharedEvent(
+                event.id(), event.type(), event.title(), event.startsAt(), event.endsAt(),
+                companiesByApplication.getOrDefault(event.applicationId(), event.company())
+            ))
+            .sorted(Comparator.comparing(SharedEvent::startsAt).thenComparing(SharedEvent::id))
+            .toList();
     }
 
     static boolean isPointEvent(String startsAt, String endsAt) {

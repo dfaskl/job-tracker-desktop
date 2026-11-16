@@ -116,7 +116,7 @@ onDeactivated(() => {
   stopScheduleMotion()
   stopScheduleClock()
 })
-watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
+watch([store.events, store.applications], () => { if (homeViewActive) void loadSharedTimelines() })
 
 const applicationsById = computed(() => new Map(store.applications.value.map(item => [item.id, item])))
 const eventsByApplication = computed(() => {
@@ -356,7 +356,7 @@ function progressHealth(item:JobApplication){return applicationProgressHealth(it
 function appFor(event:JobEvent){return event.applicationId ? applicationsById.value.get(event.applicationId) : undefined}
 function openApplicationDetail(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id))}
 function focusApplication(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id),'focus')}
-function eventCompany(event:JobEvent){return String(event.company||appFor(event)?.company||'未填写公司')}
+function eventCompany(event:JobEvent){return String(appFor(event)?.company?.trim()||event.company||'未填写公司')}
 function eventPosition(event:JobEvent){return String(event.position||appFor(event)?.position||'未填写岗位')}
 function eventDate(event:JobEvent){
   const value=eventStart(event),endValue=String(event.endsAt||event.end||'')
