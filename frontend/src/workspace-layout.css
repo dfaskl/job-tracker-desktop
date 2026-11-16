@@ -14,7 +14,7 @@
   min-width: 0; padding: 16px 18px; border: 1px solid var(--color-border);
   border-radius: 10px; background: var(--color-card); box-shadow: var(--shadow-panel);
 }
-#app .schedule-list article:last-child { border-bottom: 1px solid var(--color-border); }
+#app .schedule-entry:last-child > article { border-bottom: 1px solid var(--color-border); }
 #app .schedule-copy > small,
 :root[data-theme="dark"] #app .schedule-copy > small { padding-left: 0; background: transparent; }
 #app .timeline-column { padding: 18px 0 0; border: 0; border-radius: 0; background: transparent; }

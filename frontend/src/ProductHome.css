@@ -369,7 +369,37 @@
   padding: 18px 4px;
   border-bottom: 1px solid var(--home-line);
 }
-.schedule-list article:last-child { border-bottom: 0; }
+.schedule-entry:last-child > article { border-bottom: 0; }
+.schedule-stage { position: relative; padding-top: 10px; }
+.schedule-entry { position: relative; }
+.schedule-empty { position: relative; margin-top: 10px; }
+.schedule-smoke {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+}
+.schedule-smoke i {
+  position: absolute;
+  left: calc(var(--puff-index) * 13% - 4%);
+  top: 46%;
+  width: clamp(34px, 18%, 156px);
+  height: clamp(22px, 54%, 90px);
+  border-radius: 48% 52% 58% 42%;
+  background: radial-gradient(ellipse at 45% 55%, color-mix(in srgb, var(--home-aqua) 60%, var(--color-foreground)), transparent 68%);
+  filter: blur(7px);
+  animation: schedule-smoke 350ms ease-out both;
+  animation-delay: calc(var(--puff-index) * 12ms);
+}
+.schedule-smoke i:nth-child(even) {
+  top: 31%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--home-lilac) 52%, var(--color-foreground)), transparent 68%);
+}
+@keyframes schedule-smoke {
+  0% { opacity: 0; transform: translate(-18%, 8px) scale(.62); }
+  35% { opacity: .52; }
+  100% { opacity: 0; transform: translate(12%, -49px) scale(1.55); }
+}
 .schedule-list article.is-overdue {
   border-left: 3px solid var(--color-destructive, #dc6565);
 }
@@ -647,4 +677,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .schedule-advice, .advice-trigger.is-loading > .advice-glyph, .timeline-loading > i { animation: none; }
+  .schedule-smoke { display: none; }
 }

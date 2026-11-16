@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api, ApiError } from './api'
 import { applicationProgressHealth, isScheduleOverdue, schedulePriorityTimestamp } from './applicationProgress'
 import { dailyQuotes } from './dailyQuotes'
 import { useJobTrackerStore, type JobApplication, type JobEvent } from './jobTrackerStore'
 import { confirmDialog } from './modalDialogs'
+import HomeScheduleCat from './HomeScheduleCat.vue'
 
 type Page = 'applications' | 'calendar' | 'mail' | 'stats'
 type TimelineEntry = { id:string; label:string; date:string; start:string; end:string; status:'normal'|'tight'|'conflict'; flexible:boolean; showWindow:boolean; windowStart?:string; windowEnd?:string }
@@ -20,6 +21,7 @@ const store = useJobTrackerStore()
 const message = ref('')
 const error = ref('')
 const busyId = ref('')
+const completingEventId = ref('')
 const scheduleNow = ref(Date.now())
 const quoteDay = computed(() => {
   const date = new Date(scheduleNow.value)
@@ -111,6 +113,7 @@ onDeactivated(() => {
   homeViewActive = false
   quoteArrowSpinning.value = false
   stopTimelineEntrance()
+  stopScheduleMotion()
   stopScheduleClock()
 })
 watch(store.events, () => { if (homeViewActive) void loadSharedTimelines() })
@@ -130,10 +133,46 @@ const upcomingItems = computed(() => store.events.value.filter(item => !item.com
   .sort((a,b) => schedulePriorityTimestamp(a)-schedulePriorityTimestamp(b)))
 const recentSchedules = computed(() => upcomingItems.value)
 const overdueSchedules = computed(() => recentSchedules.value.filter(scheduleOverdue))
+const scheduleStage = ref<HTMLElement | null>(null)
+const frozenSchedules = ref<JobEvent[] | null>(null)
+const displayedSchedules = computed(() => frozenSchedules.value ?? recentSchedules.value)
+const displayedOverdue = computed(() => displayedSchedules.value.filter(scheduleOverdue))
 const scheduledGroups = computed(() => [
-  { id: 'home-overdue-schedules', title: '过期待确认', events: overdueSchedules.value },
-  { id: 'home-upcoming-schedules', title: '即将到来', events: recentSchedules.value.filter(event => !scheduleOverdue(event)) }
+  { id: 'home-overdue-schedules', title: '过期待确认', events: displayedOverdue.value },
+  { id: 'home-upcoming-schedules', title: '即将到来', events: displayedSchedules.value.filter(event => !scheduleOverdue(event)) }
 ].filter(group => group.events.length))
+const catPerch = ref(0)
+const catReaction = ref<'startle' | 'fall' | 'land' | 'sleep' | null>(null)
+const catPose = computed(() => catReaction.value ?? (displayedSchedules.value.length ? 'walk' : 'sleep'))
+const dissolvingEventId = ref('')
+let scheduleMotionStopped = false
+const scheduleAnimations = new Set<Animation>()
+
+function updateCatPerch() {
+  const perch = scheduleStage.value?.querySelector<HTMLElement>('.schedule-entry, .schedule-empty')
+  if (perch) catPerch.value = perch.offsetTop
+}
+watch([scheduleStage, scheduledGroups], ([stage], _, onCleanup) => {
+  updateCatPerch()
+  if (!stage) return
+  const observer = new ResizeObserver(updateCatPerch)
+  observer.observe(stage)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
+
+function animateSchedule(element: Element, frames: Keyframe[], options: KeyframeAnimationOptions) {
+  const animation = element.animate(frames, options)
+  scheduleAnimations.add(animation)
+  return animation.finished.catch(() => undefined)
+}
+
+function stopScheduleMotion() {
+  scheduleMotionStopped = true
+  for (const animation of scheduleAnimations) animation.cancel()
+  scheduleAnimations.clear()
+  dissolvingEventId.value = ''
+  catReaction.value = null
+}
 function focusOverdueSchedules() {
   const heading = document.getElementById('home-overdue-schedules')
   heading?.scrollIntoView({ block: 'nearest' })
@@ -248,6 +287,7 @@ onMounted(() => {
   window.addEventListener('focus', updateScheduleClock)
   window.addEventListener('storage', syncQuoteCursor)
   reducedMotion.addEventListener('change', stopTimelineEntrance)
+  reducedMotion.addEventListener('change', stopScheduleMotion)
   void store.initialize()
 })
 function pad(value:number){return String(value).padStart(2,'0')}
@@ -328,7 +368,102 @@ function eventDate(event:JobEvent){
   const endTime=range?`${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`:''
   return {tag:same?'今天':'',date:dateText,time,range,endDate:endDateText,endTime}
 }
-async function completeEvent(event:JobEvent){busyId.value=event.id;error.value='';message.value='';try{await api(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`,{method:'POST',body:JSON.stringify({action:'complete',expectedUpdatedAt:String(event.updatedAt||event.createdAt||'')})});await store.refresh();await loadSharedTimelines();message.value='日程已完成'}catch(cause){error.value=cause instanceof Error?cause.message:'更新日程失败'}finally{busyId.value=''}}
+async function playScheduleCompletion(event: JobEvent, applyCompletion: () => void) {
+  const stage = scheduleStage.value
+  const entries = Array.from(stage?.querySelectorAll<HTMLElement>('.schedule-entry') ?? [])
+  const index = entries.findIndex(entry => entry.dataset.scheduleId === event.id)
+  const card = entries[index]?.querySelector('article')
+  if (!homeViewActive || reducedMotion.matches || !stage || !card) {
+    applyCompletion()
+    return
+  }
+
+  const catTrack = stage.querySelector('.cat-track')
+  const cat = index === 0 ? catTrack : null
+  const firstTop = entries[0].offsetTop
+  const landingTop = entries[1]?.offsetTop ?? firstTop + 18
+  scheduleMotionStopped = false
+  frozenSchedules.value = recentSchedules.value
+  dissolvingEventId.value = event.id
+  if (cat) catReaction.value = 'startle'
+
+  await animateSchedule(card, [
+    { opacity: 1, filter: 'blur(0)', translate: '0 0' },
+    { opacity: .68, filter: 'blur(2px)', translate: '0 -4px', offset: .46 },
+    { opacity: 0, filter: 'blur(12px)', translate: '0 -16px' },
+  ], { duration: 430, easing: 'ease-in', fill: 'forwards' })
+
+  if (cat && !scheduleMotionStopped) {
+    catReaction.value = 'fall'
+    await animateSchedule(cat, [{ translate: '0 0' }, { translate: `0 ${landingTop - firstTop}px` }], {
+      duration: entries.length > 1 ? 330 : 200, easing: 'cubic-bezier(.5,0,.95,.62)', fill: 'forwards',
+    })
+    if (!scheduleMotionStopped) catReaction.value = 'land'
+  }
+
+  const previousStageTop = stage.getBoundingClientRect().top
+  const before = new Map(entries.map(entry => [entry.dataset.scheduleId, entry.offsetTop]))
+  applyCompletion()
+  frozenSchedules.value = null
+  if (scheduleMotionStopped) return
+  await nextTick()
+  if (scheduleMotionStopped) return
+
+  for (const animation of scheduleAnimations) animation.cancel()
+  scheduleAnimations.clear()
+  updateCatPerch()
+  const stageShift = previousStageTop - stage.getBoundingClientRect().top
+  const lift = (element: Element, distance: number) => animateSchedule(element, [
+    { translate: `0 ${distance}px` }, { translate: '0 0' },
+  ], { delay: cat ? 110 : 0, duration: 360, easing: 'cubic-bezier(.22,.75,.25,1)', fill: 'backwards' })
+  const moving = Array.from(stage.querySelectorAll<HTMLElement>('.schedule-entry'), entry => {
+    const distance = (before.get(entry.dataset.scheduleId) ?? entry.offsetTop) - entry.offsetTop + stageShift
+    return distance ? lift(entry, distance) : undefined
+  })
+  if (cat) {
+    if (!displayedSchedules.value.length) catReaction.value = 'sleep'
+    moving.push(lift(cat, landingTop - catPerch.value + stageShift))
+  } else if (catTrack && stageShift) {
+    moving.push(lift(catTrack, stageShift))
+  }
+  await Promise.all(moving)
+}
+
+async function completeEvent(event: JobEvent) {
+  if (completingEventId.value || store.readOnly.value) return
+  const owner = store.user.value?.id
+  completingEventId.value = event.id
+  error.value = ''
+  message.value = ''
+  try {
+    const { event: completed } = await api<{ event: JobEvent }>(`/api/poc/event-sandbox/events/${encodeURIComponent(event.id)}/resolution`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'complete', expectedUpdatedAt: String(event.updatedAt || event.createdAt || '') }),
+    })
+    if (store.user.value?.id !== owner) return
+    const applyCompletion = () => {
+      if (store.user.value?.id !== owner) return
+      const current = store.events.value.find(item => item.id === event.id)
+      if (!current || current.completed || current.updatedAt !== event.updatedAt) return
+      store.data.value.events = store.events.value.map(item => item === current ? { ...item, ...completed, completed: true } : item)
+    }
+    try {
+      await playScheduleCompletion(event, applyCompletion)
+    } finally {
+      applyCompletion()
+      stopScheduleMotion()
+      frozenSchedules.value = null
+    }
+    if (store.user.value?.id === owner) {
+      message.value = '日程已完成'
+      await store.refresh()
+    }
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : '更新日程失败'
+  } finally {
+    completingEventId.value = ''
+  }
+}
 async function markRejected(item:JobApplication){if(!await confirmDialog(`确认将“${item.company} · ${item.position}”标记为未通过吗？`,{title:'结束投递',confirmText:'标记未通过',tone:'warning'}))return;busyId.value=item.id;error.value='';message.value='';try{await api(`/api/poc/application-sandbox/applications/${encodeURIComponent(item.id)}`,{method:'PUT',body:JSON.stringify({company:item.company||'',position:item.position||'',city:item.city||'',channel:item.channel||'',appliedDate:item.appliedDate||'',stage:'已结束',status:'未通过',notes:item.notes||'',expectedUpdatedAt:item.updatedAt||''})});await store.refresh();message.value='已标记为未通过'}catch(cause){error.value=cause instanceof Error?cause.message:'更新投递失败'}finally{busyId.value=''}}
 
 watch(message,value=>{if(messageTimer)clearTimeout(messageTimer);if(value)messageTimer=setTimeout(()=>{if(message.value===value)message.value=''},2600)})
@@ -341,7 +476,7 @@ function syncScheduleAdvice(signature:string){
   adviceTimer=setTimeout(()=>void generateScheduleAdvice(signature),600)
 }
 watch([adviceSignature,()=>store.user.value?.email],([signature])=>syncScheduleAdvice(signature),{immediate:true})
-onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();reducedMotion.removeEventListener('change',stopTimelineEntrance);window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
+onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();stopScheduleMotion();reducedMotion.removeEventListener('change',stopTimelineEntrance);reducedMotion.removeEventListener('change',stopScheduleMotion);window.removeEventListener('focus',updateScheduleClock);window.removeEventListener('storage',syncQuoteCursor);if(adviceTimer)clearTimeout(adviceTimer);if(messageTimer)clearTimeout(messageTimer)})</script>
 
 <template>
   <div v-if="store.user.value" class="home-dashboard">
@@ -363,10 +498,13 @@ onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();reducedMotion.remove
       </section>
       <section class="details-column" aria-labelledby="my-schedule-title">
         <div class="column-heading"><div><strong id="my-schedule-title">日程详情</strong><button v-if="overdueSchedules.length" type="button" class="text-link overdue-summary" @click="focusOverdueSchedules">{{ overdueSchedules.length }} 项已过期</button></div><span>{{recentSchedules.length}} 项</span></div>
-        <template v-if="recentSchedules.length">
+        <div ref="scheduleStage" class="schedule-stage">
+        <HomeScheduleCat :pose="catPose" :style="{ '--cat-perch': catPerch + 'px' }" />
+        <template v-if="displayedSchedules.length">
           <div v-for="group in scheduledGroups" :key="group.id" class="schedule-list">
-          <h3 v-if="overdueSchedules.length" :id="group.id" tabindex="-1">{{ group.title }}</h3>
-          <article v-for="event in group.events" :key="event.id" class="home-optical-surface" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event),'is-next':event.id===nextScheduleId}">
+          <h3 v-if="displayedOverdue.length" :id="group.id" tabindex="-1">{{ group.title }}</h3>
+          <div v-for="event in group.events" :key="event.id" class="schedule-entry" :data-schedule-id="event.id">
+          <article :inert="dissolvingEventId===event.id" class="home-optical-surface" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event),'is-next':event.id===nextScheduleId}">
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
             <div class="schedule-copy"><div class="schedule-heading"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span></div><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
             <div class="schedule-actions">
@@ -375,12 +513,17 @@ onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();reducedMotion.remove
                 <AppIcon name="arrow-right" />
               </button>
               <button class="secondary icon-button schedule-edit home-action" type="button" :aria-label="`编辑日程：${event.title||event.type||'未命名日程'}`" title="编辑日程" @click="openApplicationDetail(event)"><AppIcon name="edit" /></button>
-              <button class="icon-button schedule-complete home-action" type="button" :disabled="busyId===event.id||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button>
+              <button class="icon-button schedule-complete home-action" type="button" :disabled="Boolean(completingEventId)||store.readOnly.value" :aria-label="`完成日程：${event.title||event.type||'未命名日程'}`" title="标记完成" @click="completeEvent(event)"><AppIcon name="check" /></button>
             </div>
           </article>
+          <div v-if="dissolvingEventId===event.id" class="schedule-smoke" aria-hidden="true">
+            <i v-for="puff in 6" :key="puff" :style="{ '--puff-index': puff }"></i>
+          </div>
+          </div>
         </div>
         </template>
-        <div v-else class="empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
+        <div v-else class="empty schedule-empty">暂无待完成日程。<button type="button" class="text-link" @click="emit('navigate','calendar')">前往日程安排</button></div>
+        </div>
       </section>
     </section>
 
