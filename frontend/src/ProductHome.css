@@ -527,7 +527,33 @@
   font-size: 11px;
   font-style: normal;
 }
-.confirmation-list article > button { border: 1px solid #edc7c3; color: #a93c35; background: transparent; }
+.confirmation-list article { position: relative; }
+#app .confirmation-list .confirmation-record-link {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+#app .confirmation-list .confirmation-record-link:hover {
+  background: color-mix(in srgb, var(--home-muted) 8%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+#app .confirmation-list .confirmation-record-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.confirmation-list article > .confirmation-reject {
+  position: relative;
+  z-index: 1;
+  border: 1px solid #edc7c3;
+  color: #a93c35;
+  background: transparent;
+}
 
 .empty { padding: 34px 12px; color: var(--home-muted); text-align: center; }
 .confirmation-empty{display:grid;justify-items:center;gap:7px;margin-top:12px;padding:25px 16px;border:1px dashed var(--home-line);border-radius:12px;color:var(--home-muted);background:color-mix(in srgb,var(--home-paper) 72%,transparent);text-align:center}.confirmation-empty-icon{display:grid;width:54px;height:54px;place-items:center;border-radius:50%;color:#929baa;background:color-mix(in srgb,var(--color-muted) 70%,transparent)}.confirmation-empty-icon svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8}.confirmation-empty-icon .empty-check{stroke:#7b8797;stroke-width:2.2}.confirmation-empty strong{color:var(--home-ink);font-size:13px}.confirmation-empty p{margin:0;font-size:12px}
