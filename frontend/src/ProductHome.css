@@ -453,7 +453,6 @@
 
 .schedule-copy { display: grid; min-width: 0; gap: 6px; }
 .schedule-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-width: 0; }
-.schedule-heading > a { max-width: 100%; overflow-wrap: anywhere; }
 .schedule-heading > strong {
   max-width: 100%;
   overflow: hidden;
@@ -464,7 +463,19 @@
   white-space: nowrap;
 }
 .schedule-copy p { margin: 0; color: var(--home-muted); }
-.schedule-copy a { color: var(--accent, var(--color-primary)); font-weight: 650; text-underline-offset: 3px; }
+.schedule-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 20px; min-width: 0; }
+.schedule-meta > p { min-width: 0; }
+.schedule-location {
+  max-width: 100%;
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.schedule-location a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .schedule-copy p b {
   display: inline-block;
   margin-left: 5px;

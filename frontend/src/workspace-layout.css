@@ -29,10 +29,6 @@
 #app .schedule-advice { margin-top: 20px; border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: transparent; }
 #app .confirmation-panel { padding: 0 0 24px; background: transparent; }
 #app .confirmation-panel .empty { margin-top: 12px; padding: 14px 0; border-radius: 0; background: transparent; }
-#app .schedule-link { width: fit-content; max-width: 100%; color: var(--color-foreground); font-size: 15px; line-height: 1.45; text-decoration: none; }
-#app .schedule-link strong { font-weight: 650; }
-#app .schedule-link span { margin-left: 6px; color: var(--color-primary); font-size: 13px; }
-#app .schedule-link:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Application records can be individual cards within one scrollable list. */
 #app .workspace { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

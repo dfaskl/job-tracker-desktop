@@ -358,6 +358,15 @@ function openApplicationDetail(event:JobEvent){const application=appFor(event);i
 function focusApplication(event:JobEvent){const application=appFor(event);if(!application){error.value='未找到该日程关联的投递记录';return}emit('navigate','applications',String(application.id),'focus')}
 function eventCompany(event:JobEvent){return String(appFor(event)?.company?.trim()||event.company||'未填写公司')}
 function eventPosition(event:JobEvent){return String(event.position||appFor(event)?.position||'未填写岗位')}
+function scheduleLocationLink(location: JobEvent['location']) {
+  const value = String(location || '').trim()
+  if (!/^https?:\/\/[^\s]+$/i.test(value)) return undefined
+  try {
+    return new URL(value).href
+  } catch {
+    return undefined
+  }
+}
 function eventDate(event:JobEvent){
   const value=eventStart(event),endValue=String(event.endsAt||event.end||'')
   const date=new Date(value.replace(' ','T')),endDate=new Date(endValue.replace(' ','T'))
@@ -516,7 +525,21 @@ onUnmounted(()=>{stopScheduleClock();stopTimelineEntrance();stopScheduleMotion()
           <div v-for="event in group.events" :key="event.id" class="schedule-entry" :data-schedule-id="event.id">
           <article :inert="dissolvingEventId===event.id" class="home-optical-surface" :class="{'has-date-range':eventDate(event).range,'is-overdue':scheduleOverdue(event),'is-next':event.id===nextScheduleId}">
             <div v-if="eventDate(event).range" class="date-range"><div class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div><i>至</i><div class="date-block"><strong>{{eventDate(event).endDate}}</strong><small>{{eventDate(event).endTime}}</small></div></div><div v-else class="date-block"><em v-if="eventDate(event).tag">{{eventDate(event).tag}}</em><strong>{{eventDate(event).date}}</strong><small>{{eventDate(event).time}}</small></div>
-            <div class="schedule-copy"><div class="schedule-heading"><a v-if="String(event.location||'').startsWith('http')" class="schedule-link" :href="String(event.location)" target="_blank" rel="noopener noreferrer" :aria-label="`打开日程链接：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`"><strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span aria-hidden="true">↗</span></a><strong v-else>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong><span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span></div><p>{{eventPosition(event)}}</p><small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small></div>
+            <div class="schedule-copy">
+              <div class="schedule-heading">
+                <strong>{{eventCompany(event)}} · {{event.title||event.type||'未命名日程'}}</strong>
+                <span v-if="scheduleOverdue(event)" class="schedule-overdue-notice">已过期 · 待确认</span>
+              </div>
+              <div class="schedule-meta">
+                <p>{{eventPosition(event)}}</p>
+                <div v-if="String(event.location||'').trim()" class="schedule-location">
+                  <span>链接/地点：</span>
+                  <a v-if="scheduleLocationLink(event.location)" :href="scheduleLocationLink(event.location)" target="_blank" rel="noopener noreferrer">{{event.location}}</a>
+                  <span v-else>{{event.location}}</span>
+                </div>
+              </div>
+              <small v-if="String(event.notes||'').trim()">备注：{{event.notes}}</small>
+            </div>
             <div class="schedule-actions">
               <i v-if="event.id===nextScheduleId">下一场</i>
               <button v-if="appFor(event)" class="secondary icon-button home-action" type="button" :aria-label="`在投递记录中定位：${eventCompany(event)} · ${event.title||event.type||'未命名日程'}`" title="定位投递记录" @click="focusApplication(event)">
